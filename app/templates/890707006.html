@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inicio | Pollos Gar</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Verdana, sans-serif;
+      background-color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      position: relative;
+      min-height: 100vh;
+    }
+
+    header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .logo {
+      height: 78px;
+      max-width: 208px;
+    }
+
+    .logout-btn {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      font-size: clamp(14px, 2.5vw, 16px);
+      color: #ffffff;
+      background-color: #006633;
+      padding: 10px 18px;
+      border-radius: 5px;
+      text-decoration: none;
+      transition: background-color 0.3s ease;
+      z-index: 1000;
+    }
+
+    .logout-btn:hover {
+      background-color: #004d26;
+    }
+
+    h1 {
+      font-size: clamp(20px, 5vw, 28px);
+      color: #006633;
+      margin: 10px 0 60px;
+      text-align: center;
+    }
+
+    .grid {
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 600px;
+      margin-top: 40px;
+    }
+
+    @media (min-width: 600px) {
+      .grid {
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+    }
+
+    .icon-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 115px;
+      height: 115px;
+      border-radius: 50%;
+      background-color: #e6fff2;
+      border: 2px solid #cce5cc;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .icon-btn:hover {
+      background-color: #ccf2dd;
+      transform: scale(1.05);
+    }
+
+    .icon-btn img {
+      width: 48px;
+      height: 48px;
+    }
+
+    .icon-label {
+      margin-top: 8px;
+      font-size: clamp(14px, 2.5vw, 16px);
+      color: #003300;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="{{ url_for('static', filename='logo_pollosgar.png') }}" alt="Logo Pollos Gar" class="logo">
+    <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix 360" class="logo">
+  </header>
+
+  <h1>Bienvenido {{ nombre }} | Empresa: {{ empresa }}</h1>
+
+  <div class="grid">
+    <div class="icon-btn" onclick="acceder('gas')">
+      <img src="{{ url_for('static', filename='icon_gas.png') }}" alt="Gas">
+      <div class="icon-label">Gas</div>
+    </div>
+    <div class="icon-btn" onclick="acceder('carbon')">
+      <img src="{{ url_for('static', filename='icon_carbon.png') }}" alt="Carbón">
+      <div class="icon-label">Carbón</div>
+    </div>
+    <div class="icon-btn" onclick="acceder('electricidad')">
+      <img src="{{ url_for('static', filename='icon_electricidad.png') }}" alt="Electricidad">
+      <div class="icon-label">Electricidad</div>
+    </div>
+    <div class="icon-btn" onclick="acceder('flota')">
+      <img src="{{ url_for('static', filename='icon_flota.png') }}" alt="Flota">
+      <div class="icon-label">Flota</div>
+    </div>
+  </div>
+
+  <a href="/logout" class="logout-btn">Salir</a>
+
+  <script>
+    function acceder(seccion) {
+      window.location.href = "/dashboard/" + seccion;
+    }
+
+    window.addEventListener('beforeunload', function () {
+      navigator.sendBeacon('/logout');
+    });
+
+    window.addEventListener('popstate', function () {
+      window.location.href = '/logout';
+    });
+  </script>
+</body>
+</html>
