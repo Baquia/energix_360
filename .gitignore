@@ -1,5 +1,5 @@
-# Created by venv; see https://docs.python.org/3/library/venv.html
-# Ignorar entorno virtual
+# Ignorar entorno virtual (nuevo y anterior)
+venv/
 Lib/
 Include/
 Scripts/
