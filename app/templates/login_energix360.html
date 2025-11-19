@@ -5,72 +5,143 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login | Energix 360</title>
   <style>
+    :root {
+      --color-primary: #015249;
+      --color-primary-dark: #013d36;
+      --color-bg: #f6f7f8;
+      --color-surface: #ffffff;
+      --color-border: #e5e7eb;
+      --color-text: #111827;
+      --color-muted: #6b7280;
+      --color-danger: #b00020;
+      --shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.08);
+      --radius-card: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: Verdana, sans-serif;
-      background-color: #ffffff;
+      min-height: 100vh;
+      padding: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
-      padding: 20px;
+      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
+      color: var(--color-text);
     }
 
     .login-container {
-      border: 1px solid #cce5cc;
-      padding: 5vw;
-      border-radius: 10px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       width: 100%;
       max-width: 400px;
+      padding: 20px 18px 18px;
+      background: var(--color-surface);
+      border-radius: var(--radius-card);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-soft);
       text-align: center;
-      background-color: #ffffff;
     }
 
     .logo {
-      width: 30vw;
-      max-width: 120px;
+      width: 36vw;
+      max-width: 160px;
       height: auto;
-      margin-bottom: 20px;
+      margin-bottom: 14px;
     }
 
     h1 {
-      font-size: clamp(18px, 5vw, 24px);
-      color: #006633;
-      margin-bottom: 20px;
+      font-size: clamp(1.1rem, 4vw, 1.4rem);
+      color: var(--color-primary-dark);
+      margin: 0 0 12px;
+      font-weight: 700;
+    }
+
+    .flash-message {
+      min-height: 18px;
+      color: var(--color-danger);
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+    }
+
+    form {
+      margin-top: 4px;
+      text-align: left;
     }
 
     label {
       display: block;
-      margin: 10px 0 5px;
-      text-align: left;
-      color: #003300;
-      font-size: clamp(12px, 4vw, 14px);
+      margin: 8px 0 4px;
+      color: var(--color-text);
+      font-size: 0.85rem;
+      font-weight: 600;
     }
 
-    input, select, button {
+    input,
+    select,
+    button {
+      font-family: inherit;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    select {
       width: 100%;
-      padding: 10px;
-      margin-bottom: 15px;
-      border: 1px solid #99cc99;
-      border-radius: 5px;
-      font-size: 1rem;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--color-border);
+      font-size: 0.92rem;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      background: #ffffff;
+      margin-bottom: 10px;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(1, 82, 73, 0.18);
+      background: #f9fffd;
     }
 
     button {
-      background-color: #339966;
-      color: white;
+      width: 100%;
+      padding: 10px 16px;
+      margin-top: 6px;
+      border-radius: 999px;
+      border: 1px solid var(--color-primary);
+      background-color: var(--color-primary);
+      color: #ffffff;
+      font-size: 0.95rem;
+      font-weight: 600;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
     }
 
     button:hover {
-      background-color: #2d8659;
+      background-color: var(--color-primary-dark);
+      box-shadow: 0 6px 18px rgba(1, 82, 73, 0.35);
+      transform: translateY(-1px);
     }
 
-    .flash-message {
-      color: red;
-      font-size: 0.9rem;
-      margin-bottom: 10px;
+    @media (max-width: 480px) {
+      body {
+        padding: 16px;
+      }
+
+      .login-container {
+        padding: 18px 14px 16px;
+      }
+
+      .logo {
+        margin-bottom: 10px;
+      }
     }
   </style>
 </head>
@@ -78,7 +149,9 @@
   <div class="login-container">
     <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix 360" class="logo">
     <h1>Iniciar Sesión</h1>
-    <div id="flash" class="flash-message">{{ get_flashed_messages()[0] if get_flashed_messages() else "" }}</div>
+    <div id="flash" class="flash-message">
+      {{ get_flashed_messages()[0] if get_flashed_messages() else "" }}
+    </div>
 
     <form id="loginForm">
       {{ form.hidden_tag() }}

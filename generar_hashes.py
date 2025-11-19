@@ -9,3 +9,5 @@ passwords = [
 for pwd in passwords:
     hashed = bcrypt.generate_password_hash(pwd).decode('utf-8')
     print(f"{pwd} → {hashed}")
+
+

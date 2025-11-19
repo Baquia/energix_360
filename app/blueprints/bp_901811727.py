@@ -86,7 +86,6 @@ def registrar_perfil():
         cur.close()
 
 @csrf.exempt
-@csrf.exempt
 @bp_901811727.route('/obtener_perfiles')
 @login_required_custom
 def obtener_perfiles():

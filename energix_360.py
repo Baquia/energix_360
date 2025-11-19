@@ -4,6 +4,10 @@ from app import create_app, mysql, csrf, bcrypt
 from app.forms import LoginForm, RegistroUsuarioForm
 from functools import wraps
 
+from app import create_app
+
+
+
 # Decorador para proteger rutas
 def login_required_custom(f):
     @wraps(f)
@@ -16,6 +20,9 @@ def login_required_custom(f):
 
 # Crear aplicación
 app = create_app()
+
+
+
 
 @app.route('/', methods=['GET'])
 def index():
@@ -88,4 +95,10 @@ def logout():
 
 # Ejecutar en localhost
 if __name__ == '__main__':
+
+    print("\n✅ RUTAS DISPONIBLES EN FLASK:")
+    for rule in app.url_map.iter_rules():
+        print(f"→ {rule}  →  {rule.endpoint}")
+        
     app.run(debug=True, port=5001)
+

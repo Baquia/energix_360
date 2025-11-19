@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Módulo GLP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    :root {
+      --verde: #015249;
+      --verde-osc: #003b35;
+      --bg: #f4f6f7;
+      --rojo: #cc0000;
+      --rojo-osc: #990000;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
+      color: #111827;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .header {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px 0 20px;
+    }
+
+    .logo {
+      max-height: 52px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 720px;
+      margin: 16px auto 40px;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+      padding: 22px 18px 28px;
+    }
+
+    #saludo {
+      color: var(--verde);
+      font-size: 20px;
+      text-align: left;
+      margin: 0 0 6px;
+      font-weight: 700;
+    }
+
+    #preguntaTexto {
+      color: #111827;
+      text-align: left;
+      min-height: 24px;
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+
+    .menu {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .menu-btn {
+      flex: 1 1 calc(50% - 10px);
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid #cfd8dc;
+      background: #e5f4f1;
+      color: #013b35;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, transform .05s, box-shadow .15s;
+    }
+
+    .menu-btn:hover {
+      background: #015249;
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, .18);
+    }
+
+    #conversacion {
+      margin-top: 14px;
+    }
+
+    #lectorQR {
+      width: 100%;
+      max-width: 420px;
+      margin: 12px auto;
+    }
+
+    #respuestaInput {
+      width: 100%;
+      border: 1px solid #cfd8dc;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 15px;
+      margin-top: 10px;
+    }
+
+    #inputFoto {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    #preguntaSiNo {
+      text-align: center;
+      margin-top: 14px;
+      display: none;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    #btnSi,
+    #btnNo {
+      padding: 10px 18px;
+      font-size: 15px;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      min-width: 90px;
+    }
+
+    #btnSi {
+      background: #015249;
+      margin-right: 6px;
+    }
+
+    #btnNo {
+      background: #cc0000;
+    }
+
+    #botonEnviar {
+      display: none;
+      width: 100%;
+      background: var(--verde);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    #botonEnviar:hover {
+      background: var(--verde-osc);
+    }
+
+    #panelResumen {
+      margin-top: 20px;
+      background: #f9fbfb;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 16px 14px 18px;
+      display: none;
+      font-size: 14px;
+    }
+
+    #panelResumen h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      color: var(--verde-osc);
+      font-size: 18px;
+      text-align: center;
+    }
+
+    #panelResumen p {
+      margin: 3px 0;
+    }
+
+    #panelResumen .resumen-msg {
+      margin-top: 10px;
+      font-weight: bold;
+      color: #333333;
+      text-align: center;
+    }
+
+    #btnCerrarResumen {
+      margin-top: 14px;
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
+      background: var(--verde);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #btnCerrarResumen:hover {
+      background: var(--verde-osc);
+    }
+
+    .logout {
+      margin-top: 20px;
+      display: inline-block;
+      background: var(--rojo);
+      color: #ffffff;
+      padding: 8px 14px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .logout:hover {
+      background: var(--rojo-osc);
+    }
+
+    @media (max-width: 600px) {
+      .header {
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .wrap {
+        margin: 12px auto 28px;
+        padding: 18px 14px 24px;
+      }
+
+      .menu-btn {
+        flex: 1 1 100%;
+      }
+    }
+</style>
+
+</head>
+
+<body>
+  <div class="header">
+    <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" class="logo" alt="Logo cliente">
+    <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo" alt="Logo Energix360">
+  </div>
+
+  <div class="wrap">
+    <p id="saludo">¡Hola {{ session.get('nombre','Usuario') }}!</p>
+    <p id="preguntaTexto"></p>
+
+    <div id="menuOpciones" class="menu" style="display:flex">
+      <button class="menu-btn" onclick="iniciarCalefaccion()">🔥 Iniciar calefacción</button>
+      <button class="menu-btn" onclick="registrarTanqueo()">⛽ Registrar tanqueo</button>
+      <button class="menu-btn" onclick="registrarConsumo()">📊 Registrar consumo</button>
+      <button class="menu-btn" onclick="finalizarCalefaccion()">🔥 Finalizar calefacción</button>
+    </div>
+
+    <div id="conversacion" style="display:none">
+      <div id="lectorQR" style="display:none"></div>
+      <input id="respuestaInput" type="text" style="display:none" />
+      <input id="inputFoto" type="file" accept="image/*" capture="environment" style="display:none" />
+      <div id="preguntaSiNo" style="display:none; text-align:center; margin-top:14px;">
+        <button id="btnSi" style="
+        padding:10px 18px;
+        margin-right:12px;
+        font-size:16px;
+        background:#015249;
+        color:white;
+        border:none;
+        border-radius:8px;
+    ">Sí</button>
+
+        <button id="btnNo" style="
+        padding:10px 18px;
+        font-size:16px;
+        background:#cc0000;
+        color:white;
+        border:none;
+        border-radius:8px;
+    ">No</button>
+      </div>
+
+      <button id="botonEnviar">Enviar</button>
+    </div>
+
+    <!-- Panel reutilizable para el resumen de TODAS las operaciones -->
+    <div id="panelResumen"></div>
+
+    <a class="logout" href="/logout">Cerrar sesión</a>
+  </div>
+
+  <script>
+
+    /* ======================================
+       VARIABLES PARA REGISTRAR TANQUEO NUEVO
+    =======================================*/
+
+    let registrarTanqueoData = {
+      sede: "",
+      tanques: []
+    };
+
+    // Este arreglo se llenará con los tanques activos de la sede (TK-1, TK-2, etc)
+    let tanquesDisponibles = [];
+
+    // Índice del tanque que estamos procesando
+    let tanqueActualIndex = 0;
+
+    /* ============================
+       Normalización + lector de QR
+       ============================ */
+    function normalizarQR(decodedText) {
+      let sede = "", empresa = "";
+      // 1) JSON
+      try {
+        const obj = JSON.parse(decodedText);
+        if (obj && (obj.sede || obj.empresa)) {
+          sede = (obj.sede || "").trim();
+          empresa = (obj.empresa || "").trim();
+        }
+      } catch (_) { }
+      // 2) URL
+      if (!sede) {
+        try {
+          const u = new URL(decodedText);
+          sede = (u.searchParams.get("sede") || "").trim();
+          empresa = (u.searchParams.get("empresa") || "").trim();
+        } catch (_) { }
+      }
+      // 3) "SEDE | EMPRESA"
+      if (!sede && decodedText.includes("|")) {
+        const [s, e] = decodedText.split("|", 2);
+        sede = (s || "").trim();
+        empresa = (e || "").trim();
+      }
+      // 4) Texto plano
+      if (!sede) { sede = (decodedText || "").trim(); }
+
+      // Limpiezas
+      sede = sede.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
+      empresa = empresa.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
+      return { sede, empresa };
+    }
+
+    function leerQR(titulo) {
+      return new Promise((resolve, reject) => {
+        const menu = document.getElementById("menuOpciones");
+        const convo = document.getElementById("conversacion");
+        const lector = document.getElementById("lectorQR");
+        const texto = document.getElementById("preguntaTexto");
+        if (menu) menu.style.display = "none";
+        if (convo) convo.style.display = "block";
+        if (lector) lector.style.display = "block";
+        if (texto) texto.textContent = titulo || "Escanea el QR de la sede";
+
+        lector.innerHTML = "";
+        const qr = new Html5Qrcode("lectorQR");
+        const config = { fps: 10, qrbox: 250 };
+        qr.start({ facingMode: "environment" }, config, (decodedText) => {
+          qr.stop().then(() => {
+            lector.innerHTML = "";
+            resolve(normalizarQR(decodedText));
+          });
+        }).catch(err => reject(err));
+      });
+    }
+
+    /* ============================
+       Utilidades UI
+       ============================ */
+    function show(el, disp = "block") { if (el) el.style.display = disp; }
+    function hide(el) { if (el) el.style.display = "none"; }
+
+    const EMPRESA_SESION = "{{ session.get('empresa','') }}";
+
+    let sedeQR = "", empresaQR = "";
+    let tanques = []; // [{numero, capacidad}]
+    let items = [];   // [{numero, capacidad, nivel, testigo(base64)}]
+    let idx = 0;
+
+    /* ============================
+       Panel de resumen (único)
+       ============================ */
+    function tituloOperacion(op) {
+      switch (op) {
+        case "inicio_calefaccion": return "Resumen - Inicio de calefacción";
+        case "tanqueo": return "Resumen - Tanqueo de GLP";
+        case "consumo": return "Resumen - Registro de consumo";
+        case "finalizar_calefaccion": return "Resumen - Finalización de calefacción";
+        default: return "Resumen de operación GLP";
+      }
+    }
+
+    function mostrarResumenOperacion(resp) {
+      const panel = document.getElementById("panelResumen");
+      const menu = document.getElementById("menuOpciones");
+      const convo = document.getElementById("conversacion");
+      const pregunta = document.getElementById("preguntaTexto");
+
+      if (!panel) {
+        if (pregunta) pregunta.textContent = "";
+        alert(resp.message || (resp.success ? "Operación realizada" : "No se pudo completar la operación"));
+        mostrarMenu();
+        return;
+      }
+
+      const r = resp.resumen || {};
+      const op = r.operacion || "";
+
+      if (pregunta) {
+        pregunta.textContent = resp.message || "Operación finalizada.";
+      }
+
+      const tanques = Array.isArray(r.tanques) ? r.tanques : [];
+      const filasTanques = tanques.map(t => {
+        const num = t.numero || "";
+        const niv = (t.nivel !== undefined && t.nivel !== null) ? t.nivel : "";
+        const cap = (t.capacidad !== undefined && t.capacidad !== null) ? t.capacidad : "";
+        return `<tr>
+      <td>${num}</td>
+      <td>${niv === "" ? "" : niv + "%"}</td>
+      <td>${cap}</td>
+    </tr>`;
+      }).join("");
+
+      const saldoTexto = (r.saldo_estimado_kg !== undefined && r.saldo_estimado_kg !== null)
+        ? `<p><strong>Saldo estimado:</strong> ${r.saldo_estimado_kg} kg (${r.saldo_estimado_galones} galones)</p>`
+        : "";
+
+      const avicolaTexto = (r.pollitos || r.criadoras)
+        ? `<p><strong>Pollitos:</strong> ${r.pollitos || "-"} · <strong>Criadoras:</strong> ${r.criadoras || "-"}</p>`
+        : "";
+
+      let diasTexto = "";
+      if (typeof r.dias_operacion === "number" && r.dias_operacion > 0) {
+        diasTexto = `<p><strong>Día ${r.dias_operacion} de calefacción</strong></p>`;
+      }
+
+      let consumoTexto = "";
+      if (r.kg_consumidos !== undefined && r.kg_consumidos !== null && Number(r.kg_consumidos) > 0) {
+        consumoTexto = `<p><strong>Consumo desde la última operación:</strong> ${Number(r.kg_consumidos).toFixed(2)} kg</p>`;
+        if (r.kg_pollito !== undefined && r.kg_pollito !== null && Number(r.kg_pollito) > 0) {
+          consumoTexto += `<p><strong>Consumo por pollito:</strong> ${Number(r.kg_pollito).toFixed(6)} kg/pollito</p>`;
+        }
+      }
+
+      panel.innerHTML = `
+    <h3>${tituloOperacion(op)}</h3>
+    <p><strong>Sede:</strong> ${r.sede || ""}</p>
+    <p><strong>Lote:</strong> ${r.lote || ""}</p>
+    ${r.fecha ? `<p><strong>Fecha:</strong> ${r.fecha}</p>` : ""}
+    ${diasTexto}
+    ${avicolaTexto}
+    ${tanques.length ? `
+      <table>
+        <thead>
+          <tr>
+            <th>Tanque</th>
+            <th>Nivel (%)</th>
+            <th>Capacidad (gal)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filasTanques}
+        </tbody>
+      </table>
+    ` : ""}
+    ${consumoTexto}
+    ${saldoTexto}
+    <p class="resumen-msg">${resp.message || ""}</p>
+    <button id="btnCerrarResumen" onclick="cerrarResumen()">Volver al menú principal</button>
+  `;
+
+      if (menu) menu.style.display = "none";
+      if (convo) convo.style.display = "none";
+      panel.style.display = "block";
+    }
+
+    function cerrarResumen() {
+      const panel = document.getElementById("panelResumen");
+      if (panel) panel.style.display = "none";
+      mostrarMenu();
+    }
+
+    /**
+     * Función genérica que usan TODAS las operaciones al recibir la respuesta.
+     */
+    function manejarRespuestaOperacion(resp) {
+      if (!resp) {
+        alert("Respuesta inválida del servidor.");
+        mostrarMenu();
+        return;
+      }
+      if (resp.resumen) {
+        mostrarResumenOperacion(resp);
+      } else {
+        alert(resp.message || (resp.success ? "Operación realizada" : "No se pudo completar la operación"));
+        mostrarMenu();
+      }
+    }
+
+    /* ============================
+       Flujo común: cargar tanques
+       ============================ */
+    function cargarTanques(callback) {
+      fetch("/glp/obtener_tanques", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sede: sedeQR })
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (!d.success) {
+            alert(d.message || "No fue posible obtener tanques.");
+            mostrarMenu(); return;
+          }
+          tanques = Array.isArray(d.tanques) ? d.tanques : [];
+          if (tanques.length === 0) {
+            alert("No se encontraron tanques para esta sede.");
+            mostrarMenu(); return;
+          }
+          // Normalizar numero/etiqueta a minúsculas
+          tanques = tanques.map(t => ({
+            numero: String(t.numero || "").toLowerCase(),
+            capacidad: Number(t.capacidad || 0),
+            etiqueta: String(t.numero || "").toLowerCase()
+          }));
+          if (typeof callback === "function") callback();
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Error de red al obtener tanques.");
+          mostrarMenu();
+        });
+    }
+
+    function mostrarMenu() {
+      document.getElementById("menuOpciones").style.display = "flex";
+      document.getElementById("conversacion").style.display = "none";
+    }
+
+    /* ============================
+       Captura nivel + foto (común)
+       ============================ */
+    function preguntarNivelFoto(onFinish) {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+
+      if (idx >= tanques.length) {
+        hide(input); hide(foto); hide(btn);
+        if (typeof onFinish === "function") onFinish();
+        return;
+      }
+
+      const tk = tanques[idx];
+      // 1) Nivel
+      hide(foto); hide(btn);
+      input.type = "number";
+      input.value = "";
+      show(input);
+      texto.textContent = `Nivel actual del ${tk.numero} (0-100%)`;
+      input.onkeyup = (ev) => {
+        if (ev.key === "Enter") { btn.click(); }
+      };
+      btn.textContent = "Guardar nivel";
+      show(btn);
+      btn.onclick = () => {
+        const nivel = Number(input.value || 0);
+        if (isNaN(nivel) || nivel < 0 || nivel > 100) { alert("Ingresa un nivel válido (0-100)."); return; }
+        // 2) Foto
+        hide(btn); hide(input);
+        texto.textContent = `Adjunta la foto del ${tk.numero}`;
+        foto.value = null;
+        show(foto);
+        foto.onchange = () => {
+          const f = foto.files[0];
+          if (!f) { alert("Debes seleccionar la foto."); return; }
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = String(reader.result || "");
+            items.push({
+              numero: tk.numero,
+              capacidad: tk.capacidad,
+              nivel: nivel,
+              testigo: base64
+            });
+            idx++;
+            preguntarNivelFoto(onFinish);
+          };
+          reader.readAsDataURL(f);
+        };
+      };
+    }
+
+    /* ============================
+       INICIAR CALEFACCIÓN
+       ============================ */
+    async function iniciarCalefaccion() {
+      try {
+        const info = await leerQR("Escanea el QR de la sede para iniciar calefacción");
+        sedeQR = info.sede; empresaQR = info.empresa;
+        const texto = document.getElementById("preguntaTexto");
+        const input = document.getElementById("respuestaInput");
+        const foto = document.getElementById("inputFoto");
+        const btn = document.getElementById("botonEnviar");
+        document.getElementById("preguntaSiNo").style.display = "none";
+
+        if (input) {
+          input.onkeyup = null;
+        }
+        if (foto) {
+          foto.onchange = null;
+        }
+        if (btn) {
+          btn.onclick = null;
+        }
+
+        items = []; idx = 0;
+
+        function despuesDeAvicola() {
+          cargarTanques(() => { preguntarNivelFoto(enviarInicio); });
+        }
+
+        if (EMPRESA_SESION === "Pollos GAR SAS") {
+          // Pollitos
+          show(input); hide(foto);
+          input.type = "number"; input.value = "";
+          texto.textContent = "¿Con cuántos pollitos inicias el lote?";
+          btn.textContent = "Confirmar"; show(btn);
+          btn.onclick = () => {
+            const pollitos = Number(input.value || 0);
+            if (isNaN(pollitos) || pollitos <= 0) { alert("Ingresa un número válido de pollitos."); return; }
+            // Criadoras
+            input.value = "";
+            texto.textContent = "¿Cuántas criadoras instalaste?";
+            btn.onclick = () => {
+              const criadoras = Number(input.value || 0);
+              if (isNaN(criadoras) || criadoras <= 0) { alert("Ingresa un número válido de criadoras."); return; }
+              input.dataset.pollitos = String(pollitos);
+              input.dataset.criadoras = String(criadoras);
+              hide(btn); hide(input);
+              despuesDeAvicola();
+            };
+          };
+        } else {
+          hide(input); hide(btn); hide(foto);
+          despuesDeAvicola();
+        }
+      } catch (e) {
+        alert("No fue posible leer el QR: " + e);
+        mostrarMenu();
+      }
+    }
+
+    function enviarInicio() {
+      const pollitos = Number(document.getElementById("respuestaInput").dataset.pollitos || 0) || null;
+      const criadoras = Number(document.getElementById("respuestaInput").dataset.criadoras || 0) || null;
+
+      fetch("/glp/registrar_inicio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sede: sedeQR,
+          pollitos: (EMPRESA_SESION === "Pollos GAR SAS" ? pollitos : null),
+          criadoras: (EMPRESA_SESION === "Pollos GAR SAS" ? criadoras : null),
+          tanques: items
+        })
+      })
+        .then(r => r.json())
+        .then(manejarRespuestaOperacion)
+        .catch(err => {
+          console.error(err);
+          alert("Error al registrar el inicio.");
+          mostrarMenu();
+        });
+    }
+
+
+    // ============================================
+    // NUEVO FLUJO DE REGISTRAR TANQUEO
+    // ============================================
+
+    // Cargar tanques SOLO para la operación registrar tanqueo
+    function cargarTanquesTanqueo(callback) {
+      fetch("/glp/obtener_tanques", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sede: sedeQR })
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (!d.success) {
+            alert(d.message || "No fue posible obtener tanques.");
+            mostrarMenu();
+            return;
+          }
+          tanquesDisponibles = Array.isArray(d.tanques) ? d.tanques : [];
+          if (tanquesDisponibles.length === 0) {
+            alert("No se encontraron tanques para esta sede.");
+            mostrarMenu();
+            return;
+          }
+          // Normalizamos
+          tanquesDisponibles = tanquesDisponibles.map(t => ({
+            numero: String(t.numero || "").toLowerCase(),
+            capacidad: Number(t.capacidad || 0)
+          }));
+          if (typeof callback === "function") callback();
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Error de red al obtener tanques.");
+          mostrarMenu();
+        });
+    }
+
+    // Inicia la operación registrar tanqueo
+    async function registrarTanqueo() {
+      try {
+        registrarTanqueoData.sede = "";
+        registrarTanqueoData.tanques = [];
+        tanqueActualIndex = 0;
+
+        const info = await leerQR("Escanea el QR de la sede para registrar el tanqueo");
+        sedeQR = info.sede;
+        empresaQR = info.empresa;
+        registrarTanqueoData.sede = sedeQR;
+
+        // 🔹 Limpiamos cualquier handler viejo antes de empezar el flujo nuevo
+        const input = document.getElementById("respuestaInput");
+        const foto = document.getElementById("inputFoto");
+        const btn = document.getElementById("botonEnviar");
+
+        if (input) {
+          input.onkeyup = null;
+          input.dataset.pollitos = "";
+          input.dataset.criadoras = "";
+        }
+        if (foto) {
+          foto.onchange = null;
+        }
+        if (btn) {
+          btn.onclick = null;
+        }
+
+        cargarTanquesTanqueo(() => {
+          tanqueActualIndex = 0;
+          preguntarSiTanquearTanqueActual();
+        });
+      } catch (e) {
+        console.error(e);
+        alert("No fue posible leer el QR: " + e);
+        mostrarMenu();
+      }
+    }
+
+    // Pregunta: ¿Desea tanquear el tanque TK-n?
+    function preguntarSiTanquearTanqueActual() {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+      const panelSiNo = document.getElementById("preguntaSiNo");
+      const btnSi = document.getElementById("btnSi");
+      const btnNo = document.getElementById("btnNo");
+
+      // Si ya terminamos los tanques, enviar
+      if (tanqueActualIndex >= tanquesDisponibles.length) {
+        enviarTanqueo();
+        return;
+      }
+
+      const tk = tanquesDisponibles[tanqueActualIndex];
+
+      // Mostrar pregunta
+      texto.textContent = `¿Desea tanquear el tanque ${tk.numero.toUpperCase()}?`;
+
+      // Ocultar controles normales
+      hide(input);
+      hide(foto);
+      hide(btn);
+
+      // Mostrar botones sí/no
+      panelSiNo.style.display = "block";
+
+      // Acción SI
+      btnSi.onclick = () => {
+        panelSiNo.style.display = "none";
+        prepararDatosTanqueActual(tk);
+        pedirNivelInicial();
+      };
+
+      // Acción NO
+      btnNo.onclick = () => {
+        panelSiNo.style.display = "none";
+        tanqueActualIndex++;
+        preguntarSiTanquearTanqueActual();
+      };
+    }
+
+
+    // Prepara objeto temporal del tanque actual
+    let tanqueActualDatos = null;
+    function prepararDatosTanqueActual(tk) {
+      tanqueActualDatos = {
+        numero: tk.numero,
+        capacidad: tk.capacidad,
+        nivel_inicial: 0,
+        foto_nivel_inicial: "",
+        nivel_final: 0,
+        foto_nivel_final: "",
+        densidad_suministrada: 0,
+        kg_suministrados: 0,
+        foto_baucher: ""
+      };
+    }
+
+    // 1) Nivel inicial
+    function pedirNivelInicial() {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+
+      show(input); hide(foto);
+      input.type = "number";
+      input.value = "";
+      texto.textContent = `Ingresa el NIVEL ACTUAL del tanque ${tanqueActualDatos.numero.toUpperCase()} (0-100 %)`;
+      btn.textContent = "Confirmar nivel";
+      show(btn);
+
+      btn.onclick = () => {
+        const n = Number(input.value || 0);
+        if (isNaN(n) || n < 0 || n > 100) {
+          alert("Ingresa un nivel válido entre 0 y 100.");
+          return;
+        }
+        tanqueActualDatos.nivel_inicial = n;
+        pedirFotoNivelInicial();
+      };
+    }
+
+    // 2) Foto nivel inicial
+    function pedirFotoNivelInicial() {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+      document.getElementById("preguntaSiNo").style.display = "none";
+
+
+      hide(input);
+      texto.textContent = `Toma una FOTO del NIVEL ACTUAL del tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
+      // 🔹 limpiamos cualquier onchange anterior
+      foto.onchange = null;
+      foto.value = "";
+      show(foto);
+      btn.textContent = "Subir foto y continuar";
+      show(btn);
+
+      btn.onclick = () => {
+        const f = foto.files[0];
+        if (!f) {
+          alert("Debes seleccionar la foto.");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          tanqueActualDatos.foto_nivel_inicial = String(reader.result || "");
+          mostrarMensajeProcederTanqueo();
+        };
+        reader.readAsDataURL(f);
+      };
+    }
+
+
+    // 3) Mensaje: puede proceder con el tanqueo
+    function mostrarMensajeProcederTanqueo() {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+      document.getElementById("preguntaSiNo").style.display = "none";
+
+
+      hide(input); hide(foto);
+      texto.textContent = `Puedes proceder con el TANQUEO del tanque ${tanqueActualDatos.numero.toUpperCase()}. Cuando termines, presiona "Continuar".`;
+      btn.textContent = "Continuar";
+      show(btn);
+
+      btn.onclick = () => {
+        pedirNivelFinal();
+      };
+    }
+
+    // 4) Nivel final
+    function pedirNivelFinal() {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+      document.getElementById("preguntaSiNo").style.display = "none";
+
+
+      show(input); hide(foto);
+      input.type = "number";
+      input.value = "";
+      texto.textContent = `Ingresa el NIVEL FINAL del tanque ${tanqueActualDatos.numero.toUpperCase()} (0-100 %)`;
+      btn.textContent = "Confirmar nivel final";
+      show(btn);
+
+      btn.onclick = () => {
+        const n = Number(input.value || 0);
+        if (isNaN(n) || n < 0 || n > 100) {
+          alert("Ingresa un nivel válido entre 0 y 100.");
+          return;
+        }
+        tanqueActualDatos.nivel_final = n;
+        pedirFotoNivelFinal();
+      };
+    }
+
+    // 5) Foto nivel final
+    function pedirFotoNivelFinal() {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+      document.getElementById("preguntaSiNo").style.display = "none";
+
+
+      hide(input);
+      texto.textContent = `Toma una FOTO del NIVEL FINAL del tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
+      // 🔹 limpiamos cualquier onchange anterior
+      foto.onchange = null;
+      foto.value = "";
+      show(foto);
+      btn.textContent = "Subir foto y continuar";
+      show(btn);
+
+      btn.onclick = () => {
+        const f = foto.files[0];
+        if (!f) {
+          alert("Debes seleccionar la foto.");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          tanqueActualDatos.foto_nivel_final = String(reader.result || "");
+          pedirDensidadSuministrada();
+        };
+        reader.readAsDataURL(f);
+      };
+    }
+
+    // 6) Densidad suministrada
+    function pedirDensidadSuministrada() {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+      document.getElementById("preguntaSiNo").style.display = "none";
+
+
+      show(input); hide(foto);
+      input.type = "number";
+      input.step = "0.01";
+      input.value = "";
+      texto.textContent = `Ingresa la DENSIDAD SUMINISTRADA (kg/gal) para el tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
+      btn.textContent = "Confirmar densidad";
+      show(btn);
+
+      btn.onclick = () => {
+        const d = Number(input.value || 0);
+        if (isNaN(d) || d <= 0) {
+          alert("Ingresa una densidad válida (>0).");
+          return;
+        }
+        tanqueActualDatos.densidad_suministrada = d;
+        pedirKgSuministrados();
+      };
+    }
+
+    // 7) Kg suministrados
+    function pedirKgSuministrados() {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+      document.getElementById("preguntaSiNo").style.display = "none";
+
+
+      show(input); hide(foto);
+      input.type = "number";
+      input.step = "0.01";
+      input.value = "";
+      texto.textContent = `Ingresa los KG SUMINISTRADOS al tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
+      btn.textContent = "Confirmar kg";
+      show(btn);
+
+      btn.onclick = () => {
+        const k = Number(input.value || 0);
+        if (isNaN(k) || k <= 0) {
+          alert("Ingresa un valor válido de kg (>0).");
+          return;
+        }
+        tanqueActualDatos.kg_suministrados = k;
+        pedirFotoBaucher();
+      };
+    }
+
+    // 8) Foto baucher
+    function pedirFotoBaucher() {
+      const texto = document.getElementById("preguntaTexto");
+      const input = document.getElementById("respuestaInput");
+      const foto = document.getElementById("inputFoto");
+      const btn = document.getElementById("botonEnviar");
+      document.getElementById("preguntaSiNo").style.display = "none";
+
+
+      hide(input);
+      texto.textContent = `Toma una FOTO del BAUCHER DEL MASICO del tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
+      // 🔹 limpiamos cualquier onchange anterior
+      foto.onchange = null;
+      foto.value = "";
+      show(foto);
+      btn.textContent = "Subir baucher y continuar";
+      show(btn);
+
+      btn.onclick = () => {
+        const f = foto.files[0];
+        if (!f) {
+          alert("Debes seleccionar la foto.");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          tanqueActualDatos.foto_baucher = String(reader.result || "");
+          // Guardamos en el arreglo general
+          registrarTanqueoData.tanques.push(tanqueActualDatos);
+          // Pasamos al siguiente tanque
+          tanqueActualIndex++;
+          preguntarSiTanquearTanqueActual();
+        };
+        reader.readAsDataURL(f);
+      };
+    }
+
+    // 9) Enviar todo al backend
+    function enviarTanqueo() {
+      if (!registrarTanqueoData.sede) {
+        alert("No se pudo determinar la sede del tanqueo.");
+        mostrarMenu();
+        return;
+      }
+
+      fetch("/glp/registrar_tanqueo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registrarTanqueoData)
+      })
+        .then(r => r.json())
+        .then(manejarRespuestaOperacion)
+        .catch(err => {
+          console.error(err);
+          alert("Error al registrar tanqueo.");
+          mostrarMenu();
+        });
+    }
+
+    /* ============================
+       REGISTRAR CONSUMO
+       ============================ */
+    async function registrarConsumo() {
+      try {
+        const info = await leerQR("Escanea el QR de la sede para registrar consumo");
+        sedeQR = info.sede;
+        empresaQR = info.empresa;
+
+        const texto = document.getElementById("preguntaTexto");
+        const input = document.getElementById("respuestaInput");
+        const foto = document.getElementById("inputFoto");
+        const btn = document.getElementById("botonEnviar");
+        document.getElementById("preguntaSiNo").style.display = "none";
+
+
+        // 🔹 limpieza de handlers viejos
+        if (input) {
+          input.onkeyup = null;
+          input.dataset.pollitos = "";
+          input.dataset.criadoras = "";
+        }
+        if (foto) {
+          foto.onchange = null;
+        }
+        if (btn) {
+          btn.onclick = null;
+        }
+        items = []; idx = 0;
+        cargarTanques(() => { preguntarNivelFoto(enviarConsumo); });
+      } catch (e) {
+        alert("No fue posible leer el QR: " + e);
+        mostrarMenu();
+      }
+    }
+
+    function enviarConsumo() {
+      fetch("/glp/registrar_consumo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sede: sedeQR, tanques: items })
+      })
+        .then(r => r.json())
+        .then(manejarRespuestaOperacion)
+        .catch(err => {
+          console.error(err);
+          alert("Error al registrar consumo.");
+          mostrarMenu();
+        });
+    }
+
+    /* ============================
+       FINALIZAR CALEFACCIÓN
+       ============================ */
+    async function finalizarCalefaccion() {
+      try {
+        const info = await leerQR("Escanea el QR de la sede para finalizar la calefacción");
+
+        sedeQR = info.sede;
+        empresaQR = info.empresa;
+
+        const texto = document.getElementById("preguntaTexto");
+        const input = document.getElementById("respuestaInput");
+        const foto = document.getElementById("inputFoto");
+        const btn = document.getElementById("botonEnviar");
+        document.getElementById("preguntaSiNo").style.display = "none";
+
+
+        // 🔹 limpieza de handlers viejos
+        if (input) {
+          input.onkeyup = null;
+          input.dataset.pollitos = "";
+          input.dataset.criadoras = "";
+        }
+        if (foto) {
+          foto.onchange = null;
+        }
+        if (btn) {
+          btn.onclick = null;
+        }
+        items = []; idx = 0;
+        cargarTanques(() => { preguntarNivelFoto(enviarFinalizar); });
+      } catch (e) {
+        alert("No fue posible leer el QR: " + e);
+        mostrarMenu();
+      }
+    }
+
+    function enviarFinalizar() {
+      fetch("/glp/finalizar_calefaccion_batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sede: sedeQR, tanques: items })
+      })
+        .then(r => r.json())
+        .then(manejarRespuestaOperacion)
+        .catch(err => {
+          console.error(err);
+          alert("Error al finalizar calefacción.");
+          mostrarMenu();
+        });
+    }
+  </script>
+</body>
+
+</html>

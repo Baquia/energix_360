@@ -1,4 +1,3 @@
-# app/__init__.py
 from flask import Flask
 from flask_mysqldb import MySQL
 from flask_login import LoginManager
@@ -21,22 +20,35 @@ def create_app():
     app.config['MYSQL_HOST'] = 'localhost'
     app.config['MYSQL_USER'] = 'root'
     app.config['MYSQL_PASSWORD'] = ''
-    app.config['MYSQL_DB'] = 'energix_360bd'
+    app.config['MYSQL_DB'] = 'energix_360'
     app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
     # Inicializar extensiones
     mysql.init_app(app)
     login_manager.init_app(app)
     csrf.init_app(app)
-    csrf.exempt('bp_901811727.registrar_empresa')  # ← excluye esa ruta del CSRF
-
+    csrf.exempt('bp_901811727.registrar_empresa')
+    csrf.exempt('bp_901811727.registrar_perfil')
+    csrf.exempt('bp_901811727.obtener_perfiles')
+    csrf.exempt('bp_901811727.registrar_usuario')
+    csrf.exempt("bp_glp.registrar_inicio_calefaccion")
 
     # Registrar Blueprints
     from app.blueprints.bp_901811727 import bp_901811727
     from app.blueprints.bp_890707006 import bp_890707006
+    from app.blueprints.bp_glp import bp_glp
+    from app.blueprints.bp_gestion_mermas import bp_gestion_mermas
+
+    # app/__init__.py (fragmento)
+    
 
     app.register_blueprint(bp_901811727)
     app.register_blueprint(bp_890707006)
+    app.register_blueprint(bp_glp)
+    app.register_blueprint(bp_gestion_mermas)
+
+    
+
 
     return app
 

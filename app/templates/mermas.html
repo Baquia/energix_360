@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Control de Mermas - Registro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --color-primary: #015249;
+      --color-primary-dark: #013d36;
+      --color-bg: #f6f7f8;
+      --color-surface: #ffffff;
+      --color-border: #e5e7eb;
+      --color-text: #111827;
+      --color-muted: #6b7280;
+      --color-ok: #1a7f37;
+      --color-warn: #b8860b;
+      --color-danger: #b00020;
+      --color-danger-dark: #8f0017;
+      --shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.08);
+      --radius-card: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
+      color: var(--color-text);
+      padding: 16px 12px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    /* Header logos + logout */
+    .headerbar {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header .logo {
+      max-height: 54px;
+      width: auto;
+      object-fit: contain;
+      max-width: 48%;
+    }
+
+    .logout-area {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    /* Wrapper principal tipo tarjeta */
+    .wrap {
+      width: 100%;
+      max-width: 980px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-soft);
+      padding: 18px 16px 90px 16px;
+    }
+
+    h1 {
+      color: var(--color-primary-dark);
+      font-size: 1.25rem;
+      margin: 10px 0 8px;
+      font-weight: 700;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--color-border);
+      border-radius: 14px;
+      padding: 14px 14px 16px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+      margin-bottom: 16px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .col {
+      flex: 1 1 240px;
+      min-width: 240px;
+    }
+
+    .note {
+      font-size: 0.85rem;
+      color: var(--color-muted);
+    }
+
+    /* Inputs */
+    .inp,
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--color-border);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+      background: #ffffff;
+    }
+
+    .inp:focus,
+    select:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(1, 82, 73, 0.20);
+    }
+
+    /* Botones */
+    .btn {
+      border-radius: 999px;
+      border: 1px solid transparent;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, box-shadow .15s, transform .05s, color .15s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
+
+    .btn.primary {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+
+    .btn.primary:hover {
+      background: var(--color-primary-dark);
+      box-shadow: 0 6px 18px rgba(1, 82, 73, .35);
+      transform: translateY(-1px);
+    }
+
+    .btn.secondary {
+      background: #f3f4f6;
+      color: var(--color-text);
+      border-color: #e5e7eb;
+    }
+
+    .btn.secondary:hover {
+      background: #e5e7eb;
+    }
+
+    .btn.warn {
+      background: #f6c65b;
+      color: #000;
+      border: 1px solid #e3b340;
+    }
+
+    .btn.danger {
+      background: var(--color-danger);
+      color: #fff;
+      border-color: var(--color-danger);
+    }
+
+    .btn.danger:hover {
+      background: var(--color-danger-dark);
+    }
+
+    .btn.logout {
+      background: var(--color-danger);
+      color: #fff;
+      border-color: var(--color-danger);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+    }
+
+    .btn.logout:hover {
+      background: var(--color-danger-dark);
+      box-shadow: 0 4px 10px rgba(176, 0, 32, 0.35);
+    }
+
+    /* Pasos */
+    .step {
+      display: none;
+    }
+
+    .step.active {
+      display: block;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Caja de confirmación */
+    .confirm {
+      background: #f9fafb;
+      border: 1px dashed var(--color-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      color: var(--color-text);
+      font-size: 0.88rem;
+    }
+
+    .muted {
+      color: var(--color-muted);
+    }
+
+    /* Imagen */
+    .imgbox {
+      width: 100%;
+      height: 260px;
+      border-radius: 14px;
+      border: 1px solid var(--color-border);
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fafafa;
+      overflow: hidden;
+      font-size: 0.88rem;
+      color: var(--color-muted);
+    }
+
+    .imgbox img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #cbd5e1;
+      border-top-color: #334155;
+      border-radius: 50%;
+      display: inline-block;
+      animation: spin .8s linear infinite;
+      vertical-align: -3px;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Responsive */
+    @media (max-width: 560px) {
+      .headerbar {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+
+      .header .logo {
+        max-height: 46px;
+      }
+
+      .wrap {
+        padding-bottom: 70px;
+      }
+
+      .footer {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .footer .btn {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .imgbox {
+        height: 200px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="headerbar">
+    <div class="header">
+      <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" alt="Logo Cliente" class="logo">
+      <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix 360" class="logo">
+    </div>
+    <div class="logout-area">
+      <a href="/logout" class="btn logout" title="Cerrar sesión">⏻ Cerrar sesión</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <h1>Bienvenido(a), {{ session.get('usuario_nombre', 'Operador') }}</h1>
+      <div class="note">Módulo de registro de merma en entrega. Responde y confirma cada paso.</div>
+    </div>
+
+    <!-- Paso 1: Cliente -->
+    <div class="card step active" id="step1">
+      <h3>1) ¿A qué cliente le vas a entregar?</h3>
+      <div class="row">
+        <div class="col"><input type="text" id="cliente" class="inp" placeholder="Nombre del cliente"></div>
+      </div>
+      <div class="footer">
+        <button class="btn primary" onclick="confirmStep(1)">Confirmar cliente</button>
+      </div>
+      <div id="conf1" class="confirm" style="display:none;"></div>
+    </div>
+
+    <!-- Paso 2: Vehículo -->
+    <div class="card step" id="step2">
+      <h3>2) ¿En qué vehículo haces la entrega?</h3>
+      <div class="row">
+        <div class="col"><input type="text" id="vehiculo" class="inp" placeholder="Ej. ABC-123 / Placa / Referencia"></div>
+      </div>
+      <div class="footer">
+        <button class="btn secondary" onclick="backTo(1)">Atrás</button>
+        <button class="btn primary" onclick="confirmStep(2)">Confirmar vehículo</button>
+      </div>
+      <div id="conf2" class="confirm" style="display:none;"></div>
+    </div>
+
+    <!-- Paso 3: Factura -->
+    <div class="card step" id="step3">
+      <h3>3) Número de factura</h3>
+      <div class="row">
+        <div class="col"><input type="text" id="factura" class="inp" placeholder="Número de factura"></div>
+      </div>
+      <div class="footer">
+        <button class="btn secondary" onclick="backTo(2)">Atrás</button>
+        <button class="btn primary" onclick="confirmStep(3)">Confirmar factura</button>
+      </div>
+      <div id="conf3" class="confirm" style="display:none;"></div>
+    </div>
+
+    <!-- Paso 4: KG factura -->
+    <div class="card step" id="step4">
+      <h3>4) KG registrados en la factura</h3>
+      <div class="row">
+        <div class="col"><input type="number" step="0.001" id="kg_factura" class="inp" placeholder="KG en factura"></div>
+      </div>
+      <div class="footer">
+        <button class="btn secondary" onclick="backTo(3)">Atrás</button>
+        <button class="btn primary" onclick="confirmStep(4)">Confirmar KG factura</button>
+      </div>
+      <div id="conf4" class="confirm" style="display:none;"></div>
+    </div>
+
+    <!-- Paso 5: KG entregados -->
+    <div class="card step" id="step5">
+      <h3>5) KG entregados</h3>
+      <div class="row">
+        <div class="col"><input type="number" step="0.001" id="kg_entregados" class="inp" placeholder="KG entregados"></div>
+      </div>
+      <div class="footer">
+        <button class="btn secondary" onclick="backTo(4)">Atrás</button>
+        <button class="btn primary" onclick="confirmStep(5)">Confirmar KG entregados</button>
+      </div>
+      <div id="conf5" class="confirm" style="display:none;"></div>
+    </div>
+
+    <!-- Paso 6: Foto de pesaje -->
+    <div class="card step" id="step6">
+      <h3>6) Registro fotográfico del pesaje</h3>
+      <div class="row">
+        <div class="col">
+          <input type="file" id="foto" accept="image/*" class="inp" />
+          <div class="imgbox" id="imgbox"><span>Vista previa</span></div>
+        </div>
+      </div>
+      <div class="footer">
+        <button class="btn secondary" onclick="backTo(5)">Atrás</button>
+        <button class="btn primary" onclick="enviar()">Solicitar aprobación</button>
+      </div>
+      <div id="conf6" class="confirm" style="display:none;"></div>
+    </div>
+
+    <div class="card" id="resultado" style="display:none;">
+      <h3>Resultado</h3>
+      <div id="resText"></div>
+      <div id="resActions" style="margin-top:10px; display:none;">
+        <button class="btn primary" onclick="nuevaFacturaMismoCliente()">Seguir con otra factura para este cliente</button>
+        <button class="btn secondary" onclick="reiniciar()">Terminar operación</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let step = 1;
+    let fotoB64 = null;
+    let pollTimer = null;
+    let lastRegistroId = null;
+
+    function goTo(n){
+      document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+      const el = document.getElementById('step'+n);
+      if (el) el.classList.add('active');
+      step = n;
+      window.scrollTo({ top:0, behavior:'smooth' });
+    }
+    function backTo(n){ goTo(n); }
+
+    function confirmStep(n){
+      if(n===1){
+        const v = document.getElementById('cliente').value.trim();
+        if(!v) return alert('Indica el cliente.');
+        showConfirm('conf1', 'Cliente confirmado: ' + v);
+        goTo(2);
+      } else if(n===2){
+        const v = document.getElementById('vehiculo').value.trim();
+        if(!v) return alert('Indica el vehículo.');
+        showConfirm('conf2', 'Vehículo confirmado: ' + v);
+        goTo(3);
+      } else if(n===3){
+        const v = document.getElementById('factura').value.trim();
+        if(!v) return alert('Indica el número de factura.');
+        showConfirm('conf3', 'Factura confirmada: ' + v);
+        goTo(4);
+      } else if(n===4){
+        const v = parseFloat(document.getElementById('kg_factura').value);
+        if(!(v>0)) return alert('Ingresa los KG de factura (>0).');
+        showConfirm('conf4', 'KG factura confirmados: ' + v);
+        goTo(5);
+      } else if(n===5){
+        const v = parseFloat(document.getElementById('kg_entregados').value);
+        if(!(v>=0)) return alert('Ingresa los KG entregados (>=0).');
+        showConfirm('conf5', 'KG entregados confirmados: ' + v);
+        goTo(6);
+      }
+    }
+
+    function showConfirm(id, text){
+      const el = document.getElementById(id);
+      el.style.display='block';
+      el.textContent = text;
+    }
+
+    // Vista previa de foto
+    const foto = document.getElementById('foto');
+    const imgbox = document.getElementById('imgbox');
+    foto.addEventListener('change', async (e)=>{
+      const file = e.target.files?.[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        fotoB64 = reader.result; // dataURL
+        imgbox.innerHTML = `<img src="${fotoB64}" alt="Evidencia">`;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    async function enviar(){
+      const cliente = document.getElementById('cliente').value.trim();
+      const vehiculo = document.getElementById('vehiculo').value.trim();
+      const factura  = document.getElementById('factura').value.trim();
+      const kg_factura = parseFloat(document.getElementById('kg_factura').value);
+      const kg_entregados = parseFloat(document.getElementById('kg_entregados').value);
+
+      if(!cliente || !vehiculo || !factura || !(kg_factura>0) || !(kg_entregados>=0)){
+        return alert('Completa y confirma todos los pasos.');
+      }
+      if(!fotoB64){ if(!confirm('No adjuntaste foto de pesaje. ¿Continuar sin foto?')) return; }
+
+      const payload = {
+        cliente, vehiculo, factura,
+        kg_factura, kg_entregados,
+        evidencia_foto: fotoB64 || null
+      };
+
+      // Limpia escucha previa si existía
+      stopPolling();
+
+      try{
+        const r = await fetch('/mermas/registrar', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const j = await r.json();
+
+        const res = document.getElementById('resultado');
+        const resText = document.getElementById('resText');
+        const resActions = document.getElementById('resActions');
+        res.style.display='block';
+        resActions.style.display='none';
+
+        if(!j.success){
+          resText.innerHTML = `<span class="muted">No se pudo registrar: ${j.message||'Error'}</span>`;
+          return;
+        }
+
+        lastRegistroId = j.id || null;
+
+        if(j.aprobado){
+          // Aprobación automática
+          resText.innerHTML = `<span style="color:#1a7f37">Merma <b>APROBADA automáticamente</b> (ID ${j.id}).</span>`;
+          resActions.style.display='block';
+        }else{
+          // Pendiente → empezar a consultar estado
+          resText.innerHTML = `<span class="muted"><span class="spinner"></span>Merma registrada en estado <b>PENDIENTE</b> (ID ${j.id}). Esperando decisión de control...</span>`;
+          startPollingEstado();
+        }
+      }catch(e){
+        console.error(e);
+        alert('Error al enviar el registro.');
+      }
+    }
+
+    function startPollingEstado(){
+      if(!lastRegistroId) return;
+      stopPolling();
+      pollTimer = setInterval(checkEstadoOnce, 3000); // cada 3 s
+      checkEstadoOnce(); // primer chequeo inmediato
+    }
+
+    async function checkEstadoOnce(){
+      if(!lastRegistroId) return;
+      try{
+        const r = await fetch(`/mermas/estado?id=${encodeURIComponent(lastRegistroId)}`);
+        const j = await r.json();
+        if(!j.success) return;
+        if(['aprobada','aprobada_no_conforme','rechazada'].includes(j.estado)){
+          stopPolling();
+          const resText = document.getElementById('resText');
+          const resActions = document.getElementById('resActions');
+          if(j.estado === 'aprobada'){
+            resText.innerHTML = `<span style="color:#1a7f37">Merma <b>APROBADA</b> por control (ID ${lastRegistroId}).</span>`;
+          } else if(j.estado === 'aprobada_no_conforme'){
+            resText.innerHTML = `<span style="color:#b8860b">Merma <b>APROBADA NO CONFORME</b> por control (ID ${lastRegistroId}).</span>`;
+          } else {
+            resText.innerHTML = `<span style="color:#b00020">Merma <b>NO APROBADA</b> por control (ID ${lastRegistroId}).</span>`;
+          }
+          resActions.style.display='block';
+        }
+      }catch(e){
+        console.error(e);
+      }
+    }
+
+    function stopPolling(){
+      if(pollTimer){
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    function nuevaFacturaMismoCliente(){
+      // Mantener cliente y vehículo, limpiar factura y pesos, foto, confirmaciones intermedias
+      document.getElementById('factura').value = '';
+      document.getElementById('kg_factura').value = '';
+      document.getElementById('kg_entregados').value = '';
+      fotoB64 = null;
+      document.getElementById('imgbox').innerHTML = '<span>Vista previa</span>';
+      ['conf3','conf4','conf5','conf6'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
+      goTo(3);
+      const res = document.getElementById('resultado');
+      res.style.display='none';
+      stopPolling();
+      lastRegistroId = null;
+    }
+
+    function reiniciar(){
+      // Reset total
+      ['cliente','vehiculo','factura','kg_factura','kg_entregados'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+      ['conf1','conf2','conf3','conf4','conf5','conf6'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
+      fotoB64 = null;
+      document.getElementById('imgbox').innerHTML = '<span>Vista previa</span>';
+      const res = document.getElementById('resultado');
+      res.style.display='none';
+      stopPolling();
+      lastRegistroId = null;
+      goTo(1);
+    }
+
+    // Limpieza al salir de la página
+    window.addEventListener('beforeunload', stopPolling);
+  </script>
+</body>
+</html>
