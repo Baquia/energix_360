@@ -16,7 +16,7 @@ def create_app():
     app = Flask(__name__)
 
     # Seguridad y configuración
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '2e3fd0e89b8e2a7c3d4a21fbbac4c0c9$G&&/00JHN**Metanoia765')
+    app.config['SECRET_KEY'] = '2e3fd0e89b8e2a7c3d4a21fbbac4c0c9'
     app.config['MYSQL_HOST'] = 'localhost'
     app.config['MYSQL_USER'] = 'root'
     app.config['MYSQL_PASSWORD'] = ''
