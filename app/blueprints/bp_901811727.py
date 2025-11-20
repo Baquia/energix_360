@@ -2,6 +2,11 @@ from flask import Blueprint, render_template, session, request, jsonify,flash,re
 from app import mysql, csrf
 from app.forms import RegistroUsuarioForm
 from app.utils import login_required_custom
+from flask_bcrypt import Bcrypt
+
+bcrypt = Bcrypt()
+
+
 
 bp_901811727 = Blueprint('bp_901811727', __name__)
 
@@ -137,7 +142,7 @@ def registrar_usuario():
         return jsonify({'success': False, 'message': 'El usuario ya está registrado.'})
 
     try:
-        password_hashed = generate_password_hash(password)
+        password_hashed = bcrypt.generate_password_hash(password).decode('utf-8')
         cur.execute("""
             INSERT INTO usuarios 
             (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa)
