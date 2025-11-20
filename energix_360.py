@@ -70,10 +70,14 @@ def login():
         return jsonify(success=False, message="CONTRASEÑA INCORRECTA")
 
     # Guardar sesión
-    session['usuario_id'] = usuario['id']
+    # Guardar sesión
+    session['usuario_id'] = usuario['id']          # ID interno (lo dejamos igual)
+    session['cedula'] = usuario['cedula']          # NUEVO: cedula del operador
     session['nombre'] = usuario['nombre']
+    session['usuario_nombre'] = usuario['nombre']  # NUEVO: para mermas
     session['empresa'] = usuario['empresa']
     session['empresa_id'] = usuario['empresa_id']
+
 
     return jsonify(success=True, html=f"{nit_empresa}.html")
 

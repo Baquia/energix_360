@@ -124,6 +124,71 @@ def mermas_umbral():
     umbral = _get_umbral_pct(empresa_id)
     return jsonify(success=True, umbral_pct=umbral)
 
+@bp_gestion_mermas.route('/mermas/clientes', methods=['GET'])
+def mermas_clientes():
+    """
+    Devuelve la lista de clientes asociados a la empresa del usuario,
+    leyendo de la tabla clientes_empresa.
+    """
+    empresa_id = session.get('empresa_id') or session.get('nit')
+
+    cur = mysql.connection.cursor()
+    try:
+        if empresa_id:
+            # Filtra por empresa actual (ej: Pollos GAR SAS = 890707006)
+            cur.execute("""
+                SELECT DISTINCT cliente_empresa
+                  FROM clientes_empresa
+                 WHERE id_empresa = %s
+                   AND cliente_empresa IS NOT NULL
+                   AND cliente_empresa <> ''
+                 ORDER BY cliente_empresa ASC
+            """, (empresa_id,))
+        else:
+            # Fallback: todos los clientes de todas las empresas
+            cur.execute("""
+                SELECT DISTINCT cliente_empresa
+                  FROM clientes_empresa
+                 WHERE cliente_empresa IS NOT NULL
+                   AND cliente_empresa <> ''
+                 ORDER BY cliente_empresa ASC
+            """)
+        rows = cur.fetchall()
+    finally:
+        cur.close()
+
+    items = [r['cliente_empresa'] for r in rows if r.get('cliente_empresa')]
+    return jsonify(success=True, items=items)
+
+@bp_gestion_mermas.route('/mermas/vehiculos', methods=['GET'])
+def mermas_vehiculos():
+    """
+    Devuelve la lista de vehículos asociados a la empresa del usuario.
+    """
+    empresa_id = session.get('empresa_id') or session.get('nit')
+
+    cur = mysql.connection.cursor()
+    try:
+        if empresa_id:
+            cur.execute("""
+                SELECT DISTINCT placa
+                FROM vehiculos
+                WHERE id_empresa = %s
+                ORDER BY placa ASC
+            """, (empresa_id,))
+        else:
+            cur.execute("""
+                SELECT DISTINCT placa
+                FROM vehiculos
+                ORDER BY placa ASC
+            """)
+        rows = cur.fetchall()
+    finally:
+        cur.close()
+
+    items = [r['placa'] for r in rows if r.get('placa')]
+    return jsonify(success=True, items=items)
+
 
 @csrf.exempt
 @bp_gestion_mermas.route('/mermas/registrar', methods=['POST'])
@@ -142,8 +207,31 @@ def mermas_registrar():
     # Sesión
     empresa = (session.get('empresa') or '').strip()
     empresa_id = str(session.get('empresa_id') or session.get('nit') or '').strip()
-    operador_id = str(session.get('usuario_id') or '').strip()
-    operador_nombre = (session.get('usuario_nombre') or '').strip()
+
+    # Operador: primero cédula (si existe), si no ID interno
+    operador_id = str(
+        session.get('cedula') or
+        session.get('usuario_id') or
+        ''
+    ).strip()
+
+    # Nombre del operador
+    operador_nombre = (
+        session.get('usuario_nombre') or
+        session.get('nombre') or
+        ''
+    ).strip()
+
+    # Fallback a datos enviados por el frontend
+    if not operador_nombre:
+        operador_nombre = (j.get('operador_nombre') or '').strip()
+
+    if not operador_id:
+        operador_id = str(j.get('operador_id') or '').strip()
+
+
+
+
 
     # Fallback tolerante (solo si sesión viene vacía)
     if not operador_nombre: operador_nombre = (j.get('operador_nombre') or '').strip()

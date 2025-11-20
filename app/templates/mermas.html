@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <title>Control de Mermas - Registro</title>
@@ -302,10 +303,12 @@
     }
   </style>
 </head>
+
 <body>
   <div class="headerbar">
     <div class="header">
-      <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" alt="Logo Cliente" class="logo">
+      <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" alt="Logo Cliente"
+        class="logo">
       <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix 360" class="logo">
     </div>
     <div class="logout-area">
@@ -323,7 +326,11 @@
     <div class="card step active" id="step1">
       <h3>1) ¿A qué cliente le vas a entregar?</h3>
       <div class="row">
-        <div class="col"><input type="text" id="cliente" class="inp" placeholder="Nombre del cliente"></div>
+        <div class="autocomplete-wrapper">
+          <input type="text" id="cliente" name="cliente" class="inp" placeholder="Nombre del cliente"
+            autocomplete="off">
+          <div id="cliente-sugerencias" class="autocomplete-list" style="display:none;"></div>
+        </div>
       </div>
       <div class="footer">
         <button class="btn primary" onclick="confirmStep(1)">Confirmar cliente</button>
@@ -335,7 +342,12 @@
     <div class="card step" id="step2">
       <h3>2) ¿En qué vehículo haces la entrega?</h3>
       <div class="row">
-        <div class="col"><input type="text" id="vehiculo" class="inp" placeholder="Ej. ABC-123 / Placa / Referencia"></div>
+        <div class="autocomplete-wrapper">
+          <input type="text" id="vehiculo" name="vehiculo" class="inp" placeholder="Placa del vehículo"
+            autocomplete="off">
+
+          <div id="vehiculo-sugerencias" class="autocomplete-list" style="display:none;"></div>
+        </div>
       </div>
       <div class="footer">
         <button class="btn secondary" onclick="backTo(1)">Atrás</button>
@@ -361,7 +373,8 @@
     <div class="card step" id="step4">
       <h3>4) KG registrados en la factura</h3>
       <div class="row">
-        <div class="col"><input type="number" step="0.001" id="kg_factura" class="inp" placeholder="KG en factura"></div>
+        <div class="col"><input type="number" step="0.001" id="kg_factura" class="inp" placeholder="KG en factura">
+        </div>
       </div>
       <div class="footer">
         <button class="btn secondary" onclick="backTo(3)">Atrás</button>
@@ -374,7 +387,8 @@
     <div class="card step" id="step5">
       <h3>5) KG entregados</h3>
       <div class="row">
-        <div class="col"><input type="number" step="0.001" id="kg_entregados" class="inp" placeholder="KG entregados"></div>
+        <div class="col"><input type="number" step="0.001" id="kg_entregados" class="inp" placeholder="KG entregados">
+        </div>
       </div>
       <div class="footer">
         <button class="btn secondary" onclick="backTo(4)">Atrás</button>
@@ -403,7 +417,8 @@
       <h3>Resultado</h3>
       <div id="resText"></div>
       <div id="resActions" style="margin-top:10px; display:none;">
-        <button class="btn primary" onclick="nuevaFacturaMismoCliente()">Seguir con otra factura para este cliente</button>
+        <button class="btn primary" onclick="nuevaFacturaMismoCliente()">Seguir con otra factura para este
+          cliente</button>
         <button class="btn secondary" onclick="reiniciar()">Terminar operación</button>
       </div>
     </div>
@@ -415,56 +430,79 @@
     let pollTimer = null;
     let lastRegistroId = null;
 
-    function goTo(n){
-      document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
-      const el = document.getElementById('step'+n);
+    function goTo(n) {
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      const el = document.getElementById('step' + n);
       if (el) el.classList.add('active');
       step = n;
-      window.scrollTo({ top:0, behavior:'smooth' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    function backTo(n){ goTo(n); }
+    function backTo(n) { goTo(n); }
 
-    function confirmStep(n){
-      if(n===1){
+    document.addEventListener('DOMContentLoaded', function () {
+      // Autocompletar de clientes según la empresa en sesión
+      fetch('/mermas/clientes')
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) {
+            console.warn('No se pudieron cargar los clientes:', data.message);
+            return;
+          }
+          const dl = document.getElementById('lista_clientes');
+          if (!dl) return;
+
+          (data.items || []).forEach(nombre => {
+            const opt = document.createElement('option');
+            opt.value = nombre;
+            dl.appendChild(opt);
+          });
+        })
+        .catch(err => {
+          console.error('Error cargando clientes:', err);
+        });
+    });
+
+    function confirmStep(n) {
+      if (n === 1) {
         const v = document.getElementById('cliente').value.trim();
-        if(!v) return alert('Indica el cliente.');
+        if (!v) return alert('Indica el cliente.');
         showConfirm('conf1', 'Cliente confirmado: ' + v);
         goTo(2);
-      } else if(n===2){
+      } else if (n === 2) {
         const v = document.getElementById('vehiculo').value.trim();
-        if(!v) return alert('Indica el vehículo.');
+        if (!v) return alert('Indica el vehículo.');
         showConfirm('conf2', 'Vehículo confirmado: ' + v);
         goTo(3);
-      } else if(n===3){
+      } else if (n === 3) {
         const v = document.getElementById('factura').value.trim();
-        if(!v) return alert('Indica el número de factura.');
+        if (!v) return alert('Indica el número de factura.');
         showConfirm('conf3', 'Factura confirmada: ' + v);
         goTo(4);
-      } else if(n===4){
+      } else if (n === 4) {
         const v = parseFloat(document.getElementById('kg_factura').value);
-        if(!(v>0)) return alert('Ingresa los KG de factura (>0).');
+        if (!(v > 0)) return alert('Ingresa los KG de factura (>0).');
         showConfirm('conf4', 'KG factura confirmados: ' + v);
         goTo(5);
-      } else if(n===5){
+      } else if (n === 5) {
         const v = parseFloat(document.getElementById('kg_entregados').value);
-        if(!(v>=0)) return alert('Ingresa los KG entregados (>=0).');
+        if (!(v >= 0)) return alert('Ingresa los KG entregados (>=0).');
         showConfirm('conf5', 'KG entregados confirmados: ' + v);
         goTo(6);
       }
     }
 
-    function showConfirm(id, text){
+    function showConfirm(id, text) {
       const el = document.getElementById(id);
-      el.style.display='block';
+      el.style.display = 'block';
       el.textContent = text;
     }
 
     // Vista previa de foto
     const foto = document.getElementById('foto');
     const imgbox = document.getElementById('imgbox');
-    foto.addEventListener('change', async (e)=>{
+    foto.addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
-      if(!file) return;
+      if (!file) return;
       const reader = new FileReader();
       reader.onload = () => {
         fotoB64 = reader.result; // dataURL
@@ -473,17 +511,17 @@
       reader.readAsDataURL(file);
     });
 
-    async function enviar(){
+    async function enviar() {
       const cliente = document.getElementById('cliente').value.trim();
       const vehiculo = document.getElementById('vehiculo').value.trim();
-      const factura  = document.getElementById('factura').value.trim();
+      const factura = document.getElementById('factura').value.trim();
       const kg_factura = parseFloat(document.getElementById('kg_factura').value);
       const kg_entregados = parseFloat(document.getElementById('kg_entregados').value);
 
-      if(!cliente || !vehiculo || !factura || !(kg_factura>0) || !(kg_entregados>=0)){
+      if (!cliente || !vehiculo || !factura || !(kg_factura > 0) || !(kg_entregados >= 0)) {
         return alert('Completa y confirma todos los pasos.');
       }
-      if(!fotoB64){ if(!confirm('No adjuntaste foto de pesaje. ¿Continuar sin foto?')) return; }
+      if (!fotoB64) { if (!confirm('No adjuntaste foto de pesaje. ¿Continuar sin foto?')) return; }
 
       const payload = {
         cliente, vehiculo, factura,
@@ -494,10 +532,10 @@
       // Limpia escucha previa si existía
       stopPolling();
 
-      try{
+      try {
         const r = await fetch('/mermas/registrar', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         const j = await r.json();
@@ -505,92 +543,92 @@
         const res = document.getElementById('resultado');
         const resText = document.getElementById('resText');
         const resActions = document.getElementById('resActions');
-        res.style.display='block';
-        resActions.style.display='none';
+        res.style.display = 'block';
+        resActions.style.display = 'none';
 
-        if(!j.success){
-          resText.innerHTML = `<span class="muted">No se pudo registrar: ${j.message||'Error'}</span>`;
+        if (!j.success) {
+          resText.innerHTML = `<span class="muted">No se pudo registrar: ${j.message || 'Error'}</span>`;
           return;
         }
 
         lastRegistroId = j.id || null;
 
-        if(j.aprobado){
+        if (j.aprobado) {
           // Aprobación automática
           resText.innerHTML = `<span style="color:#1a7f37">Merma <b>APROBADA automáticamente</b> (ID ${j.id}).</span>`;
-          resActions.style.display='block';
-        }else{
+          resActions.style.display = 'block';
+        } else {
           // Pendiente → empezar a consultar estado
           resText.innerHTML = `<span class="muted"><span class="spinner"></span>Merma registrada en estado <b>PENDIENTE</b> (ID ${j.id}). Esperando decisión de control...</span>`;
           startPollingEstado();
         }
-      }catch(e){
+      } catch (e) {
         console.error(e);
         alert('Error al enviar el registro.');
       }
     }
 
-    function startPollingEstado(){
-      if(!lastRegistroId) return;
+    function startPollingEstado() {
+      if (!lastRegistroId) return;
       stopPolling();
       pollTimer = setInterval(checkEstadoOnce, 3000); // cada 3 s
       checkEstadoOnce(); // primer chequeo inmediato
     }
 
-    async function checkEstadoOnce(){
-      if(!lastRegistroId) return;
-      try{
+    async function checkEstadoOnce() {
+      if (!lastRegistroId) return;
+      try {
         const r = await fetch(`/mermas/estado?id=${encodeURIComponent(lastRegistroId)}`);
         const j = await r.json();
-        if(!j.success) return;
-        if(['aprobada','aprobada_no_conforme','rechazada'].includes(j.estado)){
+        if (!j.success) return;
+        if (['aprobada', 'aprobada_no_conforme', 'rechazada'].includes(j.estado)) {
           stopPolling();
           const resText = document.getElementById('resText');
           const resActions = document.getElementById('resActions');
-          if(j.estado === 'aprobada'){
+          if (j.estado === 'aprobada') {
             resText.innerHTML = `<span style="color:#1a7f37">Merma <b>APROBADA</b> por control (ID ${lastRegistroId}).</span>`;
-          } else if(j.estado === 'aprobada_no_conforme'){
+          } else if (j.estado === 'aprobada_no_conforme') {
             resText.innerHTML = `<span style="color:#b8860b">Merma <b>APROBADA NO CONFORME</b> por control (ID ${lastRegistroId}).</span>`;
           } else {
             resText.innerHTML = `<span style="color:#b00020">Merma <b>NO APROBADA</b> por control (ID ${lastRegistroId}).</span>`;
           }
-          resActions.style.display='block';
+          resActions.style.display = 'block';
         }
-      }catch(e){
+      } catch (e) {
         console.error(e);
       }
     }
 
-    function stopPolling(){
-      if(pollTimer){
+    function stopPolling() {
+      if (pollTimer) {
         clearInterval(pollTimer);
         pollTimer = null;
       }
     }
 
-    function nuevaFacturaMismoCliente(){
+    function nuevaFacturaMismoCliente() {
       // Mantener cliente y vehículo, limpiar factura y pesos, foto, confirmaciones intermedias
       document.getElementById('factura').value = '';
       document.getElementById('kg_factura').value = '';
       document.getElementById('kg_entregados').value = '';
       fotoB64 = null;
       document.getElementById('imgbox').innerHTML = '<span>Vista previa</span>';
-      ['conf3','conf4','conf5','conf6'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
+      ['conf3', 'conf4', 'conf5', 'conf6'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
       goTo(3);
       const res = document.getElementById('resultado');
-      res.style.display='none';
+      res.style.display = 'none';
       stopPolling();
       lastRegistroId = null;
     }
 
-    function reiniciar(){
+    function reiniciar() {
       // Reset total
-      ['cliente','vehiculo','factura','kg_factura','kg_entregados'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-      ['conf1','conf2','conf3','conf4','conf5','conf6'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
+      ['cliente', 'vehiculo', 'factura', 'kg_factura', 'kg_entregados'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      ['conf1', 'conf2', 'conf3', 'conf4', 'conf5', 'conf6'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
       fotoB64 = null;
       document.getElementById('imgbox').innerHTML = '<span>Vista previa</span>';
       const res = document.getElementById('resultado');
-      res.style.display='none';
+      res.style.display = 'none';
       stopPolling();
       lastRegistroId = null;
       goTo(1);
@@ -598,6 +636,128 @@
 
     // Limpieza al salir de la página
     window.addEventListener('beforeunload', stopPolling);
+
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const inputCliente = document.getElementById('cliente');
+      const listaDiv = document.getElementById('cliente-sugerencias');
+      let todosLosClientes = [];
+
+      // Cargar clientes de la empresa actual
+      fetch('/mermas/clientes')
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) return;
+          todosLosClientes = data.items || [];
+        })
+        .catch(err => console.error('Error cargando clientes:', err));
+
+      // Filtrado tipo Google AUTOCOMPLETAR CLIENTES
+      inputCliente.addEventListener('input', function () {
+        const texto = inputCliente.value.toLowerCase().trim();
+
+        if (!texto) {
+          listaDiv.style.display = 'none';
+          listaDiv.innerHTML = '';
+          return;
+        }
+
+        const filtrados = todosLosClientes
+          .filter(nombre => nombre.toLowerCase().includes(texto))
+          .slice(0, 10);
+
+        if (!filtrados.length) {
+          listaDiv.style.display = 'none';
+          listaDiv.innerHTML = '';
+          return;
+        }
+
+        listaDiv.innerHTML = '';
+        filtrados.forEach(nombre => {
+          const item = document.createElement('div');
+          item.className = 'autocomplete-item';
+          item.textContent = nombre;
+          item.addEventListener('click', () => {
+            inputCliente.value = nombre;
+            listaDiv.style.display = 'none';
+          });
+          listaDiv.appendChild(item);
+        });
+
+        listaDiv.style.display = 'block';
+      });
+
+      inputCliente.addEventListener('blur', function () {
+        setTimeout(() => {
+          listaDiv.style.display = 'none';
+        }, 150);
+      });
+    });
+
+    // ===============================
+    // AUTOCOMPLETADO VEHÍCULOS
+    // ===============================
+    document.addEventListener('DOMContentLoaded', function () {
+      const inputVehiculo = document.getElementById('vehiculo');
+      const listaVehiculos = document.getElementById('vehiculo-sugerencias');
+      let todosLosVehiculos = [];
+
+      // Cargar vehículos de la empresa
+      fetch('/mermas/vehiculos')
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            todosLosVehiculos = data.items || [];
+          }
+        })
+        .catch(err => console.error('Error cargando vehículos:', err));
+
+      // Filtrado tipo Google
+      inputVehiculo.addEventListener('input', function () {
+        const texto = inputVehiculo.value.toLowerCase().trim();
+
+        if (!texto) {
+          listaVehiculos.style.display = 'none';
+          listaVehiculos.innerHTML = '';
+          return;
+        }
+
+        const filtrados = todosLosVehiculos
+          .filter(x => x.toLowerCase().includes(texto))
+          .slice(0, 10);
+
+        if (!filtrados.length) {
+          listaVehiculos.style.display = 'none';
+          listaVehiculos.innerHTML = '';
+          return;
+        }
+
+        listaVehiculos.innerHTML = '';
+        filtrados.forEach(placa => {
+          const item = document.createElement('div');
+          item.className = 'autocomplete-item';
+          item.textContent = placa;
+          item.addEventListener('click', () => {
+            inputVehiculo.value = placa;
+            listaVehiculos.style.display = 'none';
+            listaVehiculos.innerHTML = '';
+          });
+          listaVehiculos.appendChild(item);
+        });
+
+        listaVehiculos.style.display = 'block';
+      });
+
+      // Ocultar sugerencias al perder foco
+      inputVehiculo.addEventListener('blur', function () {
+        setTimeout(() => {
+          listaVehiculos.style.display = 'none';
+        }, 150);
+      });
+    });
+
+
   </script>
 </body>
+
 </html>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -145,6 +146,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="login-container">
     <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix 360" class="logo">
@@ -162,12 +164,15 @@
       <label for="password">{{ form.password.label }}</label>
       {{ form.password(id="password") }}
 
-      <label for="empresa">{{ form.empresa.label }}</label>
-      <select id="empresa" name="empresa">
+      <input type="text" id="empresa" name="empresa" placeholder="Escribe el nombre de tu empresa" autocomplete="off"
+        list="lista_empresas" />
+
+      <datalist id="lista_empresas">
         {% for id, nombre in form.empresa.choices %}
-          <option value="{{ nombre }}">{{ nombre }}</option>
-        {% endfor %}
-      </select>
+        <option value="{{ nombre }}">
+          {% endfor %}
+      </datalist>
+
 
       <button type="submit">Ingresar</button>
     </form>
@@ -187,18 +192,19 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cedula, password, empresa })
       })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          window.location.href = '/' + data.html;
-        } else {
-          document.getElementById('flash').textContent = data.message;
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-      });
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            window.location.href = '/' + data.html;
+          } else {
+            document.getElementById('flash').textContent = data.message;
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+        });
     });
   </script>
 </body>
+
 </html>
