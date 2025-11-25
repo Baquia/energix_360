@@ -263,6 +263,15 @@
     <p id="saludo">¡Hola {{ session.get('nombre','Usuario') }}!</p>
     <p id="preguntaTexto"></p>
 
+    <button onclick="verColaOffline()" style="background:#444;color:white;margin:5px;">
+      Ver cola offline
+    </button>
+
+    <button onclick="borrarColaOffline()" style="background:#800;color:white;margin:5px;">
+      Borrar cola offline
+    </button>
+
+
     <div id="menuOpciones" class="menu" style="display:flex">
       <button class="menu-btn" onclick="iniciarCalefaccion()">🔥 Iniciar calefacción</button>
       <button class="menu-btn" onclick="registrarTanqueo()">⛽ Registrar tanqueo</button>
@@ -1530,6 +1539,26 @@
     window.addEventListener("online", activarLogoutSeguroOffline);
     window.addEventListener("offline", activarLogoutSeguroOffline);
   </script>
+  <script>
+    // ====== DEBUG: VER COLA OFFLINE ======
+    function verColaOffline() {
+      let q = [];
+      try {
+        q = JSON.parse(localStorage.getItem("glp_offline_queue_v1") || "[]");
+      } catch (e) {
+        console.error("Error leyendo cola:", e);
+      }
+      console.log("COLA OFFLINE:", q);
+      alert("Revisa la consola del navegador (DevTools > Console). Tamaño de cola: " + q.length);
+    }
+
+    // ====== DEBUG: VACÍAR COLA MANUALMENTE ======
+    function borrarColaOffline() {
+      localStorage.setItem("glp_offline_queue_v1", "[]");
+      alert("Cola borrada manualmente.");
+    }
+  </script>
+
 
 </body>
 
