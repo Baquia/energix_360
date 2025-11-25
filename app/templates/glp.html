@@ -390,13 +390,14 @@
     }
     async function flushOfflineQueue() {
       if (!navigator.onLine) return;
+
       const q = getQueue();
       if (!q.length) return;
 
       const remaining = [];
+
       for (const it of q) {
         try {
-          // ✅ si el payload viejo venía sin op_id, lo generamos aquí
           if (!it.payload.op_id) it.payload.op_id = generarOpId();
 
           const r = await fetch(it.url, {
@@ -404,13 +405,22 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(it.payload)
           });
+
+          // Detectar fallback HTML devuelto por el service worker
+          const ct = (r.headers.get("content-type") || "").toLowerCase();
+          if (!ct.includes("application/json")) {
+            throw new Error("non-json-response");
+          }
+
           const j = await r.json();
           if (!j.success) throw new Error(j.message || "falló backend");
 
         } catch (e) {
+          // Si falla (offline real o contenido no JSON), lo dejamos para después
           remaining.push(it);
         }
       }
+
       setQueue(remaining);
     }
 
@@ -480,7 +490,6 @@
     //   ENVÍO POST CON OFFLINE-FALLBACK
     // ===================================================
     async function sendWithOffline(url, payload, onSuccess) {
-      // ✅ Si no hay op_id, lo creamos UNA vez aquí
       if (!payload.op_id) payload.op_id = generarOpId();
 
       try {
@@ -489,23 +498,36 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
+
+        // Detectar respuesta no-JSON (fallback SW)
+        const ct = (r.headers.get("content-type") || "").toLowerCase();
+        if (!ct.includes("application/json")) {
+          throw new Error("non-json-response");
+        }
+
         const j = await r.json();
         if (!j.success) throw new Error(j.message || "Error servidor");
 
         if (typeof onSuccess === "function") onSuccess(j);
 
-        // ✅ limpieza de estado cuando SI se envió online OK
         limpiarEstadoOperacion();
-
         return j;
+
       } catch (e) {
-        const isOffline = !navigator.onLine || String(e).includes("Failed to fetch");
+        const msg = String(e || "");
+
+        const isOffline =
+          !navigator.onLine ||
+          msg.includes("Failed to fetch") ||
+          msg.includes("NetworkError") ||
+          msg.includes("non-json-response") ||
+          msg.includes("Unexpected token <") ||
+          msg.includes("Load failed");
+
         if (isOffline) {
-          // ✅ importante: se encola con el MISMO op_id
           enqueueOffline({ url, payload });
           alert("Sin internet. Registro guardado en el celular y se enviará automáticamente al volver la señal.");
 
-          // ✅ limpieza de estado cuando queda guardado offline
           limpiarEstadoOperacion();
           mostrarMenu();
 
