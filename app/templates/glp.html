@@ -526,13 +526,28 @@
 
         if (isOffline) {
           enqueueOffline({ url, payload });
-          alert("Sin internet. Registro guardado en el celular y se enviará automáticamente al volver la señal.");
+
+          const fakeResponse = {
+            success: true,
+            offline: true,
+            message: "Guardado offline. Se enviará al recuperar señal.",
+            op_id: payload.op_id,
+            data: payload   // 👈 te deja armar el resumen con lo que ya tienes
+          };
+
+          // ✅ ESTE ES EL PUNTO CLAVE:
+          if (typeof onSuccess === "function") {
+            onSuccess(fakeResponse);   // pinta resumen y botón como siempre
+          } else {
+            // por si alguna operación no pasa onSuccess:
+            alert(fakeResponse.message);
+            mostrarMenu();
+          }
 
           limpiarEstadoOperacion();
-          mostrarMenu();
-
-          return { success: true, offline: true, message: "Guardado offline", op_id: payload.op_id };
+          return fakeResponse;
         }
+
 
         alert("No se pudo completar la operación: " + (e.message || e));
         throw e;
