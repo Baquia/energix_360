@@ -4,6 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#015249">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#015249">
+  <script src="/static/js/html5-qrcode.min.js"></script>
+
+
   <title>Login | Energix 360</title>
   <style>
     :root {
@@ -146,6 +154,13 @@
     }
   </style>
 </head>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js");
+    });
+  }
+</script>
 
 <body>
   <div class="login-container">
@@ -180,31 +195,116 @@
 
   <script>
     const form = document.getElementById('loginForm');
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
+    const flashEl = document.getElementById('flash');
 
-      const cedula = document.getElementById('cedula').value;
+    // Modo seguro (B): siempre pedir login, incluso offline.
+    // Solo borramos la sesión offline, NO las credenciales offline guardadas.
+    localStorage.removeItem("bqa_offline_session");
+
+
+    function setFlash(msg) {
+      flashEl.textContent = msg || "";
+    }
+
+    async function sha256(str) {
+      const buf = new TextEncoder().encode(str);
+      const hash = await crypto.subtle.digest("SHA-256", buf);
+      return Array.from(new Uint8Array(hash))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    async function offlineLogin(cedula, password) {
+      const key = `bqa_offline_user_${cedula}`;
+      const saved = localStorage.getItem(key);
+
+      if (!saved) {
+        setFlash("Este usuario no tiene credenciales offline en este dispositivo. Inicia sesión una vez con internet.");
+        return;
+      }
+
+      const pack = JSON.parse(saved);
+      const verifier = await sha256(password + pack.salt);
+
+      if (verifier !== pack.verifier) {
+        setFlash("Contraseña incorrecta (modo offline).");
+        return;
+      }
+
+      // sesión offline local
+      localStorage.setItem("bqa_offline_session", JSON.stringify({
+        cedula: pack.cedula,
+        nombre: pack.nombre,
+        empresa: pack.empresa,
+        empresa_id: pack.empresa_id,
+        perfil: pack.perfil,
+        html: pack.html,
+        offline: true,
+        ts: Date.now()
+      }));
+
+      // redirige al panel cacheado por SW
+      window.location.href = "/" + pack.html;
+    }
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      setFlash("");
+
+      const cedula = document.getElementById('cedula').value.trim();
       const password = document.getElementById('password').value;
       const empresa = document.getElementById('empresa').value;
 
+      // Si no hay internet → login offline directo
+      if (!navigator.onLine) {
+        await offlineLogin(cedula, password);
+        return;
+      }
+
+      // Online login normal
       fetch('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cedula, password, empresa })
       })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            window.location.href = '/' + data.html;
-          } else {
-            document.getElementById('flash').textContent = data.message;
+        .then(r => r.json())
+        .then(async data => {
+          if (!data.success) {
+            setFlash(data.message);
+            return;
           }
+
+          // Guardar credenciales offline SOLO después de login online exitoso
+          if (data.offline_enabled && data.offline_salt) {
+            const verifier = await sha256(password + data.offline_salt);
+
+            const pack = {
+              cedula: data.usuario.cedula,
+              nombre: data.usuario.nombre,
+              empresa: data.usuario.empresa,
+              empresa_id: data.usuario.empresa_id,
+              perfil: data.usuario.perfil,
+              html: data.html,
+              salt: data.offline_salt,
+              verifier: verifier,
+              ts: Date.now()
+            };
+
+            localStorage.setItem(`bqa_offline_user_${cedula}`, JSON.stringify(pack));
+            localStorage.setItem("bqa_last_user", cedula);
+          }
+
+          // login online → sigue igual
+          window.location.href = "/" + data.html;
         })
-        .catch(error => {
-          console.error('Error:', error);
+        .catch(async err => {
+          console.error("Login online falló, intento offline:", err);
+          await offlineLogin(cedula, password);
         });
     });
   </script>
+
+
 </body>
 
 </html>

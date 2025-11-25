@@ -1,0 +1,25 @@
+{
+  "name": "BQA-ONE",
+  "short_name": "BQA-ONE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f7",
+  "theme_color": "#015249",
+  "description": "Plataforma modular BQA-ONE para operación en campo con soporte offline.",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/static/BQA_ONE_192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/BQA_ONE_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

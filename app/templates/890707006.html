@@ -1,157 +1,183 @@
 <!DOCTYPE html>
-<!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#015249">
+  <script src="/static/js/html5-qrcode.min.js"></script>
+
   <title>Inicio | Pollos Gar</title>
   <style>
-  :root {
-    --color-primary: #015249;
-    --color-primary-dark: #013d36;
-    --color-bg: #f6f7f8;
-    --color-surface: #ffffff;
-    --color-border: #e5e7eb;
-    --color-text: #111827;
-    --color-muted: #6b7280;
-    --color-danger: #b00020;
-    --shadow-soft: 0 4px 14px rgba(15, 23, 42, .08);
-    --radius-card: 18px;
-  }
+    :root {
+      --color-primary: #015249;
+      --color-primary-dark: #013d36;
+      --color-bg: #f6f7f8;
+      --color-surface: #ffffff;
+      --color-border: #e5e7eb;
+      --color-text: #111827;
+      --color-muted: #6b7280;
+      --color-danger: #b00020;
+      --shadow-soft: 0 4px 14px rgba(15, 23, 42, .08);
+      --radius-card: 18px;
+    }
 
-  * {
-    box-sizing: border-box;
-  }
+    * {
+      box-sizing: border-box;
+    }
 
-  body {
-    margin: 0;
-    font-family: Verdana, sans-serif;
-    background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px 12px 70px;
-    position: relative;
-    min-height: 100vh;
-    color: var(--color-text);
-  }
-
-  header {
-    width: 100%;
-    max-width: 980px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-    gap: 8px;
-  }
-
-  .logo {
-    max-height: 56px;
-    width: auto;
-  }
-
-  h1 {
-    width: 100%;
-    max-width: 980px;
-    font-size: clamp(1.2rem, 3.2vw, 1.6rem);
-    text-align: center;
-    margin: 0 0 18px;
-    color: var(--color-primary-dark);
-  }
-
-  .grid {
-    width: 100%;
-    max-width: 980px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 14px;
-  }
-
-  .icon-btn {
-    background: var(--color-surface);
-    border-radius: var(--radius-card);
-    border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-soft);
-    padding: 14px 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    cursor: pointer;
-    transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
-  }
-
-  .icon-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
-    background: #f0fdf9;
-  }
-
-  .icon-btn img {
-    width: 48px;
-    height: 48px;
-    object-fit: contain;
-  }
-
-  .icon-label {
-    margin-top: 4px;
-    font-size: clamp(0.85rem, 2.5vw, 0.95rem);
-    color: var(--color-primary-dark);
-    text-align: center;
-    font-weight: 600;
-  }
-
-  .logout-btn {
-    position: fixed;
-    left: 16px;
-    bottom: 16px;
-    background: var(--color-danger);
-    color: #fff;
-    border-radius: 999px;
-    padding: 8px 16px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    border: 1px solid var(--color-danger);
-    cursor: pointer;
-    box-shadow: 0 3px 10px rgba(180, 0, 32, 0.4);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    z-index: 20;
-    text-decoration: none;
-  }
-
-  .logout-btn:hover {
-    background: #8f0017;
-  }
-
-  @media (max-width: 640px) {
-    header {
+    body {
+      margin: 0;
+      font-family: Verdana, sans-serif;
+      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
+      display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      padding: 20px 12px 70px;
+      position: relative;
+      min-height: 100vh;
+      color: var(--color-text);
+    }
+
+    header {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 8px;
     }
 
     .logo {
-      max-height: 48px;
+      max-height: 56px;
+      width: auto;
     }
-  }
 
-  @media (max-width: 480px) {
-    body {
-      padding-bottom: 82px;
+    h1 {
+      width: 100%;
+      max-width: 980px;
+      font-size: clamp(1.2rem, 3.2vw, 1.6rem);
+      text-align: center;
+      margin: 0 0 18px;
+      color: var(--color-primary-dark);
+    }
+
+    .grid {
+      width: 100%;
+      max-width: 980px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+    }
+
+    .icon-btn {
+      background: var(--color-surface);
+      border-radius: var(--radius-card);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-soft);
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+    }
+
+    .icon-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+      background: #f0fdf9;
+    }
+
+    .icon-btn img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+    }
+
+    .icon-label {
+      margin-top: 4px;
+      font-size: clamp(0.85rem, 2.5vw, 0.95rem);
+      color: var(--color-primary-dark);
+      text-align: center;
+      font-weight: 600;
     }
 
     .logout-btn {
-      left: 50%;
-      transform: translateX(-50%);
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      background: var(--color-danger);
+      color: #fff;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid var(--color-danger);
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(180, 0, 32, 0.4);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 20;
+      text-decoration: none;
     }
-  }
+
+    .logout-btn:hover {
+      background: #8f0017;
+    }
+
+    /* MODAL QR */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 12px;
+    }
+
+    .modal-content {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 16px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: var(--shadow-soft);
+      text-align: center;
+    }
+
+    .btn-cancelar {
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--color-border);
+      background: #f3f4f6;
+      font-weight: 600;
+      cursor: pointer;
+    }
   </style>
 </head>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js")
+        .then(reg => console.log("✅ SW registrado con scope:", reg.scope))
+        .catch(err => console.error("❌ Error registrando SW:", err));
+    });
+  }
+</script>
+
 <body>
+
   <header>
     <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" alt="Logo Cliente" class="logo">
     <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix 360" class="logo">
@@ -164,19 +190,22 @@
       <img src="{{ url_for('static', filename='icon_gas.png') }}" alt="Gas">
       <div class="icon-label">Gas</div>
     </div>
+
     <div class="icon-btn" onclick="acceder('carbon')">
       <img src="{{ url_for('static', filename='icon_carbon.png') }}" alt="Carbón">
       <div class="icon-label">Carbón</div>
     </div>
+
     <div class="icon-btn" onclick="acceder('electricidad')">
       <img src="{{ url_for('static', filename='icon_electricidad.png') }}" alt="Electricidad">
       <div class="icon-label">Electricidad</div>
     </div>
+
     <div class="icon-btn" onclick="acceder('flota')">
       <img src="{{ url_for('static', filename='icon_flota.png') }}" alt="Flota">
       <div class="icon-label">Flota</div>
     </div>
-    <!-- 🔹 Nuevo módulo: Control de Mermas -->
+
     <div class="icon-btn" onclick="acceder('mermas')">
       <img src="{{ url_for('static', filename='icon_mermas.png') }}" alt="Control de Mermas">
       <div class="icon-label">Control de Mermas</div>
@@ -185,18 +214,114 @@
 
   <a href="/logout" class="logout-btn">Salir</a>
 
+  <!-- MODAL QR FLOTA -->
+  <div id="modalFlotaQR" class="modal">
+    <div class="modal-content">
+      <h3>Escanee el QR del vehículo</h3>
+      <div id="qr-reader-flota" style="width:100%;"></div>
+      <p id="qr-msg-flota" style="margin-top:8px;font-weight:600;"></p>
+      <button onclick="cerrarFlotaQR()" class="btn-cancelar">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- LIBRERÍA QR -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
   <script>
+    let qrScannerFlota = null;
+
     function acceder(seccion) {
+      if (seccion === 'flota') {
+        abrirFlotaQR();
+        return;
+      }
       window.location.href = "/dashboard/" + seccion;
     }
 
-    window.addEventListener('beforeunload', function () {
-      navigator.sendBeacon('/logout');
-    });
+    function abrirFlotaQR() {
+      const modal = document.getElementById("modalFlotaQR");
+      const msg = document.getElementById("qr-msg-flota");
+      msg.textContent = "";
+      modal.style.display = "flex";
 
-    window.addEventListener('popstate', function () {
-      window.location.href = '/logout';
-    });
+      qrScannerFlota = new Html5Qrcode("qr-reader-flota");
+      Html5Qrcode.getCameras().then(cameras => {
+        const camId = cameras && cameras.length ? cameras[0].id : null;
+        if (!camId) {
+          msg.textContent = "No se detectó cámara.";
+          return;
+        }
+
+        qrScannerFlota.start(
+          camId,
+          { fps: 10, qrbox: 250 },
+          (decodedText) => {
+            const placa = (decodedText || "").trim().toUpperCase();
+            msg.textContent = "QR leído: " + placa;
+
+            qrScannerFlota.stop().then(() => {
+              enviarPlacaPreloginFlota(placa);
+            });
+          }
+        );
+      }).catch(err => {
+        msg.textContent = "Error cámara: " + err;
+      });
+    }
+
+    function cerrarFlotaQR() {
+      const modal = document.getElementById("modalFlotaQR");
+      modal.style.display = "none";
+
+      if (qrScannerFlota) {
+        qrScannerFlota.stop().catch(() => { });
+        qrScannerFlota = null;
+      }
+    }
+
+    function enviarPlacaPreloginFlota(placa) {
+      fetch("/dashboard/flota/prelogin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ placa })
+      })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            window.location.href = res.redirect_url;
+          } else {
+            document.getElementById("qr-msg-flota").textContent = res.message;
+          }
+        })
+        .catch(() => {
+          document.getElementById("qr-msg-flota").textContent = "Error enviando placa.";
+        });
+    }
+
   </script>
+  <script>
+    function activarLogoutSeguroOffline() {
+      const logoutLinks = document.querySelectorAll('a[href="/logout"]');
+
+      logoutLinks.forEach(a => {
+        // limpiamos listeners previos por si se ejecuta varias veces
+        a.onclick = null;
+
+        if (!navigator.onLine) {
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            alert("Estás sin conexión. El cierre de sesión requiere internet.");
+          }, { once: true });
+        }
+      });
+    }
+
+    window.addEventListener("load", activarLogoutSeguroOffline);
+    window.addEventListener("online", activarLogoutSeguroOffline);
+    window.addEventListener("offline", activarLogoutSeguroOffline);
+  </script>
+
+
 </body>
+
 </html>

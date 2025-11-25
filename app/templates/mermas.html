@@ -5,6 +5,12 @@
   <meta charset="UTF-8" />
   <title>Control de Mermas - Registro</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#015249">
+  <script src="/static/js/html5-qrcode.min.js"></script>
+
+
   <style>
     :root {
       --color-primary: #015249;
@@ -758,6 +764,28 @@
 
 
   </script>
+  <script>
+    function activarLogoutSeguroOffline() {
+      const logoutLinks = document.querySelectorAll('a[href="/logout"]');
+
+      logoutLinks.forEach(a => {
+        // limpiamos listeners previos por si se ejecuta varias veces
+        a.onclick = null;
+
+        if (!navigator.onLine) {
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            alert("Estás sin conexión. El cierre de sesión requiere internet.");
+          }, { once: true });
+        }
+      });
+    }
+
+    window.addEventListener("load", activarLogoutSeguroOffline);
+    window.addEventListener("online", activarLogoutSeguroOffline);
+    window.addEventListener("offline", activarLogoutSeguroOffline);
+  </script>
+
 </body>
 
 </html>

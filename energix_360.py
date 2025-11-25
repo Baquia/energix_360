@@ -3,6 +3,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from app import create_app, mysql, csrf, bcrypt
 from app.forms import LoginForm, RegistroUsuarioForm
 from functools import wraps
+from flask import send_from_directory
+from flask import current_app
 
 from app import create_app
 
@@ -21,7 +23,10 @@ def login_required_custom(f):
 # Crear aplicación
 app = create_app()
 
-
+@app.route("/sw.js")
+def sw():
+    return send_from_directory(current_app.static_folder, "sw.js",
+                           mimetype="application/javascript")
 
 
 @app.route('/', methods=['GET'])
@@ -79,7 +84,24 @@ def login():
     session['empresa_id'] = usuario['empresa_id']
 
 
-    return jsonify(success=True, html=f"{nit_empresa}.html")
+    # --- SALT PARA LOGIN OFFLINE (no requiere cambios en BD) ---
+    offline_salt = f"{usuario['cedula']}|{usuario['empresa_id']}"
+
+    return jsonify(
+        success=True,
+        html=f"{nit_empresa}.html",
+        offline_enabled=True,
+        offline_salt=offline_salt,
+        usuario={
+            "id": usuario["id"],
+            "cedula": usuario["cedula"],
+            "nombre": usuario["nombre"],
+            "empresa": usuario["empresa"],
+            "empresa_id": usuario["empresa_id"],
+            "perfil": usuario.get("perfil")
+        }
+    )
+
 
 # Ruta protegida: renderiza tablero solo si hay sesión activa
 #@app.route('/<nit>.html')
