@@ -10,10 +10,16 @@ import re as _re
 
 bp_glp = Blueprint('bp_glp', __name__, url_prefix='/glp')
 
+import os
+
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
-EMAIL_USER = os.environ.get("EMAIL_USER", "noreply@example.com")
-EMAIL_PASS = os.environ.get("EMAIL_PASS", "password")
+
+EMAIL_USER = os.environ.get("EMAIL_USER")
+EMAIL_PASS = os.environ.get("EMAIL_PASS")
+
+EMAIL_FROM = os.environ.get("EMAIL_FROM", EMAIL_USER)
+
 
 
 # ==============
