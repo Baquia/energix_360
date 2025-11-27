@@ -263,14 +263,6 @@
     <p id="saludo">¡Hola {{ session.get('nombre','Usuario') }}!</p>
     <p id="preguntaTexto"></p>
 
-    <button onclick="verColaOffline()" style="background:#444;color:white;margin:5px;">
-      Ver cola offline
-    </button>
-
-    <button onclick="borrarColaOffline()" style="background:#800;color:white;margin:5px;">
-      Borrar cola offline
-    </button>
-
 
     <div id="menuOpciones" class="menu" style="display:flex">
       <button class="menu-btn" onclick="iniciarCalefaccion()">🔥 Iniciar calefacción</button>
@@ -483,7 +475,7 @@
     }
 
     window.addEventListener("online", () => { flushOfflineQueue(); });
-    setInterval(() => { flushOfflineQueue(); }, 30000);
+    setInterval(() => { flushOfflineQueue(); }, 10000);
 
 
     // --- Cache local de tanques por sede ---
@@ -851,14 +843,15 @@
     }
 
     /* ============================
-    Captura nivel + foto (común)
-    ============================ */
+Captura nivel + foto (común)
+============================ */
     function preguntarNivelFoto(onFinish) {
       const texto = document.getElementById("preguntaTexto");
       const input = document.getElementById("respuestaInput");
       const foto = document.getElementById("inputFoto");
       const btn = document.getElementById("botonEnviar");
 
+      // Si ya no hay más tanques, terminamos
       if (idx >= tanques.length) {
         hide(input); hide(foto); hide(btn);
         if (typeof onFinish === "function") onFinish();
@@ -866,50 +859,81 @@
       }
 
       const tk = tanques[idx];
-      // 1) Nivel
-      hide(foto); hide(btn);
+      let nivelActual = 0;
+      let archivoFoto = null;
+
+      // Paso 1: preguntar NIVEL
+      hide(foto);
       input.type = "number";
       input.value = "";
       show(input);
+
       texto.textContent = `Nivel actual del ${tk.numero} (0-100%)`;
+      btn.textContent = "Guardar nivel";
+      show(btn);
+
       input.onkeyup = (ev) => {
         if (ev.key === "Enter") { btn.click(); }
       };
-      btn.textContent = "Guardar nivel";
-      show(btn);
+
       btn.onclick = () => {
         const nivel = Number(input.value || 0);
-        if (isNaN(nivel) || nivel < 0 || nivel > 100) { alert("Ingresa un nivel válido (0-100)."); return; }
-        // 2) Foto
-        hide(btn); hide(input);
+        if (isNaN(nivel) || nivel < 0 || nivel > 100) {
+          alert("Ingresa un nivel válido (0-100).");
+          return;
+        }
+        nivelActual = nivel;
+        pedirFoto();
+      };
+
+      // Paso 2: pedir FOTO + botón verde para continuar
+      function pedirFoto() {
+        hide(input);
         texto.textContent = `Adjunta la foto del ${tk.numero}`;
         foto.value = null;
+        archivoFoto = null;
+
         show(foto);
-        foto.onchange = async () => {
+        btn.textContent = "Subir foto y continuar";
+        show(btn);
+
+        foto.onchange = () => {
           const f = foto.files[0];
           if (!f) {
             alert("Debes seleccionar la foto.");
+            archivoFoto = null;
+            return;
+          }
+          archivoFoto = f;
+        };
+
+        btn.onclick = async () => {
+          if (!archivoFoto) {
+            alert("Debes seleccionar la foto antes de continuar.");
             return;
           }
           try {
-            const base64 = await comprimirImagenArchivo(f);
+            const base64 = await comprimirImagenArchivo(archivoFoto);
 
             items.push({
               numero: tk.numero,
               capacidad: tk.capacidad,
-              nivel: nivel,
+              nivel: nivelActual,
               testigo: base64
             });
+
+            // Pasar al siguiente tanque
             idx++;
             preguntarNivelFoto(onFinish);
+
           } catch (err) {
             console.error(err);
             alert("No se pudo procesar la foto. Intenta de nuevo.");
           }
         };
-
-      };
+      }
     }
+
     // ===============================
     //  OP_ID (idempotencia frontend)
     // ===============================
@@ -1539,26 +1563,6 @@
     window.addEventListener("online", activarLogoutSeguroOffline);
     window.addEventListener("offline", activarLogoutSeguroOffline);
   </script>
-  <script>
-    // ====== DEBUG: VER COLA OFFLINE ======
-    function verColaOffline() {
-      let q = [];
-      try {
-        q = JSON.parse(localStorage.getItem("glp_offline_queue_v1") || "[]");
-      } catch (e) {
-        console.error("Error leyendo cola:", e);
-      }
-      console.log("COLA OFFLINE:", q);
-      alert("Revisa la consola del navegador (DevTools > Console). Tamaño de cola: " + q.length);
-    }
-
-    // ====== DEBUG: VACÍAR COLA MANUALMENTE ======
-    function borrarColaOffline() {
-      localStorage.setItem("glp_offline_queue_v1", "[]");
-      alert("Cola borrada manualmente.");
-    }
-  </script>
-
 
 </body>
 
