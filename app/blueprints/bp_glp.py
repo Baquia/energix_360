@@ -10,7 +10,6 @@ import re as _re
 
 bp_glp = Blueprint('bp_glp', __name__, url_prefix='/glp')
 
-import os
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
@@ -434,7 +433,7 @@ def registrar_inicio_calefaccion():
                     try:
                         msg = MIMEText(cuerpo)
                         msg["Subject"] = "Solicitud de Tanqueo GLP"
-                        msg["From"] = EMAIL_USER
+                        msg["From"] = EMAIL_FROM
                         msg["To"] = ", ".join(destinatarios)
                         with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
                             server.starttls()
@@ -664,7 +663,7 @@ def registrar_tanqueo():
                     try:
                         msg = MIMEText(cuerpo)
                         msg["Subject"] = "Alerta desviación tanqueo GLP"
-                        msg["From"] = EMAIL_USER
+                        msg["From"] = EMAIL_FROM
                         msg["To"] = ", ".join(destinatarios)
                         with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
                             server.starttls()
@@ -889,7 +888,7 @@ def registrar_consumo():
                     try:
                         msg = MIMEText(cuerpo)
                         msg["Subject"] = "Solicitud de Tanqueo GLP"
-                        msg["From"] = EMAIL_USER
+                        msg["From"] = EMAIL_FROM
                         msg["To"] = ", ".join(destinatarios)
                         with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
                             server.starttls()
