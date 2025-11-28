@@ -509,7 +509,6 @@
             body: JSON.stringify({ sede })
           });
 
-          // Comprobamos que la respuesta sea OK y JSON
           const ct = (r.headers.get("content-type") || "").toLowerCase();
           if (!r.ok || !ct.includes("application/json")) {
             console.warn("Respuesta no JSON/OK en /glp/obtener_tanques:", r.status, ct);
@@ -522,11 +521,9 @@
             return { tanques: d.tanques, fuente: "bd" };
           } else {
             console.warn("Respuesta JSON sin tanques válidos:", d);
-            // dejamos caer al siguiente fallback
           }
         } catch (e) {
           console.error("Error consultando /glp/obtener_tanques:", e);
-          // cae al siguiente fallback
         }
       }
 
@@ -548,7 +545,7 @@
         } else {
           alert("No se pudo contactar al servidor. Usando tanques embebidos en el QR.");
         }
-        cacheTanquesLocal(sede, tanquesQR); // los guardamos también
+        cacheTanquesLocal(sede, tanquesQR);
         return { tanques: tanquesQR, fuente: "qr" };
       }
 
@@ -559,26 +556,6 @@
         alert("No se pudieron obtener tanques ni del servidor, ni del celular, ni del QR.");
       }
       throw new Error("No hay tanques disponibles");
-    }
-
-
-    // 2) Cache local del celular
-    const cached = getTanquesLocal(sede);
-    if (cached && Array.isArray(cached.tanques) && cached.tanques.length) {
-      alert("Sin internet. Usando tanques guardados en el celular.");
-      return { tanques: cached.tanques, fuente: "cache", ts: cached.ts };
-    }
-
-    // 3) Tanques embebidos en QR
-    if (Array.isArray(tanquesQR) && tanquesQR.length) {
-      alert("Sin internet. Usando tanques embebidos en el QR.");
-      cacheTanquesLocal(sede, tanquesQR); // los guardamos también
-      return { tanques: tanquesQR, fuente: "qr" };
-    }
-
-    // Nada disponible
-    alert("Sin internet y no hay tanques guardados ni en el QR. Conéctate para iniciar.");
-    throw new Error("No hay tanques disponibles offline");
     }
 
     // ===================================================
