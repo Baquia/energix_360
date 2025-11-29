@@ -439,7 +439,7 @@ def registrar_inicio_calefaccion():
                             server.starttls()
                             server.login(EMAIL_USER, EMAIL_PASS)
                             server.sendmail(EMAIL_USER, destinatarios, msg.as_string())
-                         print("✅ Correo GLP enviado a:", destinatarios)
+                        print("✅ Correo GLP enviado a:", destinatarios)
                     except Exception:
                         print("⛔ Error al enviar correo GLP:")
                         traceback.print_exc()
@@ -898,7 +898,7 @@ def registrar_consumo():
                             server.starttls()
                             server.login(EMAIL_USER, EMAIL_PASS)
                             server.sendmail(EMAIL_USER, destinatarios, msg.as_string())
-                         print("✅ Correo GLP enviado a:", destinatarios)
+                        print("✅ Correo GLP enviado a:", destinatarios)
                     except Exception:
                         print("⛔ Error al enviar correo GLP:")
                         traceback.print_exc()
