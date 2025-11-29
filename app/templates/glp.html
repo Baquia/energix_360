@@ -531,7 +531,7 @@
         if (!navigator.onLine) {
           alert("Sin internet. Usando tanques embebidos en el QR.");
         } else {
-          alert("No se pudo contactar al servidor. Usando tanques embebidos en el QR.");
+          alert("No se encontraron tanques válidos en el servidor. Usando tanques embebidos en el QR.");
         }
         cacheTanquesLocal(sede, tanquesQR);
         return { tanques: tanquesQR, fuente: "qr" };
@@ -543,7 +543,7 @@
         if (!navigator.onLine) {
           alert("Sin internet. Usando tanques guardados en el celular.");
         } else {
-          alert("No se pudo contactar al servidor. Usando tanques guardados en el celular.");
+          alert("No se encontraron tanques válidos en el servidor. Usando tanques guardados en el celular.");
         }
         return { tanques: cached.tanques, fuente: "cache", ts: cached.ts };
       }
@@ -1565,6 +1565,28 @@ Captura nivel + foto (común)
 
   </script>
   <script>
+    // Background Sync + mensajes desde el Service Worker para cola GLP
+    if ("serviceWorker" in navigator && "SyncManager" in window) {
+      window.addEventListener("online", () => {
+        navigator.serviceWorker.ready
+          .then(reg => reg.sync.register("sync-glp-queue"))
+          .catch(err => console.warn("No se pudo registrar sync-glp-queue:", err));
+      });
+    }
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        if (
+          event.data &&
+          event.data.type === "BQA_GLPSYNC" &&
+          event.data.action === "flushQueue" &&
+          typeof flushOfflineQueue === "function"
+        ) {
+          flushOfflineQueue();
+        }
+      });
+    }
+
     function activarLogoutSeguroOffline() {
       const logoutLinks = document.querySelectorAll('a[href="/logout"]');
 

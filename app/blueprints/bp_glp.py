@@ -7,6 +7,7 @@ import os, base64, smtplib, traceback
 from email.mime.text import MIMEText
 from app import mysql, csrf
 import re as _re
+import random
 
 bp_glp = Blueprint('bp_glp', __name__, url_prefix='/glp')
 
@@ -31,6 +32,49 @@ def _normalize_sede(s):
         s = s.split("|", 1)[0]
     s = _re.sub(r"\s+", " ", s.replace("\u00A0", " ")).strip()
     return s
+
+def _generar_codigo_pedido(cur, empresa, proveedor, fecha):
+    """Genera un código único tipo MM-XXX-9999 y lo registra en pedidos_gas_glp.
+
+    - MM: mes del pedido (01-12)
+    - XXX: iniciales de las tres primeras palabras del nombre del cliente
+    - 9999: número aleatorio de 4 dígitos, único en la tabla
+    """
+    # Mes con dos dígitos
+    try:
+        mes = int(getattr(fecha, "month", 0) or 0)
+    except Exception:
+        mes = 0
+    if mes <= 0 or mes > 12:
+        mes = datetime.now().month
+    pref_mes = f"{mes:02d}"
+
+    # Iniciales del cliente (3 primeras palabras)
+    palabras = (empresa or "").strip().split()
+    iniciales = "".join([p[0].upper() for p in palabras[:3]])
+    if len(iniciales) < 3:
+        iniciales = (iniciales + "XXX")[:3]
+    base = f"{pref_mes}-{iniciales}-"
+
+    # Intentar generar un código único hasta 20 veces
+    for _ in range(20):
+        suf = f"{random.randint(0, 9999):04d}"
+        codigo = base + suf
+
+        cur.execute("SELECT 1 FROM pedidos_gas_glp WHERE codigo=%s LIMIT 1", (codigo,))
+        if not cur.fetchone():
+            # Insertar registro en la tabla de control de pedidos
+            cur.execute(
+                """
+                INSERT INTO pedidos_gas_glp (cliente, proveedor, codigo, estatus, fecha_registro)
+                VALUES (%s, %s, %s, %s, %s)
+                """.strip(),
+                (empresa, proveedor, codigo, "generado", fecha)
+            )
+            return codigo
+
+    raise Exception("No se pudo generar un código de pedido único tras varios intentos")
+
 
 
 def _guardar_testigo(base64_data, carpeta, nombre_archivo):
@@ -198,14 +242,15 @@ def _buscar_proveedor_principal(cur, empresa, ubicacion, tanques):
     """
     if not tanques:
         return None
-    primer_num = tanques[0].get("numero")
+    primer_num = str(tanques[0].get("numero") or "").upper().strip()
+    #primer_num = tanques[0].get("numero")
     if not primer_num:
         return None
 
     cur.execute("""
         SELECT proveedor
         FROM tanques_sedes
-        WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND nombre_tanque=%s
+        WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND UPPER(nombre_tanque)=UPPER(%s)
         LIMIT 1
     """, (empresa, ubicacion, primer_num))
     p = cur.fetchone()
@@ -411,7 +456,7 @@ def registrar_inicio_calefaccion():
                         "porcentaje_solicitado": round(pct_sol,2)
                     })
 
-            if tanques_bajos and proveedor_principal:
+                        if tanques_bajos and proveedor_principal:
                 cur.execute("SELECT email1,email2 FROM proveedores WHERE proveedor=%s",
                             (proveedor_principal,))
                 c = cur.fetchone() or {}
@@ -420,18 +465,47 @@ def registrar_inicio_calefaccion():
                     destinatarios = [EMAIL_USER]
 
                 if destinatarios:
-                    cuerpo  = "📩 Solicitud de Tanqueo GLP\n\n"
-                    cuerpo += f"Empresa: {empresa}\nSede: {ubicacion}\nLote: {lote_id}\n"
-                    cuerpo += f"Fecha: {fecha.strftime('%Y-%m-%d')}\nDía de calefacción: {dias_operacion}\n\n"
-                    cuerpo += "Recomendaciones:\n"
+                    # Generar código de pedido de gas y registrarlo en pedidos_gas_glp
+                    try:
+                        codigo_pedido = _generar_codigo_pedido(cur, empresa, proveedor_principal, fecha)
+                    except Exception as e:
+                        print("[GLP] No se pudo generar código de pedido:", e)
+                        codigo_pedido = None
+
+                    # Cuerpo del correo en HTML, resaltando el código de pedido
+                    cuerpo  = "<p>📩 <b>Solicitud de Tanqueo GLP</b></p>"
+                    cuerpo += "<p><b>Empresa:</b> {empresa}<br>"
+                    cuerpo += "<b>Sede:</b> {ubicacion}<br>"
+                    cuerpo += "<b>Lote:</b> {lote}<br>"
+                    cuerpo += "<b>Fecha:</b> {fecha}<br>"
+                    cuerpo += "<b>Día de calefacción:</b> {dia}</p>".format(
+                        empresa=empresa,
+                        ubicacion=ubicacion,
+                        lote=lote_id,
+                        fecha=fecha.strftime('%Y-%m-%d'),
+                        dia=dias_operacion
+                    )
+
+                    if codigo_pedido:
+                        cuerpo += (
+                            "<p><b>Código de validación del pedido:</b> "
+                            "<b><u>{codigo}</u></b></p>"
+                        ).format(codigo=codigo_pedido)
+                        cuerpo += (
+                            "<p><i>Nota:</i> Para que la factura sea válida, "
+                            "el proveedor debe incluir este código en la factura.</p>"
+                        )
+
+                    cuerpo += "<p><b>Recomendaciones de llenado:</b><br>"
                     for t in tanques_bajos:
                         cuerpo += (
                             f"- {t['numero']}: nivel {t['nivel_inicial']}% → "
-                            f"llenar hasta {t['porcentaje_solicitado']}%\n"
+                            f"llenar hasta {t['porcentaje_solicitado']}%<br>"
                         )
+                    cuerpo += "</p>"
 
                     try:
-                        msg = MIMEText(cuerpo)
+                        msg = MIMEText(cuerpo, "html", "utf-8")
                         msg["Subject"] = "Solicitud de Tanqueo GLP"
                         msg["From"] = EMAIL_FROM
                         msg["To"] = ", ".join(destinatarios)
@@ -444,31 +518,6 @@ def registrar_inicio_calefaccion():
                         print("⛔ Error al enviar correo GLP:")
                         traceback.print_exc()
 
-            mysql.connection.commit()
-
-        mensaje = f"Lote {lote_id} registrado correctamente."
-        if tanques_bajos:
-            mensaje += " ⚠️ Se solicitó tanqueo vía email."
-
-        resumen = {
-            "operacion": "inicio_calefaccion",
-            "sede": ubicacion,
-            "lote": lote_id,
-            "fecha": fecha.strftime("%Y-%m-%d"),
-            "pollitos": pollitos if empresa=="Pollos GAR SAS" else None,
-            "criadoras": criadoras if empresa=="Pollos GAR SAS" else None,
-            "tanques": _resumen_tanques(tanques),
-            "dias_operacion": dias_operacion,
-            "proveedor": proveedor_principal,
-            "op_id": op_id
-        }
-
-        return jsonify({"success": True, "message": mensaje, "resumen": resumen})
-
-    except Exception:
-        print("⛔ Error en registrar_inicio_calefaccion:")
-        traceback.print_exc()
-        return jsonify({"success": False, "message": "Error al registrar los datos."})
 
 
 # ======================
@@ -870,7 +919,7 @@ def registrar_consumo():
                         "porcentaje_solicitado": round(pct_sol, 2)
                     })
 
-            if tanques_bajos and proveedor_principal:
+                        if tanques_bajos and proveedor_principal:
                 cur.execute("SELECT email1,email2 FROM proveedores WHERE proveedor=%s",
                             (proveedor_principal,))
                 c = cur.fetchone() or {}
@@ -879,18 +928,47 @@ def registrar_consumo():
                     destinatarios = [EMAIL_USER]
 
                 if destinatarios:
-                    cuerpo  = "📩 Solicitud de Tanqueo GLP\n\n"
-                    cuerpo += f"Empresa: {empresa}\nSede: {ubicacion}\nLote: {lote_id}\n"
-                    cuerpo += f"Fecha: {fecha.strftime('%Y-%m-%d')}\nDía de calefacción: {dias_operacion}\n\n"
-                    cuerpo += "Recomendaciones:\n"
+                    # Generar código de pedido de gas y registrarlo en pedidos_gas_glp
+                    try:
+                        codigo_pedido = _generar_codigo_pedido(cur, empresa, proveedor_principal, fecha)
+                    except Exception as e:
+                        print("[GLP] No se pudo generar código de pedido (consumo):", e)
+                        codigo_pedido = None
+
+                    # Cuerpo del correo en HTML, resaltando el código de pedido
+                    cuerpo  = "<p>📩 <b>Solicitud de Tanqueo GLP</b> (por consumo)</p>"
+                    cuerpo += "<p><b>Empresa:</b> {empresa}<br>"
+                    cuerpo += "<b>Sede:</b> {ubicacion}<br>"
+                    cuerpo += "<b>Lote:</b> {lote}<br>"
+                    cuerpo += "<b>Fecha:</b> {fecha}<br>"
+                    cuerpo += "<b>Día de calefacción:</b> {dia}</p>".format(
+                        empresa=empresa,
+                        ubicacion=ubicacion,
+                        lote=lote_id,
+                        fecha=fecha.strftime('%Y-%m-%d'),
+                        dia=dias_operacion
+                    )
+
+                    if codigo_pedido:
+                        cuerpo += (
+                            "<p><b>Código de validación del pedido:</b> "
+                            "<b><u>{codigo}</u></b></p>"
+                        ).format(codigo=codigo_pedido)
+                        cuerpo += (
+                            "<p><i>Nota:</i> Para que la factura sea válida, "
+                            "el proveedor debe incluir este código en la factura.</p>"
+                        )
+
+                    cuerpo += "<p><b>Recomendaciones de llenado:</b><br>"
                     for t in tanques_bajos:
                         cuerpo += (
                             f"- {t['numero']}: nivel {t['nivel_inicial']}% → "
-                            f"llenar hasta {t['porcentaje_solicitado']}%\n"
+                            f"llenar hasta {t['porcentaje_solicitado']}%<br>"
                         )
+                    cuerpo += "</p>"
 
                     try:
-                        msg = MIMEText(cuerpo)
+                        msg = MIMEText(cuerpo, "html", "utf-8")
                         msg["Subject"] = "Solicitud de Tanqueo GLP"
                         msg["From"] = EMAIL_FROM
                         msg["To"] = ", ".join(destinatarios)
@@ -898,41 +976,10 @@ def registrar_consumo():
                             server.starttls()
                             server.login(EMAIL_USER, EMAIL_PASS)
                             server.sendmail(EMAIL_USER, destinatarios, msg.as_string())
-                        print("✅ Correo GLP enviado a:", destinatarios)
+                        print("✅ Correo GLP (consumo) enviado a:", destinatarios)
                     except Exception:
-                        print("⛔ Error al enviar correo GLP:")
+                        print("⛔ Error al enviar correo GLP (consumo):")
                         traceback.print_exc()
-
-            mysql.connection.commit()
-
-        mensaje = "Consumo registrado correctamente."
-        if consumo_kg > 0:
-            mensaje += f" Consumo desde la última operación: {round(consumo_kg,2)} kg"
-            if kg_pollito > 0:
-                mensaje += f" ({round(kg_pollito,6)} kg/pollito)."
-
-        resumen = {
-            "operacion": "consumo",
-            "sede": ubicacion,
-            "lote": lote_id,
-            "fecha": fecha.strftime("%Y-%m-%d"),
-            "tanques": _resumen_tanques(tanques),
-            "saldo_estimado_kg": round(saldo_estimado_kg,2),
-            "saldo_estimado_galones": round(saldo_estimado_gal,2),
-            "dias_operacion": dias_operacion,
-            "kg_consumidos": round(consumo_kg,2),
-            "kg_pollito": round(kg_pollito,6) if kg_pollito > 0 else 0.0,
-            "pollitos": pollitos,
-            "proveedor": proveedor_principal,
-            "op_id": op_id
-        }
-
-        return jsonify({"success": True, "message": mensaje, "resumen": resumen})
-
-    except Exception:
-        print("⛔ Error en registrar_consumo:")
-        traceback.print_exc()
-        return jsonify({"success": False, "message": "Error al registrar consumo."})
 
 
 # ======================

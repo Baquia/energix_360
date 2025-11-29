@@ -1,7 +1,7 @@
-/* BQA-ONE / Energix360 - Service Worker v4 (robusto) */
+/* BQA-ONE / Energix360 - Service Worker v5 (GLP network-first + BG Sync) */
 
-const CACHE_STATIC  = "bqa-one-shell-v4";
-const CACHE_DYNAMIC = "bqa-one-dyn-v4";
+const CACHE_STATIC  = "bqa-one-shell-v5";
+const CACHE_DYNAMIC = "bqa-one-dyn-v5";
 
 // App Shell mínimo y público (NO incluye "/" para evitar 302/errores)
 const APP_SHELL = [
@@ -76,6 +76,43 @@ self.addEventListener("fetch", (event) => {
 
   const accept = req.headers.get("accept") || "";
   const isHTML = req.mode === "navigate" || accept.includes("text/html");
+  const path = url.pathname || "";
+
+  // ===== GLP APIs (JSON bajo /glp/) → NETWORK-FIRST =====
+  // OJO: NO afecta glp.html, solo rutas tipo /glp/obtener_tanques, etc.
+  if (path.startsWith("/glp/") && !isHTML) {
+    event.respondWith((async () => {
+      try {
+        // Intento online primero
+        const res = await fetch(req);
+        const copy = res.clone();
+        // Guardamos respuesta en caché dinámico por si sirve como fallback
+        caches.open(CACHE_DYNAMIC).then((cache) => {
+          cache.put(req, copy);
+          limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
+        });
+        return res;
+      } catch (err) {
+        // Sin red: intentamos devolver una respuesta cacheada
+        const cached = await caches.match(req);
+        if (cached) return cached;
+
+        // Si no hay nada cacheado, devolvemos un JSON de error controlado
+        return new Response(
+          JSON.stringify({
+            success: false,
+            offline: true,
+            message: "Sin conexión y sin copia cacheada de la API GLP."
+          }),
+          {
+            status: 503,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
+    })());
+    return;
+  }
 
   // ===== HTML / Navegación =====
   if (isHTML) {
@@ -120,4 +157,20 @@ self.addEventListener("fetch", (event) => {
         .catch(() => cached);
     })
   );
+});
+
+// BACKGROUND SYNC: avisar a los clientes que deben vaciar la cola GLP
+self.addEventListener("sync", (event) => {
+  if (event.tag === "sync-glp-queue") {
+    event.waitUntil((async () => {
+      const clients = await self.clients.matchAll();
+      for (const client of clients) {
+        // El front debe escuchar este mensaje y llamar a flushOfflineQueue()
+        client.postMessage({
+          type: "BQA_GLPSYNC",
+          action: "flushQueue"
+        });
+      }
+    })());
+  }
 });
