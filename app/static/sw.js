@@ -6,13 +6,15 @@ const CACHE_DYNAMIC = "bqa-one-dyn-v4";
 // App Shell mínimo y público (NO incluye "/" para evitar 302/errores)
 const APP_SHELL = [
   "/offline.html",
+  "/login_energix360.html",
+  "/890707006.html",
+  "/glp.html",
+
   "/static/manifest.json",
   "/static/BQA_ONE_192.png",
   "/static/BQA_ONE_512.png",
   "/static/logo_energix360.png",
-
-  // ✅ Librería QR local para modo offline
-  "/static/js/html5-qrcode.min.js",
+  "/static/js/html5-qrcode.min.js"
 ];
 
 // Limitar tamaño del caché dinámico para no inflar el navegador

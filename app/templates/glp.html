@@ -526,8 +526,18 @@
           console.error("Error consultando /glp/obtener_tanques:", e);
         }
       }
+      // 2) Tanques embebidos en QR
+      if (Array.isArray(tanquesQR) && tanquesQR.length) {
+        if (!navigator.onLine) {
+          alert("Sin internet. Usando tanques embebidos en el QR.");
+        } else {
+          alert("No se pudo contactar al servidor. Usando tanques embebidos en el QR.");
+        }
+        cacheTanquesLocal(sede, tanquesQR);
+        return { tanques: tanquesQR, fuente: "qr" };
+      }
 
-      // 2) Cache local del celular
+      // 3) Cache local del celular
       const cached = getTanquesLocal(sede);
       if (cached && Array.isArray(cached.tanques) && cached.tanques.length) {
         if (!navigator.onLine) {
@@ -538,16 +548,7 @@
         return { tanques: cached.tanques, fuente: "cache", ts: cached.ts };
       }
 
-      // 3) Tanques embebidos en QR
-      if (Array.isArray(tanquesQR) && tanquesQR.length) {
-        if (!navigator.onLine) {
-          alert("Sin internet. Usando tanques embebidos en el QR.");
-        } else {
-          alert("No se pudo contactar al servidor. Usando tanques embebidos en el QR.");
-        }
-        cacheTanquesLocal(sede, tanquesQR);
-        return { tanques: tanquesQR, fuente: "qr" };
-      }
+
 
       // Nada disponible
       if (!navigator.onLine) {
