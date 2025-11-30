@@ -653,6 +653,7 @@ def registrar_tanqueo():
                 foto_bau = tk.get("foto_baucher")
 
                 if num:
+                    # Guardamos en la fila de tanqueo los NIVELES FINALES (post tanqueo)
                     set_cols.append(f"`nivel {num}`=%s");     set_vals.append(nivel_fin)
                     set_cols.append(f"`capacidad {num}`=%s"); set_vals.append(cap)
 
@@ -702,12 +703,14 @@ def registrar_tanqueo():
                  WHERE id=%s
             """, (round(saldo_estimado_kg,2), round(saldo_estimado_gal,2), id_operacion))
 
-            # consumo con niveles FINALES
+            # ⚠️ AQUÍ VIENE EL CAMBIO IMPORTANTE:
+            # Para calcular el consumo del tramo ANTERIOR al tanqueo,
+            # usamos los NIVELES INICIALES (antes de llenar), no los finales.
             consumo_kg, kg_pollito, pollitos = _calcular_consumo_lote(
                 cur, empresa, ubicacion, lote_id, id_operacion,
                 [{"numero": t.get("numero"),
                   "capacidad": t.get("capacidad"),
-                  "nivel": t.get("nivel_final")} for t in tanques]
+                  "nivel": t.get("nivel_inicial")} for t in tanques]
             )
 
             dias_operacion = _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha)
