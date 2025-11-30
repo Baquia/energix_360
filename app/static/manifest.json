@@ -1,7 +1,7 @@
 {
   "name": "BQA-ONE",
   "short_name": "BQA-ONE",
-  "start_url": "https://baquiasoft.pythonanywhere.com/",
+  "start_url": "/login_energix360.html",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f4f6f7",

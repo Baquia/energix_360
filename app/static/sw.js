@@ -3,8 +3,9 @@
 const CACHE_STATIC  = "bqa-one-shell-v5";
 const CACHE_DYNAMIC = "bqa-one-dyn-v5";
 
-// App Shell mínimo y público (NO incluye "/" para evitar 302/errores)
+// App Shell mínimo y público
 const APP_SHELL = [
+  "/",                        // raíz cacheada
   "/offline.html",
   "/login_energix360.html",
   "/890707006.html",
@@ -130,10 +131,16 @@ self.addEventListener("fetch", (event) => {
         .catch(async () => {
           // Offline:
           // 1) si la página ya fue visitada, ábrela desde caché
-          const cachedPage = await caches.match(req);
+          let cachedPage = await caches.match(req);
           if (cachedPage) return cachedPage;
 
-          // 2) fallback a offline.html
+          // 2) si pidieron raíz "/", devolver login cacheado
+          if (url.pathname === "/") {
+            cachedPage = await caches.match("/login_energix360.html");
+            if (cachedPage) return cachedPage;
+          }
+
+          // 3) fallback a offline.html
           return caches.match("/offline.html");
         })
     );
