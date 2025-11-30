@@ -505,7 +505,7 @@ def registrar_inicio_calefaccion():
                     for t in tanques_bajos:
                         cuerpo += (
                             "<li>Tanque {num}: nivel {niv}% → llenar hasta {sol}% "
-                            "(Δreq={req}%).</li>"
+                            #"(Δreq={req}%).</li>"
                         ).format(
                             num=t['numero'],
                             niv=t['nivel_inicial'],
@@ -989,7 +989,7 @@ def registrar_consumo():
                     for t in tanques_bajos:
                         cuerpo += (
                             "<li>Tanque {num}: nivel {niv}% → llenar hasta {sol}% "
-                            "(Δreq={req}%).</li>"
+                            #"(Δreq={req}%).</li>"
                         ).format(
                             num=t['numero'],
                             niv=t['nivel_inicial'],
