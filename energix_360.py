@@ -6,9 +6,8 @@ from functools import wraps
 from flask import send_from_directory
 from flask import current_app
 
-from app import create_app
+app = create_app()
 
-from app import app
 
 @app.route("/login_energix360_offline.html")
 def login_energix360_offline():
