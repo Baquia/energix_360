@@ -1,11 +1,15 @@
-/* BQA-ONE / Energix360 - Service Worker v6 (GLP network-first + BG Sync) */
+/* BQA-ONE / Energix360 - Service Worker v7
+   - App shell cache-first
+   - GLP APIs network-first
+   - HTML navegaciones network-first con fallback SIEMPRE a algo (sin ERR_FAILED)
+*/
 
-const CACHE_STATIC  = "bqa-one-shell-v6";
-const CACHE_DYNAMIC = "bqa-one-dyn-v6";
+const CACHE_STATIC  = "bqa-one-shell-v7";
+const CACHE_DYNAMIC = "bqa-one-dyn-v7";
 
 // App Shell mínimo y público
 const APP_SHELL = [
-  "/",                // raíz -> login
+  "/",                      // raíz -> login
   "/login_energix360.html",
   "/offline.html",
   "/890707006.html",
@@ -19,6 +23,7 @@ const APP_SHELL = [
 ];
 
 const MAX_DYNAMIC_ITEMS = 60;
+
 async function limitCacheSize(cacheName, maxItems) {
   const cache = await caches.open(cacheName);
   const keys = await cache.keys();
@@ -30,27 +35,35 @@ async function limitCacheSize(cacheName, maxItems) {
 
 // INSTALL (no revienta si algo no cachea)
 self.addEventListener("install", (event) => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_STATIC);
-    for (const url of APP_SHELL) {
-      try {
-        await cache.add(url);
-      } catch (err) {
-        console.warn("SW install: no se pudo cachear", url, err);
+  console.log("[SW v7] install");
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_STATIC);
+      for (const url of APP_SHELL) {
+        try {
+          await cache.add(url);
+          console.log("[SW v7] cacheado en APP_SHELL:", url);
+        } catch (err) {
+          console.warn("[SW v7] NO se pudo cachear", url, err);
+        }
       }
-    }
-  })());
+    })()
+  );
   self.skipWaiting();
 });
 
 // ACTIVATE
 self.addEventListener("activate", (event) => {
+  console.log("[SW v7] activate");
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
           .filter((k) => ![CACHE_STATIC, CACHE_DYNAMIC].includes(k))
-          .map((k) => caches.delete(k))
+          .map((k) => {
+            console.log("[SW v7] borrando cache vieja:", k);
+            return caches.delete(k);
+          })
       )
     )
   );
@@ -77,37 +90,38 @@ self.addEventListener("fetch", (event) => {
 
   // ===== GLP APIs (JSON bajo /glp/) → NETWORK-FIRST =====
   if (path.startsWith("/glp/") && !isHTML) {
-    event.respondWith((async () => {
-      try {
-        const res = await fetch(req);
-        const copy = res.clone();
-        caches.open(CACHE_DYNAMIC).then((cache) => {
-          cache.put(req, copy);
-          limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
-        });
-        return res;
-      } catch (err) {
-        const cached = await caches.match(req);
-        if (cached) return cached;
+    event.respondWith(
+      (async () => {
+        try {
+          const res = await fetch(req);
+          const copy = res.clone();
+          caches.open(CACHE_DYNAMIC).then((cache) => {
+            cache.put(req, copy);
+            limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
+          });
+          return res;
+        } catch (err) {
+          const cached = await caches.match(req);
+          if (cached) return cached;
 
-        return new Response(
-          JSON.stringify({
-            success: false,
-            offline: true,
-            message: "Sin conexión y sin copia cacheada de la API GLP."
-          }),
-          {
-            status: 503,
-            headers: { "Content-Type": "application/json" }
-          }
-        );
-      }
-    })());
+          return new Response(
+            JSON.stringify({
+              success: false,
+              offline: true,
+              message: "Sin conexión y sin copia cacheada de la API GLP."
+            }),
+            {
+              status: 503,
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+        }
+      })()
+    );
     return;
   }
 
-  // ===== HTML / Navegación =====
-    // ===== HTML / Navegación =====
+  // ===== HTML / Navegación (login, 890707006, glp, etc.) =====
   if (isHTML) {
     event.respondWith(
       (async () => {
@@ -115,26 +129,26 @@ self.addEventListener("fetch", (event) => {
           // ONLINE: intentamos ir a la red
           const res = await fetch(req);
           const copy = res.clone();
-
           caches.open(CACHE_DYNAMIC).then((cache) => {
             cache.put(req, copy);
             limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
           });
-
           return res;
         } catch (err) {
+          console.warn("[SW v7] HTML offline para", path, "error:", err);
+
           // OFFLINE: devolvemos SIEMPRE alguna página
 
-          // 1) Intentar con la petición completa
-          let cachedPage = await caches.match(req);
-          if (cachedPage) return cachedPage;
+          // 1) Intentar respuesta cacheada exacta (Request completo)
+          let cached = await caches.match(req);
+          if (cached) return cached;
 
-          // 2) Intentar con el path puro ("/890707006.html", "/glp.html", etc.)
-          cachedPage = await caches.match(url.pathname);
-          if (cachedPage) return cachedPage;
+          // 2) Intentar por pathname ("/890707006.html", "/glp.html", etc.)
+          cached = await caches.match(path);
+          if (cached) return cached;
 
-          // 3) Si pidieron raíz, intentar raíz cacheada
-          if (url.pathname === "/") {
+          // 3) Si pidieron raíz "/", intentar raíz cacheada
+          if (path === "/") {
             const rootCached = await caches.match("/");
             if (rootCached) return rootCached;
           }
@@ -143,7 +157,7 @@ self.addEventListener("fetch", (event) => {
           const offlineCached = await caches.match("/offline.html");
           if (offlineCached) return offlineCached;
 
-          // 5) Último recurso: respuesta HTML simple para evitar ERR_FAILED
+          // 5) Último recurso: HTML simple (para evitar ERR_FAILED)
           return new Response(
             "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Sin conexión</title></head>" +
             "<body style='font-family:sans-serif; padding:16px;'>" +
@@ -161,34 +175,39 @@ self.addEventListener("fetch", (event) => {
 
   // ===== ESTÁTICOS (JS/CSS/IMG/FONTS) → cache-first =====
   event.respondWith(
-    caches.match(req).then((cached) => {
+    (async () => {
+      const cached = await caches.match(req);
       if (cached) return cached;
 
-      return fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_DYNAMIC).then((cache) => {
-            cache.put(req, copy);
-            limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
-          });
-          return res;
-        })
-        .catch(() => cached);
-    })
+      try {
+        const res = await fetch(req);
+        const copy = res.clone();
+        caches.open(CACHE_DYNAMIC).then((cache) => {
+          cache.put(req, copy);
+          limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
+        });
+        return res;
+      } catch (err) {
+        // Si también falla aquí, devolvemos lo que tengamos cacheado (aunque sea null)
+        return cached || new Response("", { status: 504 });
+      }
+    })()
   );
 });
 
 // BACKGROUND SYNC: avisar a los clientes que deben vaciar la cola GLP
 self.addEventListener("sync", (event) => {
   if (event.tag === "sync-glp-queue") {
-    event.waitUntil((async () => {
-      const clients = await self.clients.matchAll();
-      for (const client of clients) {
-        client.postMessage({
-          type: "BQA_GLPSYNC",
-          action: "flushQueue"
-        });
-      }
-    })());
+    event.waitUntil(
+      (async () => {
+        const clients = await self.clients.matchAll();
+        for (const client of clients) {
+          client.postMessage({
+            type: "BQA_GLPSYNC",
+            action: "flushQueue"
+          });
+        }
+      })()
+    );
   }
 });
