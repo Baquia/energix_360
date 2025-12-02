@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Inicio OFFLINE | Pollos Gar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- PWA -->
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <script src="/static/js/html5-qrcode.min.js"></script>
+  <meta name="theme-color" content="#015249">
+
+  <style>
+    :root {
+      --color-primary: #015249;
+      --color-primary-dark: #013d36;
+      --color-bg: #f6f7f8;
+      --color-surface: #ffffff;
+      --color-border: #e5e7eb;
+      --color-text: #111827;
+      --color-muted: #6b7280;
+      --color-danger: #b00020;
+      --shadow-soft: 0 4px 14px rgba(15, 23, 42, .08);
+      --radius-card: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Verdana, sans-serif;
+      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 12px 70px;
+      position: relative;
+      min-height: 100vh;
+      color: var(--color-text);
+    }
+
+    header {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+
+    .logo {
+      max-height: 56px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    h1 {
+      width: 100%;
+      max-width: 980px;
+      font-size: clamp(1.2rem, 3.2vw, 1.6rem);
+      text-align: center;
+      margin: 0 0 18px;
+      color: var(--color-primary-dark);
+    }
+
+    .subtitulo {
+      width: 100%;
+      max-width: 980px;
+      font-size: 0.9rem;
+      text-align: center;
+      margin: 0 0 18px;
+      color: var(--color-muted);
+    }
+
+    .subtitulo strong {
+      color: var(--color-primary-dark);
+    }
+
+    .grid {
+      width: 100%;
+      max-width: 980px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+    }
+
+    .icon-btn {
+      background: var(--color-surface);
+      border-radius: var(--radius-card);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-soft);
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition:
+        transform 0.1s ease,
+        box-shadow 0.1s ease,
+        background 0.15s ease;
+    }
+
+    .icon-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+      background: #f0fdf9;
+    }
+
+    .icon-btn img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+    }
+
+    .icon-label {
+      margin-top: 4px;
+      font-size: clamp(0.85rem, 2.5vw, 0.95rem);
+      color: var(--color-primary-dark);
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .logout-btn {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      background: var(--color-danger);
+      color: #fff;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid var(--color-danger);
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(180, 0, 32, 0.4);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 20;
+      text-decoration: none;
+    }
+
+    .logout-btn:hover {
+      background: #8f0017;
+    }
+
+    @media (max-width: 640px) {
+      header {
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      h1,
+      .subtitulo {
+        text-align: center;
+      }
+    }
+  </style>
+
+  <script>
+    // Registro del Service Worker
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js")
+          .then(reg => console.log("✅ SW registrado con scope:", reg.scope))
+          .catch(err => console.error("❌ Error registrando SW:", err));
+      });
+    }
+  </script>
+</head>
+
+<body>
+
+  <header>
+    <img src="/static/logo_PollosGar.png" class="logo" alt="Pollos Gar">
+    <img src="/static/logo_energix360.png" class="logo" alt="BQA-ONE">
+  </header>
+
+  <h1 class="titulo">¡Hola Usuario! (modo offline)</h1>
+  <p class="subtitulo">
+    Estás en el panel de Pollos Gar en <strong>modo offline</strong>.<br>
+    Por ahora, solo está disponible el módulo <strong>GAS (GLP)</strong>.
+  </p>
+
+  <div class="grid">
+    <div class="icon-btn" onclick="acceder('gas')">
+      <img src="{{ url_for('static', filename='icon_gas.png') }}" alt="Gas">
+      <div class="icon-label">Gas</div>
+    </div>
+
+    <div class="icon-btn" onclick="acceder('carbon')">
+      <img src="{{ url_for('static', filename='icon_carbon.png') }}" alt="Carbón">
+      <div class="icon-label">Carbón</div>
+    </div>
+
+    <div class="icon-btn" onclick="acceder('electricidad')">
+      <img src="{{ url_for('static', filename='icon_electricidad.png') }}" alt="Electricidad">
+      <div class="icon-label">Electricidad</div>
+    </div>
+
+    <div class="icon-btn" onclick="acceder('flota')">
+      <img src="{{ url_for('static', filename='icon_flota.png') }}" alt="Flota">
+      <div class="icon-label">Flota</div>
+    </div>
+
+    <div class="icon-btn" onclick="acceder('mermas')">
+      <img src="{{ url_for('static', filename='icon_mermas.png') }}" alt="Control de Mermas">
+      <div class="icon-label">Control de Mermas</div>
+    </div>
+  </div>
+
+  <a href="/logout" class="logout-btn">Salir</a>
+
+  <script>
+    // Proteger el logout cuando no hay conexión
+    function activarLogoutSeguroOffline() {
+      const logoutLinks = document.querySelectorAll('a[href="/logout"]');
+
+      logoutLinks.forEach(a => {
+        // Limpiamos listeners previos por si se ejecuta varias veces
+        a.onclick = null;
+
+        if (!navigator.onLine) {
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            alert(
+              "Estás sin conexión a internet.\n\n" +
+              "El cierre de sesión solo se realiza cuando hay conexión.\n" +
+              "Cuando recuperes la señal, entra a la versión online y cierra sesión desde allí."
+            );
+          }, { once: true });
+        }
+      });
+    }
+
+    window.addEventListener("load", activarLogoutSeguroOffline);
+    window.addEventListener("online", activarLogoutSeguroOffline);
+    window.addEventListener("offline", activarLogoutSeguroOffline);
+  </script>
+
+  <script>
+    // Versión OFFLINE de la función acceder
+    function acceder(modulo) {
+      // Módulo GLP → usamos la versión offline del GLP
+      if (modulo === 'gas') {
+        // Podrías usar hashes (#inicio, etc.) si quieres auto-arrancar una operación
+        // window.location.href = '/glp_offline.html#inicio';
+        window.location.href = '/glp_offline.html';
+        return;
+      }
+
+      // El resto de módulos todavía no tienen modo offline
+      alert(
+        "Estás en modo OFFLINE.\n\n" +
+        "Por ahora, solo el módulo GAS (GLP) está disponible sin conexión.\n\n" +
+        "Los módulos de Carbón, Electricidad, Flota y Mermas requieren conexión a internet.\n\n" +
+        "Cuando tengas señal, usa la versión online para acceder a estos módulos."
+      );
+    }
+  </script>
+
+</body>
+
+</html>

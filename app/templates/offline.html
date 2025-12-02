@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <title>BQA-ONE | Sin conexión</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/static/js/html5-qrcode.min.js"></script>
+
+
+  <!-- PWA -->
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#015249">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+
+  <style>
+    :root {
+      --color-primary: #015249;
+      --color-primary-dark: #013d36;
+      --color-bg: #f6f7f8;
+      --color-surface: #ffffff;
+      --color-border: #e5e7eb;
+      --color-text: #111827;
+      --color-muted: #6b7280;
+      --color-danger: #b00020;
+      --shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.08);
+      --radius-card: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Verdana, sans-serif;
+      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 12px;
+      color: var(--color-text);
+    }
+
+    .offline-wrap {
+      width: 100%;
+      max-width: 460px;
+      background: var(--color-surface);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(15, 23, 42, 0.05);
+      padding: 20px 18px 20px;
+      text-align: center;
+    }
+
+    .logos {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .logos img {
+      max-height: 48px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      margin: 6px 0 4px;
+      color: var(--color-primary-dark);
+    }
+
+    .subtitulo {
+      font-size: 0.9rem;
+      color: var(--color-muted);
+      margin: 0 0 14px;
+      line-height: 1.4;
+    }
+
+    .badge-offline {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #fef3c7;
+      color: #92400e;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .badge-offline span.dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f97316;
+    }
+
+    .steps {
+      text-align: left;
+      background: #f9fafb;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      margin-bottom: 16px;
+    }
+
+    .steps h2 {
+      margin: 0 0 6px;
+      font-size: 0.9rem;
+      color: var(--color-primary-dark);
+    }
+
+    .steps ol {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .steps li {
+      margin-bottom: 4px;
+      line-height: 1.35;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 999px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--color-primary);
+      color: #ffffff;
+      box-shadow: 0 3px 10px rgba(1, 82, 73, 0.25);
+    }
+
+    .btn-primary:hover {
+      background: var(--color-primary-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(1, 82, 73, 0.3);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+      box-shadow: 0 3px 10px rgba(1, 82, 73, 0.25);
+    }
+
+    .btn-ghost {
+      background: #f3f4f6;
+      color: var(--color-muted);
+      border: 1px solid #e5e7eb;
+    }
+
+    .btn-ghost:hover {
+      background: #e5e7eb;
+    }
+
+    .status-msg {
+      font-size: 0.8rem;
+      color: var(--color-muted);
+      margin-top: 10px;
+      text-align: center;
+    }
+
+    .status-msg span {
+      font-weight: 600;
+    }
+
+    @media (max-width: 480px) {
+      .offline-wrap {
+        padding: 18px 14px 18px;
+      }
+
+      .logos img {
+        max-height: 40px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="offline-wrap">
+    <div class="logos">
+      <!-- Si quieres puedes cambiar estos logos por otros -->
+      <img src="/static/logo_PollosGar.png" alt="Pollos Gar">
+      <img src="/static/logo_energix360.png" alt="BQA-ONE">
+    </div>
+
+    <div class="badge-offline">
+      <span class="dot"></span>
+      SIN CONEXIÓN A INTERNET
+    </div>
+
+    <h1>No se pudo conectar al servidor</h1>
+    <p class="subtitulo">
+      Estás usando BQA-ONE sin señal.  
+      Puedes seguir trabajando <strong>solo en el módulo GLP</strong> en modo offline.
+    </p>
+
+    <div class="steps">
+      <h2>¿Qué puedes hacer ahora?</h2>
+      <ol>
+        <li>Si necesitas usar <strong>Gas GLP</strong>, entra al modo <strong>OFFLINE</strong> desde el botón de abajo.</li>
+        <li>Podrás leer el QR de la granja y registrar <strong>inicio, tanqueo, consumo y finalización</strong>.</li>
+        <li>Cuando recuperes la señal, entra por el login normal y el sistema enviará todas las operaciones pendientes a la base de datos.</li>
+      </ol>
+    </div>
+
+    <!-- Botón para ir a login OFFLINE de GLP -->
+    <button class="btn btn-primary" onclick="irModoOfflineGLP()">
+      🔥 Usar modo OFFLINE GLP (Pollos Gar)
+    </button>
+
+    <!-- Botón para reintentar conexión normal -->
+    <button class="btn btn-ghost" onclick="reintentarOnline()">
+      ↻ Reintentar conexión normal
+    </button>
+
+    <p class="status-msg">
+      Estado actual:
+      <span id="estadoConexion">detectando…</span>
+    </p>
+  </div>
+
+  <script>
+    function actualizarEstadoConexion() {
+      const el = document.getElementById("estadoConexion");
+      if (!el) return;
+
+      if (navigator.onLine) {
+        el.textContent = "Parece que ya hay internet. Puedes reintentar el login normal.";
+        el.style.color = "#059669";
+      } else {
+        el.textContent = "Sin conexión. Solo está disponible el modo OFFLINE de GLP.";
+        el.style.color = "#b45309";
+      }
+    }
+
+    function irModoOfflineGLP() {
+      // Vamos directo al login OFFLINE de BQA-ONE
+      window.location.href = "/login_energix360_offline.html";
+    }
+
+    function reintentarOnline() {
+      if (!navigator.onLine) {
+        alert(
+          "Todavía no hay conexión a internet.\n\n" +
+          "Activa Wi-Fi o datos móviles y vuelve a pulsar este botón."
+        );
+        return;
+      }
+      // Volvemos al login normal online
+      window.location.href = "/login_energix360.html";
+    }
+
+    window.addEventListener("online", actualizarEstadoConexion);
+    window.addEventListener("offline", actualizarEstadoConexion);
+    document.addEventListener("DOMContentLoaded", actualizarEstadoConexion);
+  </script>
+</body>
+
+</html>

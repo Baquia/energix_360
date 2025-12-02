@@ -3,8 +3,17 @@ from app.utils import login_required_custom
 from app import mysql, csrf
 from app import mysql
 import re
+from app import app
 
 bp_890707006 = Blueprint('bp_890707006', __name__)
+
+@app.route("/890707006_offline.html")
+def panel_pollosgar_offline():
+    return render_template("890707006_offline.html")
+
+@app.route("/glp_offline.html")
+def glp_offline():
+    return render_template("glp_offline.html")
 
 @bp_890707006.route('/890707006.html')
 @login_required_custom

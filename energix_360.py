@@ -8,7 +8,11 @@ from flask import current_app
 
 from app import create_app
 
+from app import app
 
+@app.route("/login_energix360_offline.html")
+def login_energix360_offline():
+    return render_template("login_energix360_offline.html")
 
 # Decorador para proteger rutas
 def login_required_custom(f):

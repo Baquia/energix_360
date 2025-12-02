@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Login OFFLINE | BQA-ONE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- PWA -->
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#015249">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <style>
+    :root {
+      --color-primary: #015249;
+      --color-primary-dark: #013d36;
+      --color-bg: #f6f7f8;
+      --color-surface: #ffffff;
+      --color-border: #e5e7eb;
+      --color-text: #111827;
+      --color-muted: #6b7280;
+      --color-danger: #b00020;
+      --shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.08);
+      --radius-card: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Verdana, sans-serif;
+      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px 12px;
+      color: var(--color-text);
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 420px;
+      background: var(--color-surface);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-soft);
+      padding: 22px 18px 20px;
+      text-align: center;
+      border: 1px solid rgba(15, 23, 42, 0.05);
+    }
+
+    .logo {
+      max-width: 180px;
+      height: auto;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-size: 1.3rem;
+      margin: 4px 0 4px;
+      color: var(--color-primary-dark);
+    }
+
+    .subtitulo {
+      font-size: 0.87rem;
+      color: var(--color-muted);
+      margin: 0 0 14px;
+    }
+
+    .subtitulo strong {
+      color: var(--color-primary-dark);
+    }
+
+    .offline-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #fef3c7;
+      color: #92400e;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    form {
+      text-align: left;
+      margin-top: 6px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+      color: var(--color-muted);
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 10px 11px;
+      border-radius: 10px;
+      border: 1px solid var(--color-border);
+      font-size: 0.95rem;
+      margin-bottom: 10px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 1px rgba(1, 82, 73, 0.12);
+    }
+
+    .remember-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+    }
+
+    .remember-row label {
+      display: flex;
+      align-items: center;
+      margin: 0;
+      gap: 5px;
+      color: var(--color-muted);
+    }
+
+    .remember-row input[type="checkbox"] {
+      margin: 0;
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 999px;
+      border: none;
+      background: var(--color-primary);
+      color: #ffffff;
+      font-size: 0.98rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+      box-shadow: 0 3px 10px rgba(1, 82, 73, 0.25);
+    }
+
+    .btn-login:hover {
+      background: var(--color-primary-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(1, 82, 73, 0.3);
+    }
+
+    .btn-login:active {
+      transform: translateY(0);
+      box-shadow: 0 3px 10px rgba(1, 82, 73, 0.25);
+    }
+
+    .help-text {
+      font-size: 0.78rem;
+      color: var(--color-muted);
+      margin-top: 10px;
+      text-align: left;
+      line-height: 1.4;
+    }
+
+    .help-text strong {
+      color: var(--color-primary-dark);
+    }
+
+    .status-msg {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--color-muted);
+      text-align: center;
+    }
+
+    .status-msg span {
+      font-weight: 600;
+    }
+
+    .error-msg {
+      color: var(--color-danger);
+      font-size: 0.8rem;
+      margin-top: 6px;
+      text-align: center;
+      min-height: 16px;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 16px;
+      }
+
+      .login-container {
+        padding: 18px 14px 16px;
+      }
+
+      .logo {
+        max-width: 160px;
+      }
+    }
+  </style>
+
+  <script>
+    // Registro SW también aquí para asegurar control offline
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js")
+          .then(reg => console.log("✅ SW registrado (login offline):", reg.scope))
+          .catch(err => console.error("❌ Error SW (login offline):", err));
+      });
+    }
+  </script>
+</head>
+
+<body>
+  <div class="login-container">
+    <img src="/static/logo_energix360.png" alt="Logo Energix 360" class="logo">
+
+    <div class="offline-badge">
+      ● MODO OFFLINE
+    </div>
+
+    <h1>Iniciar sesión (offline)</h1>
+    <p class="subtitulo">
+      Este acceso no valida contra el servidor.<br>
+      Entrarás al panel <strong>offline</strong> para usar el módulo GLP.
+    </p>
+
+    <form id="offlineLoginForm">
+      <label for="cedula">Cédula</label>
+      <input type="text" id="cedula" name="cedula" autocomplete="username" placeholder="Documento de identidad">
+
+      <label for="password">Contraseña</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Contraseña (local)">
+
+      <div class="remember-row">
+        <label>
+          <input type="checkbox" id="recordarUsuario" checked>
+          Recordar usuario
+        </label>
+        <span style="color:var(--color-muted);">Solo en este dispositivo</span>
+      </div>
+
+      <button type="submit" class="btn-login">Entrar en modo OFFLINE</button>
+    </form>
+
+    <div id="errorMsg" class="error-msg"></div>
+
+    <p class="help-text">
+      <strong>¿Qué significa esto?</strong><br>
+      • No se verifica usuario ni contraseña en el servidor.<br>
+      • Solo tendrás disponible el <strong>panel Pollos Gar OFFLINE</strong> y el módulo <strong>GLP Offline</strong>.<br>
+      • Cuando recuperes la señal, entra por el login normal para sincronizar.
+    </p>
+
+    <p class="status-msg">
+      Estado de conexión:
+      <span id="statusOnline">detectando…</span>
+    </p>
+  </div>
+
+  <script>
+    // Mostrar estado de conexión
+    function actualizarEstadoConexion() {
+      const el = document.getElementById("statusOnline");
+      if (!el) return;
+      if (navigator.onLine) {
+        el.textContent = "Conectado (pero usando login OFFLINE)";
+        el.style.color = "#059669";
+      } else {
+        el.textContent = "Sin conexión (modo offline activo)";
+        el.style.color = "#b45309";
+      }
+    }
+
+    window.addEventListener("online", actualizarEstadoConexion);
+    window.addEventListener("offline", actualizarEstadoConexion);
+
+    // Cargar último usuario recordado
+    document.addEventListener("DOMContentLoaded", () => {
+      try {
+        const last = localStorage.getItem("bqa_last_user") || "";
+        if (last) {
+          const ced = document.getElementById("cedula");
+          if (ced) ced.value = last;
+        }
+      } catch (e) {
+        console.warn("No se pudo leer bqa_last_user:", e);
+      }
+      actualizarEstadoConexion();
+    });
+
+    // Login OFFLINE
+    async function offlineLogin(cedula, password) {
+      const errBox = document.getElementById("errorMsg");
+      if (errBox) errBox.textContent = "";
+
+      cedula = (cedula || "").trim();
+      password = (password || "").trim();
+
+      if (!cedula || !password) {
+        if (errBox) errBox.textContent = "Debes ingresar cédula y contraseña para continuar.";
+        return;
+      }
+
+      // Guardar usuario localmente si el checkbox está activo
+      const check = document.getElementById("recordarUsuario");
+      if (check && check.checked) {
+        try {
+          localStorage.setItem("bqa_last_user", cedula);
+        } catch (e) {
+          console.warn("No se pudo guardar bqa_last_user:", e);
+        }
+      }
+
+      // Aquí NO se llama al backend.
+      // Simplemente redirigimos al panel OFFLINE de Pollos Gar.
+      window.location.href = "/890707006_offline.html";
+    }
+
+    // Manejador del formulario
+    document.getElementById("offlineLoginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const cedula = document.getElementById("cedula").value;
+      const password = document.getElementById("password").value;
+      offlineLogin(cedula, password);
+    });
+  </script>
+</body>
+
+</html>

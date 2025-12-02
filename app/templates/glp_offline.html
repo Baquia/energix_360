@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>GLP – Modo Offline</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#015249">
+
+  <!-- Lector QR -->
+  <script src="/static/js/html5-qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --verde: #015249;
+      --verde-osc: #003b35;
+      --bg: #f4f6f7;
+      --rojo: #cc0000;
+      --rojo-osc: #990000;
+    }
+
+    body {
+      margin: 0;
+      font-family: Verdana, Geneva, Tahoma, sans-serif;
+      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #111827;
+    }
+
+    .header {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      justify-content: space-between;
+      padding: 14px 20px;
+    }
+
+    .logo {
+      max-height: 52px;
+      object-fit: contain;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 720px;
+      margin: 16px auto 40px;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+      padding: 22px 18px 28px;
+    }
+
+    #saludo {
+      text-align: center;
+      font-weight: bold;
+      font-size: 18px;
+      color: var(--verde-osc);
+    }
+
+    .menu {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .menu-btn {
+      flex: 1 1 calc(50% - 10px);
+      padding: 12px;
+      border-radius: 999px;
+      border: 1px solid #cfd8dc;
+      background: #e5f4f1;
+      color: #013b35;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background .2s, transform .1s;
+    }
+
+    .menu-btn:hover {
+      background: var(--verde);
+      color: white;
+      transform: translateY(-2px);
+    }
+
+    #conversacion {
+      margin-top: 16px;
+    }
+
+    #lectorQR {
+      width: 100%;
+      max-width: 420px;
+      margin: 12px auto;
+    }
+
+    #respuestaInput {
+      width: 100%;
+      border: 1px solid #cfd8dc;
+      border-radius: 10px;
+      padding: 10px;
+      margin-top: 12px;
+      font-size: 16px;
+    }
+
+    #inputFoto {
+      margin-top: 12px;
+    }
+
+    #botonEnviar {
+      width: 100%;
+      background: var(--verde);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      margin-top: 14px;
+      font-weight: bold;
+      font-size: 16px;
+      display: none;
+    }
+
+    #panelResumen {
+      background: #f9fbfb;
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid #d1d5db;
+      margin-top: 20px;
+      display: none;
+    }
+
+    #panelResumen table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    #panelResumen th,
+    #panelResumen td {
+      padding: 8px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: center;
+    }
+
+    #btnCerrarResumen {
+      width: 100%;
+      background: var(--verde);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      margin-top: 14px;
+      font-weight: bold;
+    }
+
+    a.volver {
+      display: block;
+      margin-top: 24px;
+      text-align: center;
+      color: var(--rojo);
+      font-weight: bold;
+      text-decoration: none;
+    }
+  </style>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js")
+        .then(() => console.log("SW OK (offline GLP)"))
+        .catch(() => console.log("SW error"));
+    }
+  </script>
+</head>
+
+<body>
+
+  <div class="header">
+    <img src="/static/logo_PollosGar.png" class="logo">
+    <img src="/static/logo_energix360.png" class="logo">
+  </div>
+
+  <div class="wrap">
+
+    <p id="saludo">GLP – Modo Offline</p>
+    <p style="text-align:center;margin-top:6px;color:#555;">
+      Todas las operaciones serán guardadas OFFLINE.<br>
+      Se enviarán automáticamente al recuperar la señal.
+    </p>
+
+    <!-- MENÚ -->
+    <div id="menuOpciones" class="menu">
+      <button class="menu-btn" onclick="iniciarCalefaccion()">🔥 Iniciar calefacción</button>
+      <button class="menu-btn" onclick="registrarTanqueo()">⛽ Registrar tanqueo</button>
+      <button class="menu-btn" onclick="registrarConsumo()">📊 Registrar consumo</button>
+      <button class="menu-btn" onclick="finalizarCalefaccion()">🔥 Finalizar calefacción</button>
+    </div>
+
+    <!-- CONVERSACIÓN -->
+    <div id="conversacion" style="display:none;">
+      <p id="preguntaTexto" style="font-weight:bold;"></p>
+      <div id="lectorQR" style="display:none"></div>
+      <input id="respuestaInput" type="text" style="display:none" />
+      <input id="inputFoto" type="file" accept="image/*" capture="environment" style="display:none" />
+      <button id="botonEnviar">Continuar</button>
+    </div>
+
+    <!-- RESUMEN -->
+    <div id="panelResumen"></div>
+
+    <a class="volver" href="/890707006_offline.html">← Volver al panel offline</a>
+
+  </div>
+
+  <!-- ========================================== -->
+  <!-- ============ LÓGICA OFFLINE ============== -->
+  <!-- ========================================== -->
+
+  <script>
+    /* ============================================
+       INDEXEDDB PARA GUARDAR OPERACIONES OFFLINE
+    ============================================ */
+    const DB_NAME = "glp_offline_db";
+    const STORE = "queue";
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) {
+            db.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function idbAdd(item) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).add(item);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function getQueue() {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readonly");
+        const req = tx.objectStore(STORE).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function setQueue(list) {
+      const db = await openDB();
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).clear();
+      list.forEach(i => tx.objectStore(STORE).add(i));
+    }
+
+    async function enqueueOffline(op) {
+      await idbAdd({ ...op, ts: Date.now() });
+    }
+
+    /* ============================================
+       SÍNCRONIZAR CUANDO VUELVA LA SEÑAL
+    ============================================ */
+    async function flushOfflineQueue() {
+      if (!navigator.onLine) return;
+
+      const cola = await getQueue();
+      if (!cola.length) return;
+
+      const nueva = [];
+      let necesitaLogin = false;
+
+      for (const item of cola) {
+        try {
+          const res = await fetch(item.url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item.payload)
+          });
+
+          const ct = res.headers.get("content-type") || "";
+          if (!ct.includes("application/json")) {
+            necesitaLogin = true;
+            nueva.push(item);
+            continue;
+          }
+
+          const json = await res.json();
+          if (!json.success) nueva.push(item);
+
+        } catch (err) {
+          nueva.push(item);
+        }
+      }
+
+      await setQueue(nueva);
+
+      if (necesitaLogin) {
+        alert(
+          "Tienes operaciones guardadas offline.\n" +
+          "Debes iniciar sesión online para enviarlas."
+        );
+      }
+    }
+
+    window.addEventListener("online", flushOfflineQueue);
+    window.addEventListener("load", flushOfflineQueue);
+
+    /* ============================================
+       LÓGICA QR + FORMULARIOS
+    ============================================ */
+
+    function leerQR(msg) {
+      return new Promise((resolve, reject) => {
+        document.getElementById("menuOpciones").style.display = "none";
+        document.getElementById("conversacion").style.display = "block";
+
+        const texto = document.getElementById("preguntaTexto");
+        const lector = document.getElementById("lectorQR");
+
+        texto.textContent = msg;
+        lector.style.display = "block";
+        lector.innerHTML = "";
+
+        const qr = new Html5Qrcode("lectorQR");
+        qr.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 },
+          decoded => {
+            qr.stop();
+            lector.style.display = "none";
+            resolve(decoded.trim());
+          },
+          error => { });
+
+      });
+    }
+
+    function generarOpId() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return "op_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+    }
+
+    /* ============================================
+       OPERACIONES OFFLINE (4)
+    ============================================ */
+
+    async function iniciarCalefaccion() {
+      try {
+        const qr = await leerQR("Escanea el QR para iniciar calefacción");
+
+        const payload = {
+          op_id: generarOpId(),
+          sede: qr,
+          tanques: [],
+          pollitos: 0,
+          criadoras: 0
+        };
+
+        await enqueueOffline({
+          url: "/glp/registrar_inicio",
+          payload
+        });
+
+        mostrarResumen("Inicio de calefacción guardado offline.", payload);
+
+      } catch (e) {
+        alert("No se pudo leer el QR.");
+        mostrarMenu();
+      }
+    }
+
+    async function registrarTanqueo() {
+      try {
+        const qr = await leerQR("Escanea el QR para registrar tanqueo");
+
+        const payload = {
+          op_id: generarOpId(),
+          sede: qr,
+          tanques: []
+        };
+
+        await enqueueOffline({
+          url: "/glp/registrar_tanqueo",
+          payload
+        });
+
+        mostrarResumen("Tanqueo guardado offline.", payload);
+
+      } catch (e) {
+        alert("Error.");
+        mostrarMenu();
+      }
+    }
+
+    async function registrarConsumo() {
+      try {
+        const qr = await leerQR("Escanea el QR para registrar consumo");
+
+        const payload = {
+          op_id: generarOpId(),
+          sede: qr,
+          tanques: []
+        };
+
+        await enqueueOffline({
+          url: "/glp/registrar_consumo",
+          payload
+        });
+
+        mostrarResumen("Consumo guardado offline.", payload);
+
+      } catch (e) {
+        alert("Error.");
+        mostrarMenu();
+      }
+    }
+
+    async function finalizarCalefaccion() {
+      try {
+        const qr = await leerQR("Escanea el QR para finalizar calefacción");
+
+        const payload = {
+          op_id: generarOpId(),
+          sede: qr,
+          tanques: []
+        };
+
+        await enqueueOffline({
+          url: "/glp/finalizar_calefaccion_batch",
+          payload
+        });
+
+        mostrarResumen("Finalización guardada offline.", payload);
+
+      } catch (e) {
+        alert("Error.");
+        mostrarMenu();
+      }
+    }
+
+    /* ============================================
+       UI RESUMEN
+    ============================================ */
+
+    function mostrarResumen(msg, data) {
+      const panel = document.getElementById("panelResumen");
+      panel.style.display = "block";
+
+      panel.innerHTML = `
+        <h3 style="text-align:center;">Operación guardada offline</h3>
+        <p><strong>Sede:</strong> ${data.sede}</p>
+        <p style="margin-top:10px;">${msg}</p>
+        <button id="btnCerrarResumen" onclick="cerrarResumen()">Volver al menú</button>
+      `;
+      document.getElementById("conversacion").style.display = "none";
+    }
+
+    function cerrarResumen() {
+      document.getElementById("panelResumen").style.display = "none";
+      mostrarMenu();
+    }
+
+    function mostrarMenu() {
+      document.getElementById("menuOpciones").style.display = "flex";
+      document.getElementById("conversacion").style.display = "none";
+    }
+  </script>
+
+</body>
+
+</html>
