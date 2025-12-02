@@ -758,7 +758,7 @@ def registrar_tanqueo():
                         msg = MIMEText(cuerpo)
                         msg["Subject"] = "Alerta desviación tanqueo GLP"
                         msg["From"] = EMAIL_FROM
-                        msg["To"] = ", ".join(destinatarios)
+                        msg["To"] = "bqa-onebaquia-esm.com "#.join(destinatarios)
                         with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
                             server.starttls()
                             server.login(EMAIL_USER, EMAIL_PASS)

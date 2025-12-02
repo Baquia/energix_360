@@ -6,6 +6,7 @@ const CACHE_DYNAMIC = "bqa-one-dyn-v6";
 // App Shell mínimo y público
 const APP_SHELL = [
   "/",                // raíz -> login
+  "/login_energix360.html",
   "/offline.html",
   "/890707006.html",
   "/glp.html",

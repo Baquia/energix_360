@@ -232,6 +232,68 @@
     .logout:hover {
       background: var(--rojo-osc);
     }
+        /* Aviso de operaciones pendientes de sincronizar */
+    #syncWarning {
+      display: none;
+      width: 100%;
+      background: #fff5f5;
+      border-radius: 10px;
+      border: 1px solid #ffcdd2;
+      padding: 10px 12px;
+      margin: 8px 0 10px;
+      color: #b71c1c;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    #syncWarning-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-weight: 700;
+      color: #b71c1c;
+    }
+
+    #syncWarning-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #b71c1c;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    #syncWarning-body {
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    #syncWarning-steps {
+      margin: 4px 0 0;
+      padding-left: 18px;
+      font-size: 13px;
+    }
+
+    #syncWarning-steps li {
+      margin-bottom: 2px;
+    }
+
+    @media (max-width: 600px) {
+      #syncWarning {
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+      #syncWarning-steps {
+        font-size: 12px;
+      }
+    }
+    
+
 
     @media (max-width: 600px) {
       .header {
@@ -261,6 +323,12 @@
 
   <div class="wrap">
     <p id="saludo">¡Hola {{ session.get('nombre','Usuario') }}!</p>
+
+    <!-- Aviso de sincronización pendiente (se muestra solo cuando haga falta) -->
+    <div id="syncWarning" style="display:none;">
+      <!-- El contenido se llena desde JS -->
+    </div>
+
     <p id="preguntaTexto"></p>
 
 
@@ -440,15 +508,25 @@
       for (const it of q) await idbAdd(it);
     }
 
+    let GLP_LOGIN_WARNING_SHOWN = false;
+
     async function flushOfflineQueue() {
+      // 1) Si no hay internet, no hacemos nada
       if (!navigator.onLine) return;
 
       const q = await getQueue();
       if (!q.length) return;
 
       const remaining = [];
+      let needLoginForSync = false;  // bandera: indica que el servidor pidió login
 
       for (const it of q) {
+        // Si ya detectamos que falta login, no seguimos golpeando al servidor
+        if (needLoginForSync) {
+          remaining.push(it);
+          continue;
+        }
+
         try {
           if (!it.payload.op_id) it.payload.op_id = generarOpId();
 
@@ -458,24 +536,91 @@
             body: JSON.stringify(it.payload)
           });
 
+          const status = r.status;
           const ct = (r.headers.get("content-type") || "").toLowerCase();
+
+          // Caso 1: el backend está respondiendo HTML/redirección → probablemente login
           if (!ct.includes("application/json")) {
+            // 302 / 401 / 403 o HTML = sesión inválida / login requerido
+            if (status === 302 || status === 401 || status === 403 || ct.includes("text/html")) {
+              console.warn(
+                "[GLP offline] El servidor devolvió HTML/redirección (probable falta de sesión). " +
+                "Las operaciones seguirán en cola hasta que inicies sesión online."
+              );
+              needLoginForSync = true;
+              remaining.push(it);
+              continue;
+            }
+
+            // Otro tipo de respuesta no-JSON: lo tratamos como error de backend
             throw new Error("non-json-response");
           }
 
+          // Caso 2: respuesta JSON "normal"
           const j = await r.json();
-          if (!j.success) throw new Error(j.message || "falló backend");
+          if (!j.success) {
+            console.error("[GLP offline] Error del backend al reenviar operación:", j);
+            // dejamos el item en la cola para reintentar después
+            remaining.push(it);
+          }
+          // Si success === true, NO re-agregamos el item: se considera sincronizado
 
         } catch (e) {
+          console.error("[GLP offline] Error enviando item offline:", e, "Item:", it);
+          // Si hay error de red u otro, dejamos el item en la cola
           remaining.push(it);
         }
       }
 
       await setQueue(remaining);
+
+      // Si detectamos que hacía falta login, avisamos SOLO una vez (banner + alert)
+      if (needLoginForSync && !GLP_LOGIN_WARNING_SHOWN) {
+        GLP_LOGIN_WARNING_SHOWN = true;
+
+        // Banner rojo integrado al diseño
+        mostrarAvisoSyncPendiente();
+
+        // Y además un alert para que sea imposible ignorarlo
+        alert(
+          "Tienes operaciones de GLP pendientes de sincronizar,\n" +
+          "pero tu sesión en el servidor expiró.\n\n" +
+          "PASOS:\n" +
+          "1) Asegúrate de tener internet.\n" +
+          "2) Vuelve al LOGIN PRINCIPAL de Energix 360.\n" +
+          "3) Inicia sesión ONLINE normalmente.\n" +
+          "4) Entra de nuevo al módulo GLP (botón GAS GLP).\n\n" +
+          "Las operaciones pendientes se enviarán automáticamente a la base de datos."
+        );
+      }
+
+
     }
 
-    window.addEventListener("online", () => { flushOfflineQueue(); });
-    setInterval(() => { flushOfflineQueue(); }, 10000);
+    function programarFlushOffline() {
+      // Cuando el navegador detecta que vuelve a estar online
+      window.addEventListener("online", () => {
+        console.log("[GLP offline] Evento 'online': intento sincronizar cola...");
+        flushOfflineQueue();
+      });
+
+      // Cuando se carga glp.html (por ejemplo, después de iniciar sesión online)
+      window.addEventListener("load", () => {
+        console.log("[GLP offline] Carga de glp.html: intento sincronización inicial...");
+        flushOfflineQueue();
+      });
+
+      // Cada cierto tiempo, si hay conexión, intentamos de nuevo
+      setInterval(() => {
+        if (navigator.onLine) {
+          flushOfflineQueue();
+        }
+      }, 15000); // cada 15 segundos está bien para evitar bombardeos
+    }
+
+    // Activamos la programación del flush al cargar el script
+    programarFlushOffline();
+
 
 
     // --- Cache local de tanques por sede ---
@@ -659,6 +804,33 @@
     function hide(el) { if (el) el.style.display = "none"; }
 
     const EMPRESA_SESION = "{{ session.get('empresa','') }}";
+
+
+    function mostrarAvisoSyncPendiente() {
+      const div = document.getElementById("syncWarning");
+      if (!div) return;
+
+      div.style.display = "block";
+      div.innerHTML = `
+        <div id="syncWarning-header">
+          <div id="syncWarning-icon">!</div>
+          <div>Operaciones de GLP pendientes de enviar</div>
+        </div>
+        <div id="syncWarning-body">
+          Tus últimas operaciones se guardaron en el celular pero <b>aún no han llegado al servidor</b>.
+        </div>
+        <ol id="syncWarning-steps">
+          <li>Asegúrate de tener internet (datos o WiFi).</li>
+          <li>Vuelve al <b>login principal</b> de Energix 360.</li>
+          <li>Inicia sesión ONLINE con tu usuario y contraseña.</li>
+          <li>Entra de nuevo al botón <b>GAS GLP</b>.</li>
+        </ol>
+        <div style="margin-top:4px;">
+          Cuando entres al módulo GLP conectado, el sistema enviará <b>automáticamente</b> todas las operaciones pendientes.
+        </div>
+      `;
+    }
+
 
     let sedeQR = "", empresaQR = "";
     let tanques = []; // [{numero, capacidad}]
