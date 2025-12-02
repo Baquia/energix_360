@@ -107,32 +107,54 @@ self.addEventListener("fetch", (event) => {
   }
 
   // ===== HTML / Navegación =====
+    // ===== HTML / Navegación =====
   if (isHTML) {
     event.respondWith(
-      fetch(req)
-        .then((res) => {
+      (async () => {
+        try {
+          // ONLINE: intentamos ir a la red
+          const res = await fetch(req);
           const copy = res.clone();
+
           caches.open(CACHE_DYNAMIC).then((cache) => {
             cache.put(req, copy);
             limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
           });
+
           return res;
-        })
-        .catch(async () => {
-          // Offline:
-          // 1) intentar misma URL
+        } catch (err) {
+          // OFFLINE: devolvemos SIEMPRE alguna página
+
+          // 1) Intentar con la petición completa
           let cachedPage = await caches.match(req);
           if (cachedPage) return cachedPage;
 
-          // 2) si pidieron raíz "/", devolver raíz cacheada
+          // 2) Intentar con el path puro ("/890707006.html", "/glp.html", etc.)
+          cachedPage = await caches.match(url.pathname);
+          if (cachedPage) return cachedPage;
+
+          // 3) Si pidieron raíz, intentar raíz cacheada
           if (url.pathname === "/") {
-            cachedPage = await caches.match("/");
-            if (cachedPage) return cachedPage;
+            const rootCached = await caches.match("/");
+            if (rootCached) return rootCached;
           }
 
-          // 3) fallback a offline.html
-          return caches.match("/offline.html");
-        })
+          // 4) Fallback a offline.html
+          const offlineCached = await caches.match("/offline.html");
+          if (offlineCached) return offlineCached;
+
+          // 5) Último recurso: respuesta HTML simple para evitar ERR_FAILED
+          return new Response(
+            "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Sin conexión</title></head>" +
+            "<body style='font-family:sans-serif; padding:16px;'>" +
+            "<h2>Sin conexión a internet</h2>" +
+            "<p>No se encontró una copia guardada de esta página y no hay señal disponible.</p>" +
+            "<p>Cuando tengas internet, abre de nuevo la aplicación para que se actualice la información.</p>" +
+            "</body></html>",
+            { status: 503, headers: { "Content-Type": "text/html" } }
+          );
+        }
+      })()
     );
     return;
   }
