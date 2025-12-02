@@ -14,6 +14,7 @@ const APP_SHELL = [
   "/offline.html",
   "/890707006.html",
   "/glp.html",
+  "/dashboard/gas", 
 
   "/static/manifest.json",
   "/static/BQA_ONE_192.png",
