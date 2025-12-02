@@ -4,7 +4,7 @@
    - HTML navegaciones network-first con fallback SIEMPRE a algo (sin ERR_FAILED)
 */
 
-const CACHE_STATIC  = "bqa-one-shell-v7";
+const CACHE_STATIC = "bqa-one-shell-v7";
 const CACHE_DYNAMIC = "bqa-one-dyn-v7";
 
 // App Shell mínimo y público
@@ -121,43 +121,51 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ===== HTML / Navegación (login, 890707006, glp, etc.) =====
+  // ===== HTML / Navegación (login, 890707006, glp, dashboard, etc.) =====
   if (isHTML) {
     event.respondWith(
       (async () => {
         try {
-          // ONLINE: intentamos ir a la red
+          // 1) CACHE-FIRST: si ya hay una copia en caché, la usamos SIEMPRE
+          let cached = await caches.match(req);
+          if (!cached) {
+            // Intento por path plano: /890707006.html, /glp.html, /dashboard/gas, etc.
+            cached = await caches.match(path);
+          }
+          if (cached) {
+            return cached;
+          }
+
+          // 2) Si no hay copia en cache, intentamos ir a la red (si hay internet)
           const res = await fetch(req);
           const copy = res.clone();
+
           caches.open(CACHE_DYNAMIC).then((cache) => {
             cache.put(req, copy);
             limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
           });
+
           return res;
         } catch (err) {
-          console.warn("[SW v7] HTML offline para", path, "error:", err);
+          console.warn("[SW v7] HTML offline FALLBACK para", path, "error:", err);
 
-          // OFFLINE: devolvemos SIEMPRE alguna página
+          // 3) OFFLINE / ERROR: devolvemos siempre algo
 
-          // 1) Intentar respuesta cacheada exacta (Request completo)
-          let cached = await caches.match(req);
+          // 3.1) Buscar por path plano
+          let cached = await caches.match(path);
           if (cached) return cached;
 
-          // 2) Intentar por pathname ("/890707006.html", "/glp.html", etc.)
-          cached = await caches.match(path);
-          if (cached) return cached;
-
-          // 3) Si pidieron raíz "/", intentar raíz cacheada
+          // 3.2) Si pidieron raíz "/", intentar raíz cacheada
           if (path === "/") {
             const rootCached = await caches.match("/");
             if (rootCached) return rootCached;
           }
 
-          // 4) Fallback a offline.html
+          // 3.3) Fallback a offline.html
           const offlineCached = await caches.match("/offline.html");
           if (offlineCached) return offlineCached;
 
-          // 5) Último recurso: HTML simple (para evitar ERR_FAILED)
+          // 3.4) Último recurso: HTML simple (para evitar ERR_FAILED)
           return new Response(
             "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Sin conexión</title></head>" +
             "<body style='font-family:sans-serif; padding:16px;'>" +
@@ -172,6 +180,7 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
+
 
   // ===== ESTÁTICOS (JS/CSS/IMG/FONTS) → cache-first =====
   event.respondWith(
