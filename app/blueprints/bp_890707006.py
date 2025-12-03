@@ -1,16 +1,15 @@
 from flask import Blueprint, render_template, session, flash, redirect, url_for, request, jsonify
 from app.utils import login_required_custom
 from app import mysql, csrf
-from app import mysql
 import re
 
 bp_890707006 = Blueprint('bp_890707006', __name__)
 
-@bp_890707006("/890707006_offline.html")
+@bp_890707006.route("/890707006_offline.html")
 def panel_pollosgar_offline():
     return render_template("890707006_offline.html")
 
-@bp_890707006("/glp_offline.html")
+@bp_890707006.route("/glp_offline.html")
 def glp_offline():
     return render_template("glp_offline.html")
 
