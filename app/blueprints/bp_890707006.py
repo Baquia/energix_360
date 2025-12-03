@@ -3,7 +3,6 @@ from app.utils import login_required_custom
 from app import mysql, csrf
 from app import mysql
 import re
-from app import app
 
 bp_890707006 = Blueprint('bp_890707006', __name__)
 
