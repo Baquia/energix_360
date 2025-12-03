@@ -6,11 +6,11 @@ import re
 
 bp_890707006 = Blueprint('bp_890707006', __name__)
 
-@bp_890707007("/890707006_offline.html")
+@bp_890707006("/890707006_offline.html")
 def panel_pollosgar_offline():
     return render_template("890707006_offline.html")
 
-@bp_890707007("/glp_offline.html")
+@bp_890707006("/glp_offline.html")
 def glp_offline():
     return render_template("glp_offline.html")
 
