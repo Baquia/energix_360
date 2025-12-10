@@ -29,19 +29,43 @@ def create_app():
     # ==========================
     # CONFIGURACIÓN BÁSICA
     # ==========================
-    # Clave secreta
+    # Clave secreta para sesiones y CSRF
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cambia-esta-clave-en-produccion')
 
-    # Configuración MySQL
-    # Ajusta estos valores a tu configuración real en PythonAnywhere
-    app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
-    app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'root')
-    app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '')
-    app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'energix_360')
-    # Para que fetchone()/fetchall() devuelvan diccionarios
-    app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+    # ==========================
+    # DETECTAR ENTORNO
+    # ==========================
+    # Si existe /home/baquiasoft, sabemos que estamos en PythonAnywhere.
+    EN_PYTHONANYWHERE = os.path.exists("/home/baquiasoft")
 
-    # (Si usas otras opciones de configuración, puedes agregarlas aquí)
+    if EN_PYTHONANYWHERE:
+        print("DEBUG ENTORNO = PYTHONANYWHERE (producción)")
+    else:
+        print("DEBUG ENTORNO = LOCAL (desarrollo)")
+
+    # ==========================
+    # CONFIGURACIÓN MYSQL
+    # ==========================
+    if EN_PYTHONANYWHERE:
+        # ☁️ PRODUCCIÓN (PYTHONANYWHERE)
+        app.config['MYSQL_HOST'] = 'baquiasoft.mysql.pythonanywhere-services.com'
+        app.config['MYSQL_USER'] = 'baquiasoft'
+        app.config['MYSQL_PASSWORD'] = 'Metanoia765/*'
+        app.config['MYSQL_DB'] = 'baquiasoft$energix_360'
+    else:
+        # 💻 DESARROLLO LOCAL (tu PC)
+        app.config['MYSQL_HOST'] = 'localhost'
+        app.config['MYSQL_USER'] = 'root'          # ajusta si tu usuario local es otro
+        app.config['MYSQL_PASSWORD'] = ''          # pon aquí tu clave local si tienes
+        app.config['MYSQL_DB'] = 'energix_360'     # nombre de tu BD local
+        
+        # 👇 AÑADE ESTOS PRINTS JUSTO DESPUÉS
+        print("DEBUG MYSQL_HOST CONFIG =", app.config['MYSQL_HOST'])
+        print("DEBUG MYSQL_USER CONFIG =", app.config['MYSQL_USER'])
+        print("DEBUG MYSQL_DB   CONFIG =", app.config['MYSQL_DB'])
+
+    # Para obtener los resultados como diccionarios
+    app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
     # ==========================
     # INICIALIZAR EXTENSIONES
@@ -52,7 +76,6 @@ def create_app():
     login_manager.init_app(app)
 
     # Vista de login por defecto para @login_required
-    # Cambia 'index' si tu función de login se llama distinto
     login_manager.login_view = 'index'
     login_manager.login_message_category = 'warning'
 
