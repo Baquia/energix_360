@@ -292,7 +292,7 @@
         font-size: 12px;
       }
     }
-    
+
 
 
     @media (max-width: 600px) {
@@ -314,6 +314,8 @@
   </style>
 
 </head>
+
+
 
 <body>
   <div class="header">
@@ -375,6 +377,7 @@
 
   <script>
 
+
     /* ======================================
     VARIABLES PARA REGISTRAR TANQUEO NUEVO
     =======================================*/
@@ -389,6 +392,56 @@
 
     // Índice del tanque que estamos procesando
     let tanqueActualIndex = 0;
+
+    // =======================================================
+    // PROTECCIÓN BASE CONTRA RECARGA, CIERRE Y NAVEGACIÓN FUERA
+    // =======================================================
+
+    let GLP_OPERACION_EN_CURSO = false;
+
+   // Evita recargar/cerrar la página mientras hay una operación en curso
+    function bloquearSalida(e) {
+        if (GLP_OPERACION_EN_CURSO) {
+            e.preventDefault();
+            e.returnValue = "";
+            return "";
+        }
+    }
+
+    // Activar protección
+    function activarProteccionOperacion() {
+        GLP_OPERACION_EN_CURSO = true;
+        window.addEventListener("beforeunload", bloquearSalida);
+    }
+
+    // Desactivar protección
+    function desactivarProteccionOperacion() {
+        GLP_OPERACION_EN_CURSO = false;
+        window.removeEventListener("beforeunload", bloquearSalida);
+    }
+
+    // =======================================================
+    // BLOQUEO DEL BOTÓN ATRÁS DEL NAVEGADOR
+    // =======================================================
+
+    function bloquearBotonAtras() {
+        // Insertamos una entrada ficticia en el historial
+        history.pushState(null, "", location.href);
+
+        window.onpopstate = function () {
+            if (GLP_OPERACION_EN_CURSO) {
+                // Evitar retroceder
+                history.pushState(null, "", location.href);
+                alert("No puedes retroceder mientras realizas una operación GLP.");
+            } else {
+                // Si no hay operación, permitimos navegación normal
+                history.go(-1);
+            }
+        };
+    }
+
+// Activamos el bloqueo del botón atrás al cargar la página
+window.addEventListener("load", bloquearBotonAtras);
 
     /* ============================
     Normalización + lector de QR
@@ -573,6 +626,11 @@
       }
 
       await setQueue(remaining);
+
+      // ✔ NUEVO: detectar si se sincronizó alguna operación con éxito
+      if (q.length > remaining.length) {
+          alert("Las operaciones realizadas sin conexión se completaron correctamente.");
+        }
 
       // Si detectamos que hacía falta login, avisamos SOLO una vez (banner + alert)
       if (needLoginForSync && !GLP_LOGIN_WARNING_SHOWN) {
@@ -852,6 +910,7 @@
     }
 
     function mostrarResumenOperacion(resp) {
+      desactivarProteccionOperacion();
       const panel = document.getElementById("panelResumen");
       const menu = document.getElementById("menuOpciones");
       const convo = document.getElementById("conversacion");
@@ -937,6 +996,7 @@
     }
 
     function cerrarResumen() {
+      desactivarProteccionOperacion();
       const panel = document.getElementById("panelResumen");
       if (panel) panel.style.display = "none";
       mostrarMenu();
@@ -989,6 +1049,7 @@
     }
 
     function mostrarMenu() {
+      desactivarProteccionOperacion();
       document.getElementById("menuOpciones").style.display = "flex";
       document.getElementById("conversacion").style.display = "none";
     }
@@ -1037,8 +1098,8 @@
     }
 
     /* ============================
-Captura nivel + foto (común)
-============================ */
+    Captura nivel + foto (común)
+    ============================ */
     function preguntarNivelFoto(onFinish) {
       const texto = document.getElementById("preguntaTexto");
       const input = document.getElementById("respuestaInput");
@@ -1140,6 +1201,7 @@ Captura nivel + foto (común)
 
     // Limpia estado de UI/datos al terminar o guardar offline
     function limpiarEstadoOperacion() {
+      desactivarProteccionOperacion();
       items = [];
       idx = 0;
       tanques = [];
@@ -1172,6 +1234,7 @@ Captura nivel + foto (común)
     INICIAR CALEFACCIÓN
     ============================ */
     async function iniciarCalefaccion() {
+      activarProteccionOperacion();
       try {
         const info = await leerQR("Escanea el QR de la sede para iniciar calefacción");
         sedeQR = info.sede; empresaQR = info.empresa;
@@ -1277,6 +1340,7 @@ Captura nivel + foto (común)
 
     // Inicia la operación registrar tanqueo
     async function registrarTanqueo() {
+      activarProteccionOperacion();
       try {
         registrarTanqueoData.sede = "";
         registrarTanqueoData.tanques = [];
@@ -1637,6 +1701,7 @@ Captura nivel + foto (común)
        REGISTRAR CONSUMO
        ============================ */
     async function registrarConsumo() {
+      activarProteccionOperacion();
       try {
         const info = await leerQR("Escanea el QR de la sede para registrar consumo");
         sedeQR = info.sede;
@@ -1688,6 +1753,7 @@ Captura nivel + foto (común)
        FINALIZAR CALEFACCIÓN
        ============================ */
     async function finalizarCalefaccion() {
+      activarProteccionOperacion();
       try {
         const info = await leerQR("Escanea el QR de la sede para finalizar la calefacción");
 
@@ -1759,25 +1825,43 @@ Captura nivel + foto (común)
       });
     }
 
-    function activarLogoutSeguroOffline() {
-      const logoutLinks = document.querySelectorAll('a[href="/logout"]');
+    // =======================================================
+    // PROTECCIÓN DE CERRAR SESIÓN (logout)
+    // =======================================================
 
-      logoutLinks.forEach(a => {
-        // limpiamos listeners previos por si se ejecuta varias veces
-        a.onclick = null;
+    function actualizarBloqueoLogout() {
+        const logoutLinks = document.querySelectorAll('a[href="/logout"]');
 
-        if (!navigator.onLine) {
-          a.addEventListener("click", (e) => {
-            e.preventDefault();
-            alert("Estás sin conexión. El cierre de sesión requiere internet.");
-          }, { once: true });
-        }
-      });
+        logoutLinks.forEach(a => {
+            // primero quitamos cualquier handler previo
+            a.onclick = null;
+
+            a.addEventListener("click", function(e) {
+
+                // 1. Si hay operación GLP en curso → SIEMPRE bloquear
+                if (GLP_OPERACION_EN_CURSO) {
+                    e.preventDefault();
+                    alert("Debes terminar la operación de GLP antes de cerrar sesión.");
+                    return;
+                }
+
+                // 2. Si NO hay internet → bloquear (ya que no puede cerrar sesión)
+                if (!navigator.onLine) {
+                    e.preventDefault();
+                    alert("Estás sin conexión. El cierre de sesión requiere internet.");
+                    return;
+                }
+
+                // 3. Si todo está bien → permitir cerrar sesión
+            });
+        });
     }
 
-    window.addEventListener("load", activarLogoutSeguroOffline);
-    window.addEventListener("online", activarLogoutSeguroOffline);
-    window.addEventListener("offline", activarLogoutSeguroOffline);
+    // Se ejecuta en todos los estados posibles
+    window.addEventListener("load", actualizarBloqueoLogout);
+    window.addEventListener("online", actualizarBloqueoLogout);
+    window.addEventListener("offline", actualizarBloqueoLogout);
+
   </script>
 
 </body>
