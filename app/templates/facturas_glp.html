@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Módulo Validación Facturas GLP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    
+    <style>
+        :root {
+            --verde: #015249;
+            --verde-osc: #003b35;
+            --bg: #f6f7f8;
+            --rojo: #cc0000;
+            --rojo-osc: #990000;
+            --color-text: #111827;
+            --shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.08);
+            --radius-card: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Verdana, Geneva, Tahoma, sans-serif;
+            background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
+            color: var(--color-text);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 25px 20px;
+            background-color: #ffffff;
+            border-radius: var(--radius-card);
+            box-shadow: var(--shadow-soft);
+        }
+
+        /* HEADER DE LOGOS */
+        .header-logos {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--verde);
+            padding-bottom: 10px;
+        }
+
+        .logo {
+            max-height: 55px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .user-info-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .user-info-bar h2 {
+            color: var(--verde) !important;
+            font-weight: 700;
+            font-size: 1.8rem;
+            margin: 0;
+        }
+        
+        .user-info-bar p {
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .btn-custom {
+            background-color: var(--verde);
+            border-color: var(--verde);
+            color: #fff;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            padding: 8px 14px;
+        }
+
+        .btn-custom:hover {
+            background-color: var(--verde-osc);
+            border-color: var(--verde-osc);
+        }
+        
+        .btn-validar {
+            background-color: #198754; 
+            border-color: #198754;
+            color: white;
+            padding: 7px 15px;
+            font-size: 0.88rem;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        
+        .btn-validar:hover {
+            background-color: #157347;
+            border-color: #157347;
+        }
+
+        table {
+            font-size: 0.9rem;
+        }
+
+        .table thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f3f4f6;
+            z-index: 10;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                margin: 15px auto;
+                padding: 15px;
+            }
+            .header-logos {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .user-info-bar {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 10px;
+            }
+            .user-info-bar h2 {
+                font-size: 1.5rem;
+            }
+            .user-info-bar a.btn-custom {
+                width: 100%;
+                text-align: center;
+            }
+            table {
+                font-size: 0.8rem;
+            }
+            .btn-validar {
+                padding: 5px 10px;
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        
+        <div class="header-logos">
+            <img src="{{ url_for('static', filename='logo_' + empresa + '.png') }}" class="logo" alt="Logo Cliente">
+            <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo" alt="Energix 360">
+        </div>
+
+        <div class="user-info-bar">
+            <div>
+                <h2 class="text-primary" style="color: var(--verde) !important;">Validación de Facturas GLP</h2>
+                <p class="text-muted m-0">
+                    Validador: <strong>{{ nombre }}</strong> | Cédula: <strong>{{ cedula or 'N/A' }}</strong>
+                </p>
+            </div>
+            <a href="/logout" class="btn btn-custom">Cerrar Sesión</a>
+        </div>
+
+        <div class="alert alert-info" role="alert" id="info-message">
+            Coteje el <strong>Código de Pedido</strong> en la factura física con el código listado. Al validar, deberá ingresar el <strong>Número de Factura</strong> correspondiente.
+        </div>
+
+        <h4>Pedidos Pendientes de Validación</h4>
+        
+        <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+            <table class="table table-striped table-hover mt-3">
+                <thead>
+                    <tr>
+                        <th>Código de Pedido</th>
+                        <th>Fecha Generación</th>
+                        <th>Proveedor</th>
+                        <th>Ubicación (Sede)</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="pedidosTableBody">
+                    
+                    {% if pedidos %}
+                        {% for pedido in pedidos %}
+                        <tr id="pedido-{{ pedido.id }}">
+                            <td class="fw-bold text-primary">{{ pedido.codigo_pedido }}</td>
+                            <td>{{ pedido.fecha_generacion }}</td>
+                            <td>{{ pedido.proveedor }}</td>
+                            <td>{{ pedido.ubicacion }}</td>
+                            <td>
+                                <button class="btn btn-validar" 
+                                        data-id="{{ pedido.id }}"
+                                        data-codigo="{{ pedido.codigo_pedido }}"
+                                        onclick="abrirModalValidacion(this)">
+                                    GENERADO
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-success fw-bold">
+                                No hay pedidos pendientes de validación.
+                            </td>
+                        </tr>
+                    {% endif %}
+                    
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <div class="modal fade" id="modalFactura" tabindex="-1" aria-labelledby="modalFacturaLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalFacturaLabel" style="color: var(--verde);">Validar Pedido</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Coteje el código <strong><span id="modalCodigoPedido" class="fw-bold text-primary"></span></strong> con la factura física.</p>
+                    <div class="mb-3">
+                        <label for="inputNumeroFactura" class="form-label">Número de Factura <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="inputNumeroFactura" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-validar" id="btnConfirmarValidacion">Confirmar Validación</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let pedidoEnProceso = null; 
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const modalFactura = new bootstrap.Modal(document.getElementById('modalFactura'));
+
+            document.getElementById('btnConfirmarValidacion').addEventListener('click', () => {
+                const numeroFactura = document.getElementById('inputNumeroFactura').value.trim();
+                if (!numeroFactura) {
+                    alert('Debe ingresar el número de factura.');
+                    return;
+                }
+                
+                modalFactura.hide(); 
+                validarPedido(pedidoEnProceso, numeroFactura);
+            });
+            
+            document.getElementById('modalFactura').addEventListener('hidden.bs.modal', function () {
+                document.getElementById('inputNumeroFactura').value = '';
+                pedidoEnProceso = null;
+            });
+        });
+
+        // Función segura que recibe 'this'
+        function abrirModalValidacion(btn) {
+            const pedidoId = btn.getAttribute('data-id');
+            const codigoPedido = btn.getAttribute('data-codigo');
+
+            pedidoEnProceso = pedidoId;
+            document.getElementById('modalCodigoPedido').textContent = codigoPedido;
+            
+            const modalFactura = new bootstrap.Modal(document.getElementById('modalFactura'));
+            modalFactura.show();
+        }
+
+        function validarPedido(pedidoId, numeroFactura) {
+            const btn = document.getElementById('btnConfirmarValidacion');
+            const originalText = btn.textContent;
+            
+            btn.disabled = true;
+            btn.textContent = 'Validando...';
+
+            fetch('/glp/validar_pedido', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    pedido_id: pedidoId, 
+                    numero_factura: numeroFactura
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    const row = document.getElementById(`pedido-${pedidoId}`);
+                    if (row) {
+                        row.remove();
+                    }
+                    
+                    const tbody = document.getElementById('pedidosTableBody');
+                    // Ajustado a 5 columnas por eliminación de lote
+                    if (tbody.children.length === 0) {
+                        tbody.innerHTML = '<tr id="no-pedidos-row"><td colspan="5" class="text-center text-success fw-bold">No hay pedidos pendientes de validación.</td></tr>';
+                    }
+                } else {
+                    alert('Error al validar: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error al validar pedido:', error);
+                alert('Ocurrió un error de conexión al validar el pedido.');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            });
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

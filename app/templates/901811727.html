@@ -9,7 +9,11 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#015249">
+  
   <script src="/static/js/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 
   <style>
     :root {
@@ -264,6 +268,35 @@
         max-height: 46px;
       }
     }
+
+    /* Submenú estilo acordeón con los colores del proyecto */
+    .submenu {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: none;
+      /* Inicialmente oculto */
+      background-color: #003b35;
+      padding-left: 20px;
+      border-radius: 10px;
+    }
+
+    .submenu.show {
+      display: block;
+    }
+
+    .submenu-item {
+      background-color: #015249;
+      color: white;
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .submenu-item:hover {
+      background-color: #f1f1f1;
+    }
   </style>
 
 </head>
@@ -293,23 +326,41 @@
   <div class="layout">
     <div class="sidebar-left">
       <div class="d-grid gap-2">
-        <button class="btn btn-custom mb-2" onclick="mostrarFormulario('crearEmpresa')">Crear empresa</button>
-        <button class="btn btn-custom mb-2" onclick="mostrarFormulario('editarEmpresa')">Editar empresa</button>
-        <button class="btn btn-custom mb-2" onclick="mostrarFormulario('borrarEmpresa')">Borrar empresa</button>
-        <button class="btn btn-custom mb-2" onclick="mostrarFormulario('crearPerfil')">Crear perfiles</button>
-        <button class="btn btn-custom mb-2" onclick="mostrarFormulario('editarPerfil')">Editar perfiles</button>
-        <button class="btn btn-custom mb-2" onclick="mostrarFormulario('borrarPerfil')">Borrar perfiles</button>
-        <button class="btn btn-custom mb-2" onclick="mostrarFormulario('crearUsuario')">Crear usuario</button>
-        <button class="btn btn-custom mb-2" onclick="mostrarFormulario('editarUsuario')">Editar usuario</button>
-        <button class="btn btn-custom mb-2" onclick="mostrarFormulario('borrarUsuario')">Borrar usuario</button>
+        <select id="menuDesplegable" class="form-select" onchange="mostrarFormularioSeleccionado()">
+          <option value="">CLIENTES</option>
+          <option value="crearEmpresa">Crear empresa</option>
+          <option value="editarEmpresa">Editar empresa</option>
+          <option value="borrarEmpresa">Borrar empresa</option>
+          <option value="crearPerfil">Crear perfiles</option>
+          <option value="editarPerfil">Editar perfiles</option>
+          <option value="borrarPerfil">Borrar perfiles</option>
+          <option value="crearUsuario">Crear usuario</option>
+          <option value="editarUsuario">Editar usuario</option>
+          <option value="borrarUsuario">Borrar usuario</option>
+        </select>
       </div>
-    </div>
 
-    <div class="main-content">
-      <!-- FORMULARIOS ORIGINALES INSERTADOS AQUÍ -->
+      <div class="sidebar-left">
+        <div class="d-grid gap-2">
+          <select id="clienteSelect" class="form-select" onchange="cargarOperaciones()">
+            <option value="">INFORMES</option>
+            <option value="890707006">Pollos Gar SAS</option>
+            <option value="900977113">Fenix Beach Cartagena</option>
+            <option value="901370428">Mercacentro</option>
+          </select>
+        </div>
+      </div>
 
-      <!-- Crear Empresa -->
-      <div id="crearEmpresa" class="form-section">
+      <div class="sidebar-left" style="display: none;" id="submenuContainer">
+        <div class="d-grid gap-2">
+          <ul id="submenu" class="submenu" style="display: none;">
+            </ul>
+        </div>
+      </div>
+      </div>
+
+
+    <div class="main-content"> <div id="crearEmpresa" class="form-section">
         <h4>Crear Empresa</h4>
         <form id="formCrearEmpresa" data-url="/registrar_empresa" data-confirmar="¿Desea registrar esta empresa?">
           <div class="mb-2">
@@ -328,10 +379,6 @@
           </div>
         </form>
       </div>
-
-      <!-- Aquí irían los demás formularios: editarEmpresa, borrarEmpresa, crearPerfil, etc. -->
-      <!-- Se recomienda que cada <form> tenga data-url y data-confirmar para integrarse con el modal unificado -->
-
 
       <div id="crearPerfil" class="form-section">
         <h5>Crear Perfil</h5>
@@ -356,13 +403,14 @@
             <label for="operacion" class="form-label">Operación</label>
             <select id="operacion" name="operacion" class="form-select">
               <option value="">Seleccione operación</option>
-              <option value="Electricidad">Electricidad</option>
-              <option value="Gas">Gas</option>
-              <option value="Carbon">Carbón</option>
-              <option value="Flota">Flota</option>
-              <option value="Flota">Control mermas</option>
-              <option value="Mantenimiento">Mantenimiento</option>
-              <option value="Gerencia">Gerencia</option>
+              <option value="Electricidad">Gestion Electricidad</option>
+              <option value="Gas">Gestion Gas Avicola</option>
+              <option value="Carbon">Gestion Carbón</option>
+              <option value="Flota">Gestion Flota Cautiva</option>
+              <option value="Flota">Gestion Transporte Especial</option>
+              <option value="Flota">Gestion Mantenimiento</option>
+              <option value="Mantenimiento">Gestion Procesos Industriales</option>
+              <option value="Mantenimiento">Gestion EDS</option>
             </select>
           </div>
 
@@ -379,8 +427,6 @@
           </div>
         </form>
       </div>
-      <!-- Crear Usuario -->
-      <!-- Crear Usuario -->
       <div id="crearUsuario" class="form-section">
         <h4>Crear Usuario</h4>
         <form id="form_crearUsuario" data-url="/registrar_usuario" data-confirmar="¿Desea registrar este usuario?">
@@ -455,12 +501,126 @@
           </div>
         </form>
       </div>
+      
+      <div id="seccionInforme" class="content-section" style="display: none; animation: slideIn 0.5s; position: relative; background-color: #ffffff !important; padding: 25px;">
 
-    </div>
+        <div id="pdfHeader" class="d-none d-print-block mb-4" style="border-bottom: 2px solid #015249; padding-bottom: 10px;">
+            <div class="d-flex justify-content-between align-items-center">
+                <img id="logoClientePDF" src="" style="max-height: 60px;" alt="Logo Cliente">
+                <img src="/static/logo_energix360.png" style="max-height: 60px;" alt="Energix360">
+            </div>
+            <div class="text-center mt-2">
+                <h5 class="fw-bold" style="color: #015249; margin:0;">REPORTE DE GESTIÓN GLP</h5>
+                <p class="m-0 text-muted" id="pdfClienteName" style="font-weight:600; font-size: 1.1em;"></p>
+                <small id="pdfPeriodo" style="font-size: 0.9em;"></small>
+            </div>
+        </div>
 
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+              <h4 id="tituloInforme" style="color: var(--color-primary); font-weight:700; margin-bottom: 0;">Informe de Gestión GLP</h4>
+              <small id="subtituloPeriodo" class="text-muted fw-bold">Periodo...</small>
+          </div>
+          <div>
+              <button class="btn btn-custom btn-sm me-2" id="btnDescargarPdf" onclick="descargarPDF()">Descargar PDF</button>
+              <button class="btn btn-danger btn-sm" id="btnCerrarInforme" onclick="cerrarInforme()">&times; Cerrar</button>
+          </div>
+        </div>
 
-    <!-- MODAL DE CONFIRMACION GLOBAL -->
-    <div class="modal fade" id="modalConfirmacionGlobal" tabindex="-1" aria-hidden="true">
+        <div class="row g-3 mb-4 text-center" id="kpiContainer">
+          
+          <div class="col-md-3 col-6" id="kpiCard1">
+            <div class="p-3 shadow-sm rounded bg-white border-start border-4 border-primary">
+              <small class="text-muted d-block text-uppercase fw-bold" id="kpi1Label">Label 1</small>
+              <h5 class="my-1 text-primary fw-bold" id="kpi1Value">0</h5>
+            </div>
+          </div>
+
+          <div class="col-md-3 col-6" id="kpiCard2">
+            <div class="p-3 shadow-sm rounded bg-white border-start border-4 border-success">
+              <small class="text-muted d-block text-uppercase fw-bold" id="kpi2Label">Label 2</small>
+              <h5 class="my-1 text-success fw-bold" id="kpi2Value">0</h5>
+            </div>
+          </div>
+
+          <div class="col-md-3 col-6" id="kpiCard3">
+            <div class="p-3 shadow-sm rounded bg-white border-start border-4 border-warning">
+              <small class="text-muted d-block text-uppercase fw-bold" id="kpi3Label">Label 3</small>
+              <h5 class="my-1 text-warning fw-bold" id="kpi3Value">0</h5>
+            </div>
+          </div>
+
+          <div class="col-md-3 col-6" id="kpiCard4" style="display:none;">
+            <div class="p-3 shadow-sm rounded bg-white border-start border-4 border-info">
+              <small class="text-muted d-block text-uppercase fw-bold" id="kpi4Label">Label 4</small>
+              <h5 class="my-1 text-info fw-bold" id="kpi4Value">0</h5>
+            </div>
+          </div>
+          
+          <div class="col-md-3 col-12" id="kpiCard5">
+            <div class="p-3 shadow-sm rounded bg-white border-start border-4 border-secondary">
+              <small class="text-muted d-block text-uppercase fw-bold" id="kpi5Label">Pollitos</small>
+              <h5 class="my-1 text-secondary fw-bold" id="kpi5Value">0</h5>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="card p-3 mb-4 shadow-sm">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title text-muted m-0">Análisis Gráfico</h5>
+            <div class="btn-group" role="group">
+              <button type="button" class="btn btn-outline-primary btn-sm active"
+                onclick="cambiarVistaGrafico('rendimiento')">Rendimiento (kg/ave)</button>
+              <button type="button" class="btn btn-outline-primary btn-sm"
+                onclick="cambiarVistaGrafico('saldos')">Evolución Saldos</button>
+            </div>
+          </div>
+          <div style="height: 350px; width: 100%;">
+            <canvas id="graficoConsumo"></canvas>
+          </div>
+        </div>
+
+        <div class="card p-3 shadow-sm">
+          <h5 class="card-title text-muted mb-3">Resumen por Granja</h5>
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table id="tablaConsumo" class="table table-hover table-bordered table-sm text-center">
+              <thead class="table-light sticky-top">
+                <tr>
+                  </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <style>
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        /* Ajuste para móviles en la tabla si es necesario */
+        @media (max-width: 576px) {
+          #tablaConsumo {
+            font-size: 0.75rem;
+          }
+
+          .table-section {
+            max-height: 350px;
+          }
+        }
+      </style>
+
+    </div><div class="modal fade" id="modalConfirmacionGlobal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
@@ -468,16 +628,20 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body" id="modalMensajeGlobal">
-            <!-- mensaje se inserta dinámicamente -->
-          </div>
+            </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" data-bs-dismiss="modal">No</button>
             <button class="btn btn-custom" id="btnConfirmarGlobal">Sí</button>
           </div>
         </div>
       </div>
+      <script>
+        function mostrarFormularioSeleccionado() {
+          const valorSeleccionado = document.getElementById("menuDesplegable").value;
+          mostrarFormulario(valorSeleccionado);
+        }
+      </script>
 
-      <!--JS-AJAX PARA OCULTAR MOSTRAR LOS MODALES Y LIMPIAR LOS INPUTS PARA LOS FORMULARIOS-->
       <script>
         document.addEventListener('DOMContentLoaded', function () {
           function mostrarFormulario(id) {
@@ -507,10 +671,6 @@
           }
         });
       </script>
-      <!--JS-AJAX PARA OCULTAR MOSTRAR LOS MODALES Y LIMPIAR LOS INPUTS PARA LOS FORMULARIOS-->
-
-      <!--JS-AJAX PARA EL MODAL DE CONFIRMACIÓN-->
-
       <script>
         let formularioActivo = null;
 
@@ -553,9 +713,6 @@
           bootstrap.Modal.getInstance(document.getElementById('modalConfirmacionGlobal')).hide();
         });
       </script>
-      <!--JS-AJAX PARA EL MODAL DE CONFIRMACIÓN-->
-
-      <!--JS AJAX SELECCIONAR ROLES EN CRERA USUARIO-->
       <script>
         function actualizarEmpresaUsuario() {
           const select = document.getElementById('empresa_select_usuario');
@@ -595,30 +752,471 @@
         }
 
       </script>
+
       <script>
-        function activarLogoutSeguroOffline() {
-          const logoutLinks = document.querySelectorAll('a[href="/logout"]');
+        // Define las operaciones de cada cliente
+        const operaciones = {
+          "890707006": [
+            "Gestion Electricidad",
+            "Gestion Gas Avicola",
+            "Gestion Carbón",
+            "Gestion Flota Cautiva",
+            "Gestion Transporte Especial",
+            "Gestion Mantenimiento",
+            "Gestion Procesos Industriales",
+            "Gestion EDS"
+          ],
+          "900977113": [
+            "Gestion Electricidad",
+            "Gestion Gas Avicola",
+            "Gestion Carbón",
+            "Gestion Flota Cautiva",
+            "Gestion Transporte Especial",
+            "Gestion Mantenimiento",
+            "Gestion Procesos Industriales",
+            "Gestion EDS"
+          ],
+          "901370428": [
+            "Gestion Electricidad",
+            "Gestion Gas Avicola",
+            "Gestion Carbón",
+            "Gestion Flota Cautiva",
+            "Gestion Transporte Especial",
+            "Gestion Mantenimiento",
+            "Gestion Procesos Industriales",
+            "Gestion EDS"
+          ]
+        };
 
-          logoutLinks.forEach(a => {
-            // limpiamos listeners previos por si se ejecuta varias veces
-            a.onclick = null;
+        // Función para cargar el submenú de operaciones según el cliente seleccionado
+        function cargarOperaciones() {
+          const clienteId = document.getElementById("clienteSelect").value; // Asegúrate de que esto esté correcto
+          const submenu = document.getElementById("submenu");
+          const submenuContainer = document.getElementById("submenuContainer");
 
-            if (!navigator.onLine) {
-              a.addEventListener("click", (e) => {
-                e.preventDefault();
-                alert("Estás sin conexión. El cierre de sesión requiere internet.");
-              }, { once: true });
+          submenu.innerHTML = '';
+
+          if (clienteId && operaciones[clienteId]) {
+            submenuContainer.style.display = 'block';  // Mostrar el área derecha
+            submenu.style.display = 'block';  // Mostrar el submenú
+
+            operaciones[clienteId].forEach(op => {
+              const li = document.createElement("li");
+              li.classList.add("submenu-item");
+              li.textContent = op;
+
+              if (op === "Gestion Gas Avicola") {
+                li.onclick = function () {
+                  submenu.style.display = 'none';  // Ocultar el submenú
+                  activarLógicaInteractividadInformes(clienteId);
+                };
+              } else {
+                li.onclick = function () {
+                  submenu.style.display = 'none';  // Ocultar el submenú
+                  alert("Operación seleccionada: " + op);
+                };
+              }
+
+              submenu.appendChild(li);
+            });
+          } else {
+            submenuContainer.style.display = 'none';  // Ocultar el área derecha
+            submenu.style.display = 'none';  // Ocultar el submenú
+          }
+
+        }
+
+        /* =========================================================
+         LÓGICA UNIFICADA DE INFORMES AVANZADOS GLP
+         ========================================================= */
+
+        let chartInstancia = null;
+        let datosGlobales = null;
+
+        // --- FUNCIONES VISUALES (KPIs, GRÁFICOS, TABLAS) ---
+
+        function cerrarInforme() {
+          document.getElementById('seccionInforme').style.display = 'none';
+        }
+
+        function renderizarInforme(data) {
+          document.getElementById('seccionInforme').style.display = 'block';
+
+          // A. Renderizar KPIs (Tarjetas Dinámicas)
+          const kpis = data.kpis;
+          
+          // Función auxiliar para mostrar/ocultar y asignar valores
+          const setCard = (id, label, value, decimals=0) => {
+              const card = document.getElementById(id);
+              if (label === "---") {
+                  card.style.display = 'none';
+              } else {
+                  card.style.display = 'block';
+                  const numId = id.replace('kpiCard', '');
+                  document.getElementById(`kpi${numId}Label`).textContent = label;
+                  document.getElementById(`kpi${numId}Value`).textContent = Number(value).toLocaleString(undefined, { maximumFractionDigits: decimals });
+              }
+          };
+
+          setCard('kpiCard1', kpis.card1_label, kpis.card1_value, 0); // Saldo Inicial / Consumo
+          setCard('kpiCard2', kpis.card2_label, kpis.card2_value, kpis.card2_label.includes("Rendimiento") ? 5 : 0); // Pedidos / Rendimiento
+          setCard('kpiCard3', kpis.card3_label, kpis.card3_value, 0); // Consumo Parcial / Saldo Final
+          setCard('kpiCard4', kpis.card4_label, kpis.card4_value, 0); // Opcional
+          setCard('kpiCard5', kpis.card5_label, kpis.card5_value, 0); // Pollitos
+
+          // B. Renderizar Gráfico
+          cambiarVistaGrafico('rendimiento');
+
+          // C. Renderizar Tabla Resumen
+          const tbody = document.getElementById('tablaConsumo').querySelector('tbody');
+          const thead = document.getElementById('tablaConsumo').querySelector('thead tr');
+          
+          // Cambiar encabezados
+          thead.innerHTML = `
+              <th>Granja</th>
+              <th>Total kg</th>
+              <th>Pollitos</th>
+              <th>kg/pollito</th>
+          `;
+          
+          tbody.innerHTML = '';
+          
+          // Filas de granjas
+          data.tabla_resumen.forEach(row => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                  <td class="text-start fw-bold">${row.granja}</td>
+                  <td class="text-end">${Number(row.total_kg).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  <td class="text-end">${Number(row.pollitos).toLocaleString()}</td>
+                  <td class="text-end">${Number(row.kg_pollito).toFixed(4)}</td>
+              `;
+              tbody.appendChild(tr);
+          });
+          
+          // Filas de estadísticas
+          const trMedia = document.createElement('tr');
+          trMedia.style.backgroundColor = '#f0f9ff'; // Light blue
+          trMedia.innerHTML = `
+              <td colspan="3" class="text-end fw-bold">Media</td>
+              <td class="text-end fw-bold text-primary">${Number(data.estadisticas.media).toFixed(4)}</td>
+          `;
+          tbody.appendChild(trMedia);
+          
+          const trStd = document.createElement('tr');
+          trStd.style.backgroundColor = '#fff5f5'; // Light red
+          trStd.innerHTML = `
+              <td colspan="3" class="text-end fw-bold">Desviación Estándar</td>
+              <td class="text-end fw-bold text-danger">${Number(data.estadisticas.desviacion).toFixed(4)}</td>
+          `;
+          tbody.appendChild(trStd);
+
+          // Scroll automático hacia el informe
+          document.getElementById('seccionInforme').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function cambiarVistaGrafico(vista) {
+          if (!datosGlobales) return;
+
+          const ctx = document.getElementById('graficoConsumo').getContext('2d');
+          if (chartInstancia) chartInstancia.destroy();
+
+          const series = datosGlobales.series;
+          let datasets = [];
+          let tituloY = '';
+
+          if (vista === 'rendimiento') {
+            tituloY = 'kg / pollito';
+            datasets = [{
+              label: 'Rendimiento (kg/ave)',
+              data: series.kg_pollito,
+              borderColor: '#b00020',
+              backgroundColor: 'rgba(176, 0, 32, 0.1)',
+              borderWidth: 2,
+              pointRadius: 3,
+              tension: 0.3,
+              fill: true
+            }];
+          } else if (vista === 'saldos') {
+            tituloY = 'Kilogramos GLP';
+            datasets = [
+              {
+                label: 'Saldo Inicial (Clase)',
+                data: series.saldo_inicial,
+                backgroundColor: '#0d6efd',
+                borderColor: '#0d6efd',
+                pointStyle: 'rectRot',
+                pointRadius: 6,
+                showLine: false
+              },
+              {
+                label: 'Saldo Final (Clase)',
+                data: series.saldo_final,
+                backgroundColor: '#6c757d',
+                borderColor: '#6c757d',
+                pointStyle: 'triangle',
+                pointRadius: 8,
+                showLine: false
+              },
+              {
+                label: 'Ingresos (Recargas)',
+                type: 'bar',
+                data: series.ingresos,
+                backgroundColor: '#198754'
+              }
+            ];
+          }
+
+          chartInstancia = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: series.fechas,
+              datasets: datasets
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { tooltip: { mode: 'index', intersect: false } },
+              scales: { y: { beginAtZero: true, title: { display: true, text: tituloY } } }
             }
           });
         }
 
-        window.addEventListener("load", activarLogoutSeguroOffline);
-        window.addEventListener("online", activarLogoutSeguroOffline);
-        window.addEventListener("offline", activarLogoutSeguroOffline);
+        // --- FUNCIÓN DE DESCARGA PDF CON LOGOS ---
+        function descargarPDF() {
+            const element = document.getElementById('seccionInforme');
+            const header = document.getElementById('pdfHeader');
+            const btnClose = document.getElementById('btnCerrarInforme');
+            const btnDown = document.getElementById('btnDescargarPdf');
+
+            // 1. Preparar visualización para PDF
+            // Actualizar datos del encabezado (Nombre cliente y Logo)
+            const select = document.getElementById("clienteSelect");
+            const clienteNombre = select.options[select.selectedIndex].text;
+            document.getElementById("pdfClienteName").textContent = clienteNombre;
+            // IMPORTANTE: Aseguramos que la imagen del logo cargue según el cliente seleccionado
+            // Se asume convención de nombre de archivo: logo_NombreCliente.png
+            document.getElementById("logoClientePDF").src = `/static/logo_${clienteNombre}.png`; 
+
+            header.classList.remove('d-none'); // Mostrar encabezado oculto
+            btnClose.style.display = 'none';   // Ocultar botones
+            btnDown.style.display = 'none';
+
+            // 2. Configuración
+            const opt = {
+                margin:       0.2,
+                filename:     `Informe_GLP_${new Date().toISOString().split('T')[0]}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 3, useCORS: true, backgroundColor: '#ffffff' }, // Fondo blanco para evitar opacidad
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            // 3. Generar y Restaurar
+            html2pdf().set(opt).from(element).save().then(() => {
+                header.classList.add('d-none');
+                btnClose.style.display = 'inline-block';
+                btnDown.style.display = 'inline-block';
+            });
+        }
+
+        // --- FUNCIONES DE INTERACTIVIDAD (PREGUNTAS) ---
+
+        function mostrarPregunta(preguntaTexto, opciones, callback) {
+          const contenedor = document.createElement("div");
+          contenedor.classList.add("pregunta-container");
+          contenedor.style.position = "fixed";
+          contenedor.style.top = "50%";
+          contenedor.style.left = "50%";
+          contenedor.style.transform = "translate(-50%, -50%)";
+          contenedor.style.background = "white";
+          contenedor.style.padding = "20px";
+          contenedor.style.borderRadius = "10px";
+          contenedor.style.boxShadow = "0 0 15px rgba(0,0,0,0.3)";
+          contenedor.style.zIndex = "9999";
+          contenedor.style.minWidth = "300px";
+
+          const pregunta = document.createElement("h5");
+          pregunta.textContent = preguntaTexto;
+          pregunta.style.marginBottom = "15px";
+          pregunta.style.color = "#015249";
+          contenedor.appendChild(pregunta);
+
+          const select = document.createElement("select");
+          select.classList.add("form-select", "mb-3");
+
+          const defaultOption = document.createElement("option");
+          defaultOption.value = "";
+          defaultOption.textContent = "Selecciona una opción...";
+          select.appendChild(defaultOption);
+
+          opciones.forEach(opcion => {
+            const option = document.createElement("option");
+            option.value = opcion.value;
+            option.textContent = opcion.text;
+            select.appendChild(option);
+          });
+          contenedor.appendChild(select);
+
+          const btnRow = document.createElement("div");
+          btnRow.style.display = "flex";
+          btnRow.style.justifyContent = "space-between";
+
+          const botonConfirmar = document.createElement("button");
+          botonConfirmar.textContent = "Confirmar";
+          botonConfirmar.classList.add("btn", "btn-custom");
+          botonConfirmar.onclick = () => {
+            if (select.value) {
+              contenedor.remove();
+              callback(select.value);
+            } else {
+              alert("Por favor, selecciona una opción.");
+            }
+          };
+
+          const botonCancelar = document.createElement("button");
+          botonCancelar.textContent = "Cancelar";
+          botonCancelar.classList.add("btn", "btn-secondary");
+          botonCancelar.onclick = () => contenedor.remove();
+
+          btnRow.appendChild(botonCancelar);
+          btnRow.appendChild(botonConfirmar);
+          contenedor.appendChild(btnRow);
+
+          document.body.appendChild(contenedor);
+        }
+
+        function activarLógicaInteractividadInformes(clienteId) {
+          hacerPreguntaTipoInforme(clienteId);
+        }
+
+        function hacerPreguntaTipoInforme(clienteId) {
+          mostrarPregunta("¿Qué tipo de informe deseas generar?", [
+            { value: "granja", text: "Por Granja" },
+            { value: "zona", text: "Por Zona" },
+            { value: "general", text: "Informe General" }
+          ], (tipo) => {
+            if (tipo === "general") {
+              hacerPreguntaPeriodo(clienteId, tipo, null);
+            } else {
+              hacerPreguntaUbicacion(clienteId, tipo);
+            }
+          });
+        }
+
+        function hacerPreguntaUbicacion(clienteId, tipoInforme) {
+          fetch('/obtener_ubicaciones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tipo: tipoInforme, empresa_id: clienteId })
+          })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success) {
+                const opts = data.ubicaciones.map(u => ({ value: u, text: u }));
+                mostrarPregunta(`Selecciona la ${tipoInforme}:`, opts, (ubicacion) => {
+                  hacerPreguntaPeriodo(clienteId, tipoInforme, ubicacion);
+                });
+              } else {
+                alert(data.message);
+              }
+            })
+            .catch(e => { console.error(e); alert("Error de conexión al obtener ubicaciones."); });
+        }
+
+        function hacerPreguntaPeriodo(clienteId, tipo, ubicacion) {
+          mostrarPregunta("Selecciona el periodo:", [
+            { value: "Actual", text: "Periodo Actual (Activos)" },
+            { value: "Personalizado", text: "Histórico (Personalizado)" }
+          ], (periodo) => {
+            if (periodo === "Personalizado") {
+              hacerPreguntaFechas(clienteId, tipo, ubicacion, periodo);
+            } else {
+              generarInformeFinal(clienteId, tipo, ubicacion, periodo, null, null);
+            }
+          });
+        }
+
+        function hacerPreguntaFechas(clienteId, tipo, ubicacion, periodo) {
+          // Crear modal simple para fechas
+          const contenedor = document.createElement("div");
+          contenedor.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:10px; box-shadow:0 0 15px rgba(0,0,0,0.3); z-index:9999;";
+
+          contenedor.innerHTML = `
+              <h5 style="color:#015249; margin-bottom:15px;">Selecciona el rango de fechas</h5>
+              <label class="form-label">Fecha Inicio</label>
+              <input type="date" id="tempFechaIni" class="form-control mb-2">
+              <label class="form-label">Fecha Fin</label>
+              <input type="date" id="tempFechaFin" class="form-control mb-3">
+              <div style="text-align:right;">
+                  <button class="btn btn-secondary me-2" onclick="this.parentElement.parentElement.remove()">Cancelar</button>
+                  <button class="btn btn-custom" id="btnConfirmarFechas">Generar Informe</button>
+              </div>
+          `;
+          document.body.appendChild(contenedor);
+
+          document.getElementById('btnConfirmarFechas').onclick = () => {
+            const ini = document.getElementById('tempFechaIni').value;
+            const fin = document.getElementById('tempFechaFin').value;
+            if (ini && fin) {
+              contenedor.remove();
+              generarInformeFinal(clienteId, tipo, ubicacion, periodo, ini, fin);
+            } else {
+              alert("Debes seleccionar ambas fechas.");
+            }
+          };
+        }
+
+        function generarInformeFinal(empresaId, tipo, ubicacion, periodo, ini, fin) {
+          fetch('/generar_informe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo_informe: tipo,
+              periodo: periodo,
+              fecha_inicio: ini,
+              fecha_fin: fin,
+              ubicacion: ubicacion,
+              empresa_id: empresaId
+            })
+          })
+            .then(r => r.json())
+            .then(resp => {
+              if (resp.success) {
+                datosGlobales = resp.data;
+
+                // --- LÓGICA DE TÍTULO DINÁMICO ---
+                const clienteSelect = document.getElementById("clienteSelect");
+                const clienteNombre = clienteSelect.options[clienteSelect.selectedIndex].text;
+                let titulo = "Informe de Gestión GLP";
+
+                if (tipo === 'granja') {
+                    titulo = `Informe GLP Granja ${ubicacion}`;
+                } else if (tipo === 'zona') {
+                    titulo = `Informe GLP Zona ${ubicacion}`;
+                } else if (tipo === 'general') {
+                    titulo = `Informe GLP Granjas - ${clienteNombre}`;
+                }
+
+                let textoPeriodo = "";
+                if (periodo === 'Actual') {
+                    textoPeriodo = "Periodo Actual";
+                } else if (periodo === 'Personalizado') {
+                    textoPeriodo = `Desde ${ini} hasta ${fin}`;
+                }
+
+                // Actualizar en el DOM (Pantalla y PDF)
+                document.getElementById("tituloInforme").textContent = titulo;
+                document.getElementById("subtituloPeriodo").textContent = textoPeriodo;
+                document.getElementById("pdfPeriodo").textContent = textoPeriodo;
+
+                renderizarInforme(resp.data);
+              } else {
+                alert(resp.message);
+              }
+            })
+            .catch(e => { console.error(e); alert("Error al generar el informe."); });
+        }
+
       </script>
-
-
-
 
       <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

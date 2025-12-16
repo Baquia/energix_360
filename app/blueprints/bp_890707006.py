@@ -1,7 +1,9 @@
-from flask import Blueprint, render_template, session, flash, redirect, url_for, request, jsonify
+from flask import Blueprint, render_template, session, flash, redirect, url_for, request, jsonify, current_app
 from app.utils import login_required_custom
 from app import mysql, csrf
 import re
+import traceback
+from datetime import datetime
 
 bp_890707006 = Blueprint('bp_890707006', __name__)
 
@@ -19,30 +21,93 @@ def panel_pollosgar():
     return render_template('890707006.html', nombre=session.get('nombre'), empresa=session.get('empresa'))
 
 
+# =========================================================
+# RUTA UNIFICADA: ACCESO AL MÓDULO GLP (Operación o Facturas)
+# =========================================================
 @bp_890707006.route('/dashboard/gas')
 @login_required_custom
 def acceso_modulo_gas():
+    """
+    Controla el acceso al módulo GLP, realiza la consulta de pedidos pendientes 
+    si el usuario tiene perfil de facturación, y redirige a la plantilla correcta.
+    """
     usuario_id = session.get('usuario_id')
+    empresa_nombre = session.get('empresa') # Usamos el nombre de la empresa de la sesión
 
-    if not usuario_id:
-        flash("Sesión no válida. Vuelva a iniciar sesión.", "warning")
+    if not usuario_id or not empresa_nombre:
+        flash("Sesión no válida o falta información de la empresa.", "warning")
         return redirect(url_for('index'))
 
     cur = mysql.connection.cursor()
-    cur.execute("SELECT nombre, perfil, empresa_id FROM usuarios WHERE id = %s", (usuario_id,))
+    cur.execute("SELECT nombre, perfil, empresa_id, cedula FROM usuarios WHERE id = %s", (usuario_id,))
     usuario = cur.fetchone()
     cur.close()
 
     if not usuario:
         flash("Usuario no encontrado.", "danger")
         return redirect(url_for('index'))
+    
+    perfiles_permitidos = {
+        'Gar_Operador_gas': 'glp.html',
+        'Gar_controlfacturas_gas': 'facturas_glp.html'
+    }
+    perfil = usuario['perfil']
 
-    if usuario['perfil'] != 'Gar_Operador_gas':
-        flash("No tiene acceso al módulo de gas.", "danger")
+    if perfil not in perfiles_permitidos:
+        flash("No tiene acceso al módulo de gas. Perfiles permitidos: Operador o Control de Facturas.", "danger")
         return redirect(url_for('bp_890707006.panel_pollosgar'))
 
-    # Si el perfil es Granjero, redirigir a la vista glp.html
-    return render_template('glp.html', nombre=usuario['nombre'], nit=usuario['empresa_id'])
+    template_name = perfiles_permitidos[perfil]
+    
+    # --- LÓGICA DE CARGA DE DATOS DIRECTA ---
+    pedidos_pendientes = []
+    
+    # Solo consultamos si vamos a la pantalla de facturas
+    if template_name == 'facturas_glp.html':
+        try:
+            cur = mysql.connection.cursor()
+            # CORRECCIÓN: Usamos los nombres reales de la BD (codigo, fecha_registro) y quitamos 'lote'
+            query = """
+                SELECT 
+                    p.id, 
+                    p.codigo AS codigo_pedido,          
+                    p.fecha_registro AS fecha_generacion, 
+                    p.proveedor,       
+                    p.ubicacion
+                FROM pedidos_gas_glp p
+                WHERE p.cliente = %s AND p.estatus = 'generado'
+                ORDER BY p.fecha_registro DESC
+            """
+            cur.execute(query, (empresa_nombre,))
+            pedidos = cur.fetchall()
+            cur.close()
+            
+            # Formateo de datos para la vista
+            for pedido in pedidos:
+                p = dict(pedido)
+                # Asegurar que la fecha sea string
+                if p['fecha_generacion']:
+                    p['fecha_generacion'] = str(p['fecha_generacion'])
+                
+                p['proveedor'] = p.get('proveedor') or 'N/A'
+                pedidos_pendientes.append(p)
+
+        except Exception as e:
+            flash(f"Error al cargar pedidos pendientes: {str(e)}", "danger")
+            # CORRECCIÓN: Usamos current_app en lugar de app para evitar NameError
+            current_app.logger.error(f"Error cargando pedidos en ruta: {traceback.format_exc()}")
+    # ----------------------------------------
+
+    # Redirigir a la vista correspondiente
+    return render_template(
+        template_name, 
+        nombre=usuario['nombre'], 
+        nit=usuario['empresa_id'],
+        cedula=usuario.get('cedula'), 
+        empresa=empresa_nombre,       # Pasamos la empresa para cargar el logo correcto
+        pedidos=pedidos_pendientes    # Datos de la tabla
+    )
+
 
 @bp_890707006.route('/dashboard/mermas')
 @login_required_custom
@@ -137,7 +202,6 @@ def flota_prelogin_qr():
         return jsonify(success=False, message="No tiene acceso a flota."), 403
 
     #Normalizacion del QR
-    # ...
     placa = (j.get("placa") or "")
     placa = placa.strip().upper()
     placa = re.sub(r'[^A-Z0-9]', '', placa)   # <-- deja SOLO letras/números
@@ -219,7 +283,3 @@ def acceso_modulo_flota():
         nit=usuario['empresa_id'],
         placa=placa
     )
-
-
-
-

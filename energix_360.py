@@ -23,8 +23,6 @@ def login_required_custom(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Crear aplicación
-app = create_app()
 
 @app.route("/sw.js")
 def sw():
