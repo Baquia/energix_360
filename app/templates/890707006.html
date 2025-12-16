@@ -214,7 +214,6 @@
 
   <a href="/logout" class="logout-btn">Salir</a>
 
-  <!-- MODAL QR FLOTA -->
   <div id="modalFlotaQR" class="modal">
     <div class="modal-content">
       <h3>Escanee el QR del vehículo</h3>
@@ -224,17 +223,24 @@
     </div>
   </div>
 
-  <!-- LIBRERÍA QR -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
-
   <script>
     let qrScannerFlota = null;
 
+    // --- FUNCIÓN CORREGIDA PARA EVITAR CACHÉ ---
     function acceder(seccion) {
       if (seccion === 'flota') {
         abrirFlotaQR();
         return;
       }
+      
+      // TRUCO ANTI-CACHÉ SOLO PARA GAS:
+      // Agregamos "?v=" + la hora actual. 
+      // Esto obliga al navegador a ignorar la copia vieja y pedir la nueva al servidor.
+      if (seccion === 'gas') {
+          window.location.href = "/dashboard/gas?v=" + new Date().getTime();
+          return;
+      }
+
       window.location.href = "/dashboard/" + seccion;
     }
 
@@ -298,15 +304,11 @@
         });
     }
 
-  </script>
-  <script>
+    // Logout seguro offline
     function activarLogoutSeguroOffline() {
       const logoutLinks = document.querySelectorAll('a[href="/logout"]');
-
       logoutLinks.forEach(a => {
-        // limpiamos listeners previos por si se ejecuta varias veces
         a.onclick = null;
-
         if (!navigator.onLine) {
           a.addEventListener("click", (e) => {
             e.preventDefault();
@@ -321,7 +323,5 @@
     window.addEventListener("offline", activarLogoutSeguroOffline);
   </script>
 
-
 </body>
-
 </html>
