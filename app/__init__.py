@@ -58,7 +58,7 @@ def create_app():
         app.config['MYSQL_USER'] = 'root'          # ajusta si tu usuario local es otro
         app.config['MYSQL_PASSWORD'] = ''          # pon aquí tu clave local si tienes
         app.config['MYSQL_DB'] = 'energix_360'     # nombre de tu BD local
-        
+
         # 👇 AÑADE ESTOS PRINTS JUSTO DESPUÉS
         print("DEBUG MYSQL_HOST CONFIG =", app.config['MYSQL_HOST'])
         print("DEBUG MYSQL_USER CONFIG =", app.config['MYSQL_USER'])

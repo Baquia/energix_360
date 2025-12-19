@@ -126,6 +126,6 @@ if __name__ == '__main__':
     print("\n✅ RUTAS DISPONIBLES EN FLASK:")
     for rule in app.url_map.iter_rules():
         print(f"→ {rule}  →  {rule.endpoint}")
-        
+
     app.run(debug=True, port=5001)
 
