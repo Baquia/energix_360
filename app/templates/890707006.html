@@ -24,146 +24,43 @@
       --radius-card: 18px;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
-      margin: 0;
-      font-family: Verdana, sans-serif;
+      margin: 0; font-family: Verdana, sans-serif;
       background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px 12px 70px;
-      position: relative;
-      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 20px 12px 70px; position: relative; min-height: 100vh;
       color: var(--color-text);
     }
 
-    header {
-      width: 100%;
-      max-width: 980px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      gap: 8px;
-    }
-
-    .logo {
-      max-height: 56px;
-      width: auto;
-    }
-
-    h1 {
-      width: 100%;
-      max-width: 980px;
-      font-size: clamp(1.2rem, 3.2vw, 1.6rem);
-      text-align: center;
-      margin: 0 0 18px;
-      color: var(--color-primary-dark);
-    }
-
-    .grid {
-      width: 100%;
-      max-width: 980px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-      gap: 14px;
-    }
-
+    header { width: 100%; max-width: 980px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
+    .logo { max-height: 56px; width: auto; }
+    h1 { width: 100%; max-width: 980px; font-size: clamp(1.2rem, 3.2vw, 1.6rem); text-align: center; margin: 0 0 18px; color: var(--color-primary-dark); }
+    
+    .grid { width: 100%; max-width: 980px; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
+    
     .icon-btn {
-      background: var(--color-surface);
-      border-radius: var(--radius-card);
-      border: 1px solid var(--color-border);
-      box-shadow: var(--shadow-soft);
-      padding: 14px 12px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      cursor: pointer;
+      background: var(--color-surface); border-radius: var(--radius-card); border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-soft); padding: 14px 12px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 8px; cursor: pointer;
       transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
     }
-
-    .icon-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
-      background: #f0fdf9;
-    }
-
-    .icon-btn img {
-      width: 48px;
-      height: 48px;
-      object-fit: contain;
-    }
-
-    .icon-label {
-      margin-top: 4px;
-      font-size: clamp(0.85rem, 2.5vw, 0.95rem);
-      color: var(--color-primary-dark);
-      text-align: center;
-      font-weight: 600;
-    }
+    .icon-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15); background: #f0fdf9; }
+    .icon-btn img { width: 48px; height: 48px; object-fit: contain; }
+    .icon-label { margin-top: 4px; font-size: clamp(0.85rem, 2.5vw, 0.95rem); color: var(--color-primary-dark); text-align: center; font-weight: 600; }
 
     .logout-btn {
-      position: fixed;
-      left: 16px;
-      bottom: 16px;
-      background: var(--color-danger);
-      color: #fff;
-      border-radius: 999px;
-      padding: 8px 16px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      border: 1px solid var(--color-danger);
-      cursor: pointer;
-      box-shadow: 0 3px 10px rgba(180, 0, 32, 0.4);
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      z-index: 20;
-      text-decoration: none;
+      position: fixed; left: 16px; bottom: 16px; background: var(--color-danger); color: #fff;
+      border-radius: 999px; padding: 8px 16px; font-size: 0.85rem; font-weight: 600;
+      border: 1px solid var(--color-danger); cursor: pointer; box-shadow: 0 3px 10px rgba(180, 0, 32, 0.4);
+      display: inline-flex; align-items: center; gap: 6px; z-index: 20; text-decoration: none;
     }
+    .logout-btn:hover { background: #8f0017; }
 
-    .logout-btn:hover {
-      background: #8f0017;
-    }
-
-    /* MODAL QR */
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-      padding: 12px;
-    }
-
-    .modal-content {
-      background: #ffffff;
-      border-radius: 14px;
-      padding: 16px;
-      width: 100%;
-      max-width: 480px;
-      box-shadow: var(--shadow-soft);
-      text-align: center;
-    }
-
-    .btn-cancelar {
-      width: 100%;
-      margin-top: 12px;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid var(--color-border);
-      background: #f3f4f6;
-      font-weight: 600;
-      cursor: pointer;
-    }
+    .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 12px; }
+    .modal-content { background: #ffffff; border-radius: 14px; padding: 16px; width: 100%; max-width: 480px; box-shadow: var(--shadow-soft); text-align: center; }
+    .btn-cancelar { width: 100%; margin-top: 12px; padding: 10px; border-radius: 8px; border: 1px solid var(--color-border); background: #f3f4f6; font-weight: 600; cursor: pointer; }
   </style>
 </head>
 <script>
@@ -225,17 +122,22 @@
 
   <script>
     let qrScannerFlota = null;
+    
+    // CAPTURA DEL PERFIL DESDE EL BACKEND
+    const perfilUsuario = "{{ perfil }}"; 
 
-    // --- FUNCIÓN CORREGIDA PARA EVITAR CACHÉ ---
     function acceder(seccion) {
       if (seccion === 'flota') {
+        // VALIDACIÓN DE SEGURIDAD EN FRONTEND (UX)
+        if (perfilUsuario !== 'operarios_vehiculos') {
+            alert("Acceso Denegado: Su perfil no está autorizado para Operación de Flota.");
+            return;
+        }
         abrirFlotaQR();
         return;
       }
       
-      // TRUCO ANTI-CACHÉ SOLO PARA GAS:
-      // Agregamos "?v=" + la hora actual. 
-      // Esto obliga al navegador a ignorar la copia vieja y pedir la nueva al servidor.
+      // Anti-caché para Gas
       if (seccion === 'gas') {
           window.location.href = "/dashboard/gas?v=" + new Date().getTime();
           return;
@@ -304,7 +206,6 @@
         });
     }
 
-    // Logout seguro offline
     function activarLogoutSeguroOffline() {
       const logoutLinks = document.querySelectorAll('a[href="/logout"]');
       logoutLinks.forEach(a => {

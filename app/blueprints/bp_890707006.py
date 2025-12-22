@@ -7,7 +7,17 @@ from datetime import datetime
 
 bp_890707006 = Blueprint('bp_890707006', __name__)
 
-# --- RUTAS OFFLINE ---
+# CONSTANTES DE LA EMPRESA DUEÑA DEL MÓDULO (POLLOS GAR)
+NIT_POLLOS = '890707006'
+
+# CONSTANTES DEL WEBMASTER (SUPER ADMIN)
+NIT_WEBMASTER = '901811727'
+PERFIL_WEBMASTER = 'webmaster_admin'
+
+# =========================================================
+# 1. GRUPO INFRAESTRUCTURA Y GENERAL
+# =========================================================
+
 @bp_890707006.route("/890707006_offline.html")
 def panel_pollosgar_offline():
     return render_template("890707006_offline.html")
@@ -16,20 +26,36 @@ def panel_pollosgar_offline():
 def glp_offline():
     return render_template("glp_offline.html")
 
-# --- PANEL PRINCIPAL ---
 @bp_890707006.route('/890707006.html')
 @login_required_custom
 def panel_pollosgar():
-    return render_template('890707006.html', nombre=session.get('nombre'), empresa=session.get('empresa'))
+    # CAMBIO UX: Obtener el perfil real desde la BD para enviarlo al frontend
+    # Esto permite que el botón de Flota se bloquee visualmente si no es el perfil correcto
+    usuario_id = session.get('usuario_id')
+    perfil_usuario = ''
+    
+    if usuario_id:
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT perfil FROM usuarios WHERE id = %s", (usuario_id,))
+        row = cur.fetchone()
+        cur.close()
+        if row:
+            perfil_usuario = str(row['perfil']).strip().lower()
+
+    return render_template('890707006.html', 
+                           nombre=session.get('nombre'), 
+                           empresa=session.get('empresa'),
+                           perfil=perfil_usuario)
 
 
 # =========================================================
-# 1. ROUTER PRINCIPAL (El semáforo)
-#    Esta ruta NO muestra nada, solo redirige a la URL correcta.
+# 2. GRUPO MÓDULO GAS (GLP)
 # =========================================================
+
 @bp_890707006.route('/dashboard/gas')
 @login_required_custom
 def router_modulo_gas():
+    # 1. Validación de Sesión
     usuario_id = session.get('usuario_id')
     empresa_nombre = session.get('empresa') 
 
@@ -37,155 +63,119 @@ def router_modulo_gas():
         flash("Sesión no válida.", "warning")
         return redirect(url_for('index'))
 
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT nombre, perfil, empresa_id FROM usuarios WHERE id = %s", (usuario_id,))
-    usuario = cur.fetchone()
-    cur.close()
-
-    if not usuario:
-        flash("Usuario no encontrado.", "danger")
-        return redirect(url_for('index'))
-    
-    # Normalización del perfil
-    perfil_raw = usuario.get('perfil') or ''
-    perfil = perfil_raw.strip().lower()
-
-    # --- LÓGICA DE REDIRECCIÓN ---
-    # Al usar redirect(), el navegador se ve forzado a cambiar de URL,
-    # evitando que el Service Worker confunda las pantallas.
-
-    if 'operador' in perfil and 'gas' in perfil:
-        # Redirige a la URL exclusiva de operación
-        return redirect(url_for('bp_890707006.vista_operador_glp'))
-        
-    elif 'control' in perfil or 'facturas' in perfil:
-        # Redirige a la URL exclusiva de facturación
-        return redirect(url_for('bp_890707006.vista_facturas_glp'))
-    
-    else:
-        flash(f"Su perfil ({perfil_raw}) no tiene acceso habilitado al módulo de Gas.", "danger")
-        return redirect(url_for('bp_890707006.panel_pollosgar'))
-
-
-# =========================================================
-# 2. VISTA ESPECÍFICA: OPERADOR (glp.html)
-#    URL: /dashboard/gas/operacion
-# =========================================================
-@bp_890707006.route('/dashboard/gas/operacion')
-@login_required_custom
-def vista_operador_glp():
-    usuario_id = session.get('usuario_id')
-    
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT nombre, perfil, empresa_id FROM usuarios WHERE id = %s", (usuario_id,))
-    usuario = cur.fetchone()
-    cur.close()
-
-    # Renderizamos la pantalla de operación GLP
-    response = make_response(render_template(
-        'glp.html',
-        nombre=usuario['nombre'],
-        empresa=session.get('empresa')
-    ))
-    
-    # Cabeceras para asegurar que no se cachee la lógica interna
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    return response
-
-
-# =========================================================
-# 3. VISTA ESPECÍFICA: FACTURAS (facturas_glp.html)
-#    URL: /dashboard/gas/facturacion
-# =========================================================
-@bp_890707006.route('/dashboard/gas/facturacion')
-@login_required_custom
-def vista_facturas_glp():
-    usuario_id = session.get('usuario_id')
-    empresa_nombre = session.get('empresa')
-    
+    # 2. Obtener datos frescos
     cur = mysql.connection.cursor()
     cur.execute("SELECT nombre, perfil, empresa_id, cedula FROM usuarios WHERE id = %s", (usuario_id,))
     usuario = cur.fetchone()
     
-    # --- Lógica de carga de pedidos pendientes ---
-    pedidos_pendientes = []
-    try:
-        # Consulta usando las columnas REALES de tu base de datos actualizadas
-        query = """
-            SELECT 
-                p.id, 
-                p.codigo AS codigo_pedido,          
-                p.fecha_registro AS fecha_generacion, 
-                p.proveedor,       
-                p.ubicacion
-            FROM pedidos_gas_glp p
-            WHERE p.cliente = %s AND p.estatus = 'generado'
-            ORDER BY p.fecha_registro DESC
-        """
-        cur.execute(query, (empresa_nombre,))
-        pedidos = cur.fetchall()
+    if not usuario:
+        cur.close()
+        flash("Usuario no encontrado.", "danger")
+        return redirect(url_for('index'))
+    
+    # 3. Normalización
+    perfil_raw = usuario.get('perfil') or ''
+    perfil = perfil_raw.strip().lower().replace('-', '_')
+    usuario_empresa_id = str(usuario.get('empresa_id') or '').strip()
+    
+    # --- DETECCIÓN DE WEBMASTER ---
+    es_webmaster = (usuario_empresa_id == NIT_WEBMASTER and perfil == PERFIL_WEBMASTER)
+
+    # --- CASO A: OPERADOR DE GAS ---
+    if perfil == 'gar_operador_gas':
+        cur.close()
+        response = make_response(render_template(
+            'glp.html',
+            nombre=usuario['nombre'],
+            empresa=empresa_nombre
+        ))
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+    # --- CASO B: CONTROLADOR DE FACTURAS O WEBMASTER ---
+    elif perfil == 'gar_controlfacturas_gas' or es_webmaster:
         
-        for pedido in pedidos:
-            p = dict(pedido)
-            if p['fecha_generacion']:
-                p['fecha_generacion'] = str(p['fecha_generacion'])
-            p['proveedor'] = p.get('proveedor') or 'N/A'
-            pedidos_pendientes.append(p)
+        pedidos_pendientes = []
+        try:
+            query = """
+                SELECT p.id, p.codigo AS codigo_pedido, p.fecha_registro AS fecha_generacion, 
+                       p.proveedor, p.ubicacion
+                FROM pedidos_gas_glp p
+                WHERE p.cliente = %s AND p.estatus = 'generado'
+                ORDER BY p.fecha_registro DESC
+            """
+            cur.execute(query, (empresa_nombre,))
+            pedidos = cur.fetchall()
             
-    except Exception as e:
-        flash(f"Error cargando pedidos: {str(e)}", "danger")
-        current_app.logger.error(f"Error Facturas GLP: {traceback.format_exc()}")
-    
-    cur.close()
+            for p_row in pedidos:
+                p = dict(p_row)
+                if p['fecha_generacion']: p['fecha_generacion'] = str(p['fecha_generacion'])
+                p['proveedor'] = p.get('proveedor') or 'N/A'
+                pedidos_pendientes.append(p)
+                
+        except Exception as e:
+            flash(f"Error cargando datos: {str(e)}", "danger")
+            current_app.logger.error(f"Error GLP: {traceback.format_exc()}")
+        finally:
+            cur.close()
 
-    # Renderizamos la pantalla de facturas
-    response = make_response(render_template(
-        'facturas_glp.html',
-        nombre=usuario['nombre'],
-        nit=usuario['empresa_id'],
-        cedula=usuario.get('cedula'),
-        empresa=empresa_nombre,
-        pedidos=pedidos_pendientes
-    ))
-    
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    return response
+        response = make_response(render_template(
+            'facturas_glp.html',
+            nombre=usuario['nombre'],
+            nit=usuario_empresa_id,
+            cedula=usuario.get('cedula'),
+            empresa=empresa_nombre,
+            pedidos=pedidos_pendientes
+        ))
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+    # --- CASO C: DENEGADO ---
+    else:
+        cur.close()
+        flash(f"Acceso denegado: Perfil '{perfil_raw}' sin permisos para Gas.", "danger")
+        return redirect(url_for('bp_890707006.panel_pollosgar'))
 
 
-# ================================
-# MÓDULO MERMAS
-# ================================
+# =========================================================
+# 3. GRUPO MÓDULO MERMAS
+# =========================================================
+
 @bp_890707006.route('/dashboard/mermas')
 @login_required_custom
 def acceso_modulo_mermas():
     usuario_id = session.get('usuario_id')
-    if not usuario_id:
-        return redirect(url_for('index'))
+    if not usuario_id: return redirect(url_for('index'))
 
     cur = mysql.connection.cursor()
-    cur.execute("SELECT nombre, perfil, empresa_id FROM usuarios WHERE id = %s", (usuario_id,))
-    usuario = cur.fetchone()
+    cur.execute("SELECT perfil, empresa_id FROM usuarios WHERE id = %s", (usuario_id,))
+    data = cur.fetchone()
     cur.close()
 
-    if not usuario:
-        flash("Usuario no encontrado.", "danger")
-        return redirect(url_for('index'))
+    if not data: return redirect(url_for('index'))
 
-    perfil = (usuario.get('perfil') or '').strip().lower()
+    perfil = str(data['perfil']).strip().lower()  
+    empresa = str(data['empresa_id']).strip()
+    
+    # --- DETECCIÓN DE WEBMASTER ---
+    es_webmaster = (empresa == NIT_WEBMASTER and perfil == PERFIL_WEBMASTER)
 
-    if perfil == 'gar_controlador_mermas':
-        return render_template('controlmermas.html', nombre=usuario['nombre'], nit=usuario['empresa_id'])
+    # 1. Modo Supervisor (Controlador o Webmaster)
+    if (perfil == 'gar_controlador_mermas' and empresa == NIT_POLLOS) or es_webmaster:
+        return render_template('controlmermas.html', nombre=session.get('nombre'), nit=empresa)
 
-    if perfil in ('gar_operador_mermas', 'admin_mermas', 'mermas'):
-        return render_template('mermas.html', nombre=usuario['nombre'], nit=usuario['empresa_id'])
+    # 2. Modo Operador
+    if perfil == 'gar_operador_mermas' and empresa == NIT_POLLOS:
+        return render_template('mermas.html', nombre=session.get('nombre'), nit=empresa)
 
-    flash("No tiene acceso al módulo Control de Mermas.", "danger")
+    flash("Acceso no autorizado al módulo de Mermas.", "danger")
     return redirect(url_for('bp_890707006.panel_pollosgar'))
 
 
-# ================================
-# MÓDULO FLOTA
-# ================================
+# =========================================================
+# 4. GRUPO MÓDULO FLOTA (VEHÍCULOS)
+# =========================================================
+
 @csrf.exempt
 @bp_890707006.route('/dashboard/flota/prelogin', methods=['POST'])
 @login_required_custom
@@ -200,31 +190,29 @@ def flota_prelogin_qr():
         return jsonify(success=False, message="QR inválido."), 400
 
     usuario_id = session.get("usuario_id")
-    if not usuario_id:
-        return jsonify(success=False, message="Sesión no válida."), 401
-
     cur = mysql.connection.cursor()
-    cur.execute("SELECT id, nombre, perfil, empresa_id FROM usuarios WHERE id=%s", (usuario_id,))
+    cur.execute("SELECT id, perfil, empresa_id FROM usuarios WHERE id=%s", (usuario_id,))
     usuario = cur.fetchone()
-    cur.close()
-
+    
     if not usuario:
+        cur.close()
         return jsonify(success=False, message="Usuario no encontrado."), 404
 
     perfil = (usuario.get("perfil") or "").strip().lower()
+    
+    # IMPORTANTE: El Webmaster NO entra aquí porque no tiene vehículo físico ni QR
     if perfil != "operarios_vehiculos":
+        cur.close()
         return jsonify(success=False, message="No tiene acceso a flota."), 403
 
-    # Normalización
     placa = re.sub(r'[^A-Z0-9]', '', placa)
     empresa_id = str(session.get("empresa_id") or "").strip()
-    empresa_id = re.sub(r'\D', '', empresa_id)
+    empresa_id_num = re.sub(r'\D', '', empresa_id)
     
-    cur = mysql.connection.cursor()
     cur.execute("""
-        SELECT id, estatus FROM vehiculos 
+        SELECT id FROM vehiculos 
         WHERE UPPER(TRIM(placa))=%s AND id_empresa=%s LIMIT 1
-    """, (placa, int(empresa_id) if empresa_id else 0))
+    """, (placa, int(empresa_id_num) if empresa_id_num else 0))
     v = cur.fetchone()
 
     if not v:
@@ -242,16 +230,13 @@ def flota_prelogin_qr():
 @login_required_custom
 def acceso_modulo_flota():
     usuario_id = session.get('usuario_id')
-    if not usuario_id:
-        return redirect(url_for('index'))
-
+    
     cur = mysql.connection.cursor()
     cur.execute("SELECT nombre, perfil, empresa_id FROM usuarios WHERE id = %s", (usuario_id,))
     usuario = cur.fetchone()
     cur.close()
 
     if not usuario:
-        flash("Usuario no encontrado.", "danger")
         return redirect(url_for('index'))
 
     perfil = (usuario.get('perfil') or '').strip().lower()
