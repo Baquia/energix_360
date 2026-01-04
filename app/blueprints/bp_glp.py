@@ -431,6 +431,8 @@ def _enviar_alerta_pedido_tanqueo(empresa, ubicacion, lote_id, proveedor_princip
         app.logger.error(f"⛔ Error al enviar correo GLP: {e}")
         return False
 
+
+
 def _enviar_alerta_desviacion_tanqueo(
     empresa, ubicacion, lote_id, proveedor_principal, op_id,
     masa_esperada_total, masa_facturada_total, desvio_total_pct, dens_prom, tanques
@@ -617,21 +619,12 @@ def _enviar_alerta_pedido_tanqueo_consumo(
     ts_solicitado
 ):
     """
-    Función análoga a _enviar_alerta_pedido_tanqueo(), pero para CONSUMO:
-
-    - Define tanques_bajos externamente (en la ruta) con el umbral de CONSUMO (<= 25%).
-    - El nivel solicitado NO es fijo (80%), depende de ts_solicitado (algoritmo foto).
-    - Conserva el formato HTML del correo de _enviar_alerta_pedido_tanqueo().
-    - Se envía al proveedor (emails en tabla proveedores).
-    - Debe dejar explícito que la factura solo será válida si adjunta el código de pedido.
+    Envía correo de alerta de pedido (CONSUMO) con diseño corporativo.
+    El nivel de llenado es variable (ts_solicitado).
     """
 
     # Validación mínima
     if not tanques_bajos:
-        app.logger.warning(
-            f"No se envía correo (CONSUMO): no se recibieron tanques_bajos para pedido GLP. "
-            f"Proveedor={proveedor_principal}, Sede={ubicacion}, Lote={lote_id}, Codigo={codigo_pedido}"
-        )
         return False
 
     try:
@@ -641,32 +634,39 @@ def _enviar_alerta_pedido_tanqueo_consumo(
 
     # Evitar pedidos absurdos
     if ts_val <= 0.0:
-        app.logger.warning(
-            f"No se envía correo (CONSUMO): ts_solicitado <= 0. "
-            f"ts={ts_val}, Sede={ubicacion}, Lote={lote_id}, Codigo={codigo_pedido}"
-        )
+        return False
+
+    # Usar variables locales (Igual que en las funciones anteriores)
+    email_user = os.environ.get("EMAIL_USER")
+    email_pass = os.environ.get("EMAIL_PASS")
+    email_host = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+    try:
+        email_port = int(os.environ.get("EMAIL_PORT", "587"))
+    except:
+        email_port = 587
+    email_from = os.environ.get("EMAIL_FROM", email_user)
+
+    if not email_user or not email_pass:
+        app.logger.error("⛔ Error: Credenciales de correo no configuradas.")
         return False
 
     cur = mysql.connection.cursor()
     cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor = %s", (proveedor_principal,))
     c = cur.fetchone() or {}
     destinatarios = [e for e in [c.get("email1"), c.get("email2")] if e]
+    cur.close()
 
-    # Fallback si no hay emails de proveedor (usar el usuario de la app)
-    if not destinatarios and EMAIL_USER:
-        destinatarios = [EMAIL_USER]
+    if not destinatarios and email_user:
+        destinatarios = [email_user]
 
     if not destinatarios:
-        app.logger.warning(
-            f"No hay destinatarios configurados para la alerta de pedido GLP (CONSUMO) para {proveedor_principal}."
-        )
         return False
 
-    # Construir listado "tk-n (nivel actual <=25%) llenar al ts%"
-    items_html = "<ul>"
+    # --- Construcción de Filas de Tanques (HTML) ---
+    items_html = ""
     for t in (tanques_bajos or []):
         numero = t.get("numero") if isinstance(t, dict) else None
-
+        
         nivel = None
         if isinstance(t, dict):
             nivel = t.get("nivel")
@@ -675,56 +675,99 @@ def _enviar_alerta_pedido_tanqueo_consumo(
 
         try:
             nivel_float = float(nivel if nivel is not None else 0)
-        except Exception:
+        except:
             nivel_float = 0.0
 
-        items_html += (
-            "<li>tk-{n} (nivel actual {p}% &le; 25%) llenar al {ts}%</li>"
-        ).format(
-            n=(numero or "-"),
-            p=round(nivel_float, 2),
-            ts=round(ts_val, 2)
-        )
-    items_html += "</ul>"
+        items_html += f"""
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px; text-align: center;"><strong>{numero or "-"}</strong></td>
+                <td style="padding: 10px; text-align: center; color: #d9534f;"><strong>{round(nivel_float, 2)}%</strong></td>
+                <td style="padding: 10px; text-align: center;"><strong>{round(ts_val, 2)}%</strong></td>
+            </tr>
+        """
 
-    cuerpo = ""
-    cuerpo += "<p>📩 <b>Solicitud de Tanqueo GLP</b></p>"
-    cuerpo += "<p><b>Empresa:</b> {empresa}<br>".format(empresa=empresa)
-    cuerpo += "<b>Sede:</b> {ubicacion}<br>".format(ubicacion=ubicacion)
-    cuerpo += "<b>Lote:</b> {lote}</p>".format(lote=lote_id)
-    cuerpo += "<p><b>Fecha:</b> {fecha}</p>".format(fecha=datetime.now().strftime('%Y-%m-%d'))
+    # --- CUERPO DEL CORREO (Diseño Corporativo) ---
+    cuerpo = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; color: #333; line-height: 1.6; }}
+        .container {{ max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }}
+        .header {{ background-color: #015249; color: #ffffff; padding: 20px; text-align: center; }}
+        .header h2 {{ margin: 0; font-size: 24px; }}
+        .content {{ padding: 25px; }}
+        .info-box {{ background-color: #f9fbfb; border-left: 4px solid #015249; padding: 15px; margin-bottom: 20px; }}
+        .info-box p {{ margin: 5px 0; }}
+        .codigo-box {{ background-color: #e8f5e9; border: 2px dashed #015249; padding: 15px; text-align: center; margin: 20px 0; border-radius: 6px; }}
+        .codigo-title {{ font-size: 14px; color: #555; margin-bottom: 5px; }}
+        .codigo-valor {{ font-size: 28px; font-weight: bold; color: #015249; letter-spacing: 1px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+        th {{ background-color: #f2f2f2; padding: 10px; text-align: center; font-size: 14px; }}
+        .footer {{ background-color: #f4f4f4; color: #777; padding: 15px; text-align: center; font-size: 12px; }}
+        .note {{ font-size: 13px; color: #666; font-style: italic; margin-top: 10px; }}
+    </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>Solicitud de Tanqueo GLP (Consumo)</h2>
+            </div>
+            <div class="content">
+                <p>Estimado proveedor <strong>{proveedor_principal or 'N/D'}</strong>,</p>
+                <p>Se requiere el suministro de GLP para la siguiente sede operativa:</p>
+                
+                <div class="info-box">
+                    <p><strong>Empresa:</strong> {empresa}</p>
+                    <p><strong>Sede:</strong> {ubicacion}</p>
+                    <p><strong>Fecha:</strong> {datetime.now().strftime('%Y-%m-%d')}</p>
+                </div>
 
-    cuerpo += "<p><b>Código de pedido GLP (OBLIGATORIO en la factura):</b><br>"
-    cuerpo += "<b><u>{codigo}</u></b></p>".format(codigo=codigo_pedido)
+                <div class="codigo-box">
+                    <div class="codigo-title">CÓDIGO DE PEDIDO (OBLIGATORIO EN FACTURA)</div>
+                    <div class="codigo-valor">{codigo_pedido}</div>
+                </div>
 
-    cuerpo += "<p><b>Tanques con nivel ≤ 25% (requieren tanqueo):</b></p>"
-    cuerpo += items_html
+                <p><strong>Tanques con nivel crítico (≤ 25%):</strong></p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tanque</th>
+                            <th>Nivel Actual</th>
+                            <th>Llenar hasta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
 
-    # Mantener el texto original y reforzar requisito de validez de factura
-    cuerpo += (
-        "<p>Por favor, incluya el código anterior en la factura para que "
-        "el pedido sea considerado <b>válido</b> en el sistema BQA-ONE.</p>"
-    )
-    cuerpo += (
-        "<p><b>IMPORTANTE:</b> La factura del suministro será válida únicamente si "
-        "adjunta este <b>código de pedido</b> en el soporte/factura.</p>"
-    )
+                <p class="note">
+                    * El nivel de llenado solicitado ha sido calculado automáticamente por el sistema según los días restantes de operación.
+                </p>
 
-    # Nota breve (sin alterar el formato base): el nivel solicitado es variable
-    cuerpo += (
-        "<p><b>Nivel solicitado (CONSUMO):</b> llenar al <b>{ts}%</b> según cálculo del sistema.</p>"
-    ).format(ts=round(ts_val, 2))
+                <p style="margin-top: 20px; font-size: 14px; color: #555;">
+                    <em>Por favor, incluya el código de pedido anterior en la factura o remisión para que el suministro sea considerado <b>válido</b> en el sistema BQA-ONE.</em>
+                </p>
+            </div>
+            <div class="footer">
+                <p>Este es un mensaje automático generado por el sistema <strong>BQA-ONE / Energix360</strong>.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
     try:
         msg = MIMEText(cuerpo, "html", "utf-8")
         msg["Subject"] = f"Solicitud de Tanqueo GLP (CONSUMO): {ubicacion} - Cod: {codigo_pedido}"
-        msg["From"] = EMAIL_FROM
+        msg["From"] = email_from
         msg["To"] = ", ".join(destinatarios)
 
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+        with smtplib.SMTP(email_host, email_port) as server:
             server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.sendmail(EMAIL_USER, destinatarios, msg.as_string())
+            server.login(email_user, email_pass)
+            server.sendmail(email_user, destinatarios, msg.as_string())
 
         app.logger.info(f"✅ Correo GLP (CONSUMO) enviado a: {destinatarios}. Código: {codigo_pedido}")
         return True
