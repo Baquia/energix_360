@@ -5,8 +5,8 @@
    - MODO OFFLINE GARANTIZADO (opción 2): cuando FORCE_OFFLINE=true, BLOQUEA mutaciones (POST/PUT/DELETE)
 */
 
-const CACHE_STATIC = "bqa-one-shell-v9";
-const CACHE_DYNAMIC = "bqa-one-dyn-v9";
+const CACHE_STATIC = "bqa-one-shell-v9.1";
+const CACHE_DYNAMIC = "bqa-one-dyn-v9.1";
 
 // ===== MODO OFFLINE GARANTIZADO =====
 // Se controla desde el frontend vía postMessage({type:"GLP_FORCE_OFFLINE", value:true/false})

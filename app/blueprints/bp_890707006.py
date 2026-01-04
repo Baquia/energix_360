@@ -184,10 +184,10 @@ def acceso_modulo_mermas():
 
     perfil = (usuario.get('perfil') or '').strip().lower()
 
-    if perfil == 'gar_controlador_mermas':
+    if perfil == 'controlador_mermas':
         return render_template('controlmermas.html', nombre=usuario['nombre'], nit=usuario['empresa_id'])
 
-    if perfil in ('gar_operador_mermas', 'admin_mermas', 'mermas'):
+    if if perfil == 'controlador_mermas':
         return render_template('mermas.html', nombre=usuario['nombre'], nit=usuario['empresa_id'])
 
     flash("No tiene acceso al módulo Control de Mermas.", "danger")
