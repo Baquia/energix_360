@@ -541,15 +541,17 @@
       oks: 0
     };
     async function pingOperatividadPWA() {
-      // Si el sistema está offline (FORCE_OFFLINE está activo), no hacer ping
-      if (isForceOffline()) return false;
+      // CORRECCIÓN CRÍTICA: Se eliminó la línea "if (isForceOffline()) return false;"
+      // Ahora el sistema SIEMPRE verificará si hay señal para poder despertar.
 
       const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), OPERATIVIDAD.TIMEOUT_MS);
+      // Damos 6 segundos de espera (ideal para zonas con señal inestable)
+      const timeout = setTimeout(() => ctrl.abort(), 6000);
 
       try {
+        // Usamos timestamp para evitar que el navegador use memoria vieja
         const pingUrl = "/glp/context?ping=" + Date.now();
-        //const pingUrl = "/context?ping=" + Date.now();  // Asegúrate de que esta ruta es correcta
+
         const r = await fetch(pingUrl, {
           method: "GET",
           cache: "no-store",
@@ -565,12 +567,13 @@
         const ct = (r.headers.get("content-type") || "").toLowerCase();
         if (!ct.includes("application/json")) return false;
 
+        // ¡Éxito! El servidor respondió. Confirmado que hay internet.
         await r.json();
         return true;
 
       } catch (e) {
         clearTimeout(timeout);
-        return false;
+        return false; // Solo aquí confirmamos que no hay señal real
       }
     }
 
@@ -778,24 +781,44 @@
       }
     }
 
-
     function programarFlushOffline() {
+      // 1. Cuando el navegador detecta que volvieron los datos/wifi
       window.addEventListener("online", () => {
-        if (typeof isForceOffline === "function" && isForceOffline()) return;
-        console.log("[GLP offline] Evento 'online': intento sincronizar cola...");
-        flushOfflineQueue();
+        console.log("[GLP offline] Señal detectada. Iniciando secuencia de sincronización...");
+
+        // INTENTO 1: Esperar 2.5s (Dar tiempo a que la IP se asigne y estabilice)
+        setTimeout(() => {
+          console.log("🔄 Sincronizando (Intento 1)...");
+          flushOfflineQueue();
+          // Forzamos también la revisión del estado general
+          if (typeof evaluarYAplicarOperatividadPWA === 'function') {
+            evaluarYAplicarOperatividadPWA();
+          }
+        }, 2500);
+
+        // INTENTO 2: A los 6s (Respaldo por si el primero falló)
+        setTimeout(() => {
+          console.log("🔄 Sincronizando (Intento 2)...");
+          flushOfflineQueue();
+        }, 6000);
+
+        // INTENTO 3: A los 12s (Seguridad final)
+        setTimeout(() => {
+          flushOfflineQueue();
+        }, 12000);
       });
 
+      // 2. Al abrir la app
       window.addEventListener("load", () => {
-        if (typeof isForceOffline === "function" && isForceOffline()) return;
-        console.log("[GLP offline] Carga de glp.html: intento sincronización inicial...");
-        flushOfflineQueue();
+        // Intentar sincronizar apenas abra
+        setTimeout(flushOfflineQueue, 1500);
       });
 
+      // 3. Monitor constante (Cada 10 segundos)
       setInterval(() => {
-        if (typeof isForceOffline === "function" && isForceOffline()) return;
+        // Si el navegador dice que hay línea, intentamos vaciar la cola
         if (navigator.onLine) flushOfflineQueue();
-      }, 15000);
+      }, 10000);
     }
 
 
