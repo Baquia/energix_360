@@ -6,8 +6,8 @@
 */
 
 // 1. CAMBIO DE VERSIÓN PARA FORZAR ACTUALIZACIÓN
-const CACHE_STATIC = "bqa-one-shell-v10.1";
-const CACHE_DYNAMIC = "bqa-one-dyn-v10.1";
+const CACHE_STATIC = "bqa-one-shell-v10.2";
+const CACHE_DYNAMIC = "bqa-one-dyn-v10.2";
 
 // ===== MODO OFFLINE GARANTIZADO =====
 // Se controla desde el frontend vía postMessage({type:"GLP_FORCE_OFFLINE", value:true/false})
