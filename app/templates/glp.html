@@ -811,37 +811,51 @@
       window.addEventListener("online", () => {
         console.log("[GLP offline] Señal detectada. Iniciando secuencia de sincronización...");
 
-        // INTENTO 1: Esperar 2.5s (Dar tiempo a que la IP se asigne y estabilice)
+        // ESTRATEGIA DE REINTENTOS ESCALONADOS (2.5s, 6s, 12s)
+        // Ayuda a superar micro-cortes o inestabilidad inicial
         setTimeout(() => {
           console.log("🔄 Sincronizando (Intento 1)...");
           flushOfflineQueue();
-          // Forzamos también la revisión del estado general
+          // Forzamos también la revisión del estado general (ping)
           if (typeof evaluarYAplicarOperatividadPWA === 'function') {
             evaluarYAplicarOperatividadPWA();
           }
         }, 2500);
 
-        // INTENTO 2: A los 6s (Respaldo por si el primero falló)
         setTimeout(() => {
           console.log("🔄 Sincronizando (Intento 2)...");
           flushOfflineQueue();
         }, 6000);
 
-        // INTENTO 3: A los 12s (Seguridad final)
         setTimeout(() => {
           flushOfflineQueue();
         }, 12000);
       });
 
-      // 2. Al abrir la app
-      window.addEventListener("load", () => {
-        // Intentar sincronizar apenas abra
+      // 2. Al abrir la app (EVENTO LOAD) - AQUÍ ESTÁ LA MEJORA VISUAL
+      window.addEventListener("load", async () => {
+        try {
+          // A. Verificar visualmente si hay pendientes para mostrar el aviso rojo
+          if (typeof getQueue === 'function') {
+            const q = await getQueue();
+            if (q.length > 0) {
+              console.log("⚠️ Se detectaron operaciones pendientes al iniciar.");
+              if (typeof mostrarAvisoSyncPendiente === 'function') {
+                mostrarAvisoSyncPendiente(); // Muestra el botón rojo
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error verificando cola al inicio:", e);
+        }
+
+        // B. Intentar sincronizar automáticamente tras 1.5s
         setTimeout(flushOfflineQueue, 1500);
       });
 
       // 3. Monitor constante (Cada 10 segundos)
+      // Sigue intentando eternamente mientras haya internet
       setInterval(() => {
-        // Si el navegador dice que hay línea, intentamos vaciar la cola
         if (navigator.onLine) flushOfflineQueue();
       }, 10000);
     }
@@ -1008,7 +1022,7 @@
           !navigator.onLine ||
           msg.includes("Failed to fetch") ||
           msg.includes("NetworkError") ||
-          msg.includes("non-json-response") || // Login page o proxy
+          msg.includes("non-json-response") ||
           msg.includes("Unexpected token <") ||
           msg.includes("Load failed");
 
@@ -1018,11 +1032,14 @@
           // A. Guardar en la cola (Seguridad)
           await enqueueOffline({ url, payload });
 
-          // B. Respuesta visual al usuario ("Tranquilo, se guardó")
+          // B. ACTIVAR AVISO VISUAL CON BOTÓN MANUAL (¡NUEVO!)
+          mostrarAvisoSyncPendiente();
+
+          // C. Respuesta visual al usuario ("Tranquilo, se guardó")
           const fakeResponse = {
             success: true,
             offline: true,
-            message: "⚠️ Señal inestable. Operación guardada. El sistema reintentará infinitamente hasta enviarla.",
+            message: "⚠️ Señal inestable. Operación guardada en el dispositivo.",
             op_id: payload.op_id,
             data: payload
           };
@@ -1036,8 +1053,7 @@
 
           limpiarEstadoOperacion();
 
-          // C. ESTRATEGIA DE RÁFAGA (La solución al "Siempre pasa")
-          // Intentamos enviar inmediatamente en 2s, 5s y 10s por si fue un micro-corte.
+          // D. ESTRATEGIA DE RÁFAGA AUTOMÁTICA
           setTimeout(() => flushOfflineQueue(), 2000);
           setTimeout(() => flushOfflineQueue(), 5000);
           setTimeout(() => flushOfflineQueue(), 10000);
@@ -1045,7 +1061,6 @@
           return fakeResponse;
         }
 
-        // Si es otro error (lógica de negocio), mostrar alert y fallar
         alert("No se pudo completar la operación: " + (e.message || e));
         throw e;
       }
@@ -1082,7 +1097,6 @@
 
     const EMPRESA_SESION = "{{ session.get('empresa','') }}";
 
-
     function mostrarAvisoSyncPendiente() {
       const div = document.getElementById("syncWarning");
       if (!div) return;
@@ -1091,19 +1105,28 @@
       div.innerHTML = `
         <div id="syncWarning-header">
           <div id="syncWarning-icon">!</div>
-          <div>Operaciones de GLP pendientes de enviar</div>
+          <div>Operaciones pendientes</div>
         </div>
         <div id="syncWarning-body">
-          Tus últimas operaciones se guardaron en el celular pero <b>aún no han llegado al servidor</b>.
+          Hay operaciones guardadas en el celular que no han subido al servidor.
         </div>
-        <ol id="syncWarning-steps">
-          <li>Asegúrate de tener internet (datos o WiFi).</li>
-          <li>Vuelve al <b>login principal</b> de Energix 360.</li>
-          <li>Inicia sesión ONLINE con tu usuario y contraseña.</li>
-          <li>Entra de nuevo al botón <b>GAS GLP</b>.</li>
-        </ol>
-        <div style="margin-top:4px;">
-          Cuando entres al módulo GLP conectado, el sistema enviará <b>automáticamente</b> todas las operaciones pendientes.
+        
+        <button onclick="flushOfflineQueue()" style="
+            width: 100%;
+            margin-top: 8px;
+            padding: 10px;
+            background-color: #b71c1c;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        ">
+            🔄 INTENTAR ENVIAR AHORA
+        </button>
+        
+        <div style="margin-top:8px; font-size:12px; color:#555;">
+           El sistema intentará enviarlas automáticamente, pero puedes usar este botón para forzarlo si tienes internet.
         </div>
       `;
     }
