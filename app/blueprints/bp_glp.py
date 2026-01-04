@@ -777,14 +777,12 @@ def _enviar_alerta_pedido_tanqueo_consumo(
         traceback.print_exc()
         return False
 
-@csrf.exempt  # Excluye la verificación CSRF para esta ruta
+@csrf.exempt
 @bp_glp.route('/context', methods=['GET'])
-@login_required_custom
+# @login_required_custom  <--- COMENTADO O BORRADO
 def glp_context():
-    # Si no necesitas autenticación, omite @login_required_custom
-    # Si la autenticación es necesaria, usa el decorador adecuado.
-    # @login_required_custom   # Descomenta solo si necesitas login
-
+    # Al ser público, el celular recibirá SIEMPRE un JSON {success:true}
+    # y sabrá que tiene internet, activando el envío de datos inmediatamente.
     return jsonify({"success": True, "message": "Servidor disponible"})
 
 # ======================
