@@ -708,24 +708,30 @@
     let GLP_LOGIN_WARNING_SHOWN = false;
 
     async function flushOfflineQueue() {
-      // No hacer sync si estamos en modo OFFLINE
-      if (isForceOffline()) {
+      // 1. No hacer sync si estamos en modo OFFLINE manual
+      if (typeof isForceOffline === "function" && isForceOffline()) {
         console.log("[SW] Modo offline. No se sincronizan las operaciones.");
         return;
       }
 
-      // Continuar con la sincronización de la cola
+      // 2. Verificar si hay algo en la cola
       const q = await getQueue();
       if (!q.length) {
-        console.log("[SW] No hay operaciones pendientes.");
+        // Si la cola está vacía, ocultamos el aviso rojo por si acaso
+        const warningDiv = document.getElementById("syncWarning");
+        if (warningDiv) warningDiv.style.display = 'none';
         return;
       }
 
+      console.log(`[Sync] Intentando sincronizar ${q.length} operaciones...`);
+
       const remaining = [];
-      let needLoginForSync = false;
-      let sincronizadosCount = 0; // <--- NUEVO: Contador para saber si hubo éxito
+      let needLoginForSync = false; // Bandera para detectar sesión vencida
+      let sincronizadosCount = 0;
 
       for (const it of q) {
+        // Si ya detectamos que falta login, guardamos el resto y paramos
+        // para no bombardear al servidor con errores.
         if (needLoginForSync) {
           remaining.push(it);
           continue;
@@ -741,43 +747,62 @@
           const status = r.status;
           const ct = (r.headers.get("content-type") || "").toLowerCase();
 
-          if (!ct.includes("application/json")) {
-            if (status === 302 || status === 401 || status === 403 || ct.includes("text/html")) {
-              needLoginForSync = true;
-              remaining.push(it);
-              continue;
-            }
-            throw new Error("non-json-response");
+          // DETECCIÓN DE SESIÓN CADUCADA
+          // Si devuelve HTML (página de login), redirección (302) o error de auth (401/403)
+          if (!ct.includes("application/json") || status === 401 || status === 403 || r.redirected) {
+            console.warn("⚠️ La sesión caducó durante la sincronización.");
+            needLoginForSync = true; // ¡Activamos la alarma!
+            remaining.push(it);      // Guardamos el dato para después
+            continue;                // Pasamos al siguiente ciclo (que se detendrá por el if de arriba)
           }
 
           const j = await r.json();
 
           if (!j.success) {
+            // Error de lógica del servidor (ej. datos inválidos), lo guardamos para revisión
+            console.error("❌ Error del servidor:", j.message);
             remaining.push(it);
           } else {
-            // <--- NUEVO BLOQUE ELSE (AQUÍ OCURRE LA MAGIA) --->
+            // ¡ÉXITO!
             sincronizadosCount++;
-
-            // 1. Alert para el usuario
-            alert("✅ Sincronización completada:\nLa operación fue recibida correctamente por el servidor.");
-
-            // Opcional: Si quieres mostrar el resumen gráfico que devuelve el backend:
-            if (j.resumen && typeof mostrarResumenOperacion === 'function') {
-              mostrarResumenOperacion(j);
-            }
+            console.log("✅ Operación sincronizada:", it.payload.op_id);
           }
 
         } catch (e) {
+          console.error("Error de red en sync:", e);
           remaining.push(it);
         }
       }
 
+      // Guardamos lo que quedó pendiente (por error de red o por sesión vencida)
       await setQueue(remaining);
 
-      // <--- NUEVO: Si la cola quedó vacía, ocultar el aviso rojo de advertencia --->
-      if (remaining.length === 0) {
-        const warningDiv = document.getElementById("syncWarning");
-        if (warningDiv) warningDiv.style.display = 'none';
+      // === ACCIONES FINALES ===
+
+      // A. Si hubo éxito (total o parcial)
+      if (sincronizadosCount > 0) {
+        // Si ya no queda nada pendiente, ocultamos el aviso rojo
+        if (remaining.length === 0) {
+          const warningDiv = document.getElementById("syncWarning");
+          if (warningDiv) warningDiv.style.display = 'none';
+
+          // ÉXITO TOTAL: Avisamos y recargamos para limpiar la pantalla
+          alert(`✅ Se han sincronizado ${sincronizadosCount} operaciones exitosamente.`);
+          window.location.reload();
+        }
+      }
+
+      // B. SI LA SESIÓN VENCIÓ: MENSAJE TRANQUILIZADOR Y REDIRECCIÓN
+      if (needLoginForSync) {
+        alert(
+          "⚠️ ¡ATENCIÓN! TU SESIÓN HA VENCIDO\n\n" +
+          "✋ Tranquilo, los datos de la operación están GUARDADOS y SEGUROS en este celular.\n\n" +
+          "Para enviarlos al servidor, necesitamos confirmar tu identidad nuevamente.\n\n" +
+          "👉 Dale Aceptar, vuelve a ingresar tu usuario y contraseña, y los datos se enviarán AUTOMÁTICAMENTE apenas entres."
+        );
+
+        // Redirigimos al logout para obligar al usuario a loguearse de nuevo
+        window.location.href = "/logout";
       }
     }
 
@@ -929,8 +954,8 @@
     //   ENVÍO POST CON OFFLINE-FALLBACK
     // ===================================================
     async function sendWithOffline(url, payload, onSuccess) {
-      // Si está en modo offline, no enviar la solicitud, sino guardar en cola
-      if (isForceOffline()) {
+      // 1. Si está en modo offline manual, guardar y salir
+      if (typeof isForceOffline === "function" && isForceOffline()) {
         await enqueueOffline({ url, payload });
 
         const fakeResponse = {
@@ -942,17 +967,16 @@
         };
 
         if (typeof onSuccess === "function") {
-          onSuccess(fakeResponse);  // Responde con el resumen offline
+          onSuccess(fakeResponse);
         } else {
           alert(fakeResponse.message);
           mostrarMenu();
         }
-
         limpiarEstadoOperacion();
         return fakeResponse;
       }
 
-      // Si no está en modo offline, proceder como normal
+      // 2. Intento de envío normal
       try {
         const r = await fetch(url, {
           method: "POST",
@@ -961,6 +985,8 @@
         });
 
         const ct = (r.headers.get("content-type") || "").toLowerCase();
+
+        // Si no es JSON (ej. HTML de login o error de servidor), forzar error
         if (!ct.includes("application/json")) {
           throw new Error("non-json-response");
         }
@@ -968,44 +994,58 @@
         const j = await r.json();
         if (!j.success) throw new Error(j.message || "Error servidor");
 
+        // Éxito real
         if (typeof onSuccess === "function") onSuccess(j);
-
         limpiarEstadoOperacion();
         return j;
 
       } catch (e) {
+        // 3. MANEJO DE ERROR Y REINTENTOS
         const msg = String(e || "");
 
-        const isOffline =
+        // Detectar si es error de conexión/red
+        const isNetworkError =
           !navigator.onLine ||
           msg.includes("Failed to fetch") ||
           msg.includes("NetworkError") ||
-          msg.includes("non-json-response") ||
+          msg.includes("non-json-response") || // Login page o proxy
           msg.includes("Unexpected token <") ||
           msg.includes("Load failed");
 
-        if (isOffline) {
+        if (isNetworkError) {
+          console.warn("⚠️ Fallo de red. Iniciando protocolo de persistencia:", e);
+
+          // A. Guardar en la cola (Seguridad)
           await enqueueOffline({ url, payload });
 
+          // B. Respuesta visual al usuario ("Tranquilo, se guardó")
           const fakeResponse = {
             success: true,
             offline: true,
-            message: "Guardado offline. Se enviará al recuperar señal.",
+            message: "⚠️ Señal inestable. Operación guardada. El sistema reintentará infinitamente hasta enviarla.",
             op_id: payload.op_id,
             data: payload
           };
 
           if (typeof onSuccess === "function") {
-            onSuccess(fakeResponse); // pinta resumen y botón como siempre
+            onSuccess(fakeResponse);
           } else {
             alert(fakeResponse.message);
             mostrarMenu();
           }
 
           limpiarEstadoOperacion();
+
+          // C. ESTRATEGIA DE RÁFAGA (La solución al "Siempre pasa")
+          // Intentamos enviar inmediatamente en 2s, 5s y 10s por si fue un micro-corte.
+          setTimeout(() => flushOfflineQueue(), 2000);
+          setTimeout(() => flushOfflineQueue(), 5000);
+          setTimeout(() => flushOfflineQueue(), 10000);
+
           return fakeResponse;
         }
 
+        // Si es otro error (lógica de negocio), mostrar alert y fallar
         alert("No se pudo completar la operación: " + (e.message || e));
         throw e;
       }
