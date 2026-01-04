@@ -1,12 +1,13 @@
-/* BQA-ONE / Energix360 - Service Worker v8
+/* BQA-ONE / Energix360 - Service Worker v10
    - App shell cache-first
    - GLP APIs network-first
    - HTML navegaciones cache-first con fallback SIEMPRE a algo (sin ERR_FAILED)
    - MODO OFFLINE GARANTIZADO (opción 2): cuando FORCE_OFFLINE=true, BLOQUEA mutaciones (POST/PUT/DELETE)
 */
 
-const CACHE_STATIC = "bqa-one-shell-v9.1";
-const CACHE_DYNAMIC = "bqa-one-dyn-v9.1";
+// 1. CAMBIO DE VERSIÓN PARA FORZAR ACTUALIZACIÓN
+const CACHE_STATIC = "bqa-one-shell-v10";
+const CACHE_DYNAMIC = "bqa-one-dyn-v10";
 
 // ===== MODO OFFLINE GARANTIZADO =====
 // Se controla desde el frontend vía postMessage({type:"GLP_FORCE_OFFLINE", value:true/false})
@@ -17,7 +18,7 @@ self.addEventListener("message", (event) => {
   
   if (data.type === "GLP_FORCE_OFFLINE") {
     FORCE_OFFLINE = !!data.value;
-    console.log("[SW v8] FORCE_OFFLINE =", FORCE_OFFLINE);
+    console.log("[SW v10] FORCE_OFFLINE =", FORCE_OFFLINE);
 
     // Sincronizar la cola cuando el sistema vuelva a online
     if (!FORCE_OFFLINE) {
@@ -39,13 +40,16 @@ self.addEventListener("message", (event) => {
 });
 
 // App Shell mínimo y público
+// NOTA: Se eliminaron las páginas protegidas (/glp.html, /890707006.html)
+// para evitar fallos de instalación si el usuario no está logueado.
+// Esas páginas se cachearán dinámicamente apenas el usuario entre a ellas.
 const APP_SHELL = [
   "/",                              // raíz -> login
-  "/login_energix360_offline.html",  // 👈 NUEVO
+  "/login_energix360_offline.html", 
   "/offline.html",
-  "/890707006.html",
-  "/890707006_offline.html",         // 👈 NUEVO
-  "/glp.html",
+  // "/890707006.html",       <-- REMOVIDO DEL SHELL (se cachea dinámicamente)
+  "/890707006_offline.html",  
+  // "/glp.html",             <-- REMOVIDO DEL SHELL (se cachea dinámicamente)
   "/glp_offline.html",
 
   "/static/manifest.json",
@@ -68,16 +72,16 @@ async function limitCacheSize(cacheName, maxItems) {
 
 // INSTALL (no revienta si algo no cachea)
 self.addEventListener("install", (event) => {
-  console.log("[SW v8] install");
+  console.log("[SW v10] install");
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_STATIC);
       for (const url of APP_SHELL) {
         try {
           await cache.add(url);
-          console.log("[SW v8] cacheado en APP_SHELL:", url);
+          console.log("[SW v10] cacheado en APP_SHELL:", url);
         } catch (err) {
-          console.warn("[SW v8] NO se pudo cachear", url, err);
+          console.warn("[SW v10] NO se pudo cachear", url, err);
         }
       }
     })()
@@ -87,14 +91,14 @@ self.addEventListener("install", (event) => {
 
 // ACTIVATE
 self.addEventListener("activate", (event) => {
-  console.log("[SW v8] activate");
+  console.log("[SW v10] activate");
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
           .filter((k) => ![CACHE_STATIC, CACHE_DYNAMIC].includes(k))
           .map((k) => {
-            console.log("[SW v8] borrando cache vieja:", k);
+            console.log("[SW v10] borrando cache vieja:", k);
             return caches.delete(k);
           })
       )
@@ -186,13 +190,13 @@ self.addEventListener("fetch", (event) => {
           const copy = res.clone();
 
           caches.open(CACHE_DYNAMIC).then((cache) => {
-            cache.put(req, copy);
+            cache.put(req, copy); // <--- AQUÍ SE GUARDA GLP.HTML AUTOMÁTICAMENTE
             limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
           });
 
           return res;
         } catch (err) {
-          console.warn("[SW v8] HTML offline FALLBACK para", path, "error:", err);
+          console.warn("[SW v10] HTML offline FALLBACK para", path, "error:", err);
 
           // 3) OFFLINE / ERROR: devolvemos siempre algo
 
