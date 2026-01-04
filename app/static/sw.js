@@ -1,24 +1,52 @@
-/* BQA-ONE / Energix360 - Service Worker v7
+/* BQA-ONE / Energix360 - Service Worker v8
    - App shell cache-first
    - GLP APIs network-first
-   - HTML navegaciones network-first con fallback SIEMPRE a algo (sin ERR_FAILED)
+   - HTML navegaciones cache-first con fallback SIEMPRE a algo (sin ERR_FAILED)
+   - MODO OFFLINE GARANTIZADO (opción 2): cuando FORCE_OFFLINE=true, BLOQUEA mutaciones (POST/PUT/DELETE)
 */
 
-const CACHE_STATIC = "bqa-one-shell-v7";
-const CACHE_DYNAMIC = "bqa-one-dyn-v7";
+const CACHE_STATIC = "bqa-one-shell-v9";
+const CACHE_DYNAMIC = "bqa-one-dyn-v9";
+
+// ===== MODO OFFLINE GARANTIZADO =====
+// Se controla desde el frontend vía postMessage({type:"GLP_FORCE_OFFLINE", value:true/false})
+let FORCE_OFFLINE = false;
+
+self.addEventListener("message", (event) => {
+  const data = event.data || {};
+  
+  if (data.type === "GLP_FORCE_OFFLINE") {
+    FORCE_OFFLINE = !!data.value;
+    console.log("[SW v8] FORCE_OFFLINE =", FORCE_OFFLINE);
+
+    // Sincronizar la cola cuando el sistema vuelva a online
+    if (!FORCE_OFFLINE) {
+      flushOfflineQueue();
+    }
+
+    // Confirmación de mensaje al frontend
+    try {
+      if (event.source && typeof event.source.postMessage === "function") {
+        event.source.postMessage({
+          type: "GLP_FORCE_OFFLINE_ACK",
+          value: FORCE_OFFLINE
+        });
+      }
+    } catch (e) {
+      // sin acción
+    }
+  }
+});
 
 // App Shell mínimo y público
 const APP_SHELL = [
-  "/",                // raíz -> login
-  "/login_energix360.html",
-  "/login_energix360_offline.html",   // 👈 NUEVO
+  "/",                              // raíz -> login
+  "/login_energix360_offline.html",  // 👈 NUEVO
   "/offline.html",
   "/890707006.html",
-  "/890707006_offline.html",          // 👈 NUEVO
+  "/890707006_offline.html",         // 👈 NUEVO
   "/glp.html",
-  "/glp_offline.html", 
-  "/offline.html",
-               // 👈 NUEVO
+  "/glp_offline.html",
 
   "/static/manifest.json",
   "/static/BQA_ONE_192.png",
@@ -40,16 +68,16 @@ async function limitCacheSize(cacheName, maxItems) {
 
 // INSTALL (no revienta si algo no cachea)
 self.addEventListener("install", (event) => {
-  console.log("[SW v7] install");
+  console.log("[SW v8] install");
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_STATIC);
       for (const url of APP_SHELL) {
         try {
           await cache.add(url);
-          console.log("[SW v7] cacheado en APP_SHELL:", url);
+          console.log("[SW v8] cacheado en APP_SHELL:", url);
         } catch (err) {
-          console.warn("[SW v7] NO se pudo cachear", url, err);
+          console.warn("[SW v8] NO se pudo cachear", url, err);
         }
       }
     })()
@@ -59,14 +87,14 @@ self.addEventListener("install", (event) => {
 
 // ACTIVATE
 self.addEventListener("activate", (event) => {
-  console.log("[SW v7] activate");
+  console.log("[SW v8] activate");
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
           .filter((k) => ![CACHE_STATIC, CACHE_DYNAMIC].includes(k))
           .map((k) => {
-            console.log("[SW v7] borrando cache vieja:", k);
+            console.log("[SW v8] borrando cache vieja:", k);
             return caches.delete(k);
           })
       )
@@ -83,7 +111,19 @@ self.addEventListener("fetch", (event) => {
   // Solo mismo origen
   if (url.origin !== location.origin) return;
 
-  // Nunca cachear POST/PUT/DELETE
+  // ===== CANDADO: MODO OFFLINE GARANTIZADO =====
+  // Si el frontend decidió OFFLINE, NUNCA permitimos mutaciones hacia el servidor.
+  if (FORCE_OFFLINE && req.method !== "GET") {
+    event.respondWith(
+      new Response("offline-forced", {
+        status: 503,
+        headers: { "Content-Type": "text/plain" }
+      })
+    );
+    return;
+  }
+
+  // Nunca cachear POST/PUT/DELETE (si no está FORCE_OFFLINE, se permite ir a red normal)
   if (req.method !== "GET") {
     event.respondWith(fetch(req));
     return;
@@ -152,7 +192,7 @@ self.addEventListener("fetch", (event) => {
 
           return res;
         } catch (err) {
-          console.warn("[SW v7] HTML offline FALLBACK para", path, "error:", err);
+          console.warn("[SW v8] HTML offline FALLBACK para", path, "error:", err);
 
           // 3) OFFLINE / ERROR: devolvemos siempre algo
 
@@ -173,11 +213,11 @@ self.addEventListener("fetch", (event) => {
           // 3.4) Último recurso: HTML simple (para evitar ERR_FAILED)
           return new Response(
             "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Sin conexión</title></head>" +
-            "<body style='font-family:sans-serif; padding:16px;'>" +
-            "<h2>Sin conexión a internet</h2>" +
-            "<p>No se encontró una copia guardada de esta página y no hay señal disponible.</p>" +
-            "<p>Cuando tengas internet, abre de nuevo la aplicación para que se actualice la información.</p>" +
-            "</body></html>",
+              "<body style='font-family:sans-serif; padding:16px;'>" +
+              "<h2>Sin conexión a internet</h2>" +
+              "<p>No se encontró una copia guardada de esta página y no hay señal disponible.</p>" +
+              "<p>Cuando tengas internet, abre de nuevo la aplicación para que se actualice la información.</p>" +
+              "</body></html>",
             { status: 503, headers: { "Content-Type": "text/html" } }
           );
         }
@@ -185,7 +225,6 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
-
 
   // ===== ESTÁTICOS (JS/CSS/IMG/FONTS) → cache-first =====
   event.respondWith(

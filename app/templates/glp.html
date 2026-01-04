@@ -232,7 +232,8 @@
     .logout:hover {
       background: var(--rojo-osc);
     }
-        /* Aviso de operaciones pendientes de sincronizar */
+
+    /* Aviso de operaciones pendientes de sincronizar */
     #syncWarning {
       display: none;
       width: 100%;
@@ -288,6 +289,7 @@
         font-size: 13px;
         padding: 8px 10px;
       }
+
       #syncWarning-steps {
         font-size: 12px;
       }
@@ -376,6 +378,12 @@
   </div>
 
   <script>
+    function generarOpId() {
+      // Navegadores modernos
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      // Fallback simple
+      return "op_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+    }
 
 
     /* ======================================
@@ -384,7 +392,8 @@
 
     let registrarTanqueoData = {
       sede: "",
-      tanques: []
+      tanques: [],
+      op_id: generarOpId()
     };
 
     // Este arreglo se llenará con los tanques activos de la sede (TK-1, TK-2, etc)
@@ -399,25 +408,25 @@
 
     let GLP_OPERACION_EN_CURSO = false;
 
-   // Evita recargar/cerrar la página mientras hay una operación en curso
+    // Evita recargar/cerrar la página mientras hay una operación en curso
     function bloquearSalida(e) {
-        if (GLP_OPERACION_EN_CURSO) {
-            e.preventDefault();
-            e.returnValue = "";
-            return "";
-        }
+      if (GLP_OPERACION_EN_CURSO) {
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+      }
     }
 
     // Activar protección
     function activarProteccionOperacion() {
-        GLP_OPERACION_EN_CURSO = true;
-        window.addEventListener("beforeunload", bloquearSalida);
+      GLP_OPERACION_EN_CURSO = true;
+      window.addEventListener("beforeunload", bloquearSalida);
     }
 
     // Desactivar protección
     function desactivarProteccionOperacion() {
-        GLP_OPERACION_EN_CURSO = false;
-        window.removeEventListener("beforeunload", bloquearSalida);
+      GLP_OPERACION_EN_CURSO = false;
+      window.removeEventListener("beforeunload", bloquearSalida);
     }
 
     // =======================================================
@@ -425,23 +434,23 @@
     // =======================================================
 
     function bloquearBotonAtras() {
-        // Insertamos una entrada ficticia en el historial
-        history.pushState(null, "", location.href);
+      // Insertamos una entrada ficticia en el historial
+      history.pushState(null, "", location.href);
 
-        window.onpopstate = function () {
-            if (GLP_OPERACION_EN_CURSO) {
-                // Evitar retroceder
-                history.pushState(null, "", location.href);
-                alert("No puedes retroceder mientras realizas una operación GLP.");
-            } else {
-                // Si no hay operación, permitimos navegación normal
-                history.go(-1);
-            }
-        };
+      window.onpopstate = function () {
+        if (GLP_OPERACION_EN_CURSO) {
+          // Evitar retroceder
+          history.pushState(null, "", location.href);
+          alert("No puedes retroceder mientras realizas una operación GLP.");
+        } else {
+          // Si no hay operación, permitimos navegación normal
+          history.go(-1);
+        }
+      };
     }
 
-// Activamos el bloqueo del botón atrás al cargar la página
-window.addEventListener("load", bloquearBotonAtras);
+    // Activamos el bloqueo del botón atrás al cargar la página
+    window.addEventListener("load", bloquearBotonAtras);
 
     /* ============================
     Normalización + lector de QR
@@ -491,6 +500,138 @@ window.addEventListener("load", bloquearBotonAtras);
 
       return { sede, empresa, tanques: tanques_qr };
     }
+
+
+    const FORCE_OFFLINE_KEY = "glp_force_offline"; // "1" o "0"
+
+    function isForceOffline() {
+      return localStorage.getItem(FORCE_OFFLINE_KEY) === "1";
+    }
+
+    function setForceOffline(v) {
+      localStorage.setItem(FORCE_OFFLINE_KEY, v ? "1" : "0");
+
+      // informar al Service Worker (para bloquear POST reales)
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: "GLP_FORCE_OFFLINE", value: !!v });
+      }
+
+      // opcional: pinta un banner visible “MODO OFFLINE ACTIVO”
+      try { renderForceOfflineBanner(); } catch (e) { console.warn(e); }
+    }
+    function isForceOffline() {
+      return localStorage.getItem(FORCE_OFFLINE_KEY) === "1";
+    }
+    /* ============================
+    MONITOR operatividad_pwa (AUTO)
+    ============================ */
+
+    const OPERATIVIDAD = {
+      CHECK_EVERY_MS: 8000,          // cada 8s
+      TIMEOUT_MS: 4500,              // timeout del ping (4.5s)
+      FAIL_THRESHOLD: 2,             // 2 fallos seguidos -> entrar OFFLINE
+      SUCCESS_THRESHOLD: 3,          // 3 éxitos seguidos -> salir OFFLINE + sync
+      ENDPOINT: "/glp/context"       // ping liviano (GET)
+    };
+
+    let _opw = {
+      timer: null,
+      inFlight: false,
+      fails: 0,
+      oks: 0
+    };
+    async function pingOperatividadPWA() {
+      // Si el sistema está offline (FORCE_OFFLINE está activo), no hacer ping
+      if (isForceOffline()) return false;
+
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), OPERATIVIDAD.TIMEOUT_MS);
+
+      try {
+        const pingUrl = "/glp/context?ping=" + Date.now();
+        //const pingUrl = "/context?ping=" + Date.now();  // Asegúrate de que esta ruta es correcta
+        const r = await fetch(pingUrl, {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+          signal: ctrl.signal,
+          headers: { "Accept": "application/json" }
+        });
+
+        clearTimeout(timeout);
+
+        if (!r.ok) return false;
+
+        const ct = (r.headers.get("content-type") || "").toLowerCase();
+        if (!ct.includes("application/json")) return false;
+
+        await r.json();
+        return true;
+
+      } catch (e) {
+        clearTimeout(timeout);
+        return false;
+      }
+    }
+
+    async function evaluarYAplicarOperatividadPWA() {
+      const isOffline = await pingOperatividadPWA();  // Realiza el ping para ver si el servidor está disponible
+
+      if (isOffline) {
+        // Si no hay operatividad (offline)
+        if (!isForceOffline()) {
+          setForceOffline(true);  // Activa el modo offline en el frontend y en el SW
+          console.log("[Operatividad] Entrando en modo OFFLINE...");
+
+          // Enviar el estado al Service Worker
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: "GLP_FORCE_OFFLINE",
+              value: true
+            });
+          }
+        }
+      } else {
+        // Si hay operatividad (online)
+        if (isForceOffline()) {
+          setForceOffline(false);  // Desactiva el modo offline
+          console.log("[Operatividad] Volviendo a modo ONLINE...");
+
+          // Enviar el estado al Service Worker
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: "GLP_FORCE_OFFLINE",
+              value: false
+            });
+          }
+
+          flushOfflineQueue();  // Sincroniza la cola de operaciones
+        }
+      }
+    }
+
+    function iniciarMonitorOperatividadPWA() {
+      if (_opw.timer) return;
+
+      // chequeo inmediato
+      evaluarYAplicarOperatividadPWA();
+
+      _opw.timer = setInterval(evaluarYAplicarOperatividadPWA, OPERATIVIDAD.CHECK_EVERY_MS);
+
+      window.addEventListener("online", () => evaluarYAplicarOperatividadPWA());
+      window.addEventListener("offline", () => evaluarYAplicarOperatividadPWA());
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) evaluarYAplicarOperatividadPWA();
+      });
+    }
+
+
+    // al cargar la página, empuja el estado actual al SW
+    window.addEventListener("load", () => {
+      setForceOffline(isForceOffline());
+      iniciarMonitorOperatividadPWA();
+    });
+
     // ===================================================
     //   UTILIDADES OFFLINE: cola + cache tanques
     // ===================================================
@@ -564,25 +705,30 @@ window.addEventListener("load", bloquearBotonAtras);
     let GLP_LOGIN_WARNING_SHOWN = false;
 
     async function flushOfflineQueue() {
-      // 1) Si no hay internet, no hacemos nada
-      if (!navigator.onLine) return;
+      // No hacer sync si estamos en modo OFFLINE
+      if (isForceOffline()) {
+        console.log("[SW] Modo offline. No se sincronizan las operaciones.");
+        return;
+      }
 
+      // Continuar con la sincronización de la cola
       const q = await getQueue();
-      if (!q.length) return;
+      if (!q.length) {
+        console.log("[SW] No hay operaciones pendientes.");
+        return;
+      }
 
       const remaining = [];
-      let needLoginForSync = false;  // bandera: indica que el servidor pidió login
+      let needLoginForSync = false;
+      let sincronizadosCount = 0; // <--- NUEVO: Contador para saber si hubo éxito
 
       for (const it of q) {
-        // Si ya detectamos que falta login, no seguimos golpeando al servidor
         if (needLoginForSync) {
           remaining.push(it);
           continue;
         }
 
         try {
-          if (!it.payload.op_id) it.payload.op_id = generarOpId();
-
           const r = await fetch(it.url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -592,89 +738,66 @@ window.addEventListener("load", bloquearBotonAtras);
           const status = r.status;
           const ct = (r.headers.get("content-type") || "").toLowerCase();
 
-          // Caso 1: el backend está respondiendo HTML/redirección → probablemente login
           if (!ct.includes("application/json")) {
-            // 302 / 401 / 403 o HTML = sesión inválida / login requerido
             if (status === 302 || status === 401 || status === 403 || ct.includes("text/html")) {
-              console.warn(
-                "[GLP offline] El servidor devolvió HTML/redirección (probable falta de sesión). " +
-                "Las operaciones seguirán en cola hasta que inicies sesión online."
-              );
               needLoginForSync = true;
               remaining.push(it);
               continue;
             }
-
-            // Otro tipo de respuesta no-JSON: lo tratamos como error de backend
             throw new Error("non-json-response");
           }
 
-          // Caso 2: respuesta JSON "normal"
           const j = await r.json();
+
           if (!j.success) {
-            console.error("[GLP offline] Error del backend al reenviar operación:", j);
-            // dejamos el item en la cola para reintentar después
             remaining.push(it);
+          } else {
+            // <--- NUEVO BLOQUE ELSE (AQUÍ OCURRE LA MAGIA) --->
+            sincronizadosCount++;
+
+            // 1. Alert para el usuario
+            alert("✅ Sincronización completada:\nLa operación fue recibida correctamente por el servidor.");
+
+            // Opcional: Si quieres mostrar el resumen gráfico que devuelve el backend:
+            if (j.resumen && typeof mostrarResumenOperacion === 'function') {
+              mostrarResumenOperacion(j);
+            }
           }
-          // Si success === true, NO re-agregamos el item: se considera sincronizado
 
         } catch (e) {
-          console.error("[GLP offline] Error enviando item offline:", e, "Item:", it);
-          // Si hay error de red u otro, dejamos el item en la cola
           remaining.push(it);
         }
       }
 
       await setQueue(remaining);
 
-      // ✔ NUEVO: detectar si se sincronizó alguna operación con éxito
-      if (q.length > remaining.length) {
-          alert("Las operaciones realizadas sin conexión se completaron correctamente.");
-        }
-
-      // Si detectamos que hacía falta login, avisamos SOLO una vez (banner + alert)
-      if (needLoginForSync && !GLP_LOGIN_WARNING_SHOWN) {
-        GLP_LOGIN_WARNING_SHOWN = true;
-
-        // Banner rojo integrado al diseño
-        mostrarAvisoSyncPendiente();
-
-        // Y además un alert para que sea imposible ignorarlo
-        alert(
-          "Tienes operaciones de GLP pendientes de sincronizar,\n" +
-          "pero tu sesión en el servidor expiró.\n\n" +
-          "PASOS:\n" +
-          "1) Asegúrate de tener internet.\n" +
-          "2) Vuelve al LOGIN PRINCIPAL de Energix 360.\n" +
-          "3) Inicia sesión ONLINE normalmente.\n" +
-          "4) Entra de nuevo al módulo GLP (botón GAS GLP).\n\n" +
-          "Las operaciones pendientes se enviarán automáticamente a la base de datos."
-        );
+      // <--- NUEVO: Si la cola quedó vacía, ocultar el aviso rojo de advertencia --->
+      if (remaining.length === 0) {
+        const warningDiv = document.getElementById("syncWarning");
+        if (warningDiv) warningDiv.style.display = 'none';
       }
-
-
     }
 
+
     function programarFlushOffline() {
-      // Cuando el navegador detecta que vuelve a estar online
       window.addEventListener("online", () => {
+        if (typeof isForceOffline === "function" && isForceOffline()) return;
         console.log("[GLP offline] Evento 'online': intento sincronizar cola...");
         flushOfflineQueue();
       });
 
-      // Cuando se carga glp.html (por ejemplo, después de iniciar sesión online)
       window.addEventListener("load", () => {
+        if (typeof isForceOffline === "function" && isForceOffline()) return;
         console.log("[GLP offline] Carga de glp.html: intento sincronización inicial...");
         flushOfflineQueue();
       });
 
-      // Cada cierto tiempo, si hay conexión, intentamos de nuevo
       setInterval(() => {
-        if (navigator.onLine) {
-          flushOfflineQueue();
-        }
-      }, 15000); // cada 15 segundos está bien para evitar bombardeos
+        if (typeof isForceOffline === "function" && isForceOffline()) return;
+        if (navigator.onLine) flushOfflineQueue();
+      }, 15000);
     }
+
 
     // Activamos la programación del flush al cargar el script
     programarFlushOffline();
@@ -703,8 +826,11 @@ window.addEventListener("load", bloquearBotonAtras);
     //   OBTENER TANQUES CON FALLBACK: BD -> CACHE -> QR
     // ===================================================
     async function obtenerTanquesConFallback(sede) {
-      // 1) Intento BD (online)
-      if (navigator.onLine) {
+      const offlineForzado = (typeof isForceOffline === "function" && isForceOffline());
+      const onlineReal = navigator.onLine && !offlineForzado;
+
+      // 1) Intento BD (online REAL)
+      if (onlineReal) {
         try {
           const r = await fetch("/glp/obtener_tanques", {
             method: "POST",
@@ -729,13 +855,19 @@ window.addEventListener("load", bloquearBotonAtras);
           console.error("Error consultando /glp/obtener_tanques:", e);
         }
       }
-      // 2) Tanques embebidos en QR
+
+      // 2) Tanques embebidos en QR (si vienen en el QR)
       if (Array.isArray(tanquesQR) && tanquesQR.length) {
-        if (!navigator.onLine) {
-          alert("Sin internet. Usando tanques embebidos en el QR.");
+        if (!onlineReal) {
+          if (offlineForzado) {
+            alert("Modo OFFLINE activo. Usando tanques embebidos en el QR.");
+          } else {
+            alert("Sin internet. Usando tanques embebidos en el QR.");
+          }
         } else {
           alert("No se encontraron tanques válidos en el servidor. Usando tanques embebidos en el QR.");
         }
+
         cacheTanquesLocal(sede, tanquesQR);
         return { tanques: tanquesQR, fuente: "qr" };
       }
@@ -743,22 +875,30 @@ window.addEventListener("load", bloquearBotonAtras);
       // 3) Cache local del celular
       const cached = getTanquesLocal(sede);
       if (cached && Array.isArray(cached.tanques) && cached.tanques.length) {
-        if (!navigator.onLine) {
-          alert("Sin internet. Usando tanques guardados en el celular.");
+        if (!onlineReal) {
+          if (offlineForzado) {
+            alert("Modo OFFLINE activo. Usando tanques guardados en el celular.");
+          } else {
+            alert("Sin internet. Usando tanques guardados en el celular.");
+          }
         } else {
           alert("No se encontraron tanques válidos en el servidor. Usando tanques guardados en el celular.");
         }
+
         return { tanques: cached.tanques, fuente: "cache", ts: cached.ts };
       }
 
-
-
       // Nada disponible
-      if (!navigator.onLine) {
-        alert("Sin internet y no hay tanques guardados ni en el QR. Conéctate para iniciar.");
+      if (!onlineReal) {
+        if (offlineForzado) {
+          alert("Modo OFFLINE activo y no hay tanques guardados ni en el QR. Conéctate para sincronizar o escanea un QR con tanques embebidos para iniciar.");
+        } else {
+          alert("Sin internet y no hay tanques guardados ni en el QR. Conéctate para iniciar.");
+        }
       } else {
         alert("No se pudieron obtener tanques ni del servidor, ni del celular, ni del QR.");
       }
+
       throw new Error("No hay tanques disponibles");
     }
 
@@ -766,8 +906,30 @@ window.addEventListener("load", bloquearBotonAtras);
     //   ENVÍO POST CON OFFLINE-FALLBACK
     // ===================================================
     async function sendWithOffline(url, payload, onSuccess) {
-      if (!payload.op_id) payload.op_id = generarOpId();
+      // Si está en modo offline, no enviar la solicitud, sino guardar en cola
+      if (isForceOffline()) {
+        await enqueueOffline({ url, payload });
 
+        const fakeResponse = {
+          success: true,
+          offline: true,
+          message: "Guardado offline (modo OFFLINE activo). Se enviará automáticamente al recuperar operatividad.",
+          op_id: payload.op_id,
+          data: payload
+        };
+
+        if (typeof onSuccess === "function") {
+          onSuccess(fakeResponse);  // Responde con el resumen offline
+        } else {
+          alert(fakeResponse.message);
+          mostrarMenu();
+        }
+
+        limpiarEstadoOperacion();
+        return fakeResponse;
+      }
+
+      // Si no está en modo offline, proceder como normal
       try {
         const r = await fetch(url, {
           method: "POST",
@@ -775,7 +937,6 @@ window.addEventListener("load", bloquearBotonAtras);
           body: JSON.stringify(payload)
         });
 
-        // Detectar respuesta no-JSON (fallback SW)
         const ct = (r.headers.get("content-type") || "").toLowerCase();
         if (!ct.includes("application/json")) {
           throw new Error("non-json-response");
@@ -801,7 +962,6 @@ window.addEventListener("load", bloquearBotonAtras);
           msg.includes("Load failed");
 
         if (isOffline) {
-
           await enqueueOffline({ url, payload });
 
           const fakeResponse = {
@@ -809,14 +969,12 @@ window.addEventListener("load", bloquearBotonAtras);
             offline: true,
             message: "Guardado offline. Se enviará al recuperar señal.",
             op_id: payload.op_id,
-            data: payload   // 👈 te deja armar el resumen con lo que ya tienes
+            data: payload
           };
 
-          // ✅ ESTE ES EL PUNTO CLAVE:
           if (typeof onSuccess === "function") {
-            onSuccess(fakeResponse);   // pinta resumen y botón como siempre
+            onSuccess(fakeResponse); // pinta resumen y botón como siempre
           } else {
-            // por si alguna operación no pasa onSuccess:
             alert(fakeResponse.message);
             mostrarMenu();
           }
@@ -825,12 +983,10 @@ window.addEventListener("load", bloquearBotonAtras);
           return fakeResponse;
         }
 
-
         alert("No se pudo completar la operación: " + (e.message || e));
         throw e;
       }
     }
-
 
     function leerQR(titulo) {
       return new Promise((resolve, reject) => {
@@ -927,7 +1083,7 @@ window.addEventListener("load", bloquearBotonAtras);
       const op = r.operacion || "";
 
       if (pregunta) {
-        pregunta.textContent = resp.message || "Operación finalizada.";
+        pregunta.textContent = "";
       }
 
       const tanques = Array.isArray(r.tanques) ? r.tanques : [];
@@ -946,8 +1102,8 @@ window.addEventListener("load", bloquearBotonAtras);
         ? `<p><strong>Saldo estimado:</strong> ${r.saldo_estimado_kg} kg (${r.saldo_estimado_galones} galones)</p>`
         : "";
 
-      const avicolaTexto = (r.pollitos || r.criadoras)
-        ? `<p><strong>Pollitos:</strong> ${r.pollitos || "-"} · <strong>Criadoras:</strong> ${r.criadoras || "-"}</p>`
+      const avicolaTexto = (r.pollitos)
+        ? `<p><strong>Pollitos:</strong> ${r.pollitos || "-"} </p>`
         : "";
 
       let diasTexto = "";
@@ -997,10 +1153,28 @@ window.addEventListener("load", bloquearBotonAtras);
 
     function cerrarResumen() {
       desactivarProteccionOperacion();
+
       const panel = document.getElementById("panelResumen");
-      if (panel) panel.style.display = "none";
-      mostrarMenu();
+      const menu = document.getElementById("menuOpciones");
+      const convo = document.getElementById("conversacion");
+      const pregunta = document.getElementById("preguntaTexto");
+
+      // Limpieza visual completa
+      if (pregunta) pregunta.textContent = "";
+
+      if (panel) {
+        panel.innerHTML = "";
+        panel.style.display = "none";
+      }
+
+      if (menu) menu.style.display = "flex";
+      if (convo) convo.style.display = "none";
+
+      // Opcional: si quieres evitar que quede “posicionado” raro
+      window.scrollTo({ top: 0, behavior: "instant" });
     }
+
+
 
     /**
     * Función genérica que usan TODAS las operaciones al recibir la respuesta.
@@ -1262,25 +1436,22 @@ window.addEventListener("load", bloquearBotonAtras);
         }
 
         if (EMPRESA_SESION === "Pollos GAR SAS") {
-          // Pollitos
+          // Pollitos (única pregunta avícola)
           show(input); hide(foto);
           input.type = "number"; input.value = "";
           texto.textContent = "¿Con cuántos pollitos inicias el lote?";
           btn.textContent = "Confirmar"; show(btn);
+
           btn.onclick = () => {
             const pollitos = Number(input.value || 0);
             if (isNaN(pollitos) || pollitos <= 0) { alert("Ingresa un número válido de pollitos."); return; }
-            // Criadoras
-            input.value = "";
-            texto.textContent = "¿Cuántas criadoras instalaste?";
-            btn.onclick = () => {
-              const criadoras = Number(input.value || 0);
-              if (isNaN(criadoras) || criadoras <= 0) { alert("Ingresa un número válido de criadoras."); return; }
-              input.dataset.pollitos = String(pollitos);
-              input.dataset.criadoras = String(criadoras);
-              hide(btn); hide(input);
-              despuesDeAvicola();
-            };
+
+            input.dataset.pollitos = String(pollitos);
+
+            // Limpieza defensiva por si quedó de versiones anteriores
+
+            hide(btn); hide(input);
+            despuesDeAvicola();
           };
         } else {
           hide(input); hide(btn); hide(foto);
@@ -1294,15 +1465,12 @@ window.addEventListener("load", bloquearBotonAtras);
 
     function enviarInicio() {
       const pollitos = Number(document.getElementById("respuestaInput").dataset.pollitos || 0) || null;
-      const criadoras = Number(document.getElementById("respuestaInput").dataset.criadoras || 0) || null;
-
       const payload = {
+        op_id: generarOpId(),
         sede: sedeQR,
         pollitos: (EMPRESA_SESION === "Pollos GAR SAS" ? pollitos : null),
-        criadoras: (EMPRESA_SESION === "Pollos GAR SAS" ? criadoras : null),
         tanques: items
       };
-
       // Envío con tolerancia a offline:
       sendWithOffline("/glp/registrar_inicio", payload, manejarRespuestaOperacion);
     }
@@ -1360,7 +1528,6 @@ window.addEventListener("load", bloquearBotonAtras);
         if (input) {
           input.onkeyup = null;
           input.dataset.pollitos = "";
-          input.dataset.criadoras = "";
         }
         if (foto) {
           foto.onchange = null;
@@ -1501,8 +1668,6 @@ window.addEventListener("load", bloquearBotonAtras);
       };
 
     }
-
-
     // 3) Mensaje: puede proceder con el tanqueo
     function mostrarMensajeProcederTanqueo() {
       const texto = document.getElementById("preguntaTexto");
@@ -1510,7 +1675,6 @@ window.addEventListener("load", bloquearBotonAtras);
       const foto = document.getElementById("inputFoto");
       const btn = document.getElementById("botonEnviar");
       document.getElementById("preguntaSiNo").style.display = "none";
-
 
       hide(input); hide(foto);
       texto.textContent = `Puedes proceder con el TANQUEO del tanque ${tanqueActualDatos.numero.toUpperCase()}. Cuando termines, presiona "Continuar".`;
@@ -1556,7 +1720,6 @@ window.addEventListener("load", bloquearBotonAtras);
       const foto = document.getElementById("inputFoto");
       const btn = document.getElementById("botonEnviar");
       document.getElementById("preguntaSiNo").style.display = "none";
-
 
       hide(input);
       texto.textContent = `Toma una FOTO del NIVEL FINAL del tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
@@ -1698,8 +1861,8 @@ window.addEventListener("load", bloquearBotonAtras);
     }
 
     /* ============================
-       REGISTRAR CONSUMO
-       ============================ */
+      REGISTRAR CONSUMO
+    ============================ */
     async function registrarConsumo() {
       activarProteccionOperacion();
       try {
@@ -1718,7 +1881,6 @@ window.addEventListener("load", bloquearBotonAtras);
         if (input) {
           input.onkeyup = null;
           input.dataset.pollitos = "";
-          input.dataset.criadoras = "";
         }
         if (foto) {
           foto.onchange = null;
@@ -1736,6 +1898,7 @@ window.addEventListener("load", bloquearBotonAtras);
 
     function enviarConsumo() {
       const payload = {
+        op_id: generarOpId(),
         sede: sedeQR,
         tanques: items
       };
@@ -1771,7 +1934,6 @@ window.addEventListener("load", bloquearBotonAtras);
         if (input) {
           input.onkeyup = null;
           input.dataset.pollitos = "";
-          input.dataset.criadoras = "";
         }
         if (foto) {
           foto.onchange = null;
@@ -1789,6 +1951,7 @@ window.addEventListener("load", bloquearBotonAtras);
 
     function enviarFinalizar() {
       const payload = {
+        op_id: generarOpId(),
         sede: sedeQR,
         tanques: items
       };
@@ -1830,31 +1993,31 @@ window.addEventListener("load", bloquearBotonAtras);
     // =======================================================
 
     function actualizarBloqueoLogout() {
-        const logoutLinks = document.querySelectorAll('a[href="/logout"]');
+      const logoutLinks = document.querySelectorAll('a[href="/logout"]');
 
-        logoutLinks.forEach(a => {
-            // primero quitamos cualquier handler previo
-            a.onclick = null;
+      logoutLinks.forEach(a => {
+        // primero quitamos cualquier handler previo
+        a.onclick = null;
 
-            a.addEventListener("click", function(e) {
+        a.addEventListener("click", function (e) {
 
-                // 1. Si hay operación GLP en curso → SIEMPRE bloquear
-                if (GLP_OPERACION_EN_CURSO) {
-                    e.preventDefault();
-                    alert("Debes terminar la operación de GLP antes de cerrar sesión.");
-                    return;
-                }
+          // 1. Si hay operación GLP en curso → SIEMPRE bloquear
+          if (GLP_OPERACION_EN_CURSO) {
+            e.preventDefault();
+            alert("Debes terminar la operación de GLP antes de cerrar sesión.");
+            return;
+          }
 
-                // 2. Si NO hay internet → bloquear (ya que no puede cerrar sesión)
-                if (!navigator.onLine) {
-                    e.preventDefault();
-                    alert("Estás sin conexión. El cierre de sesión requiere internet.");
-                    return;
-                }
+          // 2. Si NO hay internet → bloquear (ya que no puede cerrar sesión)
+          if (!navigator.onLine) {
+            e.preventDefault();
+            alert("Estás sin conexión. El cierre de sesión requiere internet.");
+            return;
+          }
 
-                // 3. Si todo está bien → permitir cerrar sesión
-            });
+          // 3. Si todo está bien → permitir cerrar sesión
         });
+      });
     }
 
     // Se ejecuta en todos los estados posibles

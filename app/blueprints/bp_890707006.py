@@ -110,11 +110,13 @@ def vista_facturas_glp():
     # --- Lógica de carga de pedidos pendientes ---
     pedidos_pendientes = []
     try:
-        # Consulta usando las columnas REALES de tu base de datos actualizadas
+        # === CORRECCIÓN AQUÍ ===
+        # 1. Usamos p.codigo_pedido (la columna real)
+        # 2. Mantenemos el alias de fecha para que coincida con tu HTML
         query = """
             SELECT 
                 p.id, 
-                p.codigo AS codigo_pedido,          
+                p.codigo_pedido,                  
                 p.fecha_registro AS fecha_generacion, 
                 p.proveedor,       
                 p.ubicacion
@@ -123,12 +125,23 @@ def vista_facturas_glp():
             ORDER BY p.fecha_registro DESC
         """
         cur.execute(query, (empresa_nombre,))
+        
+        # Recuperamos los nombres de las columnas para armar el diccionario
+        columns = [col[0] for col in cur.description]
         pedidos = cur.fetchall()
         
         for pedido in pedidos:
-            p = dict(pedido)
-            if p['fecha_generacion']:
+            # Creamos el diccionario uniendo columnas y valores
+            # (Esto funciona tanto si el cursor devuelve tuplas como diccionarios)
+            if isinstance(pedido, dict):
+                p = pedido
+            else:
+                p = dict(zip(columns, pedido))
+            
+            # Formateo de fecha
+            if p.get('fecha_generacion'):
                 p['fecha_generacion'] = str(p['fecha_generacion'])
+            
             p['proveedor'] = p.get('proveedor') or 'N/A'
             pedidos_pendientes.append(p)
             
@@ -150,8 +163,6 @@ def vista_facturas_glp():
     
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
-
-
 # ================================
 # MÓDULO MERMAS
 # ================================
