@@ -713,10 +713,10 @@
 
       const q = await getQueue();
       if (!q.length) {
-         // Ocultar aviso rojo si no hay nada pendiente
-         const warningDiv = document.getElementById("syncWarning");
-         if (warningDiv) warningDiv.style.display = 'none';
-         return;
+        // Ocultar aviso rojo si no hay nada pendiente
+        const warningDiv = document.getElementById("syncWarning");
+        if (warningDiv) warningDiv.style.display = 'none';
+        return;
       }
 
       console.log(`[Sync] Procesando ${q.length} operaciones...`);
@@ -740,13 +740,13 @@
           });
 
           const ct = (r.headers.get("content-type") || "").toLowerCase();
-          
+
           // DETECTAR SI LA SESIÓN VENCIÓ
           if (!ct.includes("application/json") || r.status === 401 || r.redirected) {
-             console.warn("⚠️ Sesión vencida detectada.");
-             needLoginForSync = true;
-             remaining.push(it);
-             continue;
+            console.warn("⚠️ Sesión vencida detectada.");
+            needLoginForSync = true;
+            remaining.push(it);
+            continue;
           }
 
           const j = await r.json();
@@ -767,35 +767,35 @@
       await setQueue(remaining);
 
       // === ACCIONES AL FINALIZAR ===
-      
+
       // 1. Si hubo éxito
       if (sincronizadosCount > 0) {
         // Si se vació la cola por completo
         if (remaining.length === 0) {
-            const warningDiv = document.getElementById("syncWarning");
-            if (warningDiv) warningDiv.style.display = 'none';
-            
-            // AQUÍ ESTÁ LA CORRECCIÓN:
-            // En vez de recargar, mostramos el resumen de la última operación
-            if (lastSuccessResponse && typeof mostrarResumenOperacion === 'function') {
-                alert(`✅ Se han sincronizado ${sincronizadosCount} operaciones.`);
-                mostrarResumenOperacion(lastSuccessResponse); // ¡Pinta el resumen!
-            } else {
-                alert(`✅ ¡Éxito! Se sincronizaron ${sincronizadosCount} operaciones.`);
-                // Solo recargamos si no pudimos mostrar el resumen
-                window.location.reload(); 
-            }
+          const warningDiv = document.getElementById("syncWarning");
+          if (warningDiv) warningDiv.style.display = 'none';
+
+          // AQUÍ ESTÁ LA CORRECCIÓN:
+          // En vez de recargar, mostramos el resumen de la última operación
+          if (lastSuccessResponse && typeof mostrarResumenOperacion === 'function') {
+            alert(`✅ Se han sincronizado ${sincronizadosCount} operaciones.`);
+            mostrarResumenOperacion(lastSuccessResponse); // ¡Pinta el resumen!
+          } else {
+            alert(`✅ ¡Éxito! Se sincronizaron ${sincronizadosCount} operaciones.`);
+            // Solo recargamos si no pudimos mostrar el resumen
+            window.location.reload();
+          }
         }
       }
 
       // 2. Si la sesión venció
       if (needLoginForSync) {
         alert(
-            "⚠️ TU SESIÓN HA VENCIDO\n\n" +
-            "Tus datos están GUARDADOS en el celular. Para enviarlos, necesitamos que inicies sesión de nuevo.\n\n" +
-            "Dale Aceptar y el sistema te llevará al login."
+          "⚠️ TU SESIÓN HA VENCIDO\n\n" +
+          "Tus datos están GUARDADOS en el celular. Para enviarlos, necesitamos que inicies sesión de nuevo.\n\n" +
+          "Dale Aceptar y el sistema te llevará al login."
         );
-        window.location.href = "/logout"; 
+        window.location.href = "/logout";
       }
     }
 
@@ -964,10 +964,10 @@
       // 1. MODO OFFLINE MANUAL
       if (typeof isForceOffline === "function" && isForceOffline()) {
         await enqueueOffline({ url, payload });
-        
+
         // ACTIVAR AVISO VISUAL (IMPORTANTE)
         if (typeof mostrarAvisoSyncPendiente === 'function') {
-            mostrarAvisoSyncPendiente();
+          mostrarAvisoSyncPendiente();
         }
 
         const fakeResponse = {
@@ -997,9 +997,9 @@
         });
 
         const ct = (r.headers.get("content-type") || "").toLowerCase();
-        
+
         if (!ct.includes("application/json")) {
-            throw new Error("non-json-response");
+          throw new Error("non-json-response");
         }
 
         const j = await r.json();
@@ -1012,12 +1012,12 @@
       } catch (e) {
         // 3. FALLO DE RED
         const msg = String(e || "");
-        
+
         const isNetworkError =
           !navigator.onLine ||
           msg.includes("Failed to fetch") ||
           msg.includes("NetworkError") ||
-          msg.includes("non-json-response") || 
+          msg.includes("non-json-response") ||
           msg.includes("Unexpected token <") ||
           msg.includes("Load failed");
 
@@ -1029,7 +1029,7 @@
 
           // B. Mostrar botón rojo (IMPORTANTE)
           if (typeof mostrarAvisoSyncPendiente === 'function') {
-              mostrarAvisoSyncPendiente();
+            mostrarAvisoSyncPendiente();
           }
 
           // C. Respuesta visual fake
@@ -1042,19 +1042,19 @@
           };
 
           if (typeof onSuccess === "function") {
-            onSuccess(fakeResponse); 
+            onSuccess(fakeResponse);
           } else {
             alert(fakeResponse.message);
             mostrarMenu();
           }
-          
+
           limpiarEstadoOperacion();
 
           // D. Reintentos automáticos
           setTimeout(() => flushOfflineQueue(), 2000);
           setTimeout(() => flushOfflineQueue(), 5000);
           setTimeout(() => flushOfflineQueue(), 10000);
-          
+
           return fakeResponse;
         }
 
@@ -1062,7 +1062,7 @@
         throw e;
       }
     }
-    
+
     function leerQR(titulo) {
       return new Promise((resolve, reject) => {
         const menu = document.getElementById("menuOpciones");
@@ -1108,7 +1108,7 @@
           Hay operaciones guardadas en el celular que no han subido al servidor.
         </div>
         
-        <button onclick="flushOfflineQueue()" style="
+        <button id="btnSyncManual" onclick="ejecutarSyncManual()" style="
             width: 100%;
             margin-top: 8px;
             padding: 10px;
@@ -1118,6 +1118,7 @@
             border-radius: 6px;
             font-weight: bold;
             cursor: pointer;
+            transition: all 0.3s;
         ">
             🔄 INTENTAR ENVIAR AHORA
         </button>
@@ -1126,6 +1127,36 @@
            El sistema intentará enviarlas automáticamente, pero puedes usar este botón para forzarlo si tienes internet.
         </div>
       `;
+    }
+
+    async function ejecutarSyncManual() {
+      const btn = document.getElementById("btnSyncManual");
+
+      // 1. Feedback visual inmediato (para que sepas que sí hizo click)
+      if (btn) {
+        btn.innerHTML = "⏳ Conectando con el servidor...";
+        btn.disabled = true; // Evitar doble click
+        btn.style.opacity = "0.7";
+      }
+
+      // 2. CORRECCIÓN CRÍTICA: Forzamos al sistema a creer que hay internet
+      // Esto rompe el bloqueo que hacía que "no pasara nada"
+      if (typeof setForceOffline === 'function') {
+        setForceOffline(false);
+      }
+
+      // 3. Intentamos enviar (esperamos un poquito para que la UI respire)
+      await new Promise(r => setTimeout(r, 500));
+      await flushOfflineQueue();
+
+      // 4. Si llegamos aquí y el aviso sigue visible, es que falló de nuevo.
+      // Restauramos el botón para que puedas intentar otra vez.
+      const warningDiv = document.getElementById("syncWarning");
+      if (warningDiv && warningDiv.style.display !== 'none' && btn) {
+        btn.innerHTML = "⚠️ Falló. Reintentar ahora";
+        btn.disabled = false;
+        btn.style.opacity = "1";
+      }
     }
 
 
