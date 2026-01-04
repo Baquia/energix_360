@@ -294,228 +294,284 @@ def _generar_codigo_pedido(cliente_nombre, lote_id, ubicacion, proveedor, cur):
     
     return codigo_pedido
 
-
 def _enviar_alerta_pedido_tanqueo(empresa, ubicacion, lote_id, proveedor_principal, tanques_bajos, codigo_pedido):
-    """Envía un correo de alerta de solicitud de pedido al proveedor, listando los tanques con nivel <= 30% y solicitando llenado al 80%."""
+    """Envía un correo de alerta de solicitud de pedido al proveedor con diseño corporativo."""
 
-    # Validación mínima: si no hay tanques bajos, no tiene sentido enviar alerta
     if not tanques_bajos:
-        app.logger.warning(
-            f"No se envía correo: no se recibieron tanques_bajos para pedido GLP. "
-            f"Proveedor={proveedor_principal}, Sede={ubicacion}, Lote={lote_id}, Codigo={codigo_pedido}"
-        )
+        return False
+
+    # Usar variables locales leídas de os.environ (¡IMPORTANTE!)
+    email_user = os.environ.get("EMAIL_USER")
+    email_pass = os.environ.get("EMAIL_PASS")
+    email_host = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+    try:
+        email_port = int(os.environ.get("EMAIL_PORT", "587"))
+    except:
+        email_port = 587
+    email_from = os.environ.get("EMAIL_FROM", email_user)
+
+    if not email_user or not email_pass:
+        app.logger.error("⛔ Error: Credenciales de correo no configuradas.")
         return False
 
     cur = mysql.connection.cursor()
     cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor = %s", (proveedor_principal,))
     c = cur.fetchone() or {}
     destinatarios = [e for e in [c.get("email1"), c.get("email2")] if e]
+    cur.close()
 
-    # Fallback si no hay emails de proveedor (usar el usuario de la app)
-    if not destinatarios and EMAIL_USER:
-        destinatarios = [EMAIL_USER]
+    if not destinatarios and email_user:
+        destinatarios = [email_user]
 
     if not destinatarios:
-        app.logger.warning(
-            f"No hay destinatarios configurados para la alerta de pedido GLP para {proveedor_principal}."
-        )
         return False
 
-    # Construir listado "tk-n (nivel actual <=30%) llenar al 80%"
-    items_html = "<ul>"
+    # --- Construcción de Filas de Tanques (HTML) ---
+    items_html = ""
     for t in (tanques_bajos or []):
         numero = t.get("numero") if isinstance(t, dict) else None
-
-        nivel = None
-        if isinstance(t, dict):
-            nivel = t.get("nivel")
-            if nivel is None:
-                nivel = t.get("nivel_inicial")
-
+        nivel = t.get("nivel") if isinstance(t, dict) else t.get("nivel_inicial")
         try:
             nivel_float = float(nivel if nivel is not None else 0)
-        except Exception:
+        except:
             nivel_float = 0.0
 
-        items_html += "<li>tk-{n} (nivel actual {p}% &le; 30%) llenar al 80%</li>".format(
-            n=(numero or "-"),
-            p=round(nivel_float, 2)
-        )
-    items_html += "</ul>"
+        items_html += f"""
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px; text-align: center;"><strong>{numero or "-"}</strong></td>
+                <td style="padding: 10px; text-align: center; color: #d9534f;"><strong>{round(nivel_float, 2)}%</strong></td>
+                <td style="padding: 10px; text-align: center;">80%</td>
+            </tr>
+        """
 
-    cuerpo = ""
-    cuerpo += "<p>📩 <b>Solicitud de Tanqueo GLP</b></p>"
-    cuerpo += "<p><b>Empresa:</b> {empresa}<br>".format(empresa=empresa)
-    cuerpo += "<b>Sede:</b> {ubicacion}<br>".format(ubicacion=ubicacion)
-    cuerpo += "<b>Lote:</b> {lote}</p>".format(lote=lote_id)
-    cuerpo += "<p><b>Fecha:</b> {fecha}</p>".format(fecha=datetime.now().strftime('%Y-%m-%d'))
+    # --- CUERPO DEL CORREO (Diseño Corporativo) ---
+    cuerpo = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; color: #333; line-height: 1.6; }}
+        .container {{ max-width: 600px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }}
+        .header {{ background-color: #015249; color: #ffffff; padding: 20px; text-align: center; }}
+        .header h2 {{ margin: 0; font-size: 24px; }}
+        .content {{ padding: 25px; }}
+        .info-box {{ background-color: #f9fbfb; border-left: 4px solid #015249; padding: 15px; margin-bottom: 20px; }}
+        .info-box p {{ margin: 5px 0; }}
+        .codigo-box {{ background-color: #e8f5e9; border: 2px dashed #015249; padding: 15px; text-align: center; margin: 20px 0; border-radius: 6px; }}
+        .codigo-title {{ font-size: 14px; color: #555; margin-bottom: 5px; }}
+        .codigo-valor {{ font-size: 28px; font-weight: bold; color: #015249; letter-spacing: 1px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+        th {{ background-color: #f2f2f2; padding: 10px; text-align: center; font-size: 14px; }}
+        .footer {{ background-color: #f4f4f4; color: #777; padding: 15px; text-align: center; font-size: 12px; }}
+        .footer p {{ margin: 5px 0; }}
+    </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>Solicitud de Tanqueo GLP</h2>
+            </div>
+            <div class="content">
+                <p>Estimado proveedor <strong>{proveedor_principal or 'N/D'}</strong>,</p>
+                <p>Se requiere el suministro de GLP para la siguiente sede operativa:</p>
+                
+                <div class="info-box">
+                    <p><strong>Empresa:</strong> {empresa}</p>
+                    <p><strong>Sede:</strong> {ubicacion}</p>
+                    <p><strong>Fecha de Solicitud:</strong> {datetime.now().strftime('%Y-%m-%d')}</p>
+                </div>
 
-    cuerpo += "<p><b>Código de pedido GLP (OBLIGATORIO en la factura):</b><br>"
-    cuerpo += "<b><u>{codigo}</u></b></p>".format(codigo=codigo_pedido)
+                <div class="codigo-box">
+                    <div class="codigo-title">CÓDIGO DE PEDIDO (OBLIGATORIO EN FACTURA)</div>
+                    <div class="codigo-valor">{codigo_pedido}</div>
+                </div>
 
-    cuerpo += "<p><b>Tanques con nivel ≤ 30% (requieren tanqueo):</b></p>"
-    cuerpo += items_html
+                <p><strong>Tanques que requieren llenado (Nivel ≤ 30%):</strong></p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tanque</th>
+                            <th>Nivel Actual</th>
+                            <th>Llenar hasta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
 
-    cuerpo += (
-        "<p>Por favor, incluya el código anterior en la factura para que "
-        "el pedido sea considerado <b>válido</b> en el sistema BQA-ONE.</p>"
-    )
+                <p style="margin-top: 20px; font-size: 14px; color: #555;">
+                    <em>Por favor, incluya el código de pedido anterior en la factura o remisión para que el suministro sea procesado correctamente en el sistema BQA-ONE.</em>
+                </p>
+            </div>
+            <div class="footer">
+                <p>Este es un mensaje automático generado por el sistema <strong>BQA-ONE / Energix360</strong>.</p>
+                <p>No responda a este correo.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
     try:
         msg = MIMEText(cuerpo, "html", "utf-8")
-        msg["Subject"] = f"Solicitud de Tanqueo GLP: {ubicacion} - Cod: {codigo_pedido}"
-        msg["From"] = EMAIL_FROM
+        msg["Subject"] = f"🆕 Solicitud de Tanqueo GLP - {ubicacion} - Cod: {codigo_pedido}"
+        msg["From"] = email_from
         msg["To"] = ", ".join(destinatarios)
 
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+        with smtplib.SMTP(email_host, email_port) as server:
             server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.sendmail(EMAIL_USER, destinatarios, msg.as_string())
+            server.login(email_user, email_pass)
+            server.sendmail(email_user, destinatarios, msg.as_string())
 
         app.logger.info(f"✅ Correo GLP enviado a: {destinatarios}. Código: {codigo_pedido}")
         return True
 
-    except Exception:
-        app.logger.error("⛔ Error al enviar correo GLP:")
-        traceback.print_exc()
+    except Exception as e:
+        app.logger.error(f"⛔ Error al enviar correo GLP: {e}")
         return False
 
 def _enviar_alerta_desviacion_tanqueo(
-    empresa,
-    ubicacion,
-    lote_id,
-    proveedor_principal,
-    op_id,
-    masa_esperada_total,
-    masa_facturada_total,
-    desvio_total_pct,
-    dens_prom,
-    tanques
+    empresa, ubicacion, lote_id, proveedor_principal, op_id,
+    masa_esperada_total, masa_facturada_total, desvio_total_pct, dens_prom, tanques
 ):
-    """
-    Envía correo cuando (facturado - esperado)/esperado * 100 > 8% (solo positivo),
-    con formato HTML similar a _enviar_alerta_pedido_tanqueo().
-    """
+    """Envía correo de alerta de desviación con diseño corporativo."""
 
-    # BAQ-ONE (destino fijo). Por defecto usa EMAIL_USER si no defines otro.
-    email_baqone = os.environ.get("EMAIL_ALERT_BAQONE", EMAIL_USER)
+    # Usar variables locales (IMPORTANTE)
+    email_user = os.environ.get("EMAIL_USER")
+    email_pass = os.environ.get("EMAIL_PASS")
+    email_host = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+    try:
+        email_port = int(os.environ.get("EMAIL_PORT", "587"))
+    except:
+        email_port = 587
+    email_from = os.environ.get("EMAIL_FROM", email_user)
+    
+    if not email_user or not email_pass:
+        return False
 
-    # Proveedor (emails desde tabla proveedores)
+    email_baqone = os.environ.get("EMAIL_ALERT_BAQONE", email_user)
+
     cur = mysql.connection.cursor()
     cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor = %s", (proveedor_principal,))
     c = cur.fetchone() or {}
-    emails_proveedor = [e for e in [c.get("email1"), c.get("email2")] if e]
+    destinatarios = [e for e in [c.get("email1"), c.get("email2")] if e]
+    cur.close()
 
-    # Receptores: SIEMPRE BAQ-ONE + proveedor (si existe)
-    destinatarios = []
-    if email_baqone:
+    if email_baqone and email_baqone not in destinatarios:
         destinatarios.append(email_baqone)
-    for e in emails_proveedor:
-        if e and e not in destinatarios:
-            destinatarios.append(e)
 
     if not destinatarios:
-        app.logger.warning(
-            f"No se envía correo de desviación: no hay destinatarios (BAQ-ONE/proveedor). "
-            f"Proveedor={proveedor_principal}, Sede={ubicacion}, Lote={lote_id}, op_id={op_id}"
-        )
         return False
 
-    # Detalle por tanque (mismo estilo <ul>)
-    items_html = "<ul>"
+    # --- Filas de Detalle por Tanque ---
+    items_html = ""
     for t in (tanques or []):
-        if not isinstance(t, dict):
-            continue
-
-        num = (t.get("numero") or "-")
-        try:
-            cap = float(t.get("capacidad") or 0)
-        except Exception:
-            cap = 0.0
-
-        try:
-            ni = float(t.get("nivel_inicial") or 0)
-        except Exception:
-            ni = 0.0
-
-        try:
-            nf = float(t.get("nivel_final") or 0)
-        except Exception:
-            nf = 0.0
-
-        try:
-            dens = float(t.get("densidad_suministrada") or 0)
-        except Exception:
-            dens = 0.0
-
-        try:
-            kg_fact = float(t.get("kg_suministrados") or 0)
-        except Exception:
-            kg_fact = 0.0
-
+        num = t.get("numero") or "-"
+        ni = float(t.get("nivel_inicial") or 0)
+        nf = float(t.get("nivel_final") or 0)
         delta = nf - ni
-        # esperado por tanque (solo si delta positivo)
-        kg_esp = 0.0
-        if delta > 0 and dens > 0 and cap > 0:
-            kg_esp = dens * cap * (delta / 100.0)
+        cap = float(t.get("capacidad") or 0)
+        dens = float(t.get("densidad_suministrada") or 0)
+        kg_fact = float(t.get("kg_suministrados") or 0)
+        kg_esp = dens * cap * (delta / 100.0) if delta > 0 else 0.0
 
-        items_html += (
-            "<li>"
-            f"{num}: {round(ni,2)}% → {round(nf,2)}% (Δ {round(delta,2)}%), "
-            f"cap {round(cap,2)} gal, "
-            f"esperado {round(kg_esp,2)} kg, facturado {round(kg_fact,2)} kg"
-            "</li>"
-        )
-    items_html += "</ul>"
+        items_html += f"""
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 8px;"><strong>{num}</strong></td>
+                <td style="padding: 8px;">{round(ni,1)}% → {round(nf,1)}%</td>
+                <td style="padding: 8px;">{round(delta,1)}%</td>
+                <td style="padding: 8px;">{round(kg_esp,1)} kg</td>
+                <td style="padding: 8px; background-color: #ffebee;"><strong>{round(kg_fact,1)} kg</strong></td>
+            </tr>
+        """
 
-    # Cuerpo HTML (misma estructura del correo existente)
-    cuerpo = ""
-    cuerpo += "<p>📩 <b>Alerta de Desviación de Tanqueo GLP</b></p>"
-    cuerpo += "<p><b>Empresa:</b> {empresa}<br>".format(empresa=empresa)
-    cuerpo += "<b>Sede:</b> {ubicacion}<br>".format(ubicacion=ubicacion)
-    cuerpo += "<b>Lote:</b> {lote}</p>".format(lote=lote_id)
-    cuerpo += "<p><b>Fecha:</b> {fecha}</p>".format(fecha=datetime.now().strftime('%Y-%m-%d'))
+    # --- CUERPO DEL CORREO (Diseño Corporativo) ---
+    cuerpo = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; color: #333; }}
+        .container {{ max-width: 650px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }}
+        .header {{ background-color: #d9534f; color: #ffffff; padding: 20px; text-align: center; }} /* Rojo para alerta */
+        .header h2 {{ margin: 0; }}
+        .content {{ padding: 25px; }}
+        .alert-box {{ background-color: #ffebee; color: #c62828; padding: 15px; border-radius: 6px; text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 20px; }}
+        .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }}
+        .info-item {{ background: #f9fbfb; padding: 12px; border-radius: 6px; border-left: 3px solid #d9534f; }}
+        .info-label {{ font-size: 12px; color: #777; display: block; margin-bottom: 4px; }}
+        .info-value {{ font-size: 16px; font-weight: bold; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+        th {{ background-color: #f2f2f2; padding: 8px; text-align: left; }}
+        .footer {{ background-color: #f4f4f4; color: #777; padding: 15px; text-align: center; font-size: 12px; }}
+    </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>⚠️ Alerta de Desviación en Tanqueo GLP</h2>
+            </div>
+            <div class="content">
+                <div class="alert-box">
+                    Desviación detectada: {round(desvio_total_pct, 2)}%
+                </div>
+                <p>Se ha registrado un tanqueo con una diferencia significativa entre la masa esperada y la facturada.</p>
 
-    cuerpo += "<p><b>Código de operación GLP (op_id):</b><br>"
-    cuerpo += "<b><u>{codigo}</u></b></p>".format(codigo=op_id)
+                <div class="info-grid">
+                    <div class="info-item"><span class="info-label">Sede</span><span class="info-value">{ubicacion}</span></div>
+                    <div class="info-item"><span class="info-label">Proveedor</span><span class="info-value">{proveedor_principal}</span></div>
+                    <div class="info-item"><span class="info-label">Masa Esperada (Total)</span><span class="info-value">{round(masa_esperada_total, 2)} kg</span></div>
+                    <div class="info-item"><span class="info-label" style="color: #c62828;">Masa Facturada (Total)</span><span class="info-value" style="color: #c62828;">{round(masa_facturada_total, 2)} kg</span></div>
+                    <div class="info-item"><span class="info-label">Densidad Promedio</span><span class="info-value">{round(dens_prom, 3)} kg/gal</span></div>
+                    <div class="info-item"><span class="info-label">ID Operación</span><span class="info-value">{op_id}</span></div>
+                </div>
 
-    cuerpo += "<p><b>Proveedor:</b> {prov}</p>".format(prov=(proveedor_principal or "N/D"))
-
-    cuerpo += (
-        "<p><b>Control de tanqueo (totales):</b><br>"
-        f"Esperado: <b>{round(masa_esperada_total,2)} kg</b><br>"
-        f"Facturado: <b>{round(masa_facturada_total,2)} kg</b><br>"
-        f"Diferencia: <b>{round(desvio_total_pct,2)}%</b><br>"
-        f"Densidad suministrada (prom): <b>{round(dens_prom,3) if dens_prom else 0.0} kg/gal</b>"
-        "</p>"
-    )
-
-    cuerpo += "<p><b>Detalle por tanque:</b></p>"
-    cuerpo += items_html
-
-    cuerpo += (
-        "<p>Este correo se genera automáticamente cuando la diferencia porcentual es "
-        "<b>positiva</b> y supera el <b>8%</b> (facturado &gt; esperado).</p>"
-    )
+                <h3>Detalle por Tanque:</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tanque</th>
+                            <th>Nivel (Ini → Fin)</th>
+                            <th>Δ Nivel</th>
+                            <th>Esperado</th>
+                            <th>Facturado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
+                <p style="margin-top: 20px; font-size: 12px; color: #777;">
+                    * Esta alerta se genera automáticamente cuando la masa facturada supera a la esperada en más del 8%.
+                </p>
+            </div>
+            <div class="footer">
+                <p>Reporte generado por <strong>BQA-ONE / Energix360</strong>.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
     try:
         msg = MIMEText(cuerpo, "html", "utf-8")
-        msg["Subject"] = f"⚠️ Desviación Tanqueo GLP >8%: {ubicacion} - op_id: {op_id}"
-        msg["From"] = EMAIL_FROM
+        msg["Subject"] = f"🚨 Alerta: Desviación Tanqueo {round(desvio_total_pct,1)}% - {ubicacion}"
+        msg["From"] = email_from
         msg["To"] = ", ".join(destinatarios)
 
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+        with smtplib.SMTP(email_host, email_port) as server:
             server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.sendmail(EMAIL_USER, destinatarios, msg.as_string())
+            server.login(email_user, email_pass)
+            server.sendmail(email_user, destinatarios, msg.as_string())
 
-        app.logger.info(f"✅ Correo desviación tanqueo enviado a: {destinatarios}. op_id: {op_id}")
+        app.logger.info(f"✅ Correo desviación enviado. op_id: {op_id}")
         return True
 
-    except Exception:
-        app.logger.error("⛔ Error al enviar correo de desviación de tanqueo GLP:")
-        traceback.print_exc()
+    except Exception as e:
+        app.logger.error(f"⛔ Error al enviar correo desviación: {e}")
         return False
+
 def _calcular_ts_consumo(dias_operacion: int):
     """
     Algoritmo (foto) para CONSUMO:
