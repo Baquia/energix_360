@@ -708,30 +708,25 @@
     let GLP_LOGIN_WARNING_SHOWN = false;
 
     async function flushOfflineQueue() {
-      // 1. No hacer sync si estamos en modo OFFLINE manual
-      if (typeof isForceOffline === "function" && isForceOffline()) {
-        console.log("[SW] Modo offline. No se sincronizan las operaciones.");
-        return;
-      }
+      // 1. Evitar sync si modo offline manual activo
+      if (typeof isForceOffline === "function" && isForceOffline()) return;
 
-      // 2. Verificar si hay algo en la cola
       const q = await getQueue();
       if (!q.length) {
-        // Si la cola está vacía, ocultamos el aviso rojo por si acaso
-        const warningDiv = document.getElementById("syncWarning");
-        if (warningDiv) warningDiv.style.display = 'none';
-        return;
+         // Ocultar aviso rojo si no hay nada pendiente
+         const warningDiv = document.getElementById("syncWarning");
+         if (warningDiv) warningDiv.style.display = 'none';
+         return;
       }
 
-      console.log(`[Sync] Intentando sincronizar ${q.length} operaciones...`);
+      console.log(`[Sync] Procesando ${q.length} operaciones...`);
 
       const remaining = [];
-      let needLoginForSync = false; // Bandera para detectar sesión vencida
+      let needLoginForSync = false;
       let sincronizadosCount = 0;
+      let lastSuccessResponse = null; // Guardaremos la respuesta para mostrar el resumen
 
       for (const it of q) {
-        // Si ya detectamos que falta login, guardamos el resto y paramos
-        // para no bombardear al servidor con errores.
         if (needLoginForSync) {
           remaining.push(it);
           continue;
@@ -744,65 +739,63 @@
             body: JSON.stringify(it.payload)
           });
 
-          const status = r.status;
           const ct = (r.headers.get("content-type") || "").toLowerCase();
-
-          // DETECCIÓN DE SESIÓN CADUCADA
-          // Si devuelve HTML (página de login), redirección (302) o error de auth (401/403)
-          if (!ct.includes("application/json") || status === 401 || status === 403 || r.redirected) {
-            console.warn("⚠️ La sesión caducó durante la sincronización.");
-            needLoginForSync = true; // ¡Activamos la alarma!
-            remaining.push(it);      // Guardamos el dato para después
-            continue;                // Pasamos al siguiente ciclo (que se detendrá por el if de arriba)
+          
+          // DETECTAR SI LA SESIÓN VENCIÓ
+          if (!ct.includes("application/json") || r.status === 401 || r.redirected) {
+             console.warn("⚠️ Sesión vencida detectada.");
+             needLoginForSync = true;
+             remaining.push(it);
+             continue;
           }
 
           const j = await r.json();
-
-          if (!j.success) {
-            // Error de lógica del servidor (ej. datos inválidos), lo guardamos para revisión
-            console.error("❌ Error del servidor:", j.message);
-            remaining.push(it);
-          } else {
-            // ¡ÉXITO!
+          if (j.success) {
             sincronizadosCount++;
-            console.log("✅ Operación sincronizada:", it.payload.op_id);
+            lastSuccessResponse = j; // ¡Guardamos la respuesta exitosa!
+          } else {
+            // Error de lógica del servidor, mantener en cola por seguridad
+            console.error("❌ Error servidor:", j.message);
+            remaining.push(it);
           }
-
         } catch (e) {
-          console.error("Error de red en sync:", e);
+          // Error de red real
           remaining.push(it);
         }
       }
 
-      // Guardamos lo que quedó pendiente (por error de red o por sesión vencida)
       await setQueue(remaining);
 
-      // === ACCIONES FINALES ===
-
-      // A. Si hubo éxito (total o parcial)
+      // === ACCIONES AL FINALIZAR ===
+      
+      // 1. Si hubo éxito
       if (sincronizadosCount > 0) {
-        // Si ya no queda nada pendiente, ocultamos el aviso rojo
+        // Si se vació la cola por completo
         if (remaining.length === 0) {
-          const warningDiv = document.getElementById("syncWarning");
-          if (warningDiv) warningDiv.style.display = 'none';
-
-          // ÉXITO TOTAL: Avisamos y recargamos para limpiar la pantalla
-          alert(`✅ Se han sincronizado ${sincronizadosCount} operaciones exitosamente.`);
-          window.location.reload();
+            const warningDiv = document.getElementById("syncWarning");
+            if (warningDiv) warningDiv.style.display = 'none';
+            
+            // AQUÍ ESTÁ LA CORRECCIÓN:
+            // En vez de recargar, mostramos el resumen de la última operación
+            if (lastSuccessResponse && typeof mostrarResumenOperacion === 'function') {
+                alert(`✅ Se han sincronizado ${sincronizadosCount} operaciones.`);
+                mostrarResumenOperacion(lastSuccessResponse); // ¡Pinta el resumen!
+            } else {
+                alert(`✅ ¡Éxito! Se sincronizaron ${sincronizadosCount} operaciones.`);
+                // Solo recargamos si no pudimos mostrar el resumen
+                window.location.reload(); 
+            }
         }
       }
 
-      // B. SI LA SESIÓN VENCIÓ: MENSAJE TRANQUILIZADOR Y REDIRECCIÓN
+      // 2. Si la sesión venció
       if (needLoginForSync) {
         alert(
-          "⚠️ ¡ATENCIÓN! TU SESIÓN HA VENCIDO\n\n" +
-          "✋ Tranquilo, los datos de la operación están GUARDADOS y SEGUROS en este celular.\n\n" +
-          "Para enviarlos al servidor, necesitamos confirmar tu identidad nuevamente.\n\n" +
-          "👉 Dale Aceptar, vuelve a ingresar tu usuario y contraseña, y los datos se enviarán AUTOMÁTICAMENTE apenas entres."
+            "⚠️ TU SESIÓN HA VENCIDO\n\n" +
+            "Tus datos están GUARDADOS en el celular. Para enviarlos, necesitamos que inicies sesión de nuevo.\n\n" +
+            "Dale Aceptar y el sistema te llevará al login."
         );
-
-        // Redirigimos al logout para obligar al usuario a loguearse de nuevo
-        window.location.href = "/logout";
+        window.location.href = "/logout"; 
       }
     }
 
@@ -968,9 +961,14 @@
     //   ENVÍO POST CON OFFLINE-FALLBACK
     // ===================================================
     async function sendWithOffline(url, payload, onSuccess) {
-      // 1. Si está en modo offline manual, guardar y salir
+      // 1. MODO OFFLINE MANUAL
       if (typeof isForceOffline === "function" && isForceOffline()) {
         await enqueueOffline({ url, payload });
+        
+        // ACTIVAR AVISO VISUAL (IMPORTANTE)
+        if (typeof mostrarAvisoSyncPendiente === 'function') {
+            mostrarAvisoSyncPendiente();
+        }
 
         const fakeResponse = {
           success: true,
@@ -990,7 +988,7 @@
         return fakeResponse;
       }
 
-      // 2. Intento de envío normal
+      // 2. ENVÍO NORMAL
       try {
         const r = await fetch(url, {
           method: "POST",
@@ -999,43 +997,42 @@
         });
 
         const ct = (r.headers.get("content-type") || "").toLowerCase();
-
-        // Si no es JSON (ej. HTML de login o error de servidor), forzar error
+        
         if (!ct.includes("application/json")) {
-          throw new Error("non-json-response");
+            throw new Error("non-json-response");
         }
 
         const j = await r.json();
         if (!j.success) throw new Error(j.message || "Error servidor");
 
-        // Éxito real
         if (typeof onSuccess === "function") onSuccess(j);
         limpiarEstadoOperacion();
         return j;
 
       } catch (e) {
-        // 3. MANEJO DE ERROR Y REINTENTOS
+        // 3. FALLO DE RED
         const msg = String(e || "");
-
-        // Detectar si es error de conexión/red
+        
         const isNetworkError =
           !navigator.onLine ||
           msg.includes("Failed to fetch") ||
           msg.includes("NetworkError") ||
-          msg.includes("non-json-response") ||
+          msg.includes("non-json-response") || 
           msg.includes("Unexpected token <") ||
           msg.includes("Load failed");
 
         if (isNetworkError) {
-          console.warn("⚠️ Fallo de red. Iniciando protocolo de persistencia:", e);
+          console.warn("⚠️ Fallo de red. Iniciando persistencia:", e);
 
-          // A. Guardar en la cola (Seguridad)
+          // A. Guardar en cola
           await enqueueOffline({ url, payload });
 
-          // B. ACTIVAR AVISO VISUAL CON BOTÓN MANUAL (¡NUEVO!)
-          mostrarAvisoSyncPendiente();
+          // B. Mostrar botón rojo (IMPORTANTE)
+          if (typeof mostrarAvisoSyncPendiente === 'function') {
+              mostrarAvisoSyncPendiente();
+          }
 
-          // C. Respuesta visual al usuario ("Tranquilo, se guardó")
+          // C. Respuesta visual fake
           const fakeResponse = {
             success: true,
             offline: true,
@@ -1045,19 +1042,19 @@
           };
 
           if (typeof onSuccess === "function") {
-            onSuccess(fakeResponse);
+            onSuccess(fakeResponse); 
           } else {
             alert(fakeResponse.message);
             mostrarMenu();
           }
-
+          
           limpiarEstadoOperacion();
 
-          // D. ESTRATEGIA DE RÁFAGA AUTOMÁTICA
+          // D. Reintentos automáticos
           setTimeout(() => flushOfflineQueue(), 2000);
           setTimeout(() => flushOfflineQueue(), 5000);
           setTimeout(() => flushOfflineQueue(), 10000);
-
+          
           return fakeResponse;
         }
 
@@ -1065,7 +1062,7 @@
         throw e;
       }
     }
-
+    
     function leerQR(titulo) {
       return new Promise((resolve, reject) => {
         const menu = document.getElementById("menuOpciones");
