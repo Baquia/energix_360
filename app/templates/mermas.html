@@ -137,7 +137,7 @@
   <div id="step-decide" class="card hidden" style="text-align:center;">
     <div style="font-size:3rem; margin-bottom:10px;">✅</div>
     <h2>Ítem Registrado</h2>
-    <p>¿Desea agregar otro ítem?</p>
+    <p>¿Desea agregar otro ítem a esta factura?</p>
     <button class="btn btn-primary" onclick="nextItem(true)">Sí, agregar otro</button>
     <button class="btn btn-outline" onclick="nextItem(false)">No, terminar factura</button>
   </div>
@@ -191,14 +191,14 @@
     // --- LÓGICA DE CÁMARA INTEGRADA (BAJO PESO) ---
     async function openCamera() {
         try {
-            // Pedimos video de baja resolución (480p ideal, 240p minimo) para que pese poco
+            // Pedimos video de baja resolución (480p ideal, 240p minimo)
             const constraints = { 
                 video: { 
                     facingMode: "environment",
                     width: { ideal: 640 }, 
                     height: { ideal: 480 } 
                 }, 
-                audio: false // Sin audio para ahorrar más espacio
+                audio: false 
             };
             
             mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -218,19 +218,18 @@
 
     function startRecording() {
         recordedChunks = [];
-        // Intentar usar codecs eficientes si están disponibles
-        let options = { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 500000 }; // 0.5 Mbps
+        let options = { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 500000 }; 
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options = { mimeType: 'video/mp4', videoBitsPerSecond: 500000 }; // Fallback para iOS
+            options = { mimeType: 'video/mp4', videoBitsPerSecond: 500000 }; 
              if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options = {}; // Default del navegador
+                options = {}; 
              }
         }
 
         try {
             mediaRecorder = new MediaRecorder(mediaStream, options);
         } catch (e) {
-            mediaRecorder = new MediaRecorder(mediaStream); // Fallback total
+            mediaRecorder = new MediaRecorder(mediaStream);
         }
 
         mediaRecorder.ondataavailable = (event) => {
@@ -240,27 +239,29 @@
         mediaRecorder.onstop = async () => {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             finalVideoBlob = blob;
-            // Convertir a Base64 para envío
             finalVideoBase64 = await blobToBase64(blob);
             
-            // UI Feedback
             getEl('camera-container').style.display = 'none';
             getEl('btn-record').classList.add('hidden');
             getEl('video-status-text').innerText = `✅ Video grabado (${(blob.size/1024).toFixed(0)} KB)`;
             getEl('video-status-text').classList.add('success');
             
-            // Apagar cámara
-            mediaStream.getTracks().forEach(track => track.stop());
+            if(mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
         };
 
         mediaRecorder.start();
         getEl('rec-dot').style.display = 'block';
-        getEl('btn-record').disabled = true;
-        getEl('btn-record').innerText = "Grabando...";
+        
+        // UI grabando
+        const btnRec = getEl('btn-record');
+        btnRec.disabled = true;
+        btnRec.innerText = "Grabando...";
 
-        // Parar automáticamente a los 6 segundos
         setTimeout(() => {
-            if(mediaRecorder.state === 'recording') {
+            if(mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
                 getEl('rec-dot').style.display = 'none';
             }
@@ -297,14 +298,13 @@
                 img.src = event.target.result;
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800; // Reducir tamaño
+                    const MAX_WIDTH = 800; 
                     const scaleSize = MAX_WIDTH / img.width;
                     const width = (img.width > MAX_WIDTH) ? MAX_WIDTH : img.width;
                     const height = (img.width > MAX_WIDTH) ? (img.height * scaleSize) : img.height;
                     canvas.width = width; canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    // Calidad 60% JPEG
                     resolve(canvas.toDataURL('image/jpeg', 0.6));
                 };
             };
@@ -317,6 +317,37 @@
         reader.readAsDataURL(blob);
     });
 
+    // --- FUNCION DE LIMPIEZA DE CÁMARA (CORRECCIÓN) ---
+    function resetCameraUI() {
+        // 1. Limpiar variables
+        finalVideoBase64 = null;
+        processedFiles = { f1: null, f2: null };
+        mediaStream = null;
+        mediaRecorder = null;
+
+        // 2. Restaurar Textos y Clases de UI
+        const statusTxt = getEl('video-status-text');
+        statusTxt.innerText = "📹 Video requerido (Max 6 seg)";
+        statusTxt.classList.remove('success');
+
+        const btnOpen = getEl('btn-open-camera');
+        btnOpen.classList.remove('hidden');
+
+        const btnRec = getEl('btn-record');
+        btnRec.classList.add('hidden');
+        btnRec.disabled = false;       // <--- Importante: Reactivar botón
+        btnRec.innerText = "🔴 GRABAR (6s)"; // <--- Importante: Restaurar texto
+
+        getEl('camera-container').style.display = 'none';
+        getEl('rec-dot').style.display = 'none';
+
+        // 3. Limpiar Inputs Fotos
+        getEl('box_f1').classList.remove('file-loaded');
+        getEl('box_f2').classList.remove('file-loaded');
+        getEl('f_1').value = "";
+        getEl('f_2').value = "";
+    }
+
     // --- FLUJO DE NAVEGACIÓN ---
     function goToItems() {
         const cli = getEl('cliente_nit').value;
@@ -327,6 +358,7 @@
         HEADER_DATA = { cliente: cli, vehiculo: veh, factura: fac, total_kg: tot };
         getEl('lbl_info_header').innerText = `Fac: ${fac} | Veh: ${veh}`;
         IS_RETRY_MODE = false;
+        resetCameraUI(); // Asegurar limpieza al entrar
         showStep('step-item');
     }
 
@@ -353,6 +385,12 @@
             const payload = { ...HEADER_DATA, items: [itemPayload], is_retry: IS_RETRY_MODE, retry_id: RETRY_ITEM_ID };
 
             const r = await fetch('/mermas/registrar', { method: 'POST', body: JSON.stringify(payload) });
+            
+            // Manejo de HTML error response
+            if (!r.ok) {
+               throw new Error("Error del Servidor. Intente nuevamente.");
+            }
+
             const resp = await r.json();
             
             if(!resp.success) throw new Error(resp.message || "Error");
@@ -394,28 +432,17 @@
     function prepareRectification(id) {
         showStep('step-item');
         IS_RETRY_MODE = true; RETRY_ITEM_ID = id;
+        resetCameraUI(); // Limpiar UI para la nueva toma
+        
         getEl('item-title-text').innerText = "⚠️ RECTIFICAR";
         getEl('item-title-text').style.color = "#b45309";
         getEl('kg_f').value = ""; getEl('kg_e').value = "";
-        
-        // Reset evidences
-        finalVideoBase64 = null; processedFiles = {f1:null, f2:null};
-        getEl('video-status-text').innerText = "📹 Video requerido";
-        getEl('video-status-text').classList.remove('success');
-        getEl('btn-open-camera').classList.remove('hidden');
-        getEl('box_f1').classList.remove('file-loaded');
-        getEl('box_f2').classList.remove('file-loaded');
     }
 
     function nextItem(addAnother) {
         if(addAnother) {
             getEl('item_name').value = ""; getEl('kg_f').value = ""; getEl('kg_e').value = "";
-            finalVideoBase64 = null; processedFiles = {f1:null, f2:null};
-            getEl('video-status-text').innerText = "📹 Video requerido";
-            getEl('video-status-text').classList.remove('success');
-            getEl('btn-open-camera').classList.remove('hidden');
-            getEl('box_f1').classList.remove('file-loaded');
-            getEl('box_f2').classList.remove('file-loaded');
+            resetCameraUI(); // <--- AQUÍ SE CORRIGE EL BUG
             
             IS_RETRY_MODE = false;
             getEl('item-title-text').innerText = "📦 Agregar Ítem";
@@ -453,7 +480,7 @@
     }
 
     function sameClientNewInvoice() {
-        location.reload(); // Simplificado para recargar limpio
+        location.reload(); 
     }
   </script>
 </body>
