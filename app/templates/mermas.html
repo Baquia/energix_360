@@ -409,18 +409,31 @@
     }
 
     let pollInterval;
+    let pollInterval;
     function startPolling(fac) {
         if(pollInterval) clearInterval(pollInterval);
         pollInterval = setInterval(async () => {
             try {
                 const r = await fetch(`/mermas/check_status_live?factura=${fac}&nc=${Date.now()}`);
                 const d = await r.json();
+                
                 if(d.completed) {
                     clearInterval(pollInterval);
+
+                    // CASO 1: PRIMER RECHAZO (Controlador pide rectificar)
                     if(d.status === 'en_revision') {
                         alert("⚠️ SU PESAJE FUE OBJETADO. Rectifique.");
                         prepareRectification(d.id);
+                    
+                    // CASO 2: SEGUNDO RECHAZO (Controlador objeta definitivamente) -> NUEVA LÓGICA
+                    } else if (d.status === 'objetada') {
+                        alert("🚨 ATENCIÓN: La validación sigue NO CONFORME.\n\nEl registro se ha guardado, pero el caso pasará a INVESTIGACIÓN.\n\nPuede continuar con el siguiente ítem.");
+                        IS_RETRY_MODE = false;
+                        showStep('step-decide');
+
+                    // CASO 3: APROBADO (Todo OK)
                     } else {
+                        // Aquí entra 'aprobada' o 'validada'
                         IS_RETRY_MODE = false;
                         showStep('step-decide');
                     }
