@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <style>
-    :root { --primary: #015249; --primary-light: #e0f2f1; --accent: #2e7d32; --bg-body: #f8fafc; --text-dark: #1e293b; --text-gray: #64748b; --border-color: #cbd5e1; --radius: 12px; }
+    :root { --primary: #015249; --bg-body: #f8fafc; --text-dark: #1e293b; --border-color: #cbd5e1; --radius: 12px; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: var(--text-dark); margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
     
@@ -19,31 +19,36 @@
     .divider { width: 1px; height: 25px; background: var(--border-color); }
     .btn-logout { font-size: 0.75rem; color: #ef4444; text-decoration: none; font-weight: bold; }
 
-    .card { background: white; width: 100%; max-width: 500px; padding: 25px 20px; border-radius: var(--radius); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; animation: fadeIn 0.3s ease-out; }
-    @keyframes fadeIn { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
+    .card { background: white; width: 100%; max-width: 500px; padding: 25px 20px; border-radius: var(--radius); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; }
     .hidden { display: none !important; }
     h2 { color: var(--primary); font-size: 1.3rem; margin: 0 0 15px 0; text-align: center; }
     label { display: block; font-weight: 600; margin-bottom: 6px; margin-top: 15px; font-size: 0.9rem; }
     input, select { width: 100%; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; }
+    
     .btn { width: 100%; padding: 16px; font-size: 1rem; font-weight: 700; border-radius: 10px; border: none; cursor: pointer; margin-top: 25px; }
     .btn:disabled { background: #94a3b8; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); margin-top: 10px; }
+    .btn-danger { background: #b91c1c; color: white; margin-top: 10px; }
 
-    .upload-box { border: 2px dashed #cbd5e1; padding: 15px; text-align: center; border-radius: 8px; margin-top: 10px; position: relative; background: #fafafa; transition: all 0.2s; }
+    /* ESTILOS DE EVIDENCIA */
+    .upload-box { border: 2px dashed #cbd5e1; padding: 15px; text-align: center; border-radius: 8px; margin-top: 10px; position: relative; background: #fafafa; }
     .upload-box input { position: absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor: pointer; }
     .upload-box.file-loaded { background: #dcfce7; border-color: #16a34a; color: #166534; font-weight: bold; }
     .upload-box.file-loaded::after { content: "✅ Listo"; display: block; font-size: 0.8rem; margin-top: 5px; }
-    .upload-box.compressing { background: #fff7ed; border-color: #f97316; color: #c2410c; }
-    .upload-box.compressing::after { content: "⏳ Comprimiendo..."; }
+
+    /* ESTILOS CÁMARA WEB */
+    #camera-container { display: none; margin-top: 15px; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
+    #camera-preview { width: 100%; height: 250px; object-fit: cover; background: #000; }
+    .rec-indicator { position: absolute; top: 10px; right: 10px; background: red; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; animation: blink 1s infinite; display: none; }
+    @keyframes blink { 50% { opacity: 0.5; } }
+    
+    .video-status { font-size: 0.9rem; margin-top: 5px; text-align: center; color: #666; font-weight: bold; }
+    .video-status.success { color: #16a34a; }
 
     .summary-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
     .summary-table th { background: #f1f5f9; padding: 8px; text-align: left; }
     .summary-table td { border-bottom: 1px solid #eee; padding: 8px; }
-
-    .status-wait { text-align: center; padding: 40px 20px; }
-    .spinner { width: 48px; height: 48px; border: 5px solid #e2e8f0; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
     .info-bar { background: #f0fdf4; color: #15803d; padding: 10px; border-radius: 8px; text-align: center; font-size: 0.85rem; font-weight: bold; margin-bottom: 15px; }
   </style>
 </head>
@@ -93,20 +98,27 @@
         <div style="flex:1;"><label>Kg Entr.</label><input type="number" id="kg_e" step="0.01"></div>
     </div>
     
-    <label style="margin-top:20px;">Evidencias (Obligatorias)</label>
-    <div class="upload-box" id="box_vid">
-        📹 Video (Max 6 seg)
-        <input type="file" id="f_vid" accept="video/*" capture="environment" onchange="processFile(this, 'box_vid', 'video')">
-    </div>
+    <label style="margin-top:20px;">Evidencias</label>
     
+    <div style="border:1px solid #ddd; padding:10px; border-radius:8px; margin-bottom:10px;">
+        <div class="video-status" id="video-status-text">📹 Video requerido (Max 6 seg)</div>
+        
+        <button id="btn-open-camera" class="btn btn-outline" style="margin-top:5px; padding:10px;" onclick="openCamera()">Abrir Cámara</button>
+        
+        <div id="camera-container">
+            <video id="camera-preview" autoplay muted playsinline></video>
+            <div id="rec-dot" class="rec-indicator">GRABANDO</div>
+        </div>
+        
+        <button id="btn-record" class="btn btn-danger hidden" style="margin-top:5px; padding:10px;" onclick="startRecording()">🔴 GRABAR (6s)</button>
+    </div>
+
     <div style="display:flex; gap:10px;">
         <div class="upload-box" id="box_f1" style="flex:1;">
-            📸 Foto 1
-            <input type="file" id="f_1" accept="image/*" capture="environment" onchange="processFile(this, 'box_f1', 'image')">
+            📸 Foto 1 <input type="file" id="f_1" accept="image/*" capture="environment" onchange="processImage(this, 'box_f1')">
         </div>
         <div class="upload-box" id="box_f2" style="flex:1;">
-            📸 Foto 2
-            <input type="file" id="f_2" accept="image/*" capture="environment" onchange="processFile(this, 'box_f2', 'image')">
+            📸 Foto 2 <input type="file" id="f_2" accept="image/*" capture="environment" onchange="processImage(this, 'box_f2')">
         </div>
     </div>
     
@@ -114,18 +126,18 @@
   </div>
 
   <div id="step-wait" class="card hidden status-wait">
-    <div class="spinner"></div>
     <h3 style="color:#d97706;">Esperando Aprobación</h3>
+    <div style="font-size:3rem;">⏳</div>
     <p>La merma excede el límite permitido.</p>
     <div style="background:#fff7ed; padding:15px; border-radius:8px; color:#9a3412; font-size:0.9rem; margin-top:15px;">
-        El controlador está revisando su solicitud.<br>Por favor espere en esta pantalla.
+        El controlador está revisando su solicitud.
     </div>
   </div>
 
   <div id="step-decide" class="card hidden" style="text-align:center;">
     <div style="font-size:3rem; margin-bottom:10px;">✅</div>
     <h2>Ítem Registrado</h2>
-    <p>¿Desea agregar otro ítem a esta factura?</p>
+    <p>¿Desea agregar otro ítem?</p>
     <button class="btn btn-primary" onclick="nextItem(true)">Sí, agregar otro</button>
     <button class="btn btn-outline" onclick="nextItem(false)">No, terminar factura</button>
   </div>
@@ -133,9 +145,7 @@
   <div id="step-summary" class="card hidden">
     <h2>📄 Resumen Factura</h2>
     <div style="margin-bottom:10px; font-size:0.9rem;">
-        <b>Cliente:</b> <span id="sum_cli"></span><br>
-        <b>Factura:</b> <span id="sum_fac"></span><br>
-        <b>Total Kg Factura:</b> <span id="sum_kg_total"></span>
+        <b>Cliente:</b> <span id="sum_cli"></span> | <b>Factura:</b> <span id="sum_fac"></span>
     </div>
     <table class="summary-table">
         <thead><tr><th>Prod</th><th>Fact</th><th>Entr</th><th>%</th></tr></thead>
@@ -151,9 +161,9 @@
 
   <div id="step-next-inv" class="card hidden" style="text-align:center;">
     <h2>Factura Finalizada</h2>
-    <p>¿Desea agregar <b>otra factura</b> para el mismo cliente (<span id="next_cli_name"></span>)?</p>
+    <p>¿Otra factura para <b id="next_cli_name"></b>?</p>
     <button class="btn btn-primary" onclick="sameClientNewInvoice()">Sí, mismo cliente</button>
-    <button class="btn btn-outline" onclick="location.reload()">No, salir / otro cliente</button>
+    <button class="btn btn-outline" onclick="location.reload()">No, otro cliente</button>
   </div>
 
   <script>
@@ -162,12 +172,15 @@
     let IS_RETRY_MODE = false;
     let RETRY_ITEM_ID = null;
     
-    // Almacenamiento temporal de archivos procesados (Base64 optimizado)
-    let processedFiles = {
-        vid: null,
-        f1: null,
-        f2: null
-    };
+    // Variables para archivos
+    let finalVideoBlob = null;
+    let finalVideoBase64 = null;
+    let processedFiles = { f1: null, f2: null };
+    
+    // Variables de cámara
+    let mediaStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
 
     const getEl = id => document.getElementById(id);
     const showStep = (id) => {
@@ -175,54 +188,106 @@
         getEl(id).classList.remove('hidden');
     };
 
-    // --- PROCESAMIENTO INTELIGENTE DE ARCHIVOS ---
-    async function processFile(input, boxId, type) {
-        const box = getEl(boxId);
-        const file = input.files[0];
-        
-        // Limpiar estado previo
-        box.classList.remove('file-loaded', 'compressing');
-        if(boxId === 'box_vid') processedFiles.vid = null;
-        if(boxId === 'box_f1') processedFiles.f1 = null;
-        if(boxId === 'box_f2') processedFiles.f2 = null;
-
-        if (!file) return;
-
-        // 1. VALIDACIÓN DE VIDEO (TAMAÑO)
-        if (type === 'video') {
-            const maxSizeMB = 8; // Límite estricto de 8MB (~6 seg en HD o 10 seg en SD)
-            if (file.size > maxSizeMB * 1024 * 1024) {
-                alert(`⚠️ EL VIDEO ES MUY PESADO (${(file.size/1024/1024).toFixed(1)}MB).\n\nEl límite es ${maxSizeMB}MB (aprox 6 segundos).\n\nPor favor grabe un video más corto.`);
-                input.value = ""; // Borrar input
-                return;
-            }
-            // Si pasa, convertimos a base64 tal cual
-            box.classList.add('compressing');
-            try {
-                processedFiles.vid = await toBase64(file);
-                box.classList.remove('compressing');
-                box.classList.add('file-loaded');
-            } catch(e) { alert("Error leyendo video"); }
-        }
-
-        // 2. COMPRESIÓN DE IMAGEN (CANVAS)
-        if (type === 'image') {
-            box.classList.add('compressing');
-            try {
-                const compressedBase64 = await compressImage(file);
-                if(boxId === 'box_f1') processedFiles.f1 = compressedBase64;
-                if(boxId === 'box_f2') processedFiles.f2 = compressedBase64;
-                
-                box.classList.remove('compressing');
-                box.classList.add('file-loaded');
-            } catch (e) {
-                alert("Error procesando imagen: " + e);
-                input.value = "";
-            }
+    // --- LÓGICA DE CÁMARA INTEGRADA (BAJO PESO) ---
+    async function openCamera() {
+        try {
+            // Pedimos video de baja resolución (480p ideal, 240p minimo) para que pese poco
+            const constraints = { 
+                video: { 
+                    facingMode: "environment",
+                    width: { ideal: 640 }, 
+                    height: { ideal: 480 } 
+                }, 
+                audio: false // Sin audio para ahorrar más espacio
+            };
+            
+            mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+            const videoEl = getEl('camera-preview');
+            videoEl.srcObject = mediaStream;
+            
+            getEl('camera-container').style.display = 'block';
+            getEl('btn-open-camera').classList.add('hidden');
+            getEl('btn-record').classList.remove('hidden');
+            getEl('video-status-text').innerText = "Encuadre y presione GRABAR";
+            
+        } catch (err) {
+            alert("No se pudo acceder a la cámara. Asegúrese de dar permisos.");
+            console.error(err);
         }
     }
 
-    // Utilidad: Redimensionar y comprimir imagen
+    function startRecording() {
+        recordedChunks = [];
+        // Intentar usar codecs eficientes si están disponibles
+        let options = { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 500000 }; // 0.5 Mbps
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/mp4', videoBitsPerSecond: 500000 }; // Fallback para iOS
+             if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = {}; // Default del navegador
+             }
+        }
+
+        try {
+            mediaRecorder = new MediaRecorder(mediaStream, options);
+        } catch (e) {
+            mediaRecorder = new MediaRecorder(mediaStream); // Fallback total
+        }
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) recordedChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            finalVideoBlob = blob;
+            // Convertir a Base64 para envío
+            finalVideoBase64 = await blobToBase64(blob);
+            
+            // UI Feedback
+            getEl('camera-container').style.display = 'none';
+            getEl('btn-record').classList.add('hidden');
+            getEl('video-status-text').innerText = `✅ Video grabado (${(blob.size/1024).toFixed(0)} KB)`;
+            getEl('video-status-text').classList.add('success');
+            
+            // Apagar cámara
+            mediaStream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        getEl('rec-dot').style.display = 'block';
+        getEl('btn-record').disabled = true;
+        getEl('btn-record').innerText = "Grabando...";
+
+        // Parar automáticamente a los 6 segundos
+        setTimeout(() => {
+            if(mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                getEl('rec-dot').style.display = 'none';
+            }
+        }, 6000);
+    }
+
+    // --- PROCESAMIENTO DE FOTOS (COMPRESIÓN) ---
+    async function processImage(input, boxId) {
+        const file = input.files[0];
+        if (!file) return;
+        
+        const box = getEl(boxId);
+        box.style.opacity = '0.5';
+        
+        try {
+            const compressed = await compressImage(file);
+            if(boxId === 'box_f1') processedFiles.f1 = compressed;
+            if(boxId === 'box_f2') processedFiles.f2 = compressed;
+            
+            box.classList.add('file-loaded');
+            box.style.opacity = '1';
+        } catch (e) {
+            alert("Error procesando imagen");
+            box.style.opacity = '1';
+        }
+    }
+
     function compressImage(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -232,51 +297,35 @@
                 img.src = event.target.result;
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800; // Reducir ancho máximo
+                    const MAX_WIDTH = 800; // Reducir tamaño
                     const scaleSize = MAX_WIDTH / img.width;
                     const width = (img.width > MAX_WIDTH) ? MAX_WIDTH : img.width;
                     const height = (img.width > MAX_WIDTH) ? (img.height * scaleSize) : img.height;
-
-                    canvas.width = width;
-                    canvas.height = height;
+                    canvas.width = width; canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    
-                    // Comprimir a JPEG calidad 0.6 (60%)
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                    resolve(dataUrl);
+                    // Calidad 60% JPEG
+                    resolve(canvas.toDataURL('image/jpeg', 0.6));
                 };
-                img.onerror = (e) => reject(e);
             };
-            reader.onerror = (e) => reject(e);
         });
     }
 
-    const toBase64 = file => new Promise((resolve, reject) => {
+    const blobToBase64 = blob => new Promise((resolve, _) => {
         const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
     });
 
-    function resetFileBoxes() {
-        ['box_vid', 'box_f1', 'box_f2'].forEach(id => {
-            getEl(id).classList.remove('file-loaded', 'compressing');
-        });
-        ['f_vid', 'f_1', 'f_2'].forEach(id => getEl(id).value = "");
-        processedFiles = { vid: null, f1: null, f2: null };
-    }
-
-    // --- FLUJO PRINCIPAL ---
-
+    // --- FLUJO DE NAVEGACIÓN ---
     function goToItems() {
         const cli = getEl('cliente_nit').value;
         const veh = getEl('vehiculo').value;
         const fac = getEl('factura').value;
         const tot = getEl('total_factura_kg').value;
-        if(!cli || !veh || !fac || !tot) return alert("Complete todos los datos de la cabecera (incluyendo Total Kg).");
+        if(!cli || !veh || !fac || !tot) return alert("Complete los datos del viaje.");
         HEADER_DATA = { cliente: cli, vehiculo: veh, factura: fac, total_kg: tot };
-        getEl('lbl_info_header').innerText = `Factura: ${fac} | Vehículo: ${veh}`;
+        getEl('lbl_info_header').innerText = `Fac: ${fac} | Veh: ${veh}`;
         IS_RETRY_MODE = false;
         showStep('step-item');
     }
@@ -286,39 +335,27 @@
         const kgf = parseFloat(getEl('kg_f').value);
         const kge = parseFloat(getEl('kg_e').value);
 
-        if(!prod || isNaN(kgf) || isNaN(kge)) return alert("Datos del ítem incompletos.");
-        
-        // Verificar que los archivos ya se procesaron
-        if(!processedFiles.vid || !processedFiles.f1 || !processedFiles.f2) {
-            return alert("Faltan evidencias o aún se están procesando (espere a que digan '✅ Listo').");
-        }
+        if(!prod || isNaN(kgf) || isNaN(kge)) return alert("Complete los datos del ítem.");
+        if(!finalVideoBase64) return alert("Debe grabar el video de evidencia.");
+        if(!processedFiles.f1 || !processedFiles.f2) return alert("Debe tomar las 2 fotos.");
 
         const btn = getEl('btn-submit-item');
-        const originalText = IS_RETRY_MODE ? "Rectificar Ítem" : "Registrar Ítem";
-        btn.innerHTML = "⏳ Enviando..."; btn.disabled = true;
+        const originalText = btn.innerText;
+        btn.innerText = "Enviando..."; btn.disabled = true;
 
         try {
-            // Usamos los archivos YA PROCESADOS Y COMPRIMIDOS
             const itemPayload = { 
-                item: prod, 
-                kg_facturados: kgf, 
-                kg_entregados: kge, 
-                evidencia_url: processedFiles.vid, 
+                item: prod, kg_facturados: kgf, kg_entregados: kge, 
+                evidencia_url: finalVideoBase64, 
                 evidencia_url2: processedFiles.f1, 
                 evidencia_url3: processedFiles.f2 
             };
             const payload = { ...HEADER_DATA, items: [itemPayload], is_retry: IS_RETRY_MODE, retry_id: RETRY_ITEM_ID };
 
             const r = await fetch('/mermas/registrar', { method: 'POST', body: JSON.stringify(payload) });
-            
-            // Manejo de errores de servidor (HTML response)
-            if (!r.ok) {
-                const txt = await r.text();
-                throw new Error("Error del Servidor: Es posible que el video siga siendo muy pesado. Intente grabar menos tiempo.");
-            }
-
             const resp = await r.json();
-            if(!resp.success) throw new Error(resp.message || "Error desconocido");
+            
+            if(!resp.success) throw new Error(resp.message || "Error");
 
             if(IS_RETRY_MODE) CURRENT_ITEMS_LOCAL.pop(); 
             CURRENT_ITEMS_LOCAL.push({ prod, kgf, kge, merma: kgf-kge, pct: ((kgf-kge)/kgf)*100 });
@@ -330,17 +367,12 @@
                 IS_RETRY_MODE = false;
                 showStep('step-decide');
             }
-        } catch(e) { 
-            alert("Error: " + e.message); 
-        } finally { 
-            btn.innerHTML = originalText; btn.disabled = false; 
-        }
+        } catch(e) { alert("Error: " + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
     }
 
     let pollInterval;
     function startPolling(fac) {
         if(pollInterval) clearInterval(pollInterval);
-        // Polling optimizado a 5 segundos
         pollInterval = setInterval(async () => {
             try {
                 const r = await fetch(`/mermas/check_status_live?factura=${fac}&nc=${Date.now()}`);
@@ -348,19 +380,11 @@
                 if(d.completed) {
                     clearInterval(pollInterval);
                     if(d.status === 'en_revision') {
-                        alert("⚠️ SU PESAJE FUE OBJETADO. Por favor, vuelva a pesar el producto asegurando que la báscula esté en ceros y suba nuevas evidencias.");
+                        alert("⚠️ SU PESAJE FUE OBJETADO. Rectifique.");
                         prepareRectification(d.id);
-                    } else if (d.status === 'objetada') {
-                        alert("⚠️ MERMA EN AUDITORÍA. El sistema permite continuar, pero el caso queda bajo investigación.");
-                        IS_RETRY_MODE = false;
-                        showStep('step-decide');
-                    } else if (d.status === 'rechazada') {
-                        alert("❌ MERMA RECHAZADA.");
-                        IS_RETRY_MODE = false;
-                        showStep('step-decide');
                     } else {
                         IS_RETRY_MODE = false;
-                        showStep('step-decide'); 
+                        showStep('step-decide');
                     }
                 }
             } catch(e) {}
@@ -369,26 +393,33 @@
 
     function prepareRectification(id) {
         showStep('step-item');
-        IS_RETRY_MODE = true;
-        RETRY_ITEM_ID = id;
-        getEl('item-title-text').innerText = "⚠️ RECTIFICAR: VUELVA A PESAR";
+        IS_RETRY_MODE = true; RETRY_ITEM_ID = id;
+        getEl('item-title-text').innerText = "⚠️ RECTIFICAR";
         getEl('item-title-text').style.color = "#b45309";
-        getEl('btn-submit-item').innerText = "Reenviar Rectificación";
-        resetFileBoxes();
-        getEl('kg_f').value = "";
-        getEl('kg_e').value = "";
+        getEl('kg_f').value = ""; getEl('kg_e').value = "";
+        
+        // Reset evidences
+        finalVideoBase64 = null; processedFiles = {f1:null, f2:null};
+        getEl('video-status-text').innerText = "📹 Video requerido";
+        getEl('video-status-text').classList.remove('success');
+        getEl('btn-open-camera').classList.remove('hidden');
+        getEl('box_f1').classList.remove('file-loaded');
+        getEl('box_f2').classList.remove('file-loaded');
     }
 
     function nextItem(addAnother) {
         if(addAnother) {
-            getEl('item_name').value = "";
-            getEl('kg_f').value = "";
-            getEl('kg_e').value = "";
-            resetFileBoxes();
+            getEl('item_name').value = ""; getEl('kg_f').value = ""; getEl('kg_e').value = "";
+            finalVideoBase64 = null; processedFiles = {f1:null, f2:null};
+            getEl('video-status-text').innerText = "📹 Video requerido";
+            getEl('video-status-text').classList.remove('success');
+            getEl('btn-open-camera').classList.remove('hidden');
+            getEl('box_f1').classList.remove('file-loaded');
+            getEl('box_f2').classList.remove('file-loaded');
+            
             IS_RETRY_MODE = false;
             getEl('item-title-text').innerText = "📦 Agregar Ítem";
             getEl('item-title-text').style.color = "var(--primary)";
-            getEl('btn-submit-item').innerText = "Registrar Ítem";
             showStep('step-item');
         } else {
             buildSummary();
@@ -399,39 +430,30 @@
     function buildSummary() {
         getEl('sum_cli').innerText = HEADER_DATA.cliente;
         getEl('sum_fac').innerText = HEADER_DATA.factura;
-        getEl('sum_kg_total').innerText = HEADER_DATA.total_kg; 
         const tbody = getEl('table_body');
         tbody.innerHTML = '';
         let totalMerma = 0;
         CURRENT_ITEMS_LOCAL.forEach(it => {
             totalMerma += it.merma;
-            tbody.innerHTML += `<tr><td>${it.prod}</td><td>${it.kgf}</td><td>${it.kge}</td><td style="color:${it.pct>2?'#b91c1c':'#15803d'}">${it.pct.toFixed(1)}%</td></tr>`;
+            tbody.innerHTML += `<tr><td>${it.prod}</td><td>${it.kgf}</td><td>${it.kge}</td><td>${it.pct.toFixed(1)}%</td></tr>`;
         });
         getEl('total_merma_kg').innerText = totalMerma.toFixed(2);
     }
 
     async function finishInvoice() {
         const nota = getEl('nota_general').value;
-        if(!nota) return alert("Debe ingresar el número de la Nota General.");
+        if(!nota) return alert("Ingrese Nota General");
         const btn = document.querySelector('#step-summary .btn-primary');
-        btn.innerHTML = "Finalizando..."; btn.disabled = true;
+        btn.innerText = "Finalizando..."; btn.disabled = true;
         try {
             await fetch('/mermas/finalizar_con_nota', { method: 'POST', body: JSON.stringify({ factura: HEADER_DATA.factura, nota: nota }) });
             getEl('next_cli_name').innerText = HEADER_DATA.cliente;
             showStep('step-next-inv');
-        } catch(e) { alert("Error al finalizar. Intente nuevamente."); } finally { btn.innerHTML = "TERMINAR FACTURA"; btn.disabled = false; }
+        } catch(e) { alert("Error"); } finally { btn.innerText = "TERMINAR"; btn.disabled = false; }
     }
 
     function sameClientNewInvoice() {
-        getEl('factura').value = "";
-        getEl('total_factura_kg').value = ""; 
-        getEl('item_name').value = "";
-        getEl('kg_f').value = "";
-        getEl('kg_e').value = "";
-        resetFileBoxes();
-        CURRENT_ITEMS_LOCAL = []; 
-        IS_RETRY_MODE = false;
-        showStep('step-header');
+        location.reload(); // Simplificado para recargar limpio
     }
   </script>
 </body>
