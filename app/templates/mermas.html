@@ -33,7 +33,9 @@
     .upload-box { border: 2px dashed #cbd5e1; padding: 15px; text-align: center; border-radius: 8px; margin-top: 10px; position: relative; background: #fafafa; transition: all 0.2s; }
     .upload-box input { position: absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor: pointer; }
     .upload-box.file-loaded { background: #dcfce7; border-color: #16a34a; color: #166534; font-weight: bold; }
-    .upload-box.file-loaded::after { content: "✅ Cargado"; display: block; font-size: 0.8rem; margin-top: 5px; }
+    .upload-box.file-loaded::after { content: "✅ Listo"; display: block; font-size: 0.8rem; margin-top: 5px; }
+    .upload-box.compressing { background: #fff7ed; border-color: #f97316; color: #c2410c; }
+    .upload-box.compressing::after { content: "⏳ Comprimiendo..."; }
 
     .summary-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
     .summary-table th { background: #f1f5f9; padding: 8px; text-align: left; }
@@ -90,12 +92,24 @@
         <div style="flex:1;"><label>Kg Fact.</label><input type="number" id="kg_f" step="0.01"></div>
         <div style="flex:1;"><label>Kg Entr.</label><input type="number" id="kg_e" step="0.01"></div>
     </div>
+    
     <label style="margin-top:20px;">Evidencias (Obligatorias)</label>
-    <div class="upload-box" id="box_vid">📹 Video <input type="file" id="f_vid" accept="video/*" capture="environment" onchange="handleFile(this, 'box_vid')"></div>
-    <div style="display:flex; gap:10px;">
-        <div class="upload-box" id="box_f1" style="flex:1;">📸 Foto 1 <input type="file" id="f_1" accept="image/*" capture="environment" onchange="handleFile(this, 'box_f1')"></div>
-        <div class="upload-box" id="box_f2" style="flex:1;">📸 Foto 2 <input type="file" id="f_2" accept="image/*" capture="environment" onchange="handleFile(this, 'box_f2')"></div>
+    <div class="upload-box" id="box_vid">
+        📹 Video (Max 6 seg)
+        <input type="file" id="f_vid" accept="video/*" capture="environment" onchange="processFile(this, 'box_vid', 'video')">
     </div>
+    
+    <div style="display:flex; gap:10px;">
+        <div class="upload-box" id="box_f1" style="flex:1;">
+            📸 Foto 1
+            <input type="file" id="f_1" accept="image/*" capture="environment" onchange="processFile(this, 'box_f1', 'image')">
+        </div>
+        <div class="upload-box" id="box_f2" style="flex:1;">
+            📸 Foto 2
+            <input type="file" id="f_2" accept="image/*" capture="environment" onchange="processFile(this, 'box_f2', 'image')">
+        </div>
+    </div>
+    
     <button id="btn-submit-item" class="btn btn-primary" onclick="submitItem()">Registrar Ítem</button>
   </div>
 
@@ -147,12 +161,97 @@
     let CURRENT_ITEMS_LOCAL = []; 
     let IS_RETRY_MODE = false;
     let RETRY_ITEM_ID = null;
+    
+    // Almacenamiento temporal de archivos procesados (Base64 optimizado)
+    let processedFiles = {
+        vid: null,
+        f1: null,
+        f2: null
+    };
 
     const getEl = id => document.getElementById(id);
     const showStep = (id) => {
         ['step-header', 'step-item', 'step-wait', 'step-decide', 'step-summary', 'step-next-inv'].forEach(sid => getEl(sid).classList.add('hidden'));
         getEl(id).classList.remove('hidden');
     };
+
+    // --- PROCESAMIENTO INTELIGENTE DE ARCHIVOS ---
+    async function processFile(input, boxId, type) {
+        const box = getEl(boxId);
+        const file = input.files[0];
+        
+        // Limpiar estado previo
+        box.classList.remove('file-loaded', 'compressing');
+        if(boxId === 'box_vid') processedFiles.vid = null;
+        if(boxId === 'box_f1') processedFiles.f1 = null;
+        if(boxId === 'box_f2') processedFiles.f2 = null;
+
+        if (!file) return;
+
+        // 1. VALIDACIÓN DE VIDEO (TAMAÑO)
+        if (type === 'video') {
+            const maxSizeMB = 8; // Límite estricto de 8MB (~6 seg en HD o 10 seg en SD)
+            if (file.size > maxSizeMB * 1024 * 1024) {
+                alert(`⚠️ EL VIDEO ES MUY PESADO (${(file.size/1024/1024).toFixed(1)}MB).\n\nEl límite es ${maxSizeMB}MB (aprox 6 segundos).\n\nPor favor grabe un video más corto.`);
+                input.value = ""; // Borrar input
+                return;
+            }
+            // Si pasa, convertimos a base64 tal cual
+            box.classList.add('compressing');
+            try {
+                processedFiles.vid = await toBase64(file);
+                box.classList.remove('compressing');
+                box.classList.add('file-loaded');
+            } catch(e) { alert("Error leyendo video"); }
+        }
+
+        // 2. COMPRESIÓN DE IMAGEN (CANVAS)
+        if (type === 'image') {
+            box.classList.add('compressing');
+            try {
+                const compressedBase64 = await compressImage(file);
+                if(boxId === 'box_f1') processedFiles.f1 = compressedBase64;
+                if(boxId === 'box_f2') processedFiles.f2 = compressedBase64;
+                
+                box.classList.remove('compressing');
+                box.classList.add('file-loaded');
+            } catch (e) {
+                alert("Error procesando imagen: " + e);
+                input.value = "";
+            }
+        }
+    }
+
+    // Utilidad: Redimensionar y comprimir imagen
+    function compressImage(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800; // Reducir ancho máximo
+                    const scaleSize = MAX_WIDTH / img.width;
+                    const width = (img.width > MAX_WIDTH) ? MAX_WIDTH : img.width;
+                    const height = (img.width > MAX_WIDTH) ? (img.height * scaleSize) : img.height;
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Comprimir a JPEG calidad 0.6 (60%)
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    resolve(dataUrl);
+                };
+                img.onerror = (e) => reject(e);
+            };
+            reader.onerror = (e) => reject(e);
+        });
+    }
+
     const toBase64 = file => new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -160,17 +259,15 @@
         reader.onerror = error => reject(error);
     });
 
-    function handleFile(input, boxId) {
-        if(input.files && input.files[0]) {
-            document.getElementById(boxId).classList.add('file-loaded');
-        } else {
-            document.getElementById(boxId).classList.remove('file-loaded');
-        }
-    }
     function resetFileBoxes() {
-        ['box_vid', 'box_f1', 'box_f2'].forEach(id => getEl(id).classList.remove('file-loaded'));
+        ['box_vid', 'box_f1', 'box_f2'].forEach(id => {
+            getEl(id).classList.remove('file-loaded', 'compressing');
+        });
         ['f_vid', 'f_1', 'f_2'].forEach(id => getEl(id).value = "");
+        processedFiles = { vid: null, f1: null, f2: null };
     }
+
+    // --- FLUJO PRINCIPAL ---
 
     function goToItems() {
         const cli = getEl('cliente_nit').value;
@@ -188,23 +285,38 @@
         const prod = getEl('item_name').value;
         const kgf = parseFloat(getEl('kg_f').value);
         const kge = parseFloat(getEl('kg_e').value);
-        const fv = getEl('f_vid').files[0];
-        const f1 = getEl('f_1').files[0];
-        const f2 = getEl('f_2').files[0];
 
         if(!prod || isNaN(kgf) || isNaN(kge)) return alert("Datos del ítem incompletos.");
-        if(!fv || !f1 || !f2) return alert("Debe cargar Video y 2 Fotos.");
+        
+        // Verificar que los archivos ya se procesaron
+        if(!processedFiles.vid || !processedFiles.f1 || !processedFiles.f2) {
+            return alert("Faltan evidencias o aún se están procesando (espere a que digan '✅ Listo').");
+        }
 
         const btn = getEl('btn-submit-item');
         const originalText = IS_RETRY_MODE ? "Rectificar Ítem" : "Registrar Ítem";
         btn.innerHTML = "⏳ Enviando..."; btn.disabled = true;
 
         try {
-            const [bVid, bFoto1, bFoto2] = await Promise.all([toBase64(fv), toBase64(f1), toBase64(f2)]);
-            const itemPayload = { item: prod, kg_facturados: kgf, kg_entregados: kge, evidencia_url: bVid, evidencia_url2: bFoto1, evidencia_url3: bFoto2 };
+            // Usamos los archivos YA PROCESADOS Y COMPRIMIDOS
+            const itemPayload = { 
+                item: prod, 
+                kg_facturados: kgf, 
+                kg_entregados: kge, 
+                evidencia_url: processedFiles.vid, 
+                evidencia_url2: processedFiles.f1, 
+                evidencia_url3: processedFiles.f2 
+            };
             const payload = { ...HEADER_DATA, items: [itemPayload], is_retry: IS_RETRY_MODE, retry_id: RETRY_ITEM_ID };
 
             const r = await fetch('/mermas/registrar', { method: 'POST', body: JSON.stringify(payload) });
+            
+            // Manejo de errores de servidor (HTML response)
+            if (!r.ok) {
+                const txt = await r.text();
+                throw new Error("Error del Servidor: Es posible que el video siga siendo muy pesado. Intente grabar menos tiempo.");
+            }
+
             const resp = await r.json();
             if(!resp.success) throw new Error(resp.message || "Error desconocido");
 
@@ -218,12 +330,17 @@
                 IS_RETRY_MODE = false;
                 showStep('step-decide');
             }
-        } catch(e) { alert("Error: " + e.message); } finally { btn.innerHTML = originalText; btn.disabled = false; }
+        } catch(e) { 
+            alert("Error: " + e.message); 
+        } finally { 
+            btn.innerHTML = originalText; btn.disabled = false; 
+        }
     }
 
     let pollInterval;
     function startPolling(fac) {
         if(pollInterval) clearInterval(pollInterval);
+        // Polling optimizado a 5 segundos
         pollInterval = setInterval(async () => {
             try {
                 const r = await fetch(`/mermas/check_status_live?factura=${fac}&nc=${Date.now()}`);
@@ -231,7 +348,6 @@
                 if(d.completed) {
                     clearInterval(pollInterval);
                     if(d.status === 'en_revision') {
-                        // AQUÍ ESTÁ EL MENSAJE CLAVE PARA EL OPERADOR
                         alert("⚠️ SU PESAJE FUE OBJETADO. Por favor, vuelva a pesar el producto asegurando que la báscula esté en ceros y suba nuevas evidencias.");
                         prepareRectification(d.id);
                     } else if (d.status === 'objetada') {
