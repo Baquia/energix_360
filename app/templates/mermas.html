@@ -1,791 +1,322 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-  <meta charset="UTF-8" />
-  <title>Control de Mermas - Registro</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <meta charset="UTF-8">
+  <title>Registro Mermas | BQA ONE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#015249">
-  <script src="/static/js/html5-qrcode.min.js"></script>
-
-
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
   <style>
-    :root {
-      --color-primary: #015249;
-      --color-primary-dark: #013d36;
-      --color-bg: #f6f7f8;
-      --color-surface: #ffffff;
-      --color-border: #e5e7eb;
-      --color-text: #111827;
-      --color-muted: #6b7280;
-      --color-ok: #1a7f37;
-      --color-warn: #b8860b;
-      --color-danger: #b00020;
-      --color-danger-dark: #8f0017;
-      --shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.08);
-      --radius-card: 16px;
-    }
+    :root { --primary: #015249; --primary-light: #e0f2f1; --accent: #2e7d32; --bg-body: #f8fafc; --text-dark: #1e293b; --text-gray: #64748b; --border-color: #cbd5e1; --radius: 12px; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: var(--text-dark); margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+    
+    .app-header { width: 100%; max-width: 500px; background: white; padding: 12px 20px; border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 3px solid var(--primary); }
+    .logos-container { display: flex; align-items: center; gap: 15px; }
+    .logo-img { height: 35px; width: auto; object-fit: contain; }
+    .divider { width: 1px; height: 25px; background: var(--border-color); }
+    .btn-logout { font-size: 0.75rem; color: #ef4444; text-decoration: none; font-weight: bold; }
 
-    * {
-      box-sizing: border-box;
-    }
+    .card { background: white; width: 100%; max-width: 500px; padding: 25px 20px; border-radius: var(--radius); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
+    .hidden { display: none !important; }
+    h2 { color: var(--primary); font-size: 1.3rem; margin: 0 0 15px 0; text-align: center; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; margin-top: 15px; font-size: 0.9rem; }
+    input, select { width: 100%; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; }
+    .btn { width: 100%; padding: 16px; font-size: 1rem; font-weight: 700; border-radius: 10px; border: none; cursor: pointer; margin-top: 25px; }
+    .btn:disabled { background: #94a3b8; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); margin-top: 10px; }
 
-    body {
-      margin: 0;
-      font-family: Verdana, Geneva, Tahoma, sans-serif;
-      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
-      color: var(--color-text);
-      padding: 16px 12px 40px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-    }
+    .upload-box { border: 2px dashed #cbd5e1; padding: 15px; text-align: center; border-radius: 8px; margin-top: 10px; position: relative; background: #fafafa; transition: all 0.2s; }
+    .upload-box input { position: absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor: pointer; }
+    .upload-box.file-loaded { background: #dcfce7; border-color: #16a34a; color: #166534; font-weight: bold; }
+    .upload-box.file-loaded::after { content: "✅ Cargado"; display: block; font-size: 0.8rem; margin-top: 5px; }
 
-    /* Header logos + logout */
-    .headerbar {
-      width: 100%;
-      max-width: 980px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
+    .summary-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+    .summary-table th { background: #f1f5f9; padding: 8px; text-align: left; }
+    .summary-table td { border-bottom: 1px solid #eee; padding: 8px; }
 
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .header .logo {
-      max-height: 54px;
-      width: auto;
-      object-fit: contain;
-      max-width: 48%;
-    }
-
-    .logout-area {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-    }
-
-    /* Wrapper principal tipo tarjeta */
-    .wrap {
-      width: 100%;
-      max-width: 980px;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-card);
-      box-shadow: var(--shadow-soft);
-      padding: 18px 16px 90px 16px;
-    }
-
-    h1 {
-      color: var(--color-primary-dark);
-      font-size: 1.25rem;
-      margin: 10px 0 8px;
-      font-weight: 700;
-    }
-
-    .card {
-      background: #ffffff;
-      border: 1px solid var(--color-border);
-      border-radius: 14px;
-      padding: 14px 14px 16px;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-      margin-bottom: 16px;
-    }
-
-    .row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 6px;
-    }
-
-    .col {
-      flex: 1 1 240px;
-      min-width: 240px;
-    }
-
-    .note {
-      font-size: 0.85rem;
-      color: var(--color-muted);
-    }
-
-    /* Inputs */
-    .inp,
-    select {
-      width: 100%;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--color-border);
-      font-size: 0.9rem;
-      outline: none;
-      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
-      background: #ffffff;
-    }
-
-    .inp:focus,
-    select:focus {
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 2px rgba(1, 82, 73, 0.20);
-    }
-
-    /* Botones */
-    .btn {
-      border-radius: 999px;
-      border: 1px solid transparent;
-      padding: 10px 16px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background .15s, box-shadow .15s, transform .05s, color .15s;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-    }
-
-    .btn.primary {
-      background: var(--color-primary);
-      color: #fff;
-      border-color: var(--color-primary);
-    }
-
-    .btn.primary:hover {
-      background: var(--color-primary-dark);
-      box-shadow: 0 6px 18px rgba(1, 82, 73, .35);
-      transform: translateY(-1px);
-    }
-
-    .btn.secondary {
-      background: #f3f4f6;
-      color: var(--color-text);
-      border-color: #e5e7eb;
-    }
-
-    .btn.secondary:hover {
-      background: #e5e7eb;
-    }
-
-    .btn.warn {
-      background: #f6c65b;
-      color: #000;
-      border: 1px solid #e3b340;
-    }
-
-    .btn.danger {
-      background: var(--color-danger);
-      color: #fff;
-      border-color: var(--color-danger);
-    }
-
-    .btn.danger:hover {
-      background: var(--color-danger-dark);
-    }
-
-    .btn.logout {
-      background: var(--color-danger);
-      color: #fff;
-      border-color: var(--color-danger);
-      font-size: 0.85rem;
-      padding: 8px 14px;
-    }
-
-    .btn.logout:hover {
-      background: var(--color-danger-dark);
-      box-shadow: 0 4px 10px rgba(176, 0, 32, 0.35);
-    }
-
-    /* Pasos */
-    .step {
-      display: none;
-    }
-
-    .step.active {
-      display: block;
-    }
-
-    .footer {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 12px;
-      flex-wrap: wrap;
-    }
-
-    /* Caja de confirmación */
-    .confirm {
-      background: #f9fafb;
-      border: 1px dashed var(--color-border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin-top: 10px;
-      color: var(--color-text);
-      font-size: 0.88rem;
-    }
-
-    .muted {
-      color: var(--color-muted);
-    }
-
-    /* Imagen */
-    .imgbox {
-      width: 100%;
-      height: 260px;
-      border-radius: 14px;
-      border: 1px solid var(--color-border);
-      margin-top: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #fafafa;
-      overflow: hidden;
-      font-size: 0.88rem;
-      color: var(--color-muted);
-    }
-
-    .imgbox img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-
-    /* Spinner */
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid #cbd5e1;
-      border-top-color: #334155;
-      border-radius: 50%;
-      display: inline-block;
-      animation: spin .8s linear infinite;
-      vertical-align: -3px;
-      margin-right: 6px;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    /* Responsive */
-    @media (max-width: 560px) {
-      .headerbar {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-      }
-
-      .header .logo {
-        max-height: 46px;
-      }
-
-      .wrap {
-        padding-bottom: 70px;
-      }
-
-      .footer {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .footer .btn {
-        width: 100%;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .imgbox {
-        height: 200px;
-      }
-    }
+    .status-wait { text-align: center; padding: 40px 20px; }
+    .spinner { width: 48px; height: 48px; border: 5px solid #e2e8f0; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .info-bar { background: #f0fdf4; color: #15803d; padding: 10px; border-radius: 8px; text-align: center; font-size: 0.85rem; font-weight: bold; margin-bottom: 15px; }
   </style>
 </head>
-
 <body>
-  <div class="headerbar">
-    <div class="header">
-      <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" alt="Logo Cliente"
-        class="logo">
-      <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix 360" class="logo">
+
+  <header class="app-header">
+    <div class="logos-container">
+        <img src="{{ url_for('static', filename='logo_' + session.get('empresa', 'default') + '.png') }}" class="logo-img" onerror="this.style.display='none'">
+        <div class="divider"></div>
+        <img src="/static/logo_energix360.png" class="logo-img">
     </div>
-    <div class="logout-area">
-      <a href="/logout" class="btn logout" title="Cerrar sesión">⏻ Cerrar sesión</a>
+    <a href="/logout" class="btn-logout">Salir</a>
+  </header>
+
+  <div id="step-header" class="card">
+    <h2>🚚 Datos del Viaje</h2>
+    <label>NIT Cliente (Sin DV)</label> 
+    <input type="number" id="cliente_nit" placeholder="Ej: 890900608">
+    <label>Vehículo</label>
+    <select id="vehiculo">
+        <option value="" disabled selected>Seleccione...</option>
+        <option value="TGU321">TGU321</option><option value="WNV689">WNV689</option>
+        <option value="TGT260">TGT260</option><option value="TGN967">TGN967</option>
+        <option value="TGU158">TGU158</option><option value="WTL092">WTL092</option>
+        <option value="WTL606">WTL606</option><option value="TGM827">TGM827</option>
+        <option value="WTP830">WTP830</option><option value="TGT894">TGT894</option>
+        <option value="TGU357">TGU357</option><option value="GIL637">GIL637</option>
+        <option value="WTN176">WTN176</option>
+    </select>
+    <label>Número de Factura</label> 
+    <input type="text" id="factura" placeholder="Ej: F-12345">
+    <label>Total Kg Factura</label>
+    <input type="number" id="total_factura_kg" step="0.01" placeholder="Ej: 5000.00">
+    <button class="btn btn-primary" onclick="goToItems()">Iniciar Factura</button>
+  </div>
+
+  <div id="step-item" class="card hidden">
+    <div class="info-bar" id="lbl_info_header"></div>
+    <h2 id="item-title-text">📦 Agregar Ítem</h2>
+    <label>Producto</label>
+    <input type="text" id="item_name" list="list_prods" placeholder="Buscar producto...">
+    <datalist id="list_prods">
+        <option value="Pollo en Canal"><option value="Pechuga"><option value="Muslo"><option value="Alas"><option value="Menudencia">
+    </datalist>
+    <div style="display:flex; gap:15px;">
+        <div style="flex:1;"><label>Kg Fact.</label><input type="number" id="kg_f" step="0.01"></div>
+        <div style="flex:1;"><label>Kg Entr.</label><input type="number" id="kg_e" step="0.01"></div>
+    </div>
+    <label style="margin-top:20px;">Evidencias (Obligatorias)</label>
+    <div class="upload-box" id="box_vid">📹 Video <input type="file" id="f_vid" accept="video/*" capture="environment" onchange="handleFile(this, 'box_vid')"></div>
+    <div style="display:flex; gap:10px;">
+        <div class="upload-box" id="box_f1" style="flex:1;">📸 Foto 1 <input type="file" id="f_1" accept="image/*" capture="environment" onchange="handleFile(this, 'box_f1')"></div>
+        <div class="upload-box" id="box_f2" style="flex:1;">📸 Foto 2 <input type="file" id="f_2" accept="image/*" capture="environment" onchange="handleFile(this, 'box_f2')"></div>
+    </div>
+    <button id="btn-submit-item" class="btn btn-primary" onclick="submitItem()">Registrar Ítem</button>
+  </div>
+
+  <div id="step-wait" class="card hidden status-wait">
+    <div class="spinner"></div>
+    <h3 style="color:#d97706;">Esperando Aprobación</h3>
+    <p>La merma excede el límite permitido.</p>
+    <div style="background:#fff7ed; padding:15px; border-radius:8px; color:#9a3412; font-size:0.9rem; margin-top:15px;">
+        El controlador está revisando su solicitud.<br>Por favor espere en esta pantalla.
     </div>
   </div>
 
-  <div class="wrap">
-    <div class="card">
-      <h1>Bienvenido(a), {{ session.get('usuario_nombre', 'Operador') }}</h1>
-      <div class="note">Módulo de registro de merma en entrega. Responde y confirma cada paso.</div>
-    </div>
+  <div id="step-decide" class="card hidden" style="text-align:center;">
+    <div style="font-size:3rem; margin-bottom:10px;">✅</div>
+    <h2>Ítem Registrado</h2>
+    <p>¿Desea agregar otro ítem a esta factura?</p>
+    <button class="btn btn-primary" onclick="nextItem(true)">Sí, agregar otro</button>
+    <button class="btn btn-outline" onclick="nextItem(false)">No, terminar factura</button>
+  </div>
 
-    <!-- Paso 1: Cliente -->
-    <div class="card step active" id="step1">
-      <h3>1) ¿A qué cliente le vas a entregar?</h3>
-      <div class="row">
-        <div class="autocomplete-wrapper">
-          <input type="text" id="cliente" name="cliente" class="inp" placeholder="Nombre del cliente"
-            autocomplete="off">
-          <div id="cliente-sugerencias" class="autocomplete-list" style="display:none;"></div>
-        </div>
-      </div>
-      <div class="footer">
-        <button class="btn primary" onclick="confirmStep(1)">Confirmar cliente</button>
-      </div>
-      <div id="conf1" class="confirm" style="display:none;"></div>
+  <div id="step-summary" class="card hidden">
+    <h2>📄 Resumen Factura</h2>
+    <div style="margin-bottom:10px; font-size:0.9rem;">
+        <b>Cliente:</b> <span id="sum_cli"></span><br>
+        <b>Factura:</b> <span id="sum_fac"></span><br>
+        <b>Total Kg Factura:</b> <span id="sum_kg_total"></span>
     </div>
-
-    <!-- Paso 2: Vehículo -->
-    <div class="card step" id="step2">
-      <h3>2) ¿En qué vehículo haces la entrega?</h3>
-      <div class="row">
-        <div class="autocomplete-wrapper">
-          <input type="text" id="vehiculo" name="vehiculo" class="inp" placeholder="Placa del vehículo"
-            autocomplete="off">
-
-          <div id="vehiculo-sugerencias" class="autocomplete-list" style="display:none;"></div>
-        </div>
-      </div>
-      <div class="footer">
-        <button class="btn secondary" onclick="backTo(1)">Atrás</button>
-        <button class="btn primary" onclick="confirmStep(2)">Confirmar vehículo</button>
-      </div>
-      <div id="conf2" class="confirm" style="display:none;"></div>
+    <table class="summary-table">
+        <thead><tr><th>Prod</th><th>Fact</th><th>Entr</th><th>%</th></tr></thead>
+        <tbody id="table_body"></tbody>
+    </table>
+    <div style="margin-top:20px; text-align:right; font-weight:bold; font-size:1.1rem;">
+        Total Merma: <span id="total_merma_kg" style="color:#b91c1c;">0.00</span> kg
     </div>
+    <label style="margin-top:30px; color:#d97706;">Número de Nota General</label>
+    <input type="text" id="nota_general" placeholder="Ingrese consecutivo..." style="border:2px solid #fbbf24; background:#fffbeb; text-align:center; font-weight:bold;">
+    <button class="btn btn-primary" onclick="finishInvoice()">TERMINAR FACTURA</button>
+  </div>
 
-    <!-- Paso 3: Factura -->
-    <div class="card step" id="step3">
-      <h3>3) Número de factura</h3>
-      <div class="row">
-        <div class="col"><input type="text" id="factura" class="inp" placeholder="Número de factura"></div>
-      </div>
-      <div class="footer">
-        <button class="btn secondary" onclick="backTo(2)">Atrás</button>
-        <button class="btn primary" onclick="confirmStep(3)">Confirmar factura</button>
-      </div>
-      <div id="conf3" class="confirm" style="display:none;"></div>
-    </div>
-
-    <!-- Paso 4: KG factura -->
-    <div class="card step" id="step4">
-      <h3>4) KG registrados en la factura</h3>
-      <div class="row">
-        <div class="col"><input type="number" step="0.001" id="kg_factura" class="inp" placeholder="KG en factura">
-        </div>
-      </div>
-      <div class="footer">
-        <button class="btn secondary" onclick="backTo(3)">Atrás</button>
-        <button class="btn primary" onclick="confirmStep(4)">Confirmar KG factura</button>
-      </div>
-      <div id="conf4" class="confirm" style="display:none;"></div>
-    </div>
-
-    <!-- Paso 5: KG entregados -->
-    <div class="card step" id="step5">
-      <h3>5) KG entregados</h3>
-      <div class="row">
-        <div class="col"><input type="number" step="0.001" id="kg_entregados" class="inp" placeholder="KG entregados">
-        </div>
-      </div>
-      <div class="footer">
-        <button class="btn secondary" onclick="backTo(4)">Atrás</button>
-        <button class="btn primary" onclick="confirmStep(5)">Confirmar KG entregados</button>
-      </div>
-      <div id="conf5" class="confirm" style="display:none;"></div>
-    </div>
-
-    <!-- Paso 6: Foto de pesaje -->
-    <div class="card step" id="step6">
-      <h3>6) Registro fotográfico del pesaje</h3>
-      <div class="row">
-        <div class="col">
-          <input type="file" id="foto" accept="image/*" class="inp" />
-          <div class="imgbox" id="imgbox"><span>Vista previa</span></div>
-        </div>
-      </div>
-      <div class="footer">
-        <button class="btn secondary" onclick="backTo(5)">Atrás</button>
-        <button class="btn primary" onclick="enviar()">Solicitar aprobación</button>
-      </div>
-      <div id="conf6" class="confirm" style="display:none;"></div>
-    </div>
-
-    <div class="card" id="resultado" style="display:none;">
-      <h3>Resultado</h3>
-      <div id="resText"></div>
-      <div id="resActions" style="margin-top:10px; display:none;">
-        <button class="btn primary" onclick="nuevaFacturaMismoCliente()">Seguir con otra factura para este
-          cliente</button>
-        <button class="btn secondary" onclick="reiniciar()">Terminar operación</button>
-      </div>
-    </div>
+  <div id="step-next-inv" class="card hidden" style="text-align:center;">
+    <h2>Factura Finalizada</h2>
+    <p>¿Desea agregar <b>otra factura</b> para el mismo cliente (<span id="next_cli_name"></span>)?</p>
+    <button class="btn btn-primary" onclick="sameClientNewInvoice()">Sí, mismo cliente</button>
+    <button class="btn btn-outline" onclick="location.reload()">No, salir / otro cliente</button>
   </div>
 
   <script>
-    let step = 1;
-    let fotoB64 = null;
-    let pollTimer = null;
-    let lastRegistroId = null;
+    let HEADER_DATA = {};
+    let CURRENT_ITEMS_LOCAL = []; 
+    let IS_RETRY_MODE = false;
+    let RETRY_ITEM_ID = null;
 
-    function goTo(n) {
-      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-      const el = document.getElementById('step' + n);
-      if (el) el.classList.add('active');
-      step = n;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    function backTo(n) { goTo(n); }
-
-    document.addEventListener('DOMContentLoaded', function () {
-      // Autocompletar de clientes según la empresa en sesión
-      fetch('/mermas/clientes')
-        .then(res => res.json())
-        .then(data => {
-          if (!data.success) {
-            console.warn('No se pudieron cargar los clientes:', data.message);
-            return;
-          }
-          const dl = document.getElementById('lista_clientes');
-          if (!dl) return;
-
-          (data.items || []).forEach(nombre => {
-            const opt = document.createElement('option');
-            opt.value = nombre;
-            dl.appendChild(opt);
-          });
-        })
-        .catch(err => {
-          console.error('Error cargando clientes:', err);
-        });
+    const getEl = id => document.getElementById(id);
+    const showStep = (id) => {
+        ['step-header', 'step-item', 'step-wait', 'step-decide', 'step-summary', 'step-next-inv'].forEach(sid => getEl(sid).classList.add('hidden'));
+        getEl(id).classList.remove('hidden');
+    };
+    const toBase64 = file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
     });
 
-    function confirmStep(n) {
-      if (n === 1) {
-        const v = document.getElementById('cliente').value.trim();
-        if (!v) return alert('Indica el cliente.');
-        showConfirm('conf1', 'Cliente confirmado: ' + v);
-        goTo(2);
-      } else if (n === 2) {
-        const v = document.getElementById('vehiculo').value.trim();
-        if (!v) return alert('Indica el vehículo.');
-        showConfirm('conf2', 'Vehículo confirmado: ' + v);
-        goTo(3);
-      } else if (n === 3) {
-        const v = document.getElementById('factura').value.trim();
-        if (!v) return alert('Indica el número de factura.');
-        showConfirm('conf3', 'Factura confirmada: ' + v);
-        goTo(4);
-      } else if (n === 4) {
-        const v = parseFloat(document.getElementById('kg_factura').value);
-        if (!(v > 0)) return alert('Ingresa los KG de factura (>0).');
-        showConfirm('conf4', 'KG factura confirmados: ' + v);
-        goTo(5);
-      } else if (n === 5) {
-        const v = parseFloat(document.getElementById('kg_entregados').value);
-        if (!(v >= 0)) return alert('Ingresa los KG entregados (>=0).');
-        showConfirm('conf5', 'KG entregados confirmados: ' + v);
-        goTo(6);
-      }
-    }
-
-    function showConfirm(id, text) {
-      const el = document.getElementById(id);
-      el.style.display = 'block';
-      el.textContent = text;
-    }
-
-    // Vista previa de foto
-    const foto = document.getElementById('foto');
-    const imgbox = document.getElementById('imgbox');
-    foto.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        fotoB64 = reader.result; // dataURL
-        imgbox.innerHTML = `<img src="${fotoB64}" alt="Evidencia">`;
-      };
-      reader.readAsDataURL(file);
-    });
-
-    async function enviar() {
-      const cliente = document.getElementById('cliente').value.trim();
-      const vehiculo = document.getElementById('vehiculo').value.trim();
-      const factura = document.getElementById('factura').value.trim();
-      const kg_factura = parseFloat(document.getElementById('kg_factura').value);
-      const kg_entregados = parseFloat(document.getElementById('kg_entregados').value);
-
-      if (!cliente || !vehiculo || !factura || !(kg_factura > 0) || !(kg_entregados >= 0)) {
-        return alert('Completa y confirma todos los pasos.');
-      }
-      if (!fotoB64) { if (!confirm('No adjuntaste foto de pesaje. ¿Continuar sin foto?')) return; }
-
-      const payload = {
-        cliente, vehiculo, factura,
-        kg_factura, kg_entregados,
-        evidencia_foto: fotoB64 || null
-      };
-
-      // Limpia escucha previa si existía
-      stopPolling();
-
-      try {
-        const r = await fetch('/mermas/registrar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const j = await r.json();
-
-        const res = document.getElementById('resultado');
-        const resText = document.getElementById('resText');
-        const resActions = document.getElementById('resActions');
-        res.style.display = 'block';
-        resActions.style.display = 'none';
-
-        if (!j.success) {
-          resText.innerHTML = `<span class="muted">No se pudo registrar: ${j.message || 'Error'}</span>`;
-          return;
-        }
-
-        lastRegistroId = j.id || null;
-
-        if (j.aprobado) {
-          // Aprobación automática
-          resText.innerHTML = `<span style="color:#1a7f37">Merma <b>APROBADA automáticamente</b> (ID ${j.id}).</span>`;
-          resActions.style.display = 'block';
+    function handleFile(input, boxId) {
+        if(input.files && input.files[0]) {
+            document.getElementById(boxId).classList.add('file-loaded');
         } else {
-          // Pendiente → empezar a consultar estado
-          resText.innerHTML = `<span class="muted"><span class="spinner"></span>Merma registrada en estado <b>PENDIENTE</b> (ID ${j.id}). Esperando decisión de control...</span>`;
-          startPollingEstado();
+            document.getElementById(boxId).classList.remove('file-loaded');
         }
-      } catch (e) {
-        console.error(e);
-        alert('Error al enviar el registro.');
-      }
+    }
+    function resetFileBoxes() {
+        ['box_vid', 'box_f1', 'box_f2'].forEach(id => getEl(id).classList.remove('file-loaded'));
+        ['f_vid', 'f_1', 'f_2'].forEach(id => getEl(id).value = "");
     }
 
-    function startPollingEstado() {
-      if (!lastRegistroId) return;
-      stopPolling();
-      pollTimer = setInterval(checkEstadoOnce, 3000); // cada 3 s
-      checkEstadoOnce(); // primer chequeo inmediato
+    function goToItems() {
+        const cli = getEl('cliente_nit').value;
+        const veh = getEl('vehiculo').value;
+        const fac = getEl('factura').value;
+        const tot = getEl('total_factura_kg').value;
+        if(!cli || !veh || !fac || !tot) return alert("Complete todos los datos de la cabecera (incluyendo Total Kg).");
+        HEADER_DATA = { cliente: cli, vehiculo: veh, factura: fac, total_kg: tot };
+        getEl('lbl_info_header').innerText = `Factura: ${fac} | Vehículo: ${veh}`;
+        IS_RETRY_MODE = false;
+        showStep('step-item');
     }
 
-    async function checkEstadoOnce() {
-      if (!lastRegistroId) return;
-      try {
-        const r = await fetch(`/mermas/estado?id=${encodeURIComponent(lastRegistroId)}`);
-        const j = await r.json();
-        if (!j.success) return;
-        if (['aprobada', 'aprobada_no_conforme', 'rechazada'].includes(j.estado)) {
-          stopPolling();
-          const resText = document.getElementById('resText');
-          const resActions = document.getElementById('resActions');
-          if (j.estado === 'aprobada') {
-            resText.innerHTML = `<span style="color:#1a7f37">Merma <b>APROBADA</b> por control (ID ${lastRegistroId}).</span>`;
-          } else if (j.estado === 'aprobada_no_conforme') {
-            resText.innerHTML = `<span style="color:#b8860b">Merma <b>APROBADA NO CONFORME</b> por control (ID ${lastRegistroId}).</span>`;
-          } else {
-            resText.innerHTML = `<span style="color:#b00020">Merma <b>NO APROBADA</b> por control (ID ${lastRegistroId}).</span>`;
-          }
-          resActions.style.display = 'block';
+    async function submitItem() {
+        const prod = getEl('item_name').value;
+        const kgf = parseFloat(getEl('kg_f').value);
+        const kge = parseFloat(getEl('kg_e').value);
+        const fv = getEl('f_vid').files[0];
+        const f1 = getEl('f_1').files[0];
+        const f2 = getEl('f_2').files[0];
+
+        if(!prod || isNaN(kgf) || isNaN(kge)) return alert("Datos del ítem incompletos.");
+        if(!fv || !f1 || !f2) return alert("Debe cargar Video y 2 Fotos.");
+
+        const btn = getEl('btn-submit-item');
+        const originalText = IS_RETRY_MODE ? "Rectificar Ítem" : "Registrar Ítem";
+        btn.innerHTML = "⏳ Enviando..."; btn.disabled = true;
+
+        try {
+            const [bVid, bFoto1, bFoto2] = await Promise.all([toBase64(fv), toBase64(f1), toBase64(f2)]);
+            const itemPayload = { item: prod, kg_facturados: kgf, kg_entregados: kge, evidencia_url: bVid, evidencia_url2: bFoto1, evidencia_url3: bFoto2 };
+            const payload = { ...HEADER_DATA, items: [itemPayload], is_retry: IS_RETRY_MODE, retry_id: RETRY_ITEM_ID };
+
+            const r = await fetch('/mermas/registrar', { method: 'POST', body: JSON.stringify(payload) });
+            const resp = await r.json();
+            if(!resp.success) throw new Error(resp.message || "Error desconocido");
+
+            if(IS_RETRY_MODE) CURRENT_ITEMS_LOCAL.pop(); 
+            CURRENT_ITEMS_LOCAL.push({ prod, kgf, kge, merma: kgf-kge, pct: ((kgf-kge)/kgf)*100 });
+
+            if(resp.status === 'pendiente' || resp.status === 'segunda_revision') {
+                showStep('step-wait');
+                startPolling(HEADER_DATA.factura);
+            } else {
+                IS_RETRY_MODE = false;
+                showStep('step-decide');
+            }
+        } catch(e) { alert("Error: " + e.message); } finally { btn.innerHTML = originalText; btn.disabled = false; }
+    }
+
+    let pollInterval;
+    function startPolling(fac) {
+        if(pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(async () => {
+            try {
+                const r = await fetch(`/mermas/check_status_live?factura=${fac}&nc=${Date.now()}`);
+                const d = await r.json();
+                if(d.completed) {
+                    clearInterval(pollInterval);
+                    if(d.status === 'en_revision') {
+                        // AQUÍ ESTÁ EL MENSAJE CLAVE PARA EL OPERADOR
+                        alert("⚠️ SU PESAJE FUE OBJETADO. Por favor, vuelva a pesar el producto asegurando que la báscula esté en ceros y suba nuevas evidencias.");
+                        prepareRectification(d.id);
+                    } else if (d.status === 'objetada') {
+                        alert("⚠️ MERMA EN AUDITORÍA. El sistema permite continuar, pero el caso queda bajo investigación.");
+                        IS_RETRY_MODE = false;
+                        showStep('step-decide');
+                    } else if (d.status === 'rechazada') {
+                        alert("❌ MERMA RECHAZADA.");
+                        IS_RETRY_MODE = false;
+                        showStep('step-decide');
+                    } else {
+                        IS_RETRY_MODE = false;
+                        showStep('step-decide'); 
+                    }
+                }
+            } catch(e) {}
+        }, 5000);
+    }
+
+    function prepareRectification(id) {
+        showStep('step-item');
+        IS_RETRY_MODE = true;
+        RETRY_ITEM_ID = id;
+        getEl('item-title-text').innerText = "⚠️ RECTIFICAR: VUELVA A PESAR";
+        getEl('item-title-text').style.color = "#b45309";
+        getEl('btn-submit-item').innerText = "Reenviar Rectificación";
+        resetFileBoxes();
+        getEl('kg_f').value = "";
+        getEl('kg_e').value = "";
+    }
+
+    function nextItem(addAnother) {
+        if(addAnother) {
+            getEl('item_name').value = "";
+            getEl('kg_f').value = "";
+            getEl('kg_e').value = "";
+            resetFileBoxes();
+            IS_RETRY_MODE = false;
+            getEl('item-title-text').innerText = "📦 Agregar Ítem";
+            getEl('item-title-text').style.color = "var(--primary)";
+            getEl('btn-submit-item').innerText = "Registrar Ítem";
+            showStep('step-item');
+        } else {
+            buildSummary();
+            showStep('step-summary');
         }
-      } catch (e) {
-        console.error(e);
-      }
     }
 
-    function stopPolling() {
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-    }
-
-    function nuevaFacturaMismoCliente() {
-      // Mantener cliente y vehículo, limpiar factura y pesos, foto, confirmaciones intermedias
-      document.getElementById('factura').value = '';
-      document.getElementById('kg_factura').value = '';
-      document.getElementById('kg_entregados').value = '';
-      fotoB64 = null;
-      document.getElementById('imgbox').innerHTML = '<span>Vista previa</span>';
-      ['conf3', 'conf4', 'conf5', 'conf6'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-      goTo(3);
-      const res = document.getElementById('resultado');
-      res.style.display = 'none';
-      stopPolling();
-      lastRegistroId = null;
-    }
-
-    function reiniciar() {
-      // Reset total
-      ['cliente', 'vehiculo', 'factura', 'kg_factura', 'kg_entregados'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-      ['conf1', 'conf2', 'conf3', 'conf4', 'conf5', 'conf6'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-      fotoB64 = null;
-      document.getElementById('imgbox').innerHTML = '<span>Vista previa</span>';
-      const res = document.getElementById('resultado');
-      res.style.display = 'none';
-      stopPolling();
-      lastRegistroId = null;
-      goTo(1);
-    }
-
-    // Limpieza al salir de la página
-    window.addEventListener('beforeunload', stopPolling);
-
-
-    document.addEventListener('DOMContentLoaded', function () {
-      const inputCliente = document.getElementById('cliente');
-      const listaDiv = document.getElementById('cliente-sugerencias');
-      let todosLosClientes = [];
-
-      // Cargar clientes de la empresa actual
-      fetch('/mermas/clientes')
-        .then(r => r.json())
-        .then(data => {
-          if (!data.success) return;
-          todosLosClientes = data.items || [];
-        })
-        .catch(err => console.error('Error cargando clientes:', err));
-
-      // Filtrado tipo Google AUTOCOMPLETAR CLIENTES
-      inputCliente.addEventListener('input', function () {
-        const texto = inputCliente.value.toLowerCase().trim();
-
-        if (!texto) {
-          listaDiv.style.display = 'none';
-          listaDiv.innerHTML = '';
-          return;
-        }
-
-        const filtrados = todosLosClientes
-          .filter(nombre => nombre.toLowerCase().includes(texto))
-          .slice(0, 10);
-
-        if (!filtrados.length) {
-          listaDiv.style.display = 'none';
-          listaDiv.innerHTML = '';
-          return;
-        }
-
-        listaDiv.innerHTML = '';
-        filtrados.forEach(nombre => {
-          const item = document.createElement('div');
-          item.className = 'autocomplete-item';
-          item.textContent = nombre;
-          item.addEventListener('click', () => {
-            inputCliente.value = nombre;
-            listaDiv.style.display = 'none';
-          });
-          listaDiv.appendChild(item);
+    function buildSummary() {
+        getEl('sum_cli').innerText = HEADER_DATA.cliente;
+        getEl('sum_fac').innerText = HEADER_DATA.factura;
+        getEl('sum_kg_total').innerText = HEADER_DATA.total_kg; 
+        const tbody = getEl('table_body');
+        tbody.innerHTML = '';
+        let totalMerma = 0;
+        CURRENT_ITEMS_LOCAL.forEach(it => {
+            totalMerma += it.merma;
+            tbody.innerHTML += `<tr><td>${it.prod}</td><td>${it.kgf}</td><td>${it.kge}</td><td style="color:${it.pct>2?'#b91c1c':'#15803d'}">${it.pct.toFixed(1)}%</td></tr>`;
         });
-
-        listaDiv.style.display = 'block';
-      });
-
-      inputCliente.addEventListener('blur', function () {
-        setTimeout(() => {
-          listaDiv.style.display = 'none';
-        }, 150);
-      });
-    });
-
-    // ===============================
-    // AUTOCOMPLETADO VEHÍCULOS
-    // ===============================
-    document.addEventListener('DOMContentLoaded', function () {
-      const inputVehiculo = document.getElementById('vehiculo');
-      const listaVehiculos = document.getElementById('vehiculo-sugerencias');
-      let todosLosVehiculos = [];
-
-      // Cargar vehículos de la empresa
-      fetch('/mermas/vehiculos')
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            todosLosVehiculos = data.items || [];
-          }
-        })
-        .catch(err => console.error('Error cargando vehículos:', err));
-
-      // Filtrado tipo Google
-      inputVehiculo.addEventListener('input', function () {
-        const texto = inputVehiculo.value.toLowerCase().trim();
-
-        if (!texto) {
-          listaVehiculos.style.display = 'none';
-          listaVehiculos.innerHTML = '';
-          return;
-        }
-
-        const filtrados = todosLosVehiculos
-          .filter(x => x.toLowerCase().includes(texto))
-          .slice(0, 10);
-
-        if (!filtrados.length) {
-          listaVehiculos.style.display = 'none';
-          listaVehiculos.innerHTML = '';
-          return;
-        }
-
-        listaVehiculos.innerHTML = '';
-        filtrados.forEach(placa => {
-          const item = document.createElement('div');
-          item.className = 'autocomplete-item';
-          item.textContent = placa;
-          item.addEventListener('click', () => {
-            inputVehiculo.value = placa;
-            listaVehiculos.style.display = 'none';
-            listaVehiculos.innerHTML = '';
-          });
-          listaVehiculos.appendChild(item);
-        });
-
-        listaVehiculos.style.display = 'block';
-      });
-
-      // Ocultar sugerencias al perder foco
-      inputVehiculo.addEventListener('blur', function () {
-        setTimeout(() => {
-          listaVehiculos.style.display = 'none';
-        }, 150);
-      });
-    });
-
-
-  </script>
-  <script>
-    function activarLogoutSeguroOffline() {
-      const logoutLinks = document.querySelectorAll('a[href="/logout"]');
-
-      logoutLinks.forEach(a => {
-        // limpiamos listeners previos por si se ejecuta varias veces
-        a.onclick = null;
-
-        if (!navigator.onLine) {
-          a.addEventListener("click", (e) => {
-            e.preventDefault();
-            alert("Estás sin conexión. El cierre de sesión requiere internet.");
-          }, { once: true });
-        }
-      });
+        getEl('total_merma_kg').innerText = totalMerma.toFixed(2);
     }
 
-    window.addEventListener("load", activarLogoutSeguroOffline);
-    window.addEventListener("online", activarLogoutSeguroOffline);
-    window.addEventListener("offline", activarLogoutSeguroOffline);
-  </script>
+    async function finishInvoice() {
+        const nota = getEl('nota_general').value;
+        if(!nota) return alert("Debe ingresar el número de la Nota General.");
+        const btn = document.querySelector('#step-summary .btn-primary');
+        btn.innerHTML = "Finalizando..."; btn.disabled = true;
+        try {
+            await fetch('/mermas/finalizar_con_nota', { method: 'POST', body: JSON.stringify({ factura: HEADER_DATA.factura, nota: nota }) });
+            getEl('next_cli_name').innerText = HEADER_DATA.cliente;
+            showStep('step-next-inv');
+        } catch(e) { alert("Error al finalizar. Intente nuevamente."); } finally { btn.innerHTML = "TERMINAR FACTURA"; btn.disabled = false; }
+    }
 
+    function sameClientNewInvoice() {
+        getEl('factura').value = "";
+        getEl('total_factura_kg').value = ""; 
+        getEl('item_name').value = "";
+        getEl('kg_f').value = "";
+        getEl('kg_e').value = "";
+        resetFileBoxes();
+        CURRENT_ITEMS_LOCAL = []; 
+        IS_RETRY_MODE = false;
+        showStep('step-header');
+    }
+  </script>
 </body>
-
 </html>

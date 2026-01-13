@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <title>Módulo GLP</title>
+  <title>BQA ONE: Módulo GLP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="apple-touch-icon" href="/static/icon-192.png">
   <link rel="manifest" href="/static/manifest.json">
@@ -1393,10 +1393,14 @@
       const input = document.getElementById("respuestaInput");
       const foto = document.getElementById("inputFoto");
       const btn = document.getElementById("botonEnviar");
+      const divSiNo = document.getElementById("preguntaSiNo");
 
       // Si ya no hay más tanques, terminamos
       if (idx >= tanques.length) {
-        hide(input); hide(foto); hide(btn);
+        hide(input);
+        hide(foto);
+        hide(btn);
+        hide(divSiNo);
         if (typeof onFinish === "function") onFinish();
         return;
       }
@@ -1407,6 +1411,7 @@
 
       // Paso 1: preguntar NIVEL
       hide(foto);
+      hide(divSiNo); // Asegurar que los botones de confirmación estén ocultos
       input.type = "number";
       input.value = "";
       show(input);
@@ -1416,7 +1421,9 @@
       show(btn);
 
       input.onkeyup = (ev) => {
-        if (ev.key === "Enter") { btn.click(); }
+        if (ev.key === "Enter") {
+          btn.click();
+        }
       };
 
       btn.onclick = () => {
@@ -1425,13 +1432,38 @@
           alert("Ingresa un nivel válido (0-100).");
           return;
         }
-        nivelActual = nivel;
-        pedirFoto();
+
+        // --- INICIO CONFIRMACIÓN ---
+        hide(input);
+        hide(btn); // Ocultar input y botón enviar temporalmente
+        texto.textContent = `¿Estás seguro que el nivel es ${nivel}%?`;
+
+        const bSi = document.getElementById("btnSi");
+        const bNo = document.getElementById("btnNo");
+        show(divSiNo); // Mostrar los botones de Sí/No
+
+        // Opción NO: Regresar a editar
+        bNo.onclick = () => {
+          hide(divSiNo);
+          texto.textContent = `Nivel actual del ${tk.numero} (0-100%)`;
+          show(input);
+          show(btn);
+          input.focus(); // Poner foco para corrección rápida
+        };
+
+        // Opción SÍ: Guardar y pasar a la foto
+        bSi.onclick = () => {
+          hide(divSiNo);
+          nivelActual = nivel;
+          pedirFoto();
+        };
+        // --- FIN CONFIRMACIÓN ---
       };
 
       // Paso 2: pedir FOTO + botón verde para continuar
       function pedirFoto() {
         hide(input);
+        hide(divSiNo);
         texto.textContent = `Adjunta la foto del ${tk.numero}`;
         foto.value = null;
         archivoFoto = null;
@@ -1525,13 +1557,17 @@
       activarProteccionOperacion();
       try {
         const info = await leerQR("Escanea el QR de la sede para iniciar calefacción");
-        sedeQR = info.sede; empresaQR = info.empresa;
+        sedeQR = info.sede;
+        empresaQR = info.empresa;
         tanquesQR = Array.isArray(info.tanques) ? info.tanques : [];
         const texto = document.getElementById("preguntaTexto");
         const input = document.getElementById("respuestaInput");
         const foto = document.getElementById("inputFoto");
         const btn = document.getElementById("botonEnviar");
-        document.getElementById("preguntaSiNo").style.display = "none";
+        const divSiNo = document.getElementById("preguntaSiNo");
+
+        // Asegurar que los botones de Si/No estén ocultos al inicio
+        divSiNo.style.display = "none";
 
         if (input) {
           input.onkeyup = null;
@@ -1543,32 +1579,66 @@
           btn.onclick = null;
         }
 
-        items = []; idx = 0;
+        items = [];
+        idx = 0;
 
         function despuesDeAvicola() {
-          cargarTanques(() => { preguntarNivelFoto(enviarInicio); });
+          cargarTanques(() => {
+            preguntarNivelFoto(enviarInicio);
+          });
         }
 
         if (EMPRESA_SESION === "Pollos GAR SAS") {
           // Pollitos (única pregunta avícola)
-          show(input); hide(foto);
-          input.type = "number"; input.value = "";
+          show(input);
+          hide(foto);
+          hide(divSiNo); // Asegurar oculto por si acaso
+
+          input.type = "number";
+          input.value = "";
           texto.textContent = "¿Con cuántos pollitos inicias el lote?";
-          btn.textContent = "Confirmar"; show(btn);
+          btn.textContent = "Confirmar";
+          show(btn);
 
           btn.onclick = () => {
-            const pollitos = Number(input.value || 0);
-            if (isNaN(pollitos) || pollitos <= 0) { alert("Ingresa un número válido de pollitos."); return; }
+            const val = input.value;
+            const pollitos = Number(val || 0);
 
-            input.dataset.pollitos = String(pollitos);
+            if (isNaN(pollitos) || pollitos <= 0) {
+              alert("Ingresa un número válido de pollitos.");
+              return;
+            }
 
-            // Limpieza defensiva por si quedó de versiones anteriores
+            // --- INICIO CONFIRMACIÓN ---
+            hide(input);
+            hide(btn); // Ocultar input y botón enviar
+            texto.textContent = `¿Estás seguro que la cantidad de pollitos es ${pollitos}?`;
 
-            hide(btn); hide(input);
-            despuesDeAvicola();
+            const bSi = document.getElementById("btnSi");
+            const bNo = document.getElementById("btnNo");
+            show(divSiNo); // Mostrar los botones de confirmación
+
+            // Opción NO: Volver a corregir
+            bNo.onclick = () => {
+              hide(divSiNo);
+              texto.textContent = "¿Con cuántos pollitos inicias el lote?";
+              show(input);
+              show(btn);
+              input.focus(); // Poner foco para editar rápido
+            };
+
+            // Opción SI: Continuar
+            bSi.onclick = () => {
+              hide(divSiNo);
+              input.dataset.pollitos = String(pollitos);
+              despuesDeAvicola();
+            };
+            // --- FIN CONFIRMACIÓN ---
           };
         } else {
-          hide(input); hide(btn); hide(foto);
+          hide(input);
+          hide(btn);
+          hide(foto);
           despuesDeAvicola();
         }
       } catch (e) {
@@ -1621,17 +1691,25 @@
     }
 
     // Inicia la operación registrar tanqueo
+    // Inicia la operación registrar tanqueo
     async function registrarTanqueo() {
       activarProteccionOperacion();
       try {
-        registrarTanqueoData.sede = "";
-        registrarTanqueoData.tanques = [];
+        // CORRECCIÓN IMPORTANTE: Generar siempre un op_id nuevo al iniciar
+        // Esto evita que se envíe un objeto sin ID si hubo una limpieza previa incorrecta.
+        registrarTanqueoData = {
+          op_id: generarOpId(),
+          sede: "",
+          tanques: []
+        };
+        
         tanqueActualIndex = 0;
 
         const info = await leerQR("Escanea el QR de la sede para registrar el tanqueo");
         sedeQR = info.sede;
         empresaQR = info.empresa;
         tanquesQR = Array.isArray(info.tanques) ? info.tanques : [];
+        
         registrarTanqueoData.sede = sedeQR;
 
         // 🔹 Limpiamos cualquier handler viejo antes de empezar el flujo nuevo
@@ -1660,7 +1738,6 @@
         mostrarMenu();
       }
     }
-
     // Pregunta: ¿Desea tanquear el tanque TK-n?
     function preguntarSiTanquearTanqueActual() {
       const texto = document.getElementById("preguntaTexto");
@@ -1728,8 +1805,12 @@
       const input = document.getElementById("respuestaInput");
       const foto = document.getElementById("inputFoto");
       const btn = document.getElementById("botonEnviar");
+      const divSiNo = document.getElementById("preguntaSiNo");
 
-      show(input); hide(foto);
+      show(input);
+      hide(foto);
+      hide(divSiNo); // Asegurar que los botones de confirmación estén ocultos al inicio
+
       input.type = "number";
       input.value = "";
       texto.textContent = `Ingresa el NIVEL ACTUAL del tanque ${tanqueActualDatos.numero.toUpperCase()} (0-100 %)`;
@@ -1742,11 +1823,34 @@
           alert("Ingresa un nivel válido entre 0 y 100.");
           return;
         }
-        tanqueActualDatos.nivel_inicial = n;
-        pedirFotoNivelInicial();
+
+        // --- INICIO CONFIRMACIÓN ---
+        hide(input);
+        hide(btn); // Ocultar input y botón enviar
+        texto.textContent = `¿Estás seguro que el Nivel Inicial es ${n}%?`;
+
+        const bSi = document.getElementById("btnSi");
+        const bNo = document.getElementById("btnNo");
+        show(divSiNo); // Mostrar los botones de Sí/No
+
+        // Opción NO: Regresar a editar
+        bNo.onclick = () => {
+          hide(divSiNo);
+          texto.textContent = `Ingresa el NIVEL ACTUAL del tanque ${tanqueActualDatos.numero.toUpperCase()} (0-100 %)`;
+          show(input);
+          show(btn);
+          input.focus(); // Poner foco para corrección rápida
+        };
+
+        // Opción SÍ: Guardar y pasar a la siguiente etapa
+        bSi.onclick = () => {
+          hide(divSiNo);
+          tanqueActualDatos.nivel_inicial = n;
+          pedirFotoNivelInicial();
+        };
+        // --- FIN CONFIRMACIÓN ---
       };
     }
-
     // 2) Foto nivel inicial
     function pedirFotoNivelInicial() {
       const texto = document.getElementById("preguntaTexto");
@@ -1806,10 +1910,12 @@
       const input = document.getElementById("respuestaInput");
       const foto = document.getElementById("inputFoto");
       const btn = document.getElementById("botonEnviar");
-      document.getElementById("preguntaSiNo").style.display = "none";
+      const divSiNo = document.getElementById("preguntaSiNo");
 
+      show(input);
+      hide(foto);
+      hide(divSiNo); // Asegurar que los botones de confirmación estén ocultos
 
-      show(input); hide(foto);
       input.type = "number";
       input.value = "";
       texto.textContent = `Ingresa el NIVEL FINAL del tanque ${tanqueActualDatos.numero.toUpperCase()} (0-100 %)`;
@@ -1822,8 +1928,32 @@
           alert("Ingresa un nivel válido entre 0 y 100.");
           return;
         }
-        tanqueActualDatos.nivel_final = n;
-        pedirFotoNivelFinal();
+
+        // --- INICIO CONFIRMACIÓN ---
+        hide(input);
+        hide(btn); // Ocultar input y botón enviar
+        texto.textContent = `¿Estás seguro que el Nivel Final es ${n}%?`;
+
+        const bSi = document.getElementById("btnSi");
+        const bNo = document.getElementById("btnNo");
+        show(divSiNo); // Mostrar los botones de Sí/No
+
+        // Opción NO: Regresar a editar
+        bNo.onclick = () => {
+          hide(divSiNo);
+          texto.textContent = `Ingresa el NIVEL FINAL del tanque ${tanqueActualDatos.numero.toUpperCase()} (0-100 %)`;
+          show(input);
+          show(btn);
+          input.focus(); // Poner foco para corrección rápida
+        };
+
+        // Opción SÍ: Guardar y pasar a la siguiente etapa
+        bSi.onclick = () => {
+          hide(divSiNo);
+          tanqueActualDatos.nivel_final = n;
+          pedirFotoNivelFinal();
+        };
+        // --- FIN CONFIRMACIÓN ---
       };
     }
 
@@ -1868,10 +1998,12 @@
       const input = document.getElementById("respuestaInput");
       const foto = document.getElementById("inputFoto");
       const btn = document.getElementById("botonEnviar");
-      document.getElementById("preguntaSiNo").style.display = "none";
+      const divSiNo = document.getElementById("preguntaSiNo");
 
+      show(input);
+      hide(foto);
+      hide(divSiNo); // Asegurar que los botones de confirmación estén ocultos
 
-      show(input); hide(foto);
       input.type = "number";
       input.step = "0.01";
       input.value = "";
@@ -1885,8 +2017,32 @@
           alert("Ingresa una densidad válida (>0).");
           return;
         }
-        tanqueActualDatos.densidad_suministrada = d;
-        pedirKgSuministrados();
+
+        // --- INICIO CONFIRMACIÓN ---
+        hide(input);
+        hide(btn); // Ocultar input y botón enviar
+        texto.textContent = `¿Estás seguro que la densidad es ${d} kg/gal?`;
+
+        const bSi = document.getElementById("btnSi");
+        const bNo = document.getElementById("btnNo");
+        show(divSiNo); // Mostrar los botones de Sí/No
+
+        // Opción NO: Regresar a editar
+        bNo.onclick = () => {
+          hide(divSiNo);
+          texto.textContent = `Ingresa la DENSIDAD SUMINISTRADA (kg/gal) para el tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
+          show(input);
+          show(btn);
+          input.focus(); // Poner foco para corrección rápida
+        };
+
+        // Opción SÍ: Guardar y pasar a la siguiente etapa
+        bSi.onclick = () => {
+          hide(divSiNo);
+          tanqueActualDatos.densidad_suministrada = d;
+          pedirKgSuministrados();
+        };
+        // --- FIN CONFIRMACIÓN ---
       };
     }
 
@@ -1896,10 +2052,12 @@
       const input = document.getElementById("respuestaInput");
       const foto = document.getElementById("inputFoto");
       const btn = document.getElementById("botonEnviar");
-      document.getElementById("preguntaSiNo").style.display = "none";
+      const divSiNo = document.getElementById("preguntaSiNo");
 
+      show(input);
+      hide(foto);
+      hide(divSiNo); // Asegurar que los botones de confirmación estén ocultos al inicio
 
-      show(input); hide(foto);
       input.type = "number";
       input.step = "0.01";
       input.value = "";
@@ -1913,8 +2071,32 @@
           alert("Ingresa un valor válido de kg (>0).");
           return;
         }
-        tanqueActualDatos.kg_suministrados = k;
-        pedirFotoBaucher();
+
+        // --- INICIO CONFIRMACIÓN ---
+        hide(input);
+        hide(btn); // Ocultar input y botón enviar
+        texto.textContent = `¿Estás seguro que son ${k} Kilogramos?`;
+
+        const bSi = document.getElementById("btnSi");
+        const bNo = document.getElementById("btnNo");
+        show(divSiNo); // Mostrar los botones de Sí/No
+
+        // Opción NO: Regresar a editar
+        bNo.onclick = () => {
+          hide(divSiNo);
+          texto.textContent = `Ingresa los KG SUMINISTRADOS al tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
+          show(input);
+          show(btn);
+          input.focus(); // Poner foco para corrección rápida
+        };
+
+        // Opción SÍ: Guardar y pasar a la siguiente etapa
+        bSi.onclick = () => {
+          hide(divSiNo);
+          tanqueActualDatos.kg_suministrados = k;
+          pedirFotoBaucher();
+        };
+        // --- FIN CONFIRMACIÓN ---
       };
     }
 

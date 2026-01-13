@@ -1,881 +1,643 @@
-# bp_gestion_mermas.py
 from flask import Blueprint, request, jsonify, current_app, session, send_file
-from datetime import datetime
-import os, base64, uuid
+from datetime import datetime, timedelta
+import os, base64, uuid, smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from io import BytesIO
 
-# PDF / Reportes
+# --- Librerías para PDF y Reportes ---
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
 
-# Importa la conexión y el CSRF desde la app principal
 from app import mysql, csrf
 
-# === Definición del blueprint ===
 bp_gestion_mermas = Blueprint('bp_gestion_mermas', __name__)
 
 # =========================
-# Utilidades internas
+# CONFIGURACIÓN EMAIL
+# =========================
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+try:
+    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+except:
+    EMAIL_PORT = 587
+EMAIL_USER = os.environ.get("EMAIL_USER")
+EMAIL_PASS = os.environ.get("EMAIL_PASS")
+EMAIL_FROM = os.environ.get("EMAIL_FROM", EMAIL_USER)
+
+# =========================
+# UTILIDADES INTERNAS
 # =========================
 
 def _get_umbral_pct(empresa_id=None):
-    """
-    Retorna el umbral de merma (%) para auto-aprobación.
-    Si tienes una tabla de parámetros por empresa, léela aquí.
-    """
-    try:
-        # cur = mysql.connection.cursor()
-        # cur.execute("SELECT umbral_merma_pct FROM parametros_mermas WHERE empresa_id=%s", (empresa_id,))
-        # row = cur.fetchone()
-        # cur.close()
-        # if row and row.get('umbral_merma_pct') is not None:
-        #     return float(row['umbral_merma_pct'])
-        pass
-    except Exception as e:
-        current_app.logger.exception(e)
-    # Valor por defecto
-    return 1.0
-
+    return 2.0
 
 def _save_base64_image(data_url, empresa_slug='generico'):
-    """
-    Guarda una imagen recibida como data URL base64 en /static/mermas/<empresa>/<yyyymm>/
-    Retorna la ruta relativa a /static (ej: 'mermas/pollos_gar/202511/archivo.jpg').
-    """
-    if not data_url or not isinstance(data_url, str) or not data_url.startswith('data:image'):
+    if not data_url or not isinstance(data_url, str) or not data_url.startswith('data:'):
         return None
     try:
         header, b64data = data_url.split(',', 1)
-        ext = 'jpg'
-        if 'png' in header: ext = 'png'
-        if 'jpeg' in header: ext = 'jpg'
+        if 'video' in header: ext = 'webm' 
+        elif 'png' in header: ext = 'png'
+        else: ext = 'jpg'
+        
         yyyymm = datetime.now().strftime('%Y%m')
         folder = os.path.join(current_app.static_folder, 'mermas', empresa_slug, yyyymm)
         os.makedirs(folder, exist_ok=True)
+        
         filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
         path = os.path.join(folder, filename)
+        
         with open(path, 'wb') as f:
             f.write(base64.b64decode(b64data))
+        
         return f"mermas/{empresa_slug}/{yyyymm}/{filename}"
     except Exception as e:
-        current_app.logger.exception(e)
+        current_app.logger.error(f"Error guardando archivo: {e}")
         return None
 
+def _delete_evidence_files(file_paths):
+    """Borra físicamente los archivos del servidor."""
+    if not file_paths: return
+    base_dir = current_app.static_folder
+    for rel_path in file_paths:
+        if rel_path:
+            full_path = os.path.join(base_dir, rel_path)
+            if os.path.exists(full_path):
+                try:
+                    os.remove(full_path)
+                    print(f"🗑️ Archivo eliminado: {full_path}")
+                except Exception as e:
+                    print(f"Error eliminando archivo {full_path}: {e}")
 
-def _insert_merma_registro(data, estatus='aprobada', decision='aprobada'):
-    """
-    Inserta un registro en mermas_pollosgar o actualiza estatus/decision si viene 'id' en data.
-    Retorna el id del registro afectado.
-    """
-    cur = mysql.connection.cursor()
-
-    if data.get('id'):  # actualización de estado
-        cur.execute("""
-            UPDATE mermas_pollosgar
-               SET estatus=%s,
-                   decision=%s,
-                   fecha_decision=NOW()
-             WHERE id=%s
-        """, (estatus, decision, data['id']))
-        mysql.connection.commit()
+def _limpiar_mermas_antiguas():
+    """Mantenimiento: Borra multimedia de aprobadas > 30 días."""
+    try:
+        cur = mysql.connection.cursor()
+        fecha_limite = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        sql = """
+            SELECT id, evidencia_url, evidencia_url1, evidencia_url2 
+            FROM mermas_pollosgar 
+            WHERE estatus = 'aprobada' 
+              AND fecha <= %s 
+              AND (evidencia_url IS NOT NULL OR evidencia_url1 IS NOT NULL)
+        """
+        cur.execute(sql, (fecha_limite,))
+        rows = cur.fetchall()
+        
+        if rows:
+            ids_to_clean = []
+            files_to_delete = []
+            for r in rows:
+                rid = r['id'] if isinstance(r, dict) else r[0]
+                e0 = r['evidencia_url'] if isinstance(r, dict) else r[1]
+                e1 = r['evidencia_url1'] if isinstance(r, dict) else r[2]
+                e2 = r['evidencia_url2'] if isinstance(r, dict) else r[3]
+                
+                ids_to_clean.append(rid)
+                if e0: files_to_delete.append(e0)
+                if e1: files_to_delete.append(e1)
+                if e2: files_to_delete.append(e2)
+            
+            _delete_evidence_files(files_to_delete)
+            
+            format_strings = ','.join(['%s'] * len(ids_to_clean))
+            update_sql = f"""
+                UPDATE mermas_pollosgar 
+                SET evidencia_url = NULL, evidencia_url1 = NULL, evidencia_url2 = NULL 
+                WHERE id IN ({format_strings})
+            """
+            cur.execute(update_sql, tuple(ids_to_clean))
+            mysql.connection.commit()
         cur.close()
-        return int(data['id'])
+    except Exception as e:
+        print(f"Error en mantenimiento automático: {e}")
 
-    cur.execute("""
-        INSERT INTO mermas_pollosgar
-            (fecha, empresa, empresa_id, operador_id, operador_nombre,
-             cliente, vehiculo, factura, kg_factura, kg_entregados,
-             merma_kg, merma_pct, evidencia_url, estatus, decision, fecha_decision)
-        VALUES
-            (NOW(), %s, %s, %s, %s,
-             %s, %s, %s, %s, %s,
-             %s, %s, %s, %s, %s, %s)
-    """, (
-        data.get('empresa'),
-        data.get('empresa_id'),
-        data.get('operador_id'),
-        data.get('operador_nombre'),
-        data.get('cliente'),
-        data.get('vehiculo'),
-        data.get('factura'),
-        data.get('kg_factura'),
-        data.get('kg_entregados'),
-        data.get('merma_kg'),
-        data.get('merma_pct'),
-        data.get('evidencia_url'),
-        estatus,
-        decision,
-        None if estatus == 'pendiente' else datetime.now()
-    ))
-    mysql.connection.commit()
-    new_id = cur.lastrowid
-    cur.close()
-    return int(new_id)
+def _get_email_talento_humano(empresa_id):
+    try:
+        cur = mysql.connection.cursor()
+        sql = "SELECT email FROM contactos WHERE id_empresa = %s AND area_contacto = 'talentohumano' LIMIT 1"
+        cur.execute(sql, (empresa_id,))
+        row = cur.fetchone()
+        cur.close()
+        if row:
+            return row['email'] if isinstance(row, dict) else row[0]
+        return None
+    except:
+        return None
+
+def _enviar_email_no_conforme(destinatario, data_merma, argumentos, archivos):
+    """Envía email con ADJUNTOS y estilo corporativo."""
+    if not destinatario or not EMAIL_USER or not EMAIL_PASS:
+        return False
+
+    msg = MIMEMultipart()
+    msg['From'] = EMAIL_FROM
+    msg['To'] = destinatario
+    msg['Subject'] = f"🚨 REPORTE NO CONFORME - {data_merma.get('operador_nombre')} - Fact: {data_merma.get('factura')}"
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden;">
+            <div style="background-color: #015249; color: #fff; padding: 20px; text-align: center;">
+                <h2 style="margin:0;">Notificación de Merma No Conforme</h2>
+                <p style="font-size: 12px; margin-top: 5px;">Sistema de Gestión BQA ONE</p>
+            </div>
+            <div style="padding: 20px; color: #333;">
+                <p><strong>Departamento de Talento Humano,</strong></p>
+                <p>Se ha generado una validación <strong>NO CONFORME</strong> tras la auditoría de mermas.</p>
+                
+                <div style="background: #fef2f2; border-left: 4px solid #b91c1c; padding: 15px; margin: 20px 0;">
+                    <h3 style="color: #b91c1c; margin-top: 0;">Argumentos del Controlador</h3>
+                    <p style="font-style: italic;">"{argumentos}"</p>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr style="background: #f9fafb;"><td style="padding: 8px; font-weight: bold;">Operador:</td><td style="padding: 8px;">{data_merma.get('operador_nombre')}</td></tr>
+                    <tr><td style="padding: 8px; font-weight: bold;">Factura:</td><td style="padding: 8px;">{data_merma.get('factura')}</td></tr>
+                    <tr style="background: #f9fafb;"><td style="padding: 8px; font-weight: bold;">Ítem:</td><td style="padding: 8px;">{data_merma.get('item')}</td></tr>
+                    <tr><td style="padding: 8px; font-weight: bold;">Merma:</td><td style="padding: 8px; color: #b91c1c; font-weight: bold;">{data_merma.get('merma_kg')} kg ({data_merma.get('merma_pct')}%)</td></tr>
+                </table>
+                
+                <p style="font-size: 12px; color: #666; margin-top: 20px;">
+                    * Las evidencias (fotos y video) se encuentran adjuntas a este correo.
+                    <br>* Los archivos han sido eliminados del servidor por seguridad tras el envío.
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    msg.attach(MIMEText(html, 'html'))
+
+    base_dir = current_app.static_folder
+    for rel_path in archivos:
+        if rel_path:
+            full_path = os.path.join(base_dir, rel_path)
+            if os.path.exists(full_path):
+                try:
+                    with open(full_path, "rb") as f:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(f.read())
+                    encoders.encode_base64(part)
+                    part.add_header('Content-Disposition', f"attachment; filename={os.path.basename(full_path)}")
+                    msg.attach(part)
+                except Exception as e:
+                    print(f"Error adjuntando {full_path}: {e}")
+
+    try:
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+            server.starttls()
+            server.login(EMAIL_USER, EMAIL_PASS)
+            server.sendmail(EMAIL_FROM, destinatario, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"Error SMTP: {e}")
+        return False
 
 # =========================
-# Endpoints existentes
+# RUTAS OPERATIVAS
 # =========================
 
 @bp_gestion_mermas.route('/mermas/umbral', methods=['GET'])
-def mermas_umbral():
-    empresa_id = session.get('empresa_id') or session.get('nit')
-    umbral = _get_umbral_pct(empresa_id)
-    return jsonify(success=True, umbral_pct=umbral)
+def mermas_umbral(): return jsonify(success=True, umbral_pct=_get_umbral_pct())
 
 @bp_gestion_mermas.route('/mermas/clientes', methods=['GET'])
 def mermas_clientes():
-    """
-    Devuelve la lista de clientes asociados a la empresa del usuario,
-    leyendo de la tabla clientes_empresa.
-    """
     empresa_id = session.get('empresa_id') or session.get('nit')
-
     cur = mysql.connection.cursor()
-    try:
-        if empresa_id:
-            # Filtra por empresa actual (ej: Pollos GAR SAS = 890707006)
-            cur.execute("""
-                SELECT DISTINCT cliente_empresa
-                  FROM clientes_empresa
-                 WHERE id_empresa = %s
-                   AND cliente_empresa IS NOT NULL
-                   AND cliente_empresa <> ''
-                 ORDER BY cliente_empresa ASC
-            """, (empresa_id,))
-        else:
-            # Fallback: todos los clientes de todas las empresas
-            cur.execute("""
-                SELECT DISTINCT cliente_empresa
-                  FROM clientes_empresa
-                 WHERE cliente_empresa IS NOT NULL
-                   AND cliente_empresa <> ''
-                 ORDER BY cliente_empresa ASC
-            """)
-        rows = cur.fetchall()
-    finally:
-        cur.close()
-
-    items = [r['cliente_empresa'] for r in rows if r.get('cliente_empresa')]
-    return jsonify(success=True, items=items)
+    sql = "SELECT DISTINCT cliente_empresa FROM clientes_empresa WHERE cliente_empresa IS NOT NULL AND cliente_empresa <> ''"
+    params = []
+    if empresa_id:
+        sql += " AND id_empresa = %s"
+        params.append(empresa_id)
+    sql += " ORDER BY cliente_empresa ASC"
+    cur.execute(sql, tuple(params))
+    rows = cur.fetchall()
+    cur.close()
+    return jsonify(success=True, items=[r['cliente_empresa'] for r in rows])
 
 @bp_gestion_mermas.route('/mermas/vehiculos', methods=['GET'])
 def mermas_vehiculos():
-    """
-    Devuelve la lista de vehículos asociados a la empresa del usuario.
-    """
     empresa_id = session.get('empresa_id') or session.get('nit')
-
     cur = mysql.connection.cursor()
-    try:
-        if empresa_id:
-            cur.execute("""
-                SELECT DISTINCT placa
-                FROM vehiculos
-                WHERE id_empresa = %s
-                ORDER BY placa ASC
-            """, (empresa_id,))
-        else:
-            cur.execute("""
-                SELECT DISTINCT placa
-                FROM vehiculos
-                ORDER BY placa ASC
-            """)
-        rows = cur.fetchall()
-    finally:
-        cur.close()
-
-    items = [r['placa'] for r in rows if r.get('placa')]
-    return jsonify(success=True, items=items)
-
+    sql = "SELECT DISTINCT placa FROM vehiculos"
+    params = []
+    if empresa_id:
+        sql += " WHERE id_empresa = %s"
+        params.append(empresa_id)
+    sql += " ORDER BY placa ASC"
+    cur.execute(sql, tuple(params))
+    rows = cur.fetchall()
+    cur.close()
+    return jsonify(success=True, items=[r['placa'] for r in rows])
 
 @csrf.exempt
 @bp_gestion_mermas.route('/mermas/registrar', methods=['POST'])
 def mermas_registrar():
-    """
-    Reglas:
-    - Un operador NO puede tener más de una merma con estatus='pendiente'.
-    - Si existe una 'rechazada' del MISMO operador y MISMA factura -> se sobrescribe y vuelve a 'pendiente'.
-    - Uso de GET_LOCK por operador para evitar carreras.
-    """
-    try:
-        j = request.get_json(force=True, silent=True) or {}
-    except Exception:
-        return jsonify(success=False, message="JSON inválido"), 400
+    try: j = request.get_json(force=True, silent=True) or {}
+    except: return jsonify(success=False, message="JSON mal formado"), 400
 
-    # Sesión
-    empresa = (session.get('empresa') or '').strip()
-    empresa_id = str(session.get('empresa_id') or session.get('nit') or '').strip()
-
-    # Operador: primero cédula (si existe), si no ID interno
-    operador_id = str(
-        session.get('cedula') or
-        session.get('usuario_id') or
-        ''
-    ).strip()
-
-    # Nombre del operador
-    operador_nombre = (
-        session.get('usuario_nombre') or
-        session.get('nombre') or
-        ''
-    ).strip()
-
-    # Fallback a datos enviados por el frontend
-    if not operador_nombre:
-        operador_nombre = (j.get('operador_nombre') or '').strip()
-
-    if not operador_id:
-        operador_id = str(j.get('operador_id') or '').strip()
-
-
-
-
-
-    # Fallback tolerante (solo si sesión viene vacía)
-    if not operador_nombre: operador_nombre = (j.get('operador_nombre') or '').strip()
-    if not operador_id:     operador_id     = str(j.get('operador_id') or '').strip()
-    if not empresa:         empresa         = (j.get('empresa') or '').strip()
-
-    # Datos del formulario
-    cliente  = (j.get('cliente')  or '').strip()
+    empresa = (session.get('empresa') or j.get('empresa') or '').strip()
+    empresa_id = str(session.get('empresa_id') or session.get('nit') or j.get('empresa_id') or '').strip()
+    operador_id = str(session.get('cedula') or session.get('usuario_id') or j.get('operador_id') or '').strip()
+    operador_nombre = (session.get('usuario_nombre') or session.get('nombre') or j.get('operador_nombre') or '').strip()
+    cliente = (j.get('cliente') or '').strip()
     vehiculo = (j.get('vehiculo') or '').strip()
-    factura  = (j.get('factura')  or '').strip()
+    factura = (j.get('factura') or '').strip()
+    
+    try: total_kg_factura = float(j.get('total_kg', 0))
+    except: total_kg_factura = 0.0
+        
+    items = j.get('items')
+    is_retry = j.get('is_retry', False)
+    retry_id = j.get('retry_id')
 
-    if not (cliente and vehiculo and factura):
-        return jsonify(success=False, message="Faltan campos obligatorios (cliente/vehiculo/factura)"), 400
+    if not (cliente and vehiculo and factura and items):
+        return jsonify(success=False, message="Faltan datos"), 400
 
-    try:
-        kgf = float(j.get('kg_factura'))
-        kge = float(j.get('kg_entregados'))
-    except (TypeError, ValueError):
-        return jsonify(success=False, message="kg_factura y kg_entregados deben ser numéricos"), 400
-    if kgf <= 0: return jsonify(success=False, message="kg_factura debe ser > 0"), 400
-    if kge < 0:  return jsonify(success=False, message="kg_entregados debe ser >= 0"), 400
-
-    # Cálculos
-    merma_kg  = max(0.0, kgf - kge)
-    merma_pct = (merma_kg / kgf * 100.0) if kgf > 0 else 0.0
-
-    # Evidencia
-    empresa_slug = (empresa or 'generico').lower().replace(' ', '_')
-    evidencia_url = _save_base64_image(j.get('evidencia_foto'), empresa_slug=empresa_slug)
-
-    # Candado por operador
     lock_name = f"mermas_op_{operador_id}"
     cur = mysql.connection.cursor()
     try:
-        cur.execute("SELECT GET_LOCK(%s, 10)", (lock_name,))
-        got = cur.fetchone()
-        if not got or list(got.values())[0] != 1:
+        cur.execute("SELECT GET_LOCK(%s, 10) AS candado", (lock_name,))
+        res_lock = cur.fetchone()
+        if not res_lock:
             cur.close()
-            return jsonify(success=False, message="No fue posible obtener bloqueo. Intenta de nuevo."), 409
-
-        # ¿Existe pendiente?
-        cur.execute("""
-            SELECT id, factura
-              FROM mermas_pollosgar
-             WHERE operador_id=%s AND estatus='pendiente'
-             LIMIT 1
-        """, (operador_id,))
-        row_pend = cur.fetchone()
-        if row_pend:
-            cur.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
+            return jsonify(success=False, message="Servidor ocupado"), 409
+        
+        # Validar lock
+        locked = res_lock.get('candado') if isinstance(res_lock, dict) else res_lock[0]
+        if locked != 1:
             cur.close()
-            return jsonify(
-                success=False,
-                code='PENDING_EXISTS',
-                message=f"Tienes una merma pendiente de aprobación (ID {row_pend['id']}, factura {row_pend['factura']})."
-            ), 409
+            return jsonify(success=False, message="Servidor ocupado"), 409
 
-        # Regla de reintento sobre rechazada misma factura
-        cur.execute("""
-            SELECT id
-              FROM mermas_pollosgar
-             WHERE operador_id=%s AND factura=%s AND estatus='rechazada'
-             ORDER BY fecha_decision DESC, fecha DESC
-             LIMIT 1
-        """, (operador_id, factura))
-        row_rech = cur.fetchone()
+        if not is_retry:
+            cur.execute("SELECT id FROM mermas_pollosgar WHERE factura=%s AND estatus='pendiente' LIMIT 1", (factura,))
+            if cur.fetchone():
+                 cur.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
+                 return jsonify(success=False, code='PENDING_EXISTS', message="Factura ya en revisión."), 409
 
-        if row_rech:
-            cur.execute("""
-                UPDATE mermas_pollosgar
-                   SET fecha=NOW(),
-                       empresa=%s, empresa_id=%s,
-                       operador_nombre=%s,
-                       cliente=%s, vehiculo=%s,
-                       kg_factura=%s, kg_entregados=%s,
-                       merma_kg=%s, merma_pct=%s,
-                       evidencia_url=%s,
-                       estatus='pendiente',
-                       decision='por_aprobar',
-                       comentario_control=NULL,
-                       fecha_decision=NULL
-                 WHERE id=%s
-            """, (
-                empresa, empresa_id, operador_nombre,
-                cliente, vehiculo,
-                round(kgf, 3), round(kge, 3),
-                round(merma_kg, 3), round(merma_pct, 3),
-                evidencia_url,
-                row_rech['id']
-            ))
-            mysql.connection.commit()
-            cur.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
-            cur.close()
-            current_app.logger.info(f"[MERMA REGISTRAR] reintento sobre rechazada -> id={row_rech['id']}")
-            return jsonify(success=True, aprobado=False, id=row_rech['id'], umbral_pct=_get_umbral_pct(empresa_id))
-
-        # Alta normal
+        empresa_slug = (empresa or 'generico').lower().replace(' ', '_')
         umbral = _get_umbral_pct(empresa_id)
-        auto_aprueba = merma_pct <= umbral
+        
+        global_status = 'aprobada' 
+        
+        for it in items:
+            try:
+                kg_item_val = float(it.get('kg_facturados', 0)) 
+                kge = float(it.get('kg_entregados', 0))
+                nombre_item = (it.get('item') or 'General').strip()
+            except:
+                cur.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
+                return jsonify(success=False, message="Error numérico"), 400
 
-        data = {
-            'empresa': empresa,
-            'empresa_id': empresa_id,
-            'operador_id': operador_id,
-            'operador_nombre': operador_nombre,
-            'cliente': cliente,
-            'vehiculo': vehiculo,
-            'factura': factura,
-            'kg_factura': round(kgf, 3),
-            'kg_entregados': round(kge, 3),
-            'merma_kg': round(merma_kg, 3),
-            'merma_pct': round(merma_pct, 3),
-            'evidencia_url': evidencia_url
-        }
+            merma_kg = kg_item_val - kge 
+            merma_pct = (merma_kg / kg_item_val * 100.0) if kg_item_val > 0 else 0.0
 
-        if auto_aprueba:
-            reg_id = _insert_merma_registro(data, estatus='aprobada', decision='aprobada')
-            cur.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
-            cur.close()
-            return jsonify(success=True, aprobado=True, id=reg_id, umbral_pct=umbral)
-        else:
-            reg_id = _insert_merma_registro(data, estatus='pendiente', decision='por_aprobar')
-            cur.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
-            cur.close()
-            return jsonify(success=True, aprobado=False, id=reg_id, umbral_pct=umbral)
+            vid_path = _save_base64_image(it.get('evidencia_url'), empresa_slug)
+            foto1_path = _save_base64_image(it.get('evidencia_url2'), empresa_slug)
+            foto2_path = _save_base64_image(it.get('evidencia_url3'), empresa_slug)
+
+            item_status = 'aprobada'
+            if merma_pct > umbral:
+                item_status = 'segunda_revision' if is_retry else 'pendiente'
+                global_status = item_status
+
+            if is_retry and retry_id:
+                cur.execute("""
+                    UPDATE mermas_pollosgar
+                    SET kg_item=%s, kg_entregados=%s, merma_kg=%s, merma_pct=%s,
+                        evidencia_url=%s, evidencia_url1=%s, evidencia_url2=%s,
+                        estatus=%s, decision='rectificada'
+                    WHERE id=%s
+                """, (kg_item_val, kge, merma_kg, merma_pct, foto1_path, vid_path, foto2_path, item_status, retry_id))
+            else:
+                cur.execute("""
+                    INSERT INTO mermas_pollosgar
+                        (fecha, empresa, empresa_id, operador_id, operador_nombre,
+                         cliente, vehiculo, factura, item,
+                         kg_factura, kg_item, kg_entregados, merma_kg, merma_pct, 
+                         evidencia_url, evidencia_url1, evidencia_url2,
+                         estatus, decision, fecha_decision, nota_descuento)
+                    VALUES
+                        (NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, '')
+                """, (
+                    empresa, empresa_id, operador_id, operador_nombre,
+                    cliente, vehiculo, factura, nombre_item,
+                    total_kg_factura, kg_item_val, kge, merma_kg, merma_pct,
+                    foto1_path, vid_path, foto2_path,
+                    item_status, 
+                    'por_aprobar' if 'pendiente' in item_status else 'aprobada',
+                    None if 'pendiente' in item_status else datetime.now()
+                ))
+
+        mysql.connection.commit()
+        cur.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
+        cur.close()
+
+        return jsonify(success=True, status=global_status, factura=factura, message="Registrado correctamente")
 
     except Exception as e:
-        current_app.logger.exception(e)
         try: cur.execute("SELECT RELEASE_LOCK(%s)", (lock_name,))
-        except Exception: pass
+        except: pass
         cur.close()
-        return jsonify(success=False, message="Error interno al registrar."), 500
+        return jsonify(success=False, message=f"Error interno: {str(e)}"), 500
 
+@csrf.exempt
+@bp_gestion_mermas.route('/mermas/accion', methods=['POST'])
+def mermas_accion():
+    j = request.get_json(force=True, silent=True) or {}
+    reg_id = j.get('id')
+    accion = (j.get('accion') or '').lower()
+
+    if not reg_id: return jsonify(success=False), 400
+    
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT estatus FROM mermas_pollosgar WHERE id=%s", (reg_id,))
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        return jsonify(success=False, message="Registro no encontrado"), 404
+
+    # Limpiar y normalizar estatus
+    raw_status = row['estatus'] if isinstance(row, dict) else row[0]
+    current_status = str(raw_status).strip().lower()
+    
+    estatus_final = None 
+    decision = 'pendiente'
+    
+    if accion == 'aprobar':
+        estatus_final = 'aprobada'
+        decision = 'aprobada'
+        
+    elif accion == 'objetar':
+        if current_status == 'pendiente':
+            estatus_final = 'en_revision'
+            decision = 'solicitud_rectificacion'
+        elif current_status == 'segunda_revision':
+            estatus_final = 'objetada'
+            decision = 'objetada_auditoria'
+        else:
+            estatus_final = 'objetada'
+            decision = 'objetada_fallback'
+            
+    if estatus_final is None:
+        cur.close()
+        return jsonify(success=False, message="Acción no permitida"), 400
+
+    cur.execute("UPDATE mermas_pollosgar SET estatus=%s, decision=%s, fecha_decision=NOW() WHERE id=%s", (estatus_final, decision, reg_id))
+    mysql.connection.commit()
+    cur.close()
+
+    return jsonify(success=True, id=reg_id, estado=estatus_final)
+
+@bp_gestion_mermas.route('/mermas/validar_investigacion', methods=['POST'])
+@csrf.exempt
+def mermas_validar_investigacion():
+    j = request.get_json(force=True, silent=True) or {}
+    reg_id = j.get('id')
+    decision = j.get('decision')
+    argumentos = j.get('argumentos', '')
+
+    if not reg_id or not decision: return jsonify(success=False, message="Datos incompletos"), 400
+
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM mermas_pollosgar WHERE id=%s", (reg_id,))
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        return jsonify(success=False, message="Registro no encontrado"), 404
+
+    data_merma = row if isinstance(row, dict) else {
+        'id': row[0], 'empresa_id': row[3], 'operador_nombre': row[5], 'operador_id': row[4],
+        'cliente': row[6], 'factura': row[9], 'item': row[10], 
+        'merma_kg': row[14], 'merma_pct': row[15],
+        'evidencia_url': row[8], 'evidencia_url1': row[16], 'evidencia_url2': row[17]
+    }
+    
+    files = [data_merma['evidencia_url'], data_merma['evidencia_url1'], data_merma['evidencia_url2']]
+
+    if decision == 'conforme':
+        _delete_evidence_files(files)
+        cur.execute("""
+            UPDATE mermas_pollosgar 
+            SET estatus='validada', decision='validada_conforme', fecha_decision=NOW(), 
+                evidencia_url=NULL, evidencia_url1=NULL, evidencia_url2=NULL, comentario_control=%s
+            WHERE id=%s
+        """, (argumentos, reg_id))
+
+    elif decision == 'no_conforme':
+        email_to = _get_email_talento_humano(data_merma.get('empresa_id'))
+        if email_to:
+            _enviar_email_no_conforme(email_to, data_merma, argumentos, files)
+        
+        _delete_evidence_files(files)
+        
+        # Mantiene 'objetada' pero borra URLs, así que el filtro 'IS NOT NULL' la saca de la lista
+        cur.execute("""
+            UPDATE mermas_pollosgar 
+            SET estatus='objetada', decision='no_conforme_rrhh', fecha_decision=NOW(),
+                evidencia_url=NULL, evidencia_url1=NULL, evidencia_url2=NULL, comentario_control=%s
+            WHERE id=%s
+        """, (argumentos, reg_id))
+
+    mysql.connection.commit()
+    cur.close()
+    return jsonify(success=True)
+
+@bp_gestion_mermas.route('/mermas/check_status_live', methods=['GET'])
+def check_status_live():
+    factura = request.args.get('factura')
+    if not factura: return jsonify(completed=False)
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT count(*) as pendientes FROM mermas_pollosgar WHERE factura=%s AND estatus IN ('pendiente', 'segunda_revision')", (factura,))
+    res = cur.fetchone()
+    pendientes = res['pendientes'] if isinstance(res, dict) else res[0]
+    if pendientes > 0:
+        cur.close()
+        return jsonify(completed=False)
+    
+    cur.execute("SELECT id, estatus FROM mermas_pollosgar WHERE factura=%s ORDER BY id DESC LIMIT 1", (factura,))
+    row = cur.fetchone()
+    cur.close()
+    
+    final_status = 'aprobada'
+    row_id = None
+    if row:
+        if isinstance(row, dict):
+             final_status = row['estatus']
+             row_id = row['id']
+        else:
+             row_id = row[0]
+             final_status = row[1]
+    return jsonify(completed=True, status=final_status, id=row_id)
 
 @bp_gestion_mermas.route('/mermas/pending', methods=['GET'])
 def mermas_pending():
     empresa_id = request.args.get('empresa_id') or session.get('empresa_id') or session.get('nit')
     cur = mysql.connection.cursor()
+    sql = """
+        SELECT id, fecha, cliente, vehiculo, factura, item, operador_nombre,
+               kg_factura AS total_factura_kg, kg_item, kg_entregados, merma_kg, merma_pct,
+               evidencia_url, evidencia_url1, evidencia_url2, estatus, nota_descuento
+        FROM mermas_pollosgar 
+        WHERE estatus IN ('pendiente', 'segunda_revision')
+    """
+    params = []
     if empresa_id:
-        cur.execute("""
-            SELECT id, fecha, empresa, empresa_id, operador_nombre,
-                   cliente, vehiculo, factura, kg_factura, kg_entregados,
-                   merma_kg, merma_pct, evidencia_url, estatus, decision
-              FROM mermas_pollosgar
-             WHERE estatus='pendiente' AND empresa_id=%s
-             ORDER BY fecha ASC
-        """, (empresa_id,))
-    else:
-        cur.execute("""
-            SELECT id, fecha, empresa, empresa_id, operador_nombre,
-                   cliente, vehiculo, factura, kg_factura, kg_entregados,
-                   merma_kg, merma_pct, evidencia_url, estatus, decision
-              FROM mermas_pollosgar
-             WHERE estatus='pendiente'
-             ORDER BY fecha ASC
-        """)
+        sql += " AND empresa_id=%s"
+        params.append(empresa_id)
+    sql += " ORDER BY fecha ASC"
+    cur.execute(sql, tuple(params))
     rows = cur.fetchall()
     cur.close()
     return jsonify(success=True, items=rows)
 
-
-@csrf.exempt
-@bp_gestion_mermas.route('/mermas/accion', methods=['POST'])
-def mermas_accion():
-    """
-    Recibe: { id, accion, comentario? }
-    accion ∈ {'aprobar','no_aprobar','aprobar_nc'}
-    """
-    j = request.get_json(force=True, silent=True) or {}
-    reg_id = j.get('id')
-    accion = (j.get('accion') or '').strip().lower()
-
-    if not reg_id or accion not in ('aprobar', 'no_aprobar', 'aprobar_nc'):
-        return jsonify(success=False, message='Parámetros inválidos'), 400
-
-    if accion == 'aprobar':
-        _insert_merma_registro({'id': reg_id}, estatus='aprobada', decision='aprobada')
-        estado = 'aprobada'
-    elif accion == 'no_aprobar':
-        _insert_merma_registro({'id': reg_id}, estatus='rechazada', decision='no_aprobrada')
-        estado = 'rechazada'
-    else:
-        _insert_merma_registro({'id': reg_id}, estatus='aprobada_no_conforme', decision='aprobada_no_conforme')
-        estado = 'aprobada_no_conforme'
-
-    try:
-        if j.get('comentario'):
-            cur = mysql.connection.cursor()
-            cur.execute("""
-                UPDATE mermas_pollosgar
-                   SET comentario_control=%s
-                 WHERE id=%s
-            """, (j['comentario'], reg_id))
-            mysql.connection.commit()
-            cur.close()
-    except Exception as e:
-        current_app.logger.exception(e)
-
-    return jsonify(success=True, id=reg_id, estado=estado)
-
-
-@bp_gestion_mermas.route('/mermas/estado', methods=['GET'])
-def mermas_estado():
-    reg_id = request.args.get('id')
-    if not reg_id:
-        return jsonify(success=False, message='Falta id'), 400
-
-    cur = mysql.connection.cursor()
-    cur.execute("""
-        SELECT estatus, decision
-          FROM mermas_pollosgar
-         WHERE id=%s
-    """, (reg_id,))
-    row = cur.fetchone()
-    cur.close()
-
-    if not row:
-        return jsonify(success=False, message='No encontrado'), 404
-
-    return jsonify(success=True, estado=row['estatus'], decision=row['decision'])
-
-# =========================
-# NUEVO: Consultas e informes
-# =========================
-
-def _parse_date_range(desde, hasta):
-    """
-    Retorna (fecha_desde, fecha_hasta) en 'YYYY-MM-DD' o None si no vienen.
-    Si solo envían 'desde', 'hasta' será hoy. Si solo envían 'hasta', 'desde' será el inicio del mes de 'hasta'.
-    """
-    try:
-        d = datetime.strptime(desde, "%Y-%m-%d").date() if desde else None
-    except Exception:
-        d = None
-    try:
-        h = datetime.strptime(hasta, "%Y-%m-%d").date() if hasta else None
-    except Exception:
-        h = None
-
-    today = datetime.now().date()
-    if d and not h:
-        h = today
-    if h and not d:
-        d = h.replace(day=1)
-    return (d.isoformat() if d else None, h.isoformat() if h else None)
-
-
-@bp_gestion_mermas.route('/mermas/opciones', methods=['GET'])
-def mermas_opciones():
-    """
-    /mermas/opciones?tipo=zona|vendedor|cliente|vehiculo
-    Devuelve opciones únicas (filtradas por empresa) para poblar selects.
-    """
-    tipo = (request.args.get('tipo') or '').strip().lower()
+@bp_gestion_mermas.route('/mermas/review_list', methods=['GET'])
+def mermas_review_list():
     empresa_id = session.get('empresa_id') or session.get('nit')
-
-    colmap = {
-        'zona': 'zona',
-        'vendedor': 'operador_nombre',
-        'cliente': 'cliente',
-        'vehiculo': 'vehiculo',
-    }
-    col = colmap.get(tipo)
-    if not col:
-        return jsonify(success=False, message='tipo inválido'), 400
-
     cur = mysql.connection.cursor()
-    try:
-        if empresa_id:
-            cur.execute(f"""
-                SELECT DISTINCT {col} AS val
-                  FROM mermas_pollosgar
-                 WHERE {col} IS NOT NULL AND {col} <> '' AND empresa_id=%s
-                 ORDER BY {col} ASC
-            """, (empresa_id,))
-        else:
-            cur.execute(f"""
-                SELECT DISTINCT {col} AS val
-                  FROM mermas_pollosgar
-                 WHERE {col} IS NOT NULL AND {col} <> ''
-                 ORDER BY {col} ASC
-            """)
-        rows = cur.fetchall()
-    finally:
-        cur.close()
-
-    vals = [r['val'] for r in rows if r.get('val')]
-    return jsonify(success=True, items=vals)
-
+    _limpiar_mermas_antiguas()
+    
+    sql = """
+        SELECT id, fecha, cliente, vehiculo, factura, item, operador_nombre,
+               kg_factura AS total_factura_kg, kg_item, kg_entregados, merma_kg, merma_pct,
+               evidencia_url, evidencia_url1, evidencia_url2, estatus, nota_descuento
+        FROM mermas_pollosgar 
+        WHERE estatus IN ('objetada', 'aprobada_no_conforme') 
+          AND evidencia_url IS NOT NULL 
+    """
+    params = []
+    if empresa_id:
+        sql += " AND empresa_id=%s"
+        params.append(empresa_id)
+    sql += " ORDER BY fecha DESC"
+    cur.execute(sql, tuple(params))
+    rows = cur.fetchall()
+    cur.close()
+    return jsonify(success=True, items=rows)
 
 @csrf.exempt
 @bp_gestion_mermas.route('/mermas/consulta', methods=['POST'])
 def mermas_consulta():
-    """
-    Recibe JSON:
-      {
-        "tipo": "zona|vendedor|cliente|vehiculo|general",
-        "zona"|"vendedor"|"cliente"|"vehiculo"|"estatus": "...",
-        "desde": "YYYY-MM-DD",
-        "hasta": "YYYY-MM-DD"
-      }
-    Responde:
-      {
-        success: true,
-        filtros: {...},
-        resumen: {kg_totales, merma_total, merma_pct_total, registros},
-        detalle_clientes: [...],
-        serie_pct: [...],             # % diario (se conserva)
-        operaciones: [...],
-        chart: {type, labels, values, series_label, x_title, y_title}  # <-- NUEVO
-      }
-    """
     j = request.get_json(force=True, silent=True) or {}
-    tipo = (j.get('tipo') or '').strip().lower()
+    tipo = (j.get('tipo') or '').lower()
     desde, hasta = _parse_date_range(j.get('desde'), j.get('hasta'))
     empresa_id = session.get('empresa_id') or session.get('nit')
-
-    where = []
-    params = []
-
-    if empresa_id:
-        where.append("empresa_id=%s")
-        params.append(empresa_id)
-
-    if tipo == 'zona':
-        where.append("zona=%s")
-        params.append((j.get('zona') or '').strip())
-    elif tipo == 'vendedor':
-        where.append("operador_nombre=%s")
-        params.append((j.get('vendedor') or '').strip())
-    elif tipo == 'cliente':
-        where.append("cliente=%s")
-        params.append((j.get('cliente') or '').strip())
-    elif tipo == 'vehiculo':
-        where.append("vehiculo=%s")
-        params.append((j.get('vehiculo') or '').strip())
-    elif tipo == 'general':
-        est = (j.get('estatus') or '').strip().lower()
-        if est:
-            where.append("estatus=%s")
-            params.append(est)
-    else:
-        return jsonify(success=False, message="tipo inválido"), 400
-
-    if desde:
-        where.append("DATE(fecha) >= %s")
-        params.append(desde)
-    if hasta:
-        where.append("DATE(fecha) <= %s")
-        params.append(hasta)
-
+    where, params = [], []
+    if empresa_id: where.append("empresa_id=%s"); params.append(empresa_id)
+    if tipo=='zona': where.append("zona=%s"); params.append(j.get('zona'))
+    elif tipo=='vendedor': where.append("operador_nombre=%s"); params.append(j.get('vendedor'))
+    elif tipo=='cliente': where.append("cliente=%s"); params.append(j.get('cliente'))
+    elif tipo=='vehiculo': where.append("vehiculo=%s"); params.append(j.get('vehiculo'))
+    if desde: where.append("DATE(fecha) >= %s"); params.append(desde)
+    if hasta: where.append("DATE(fecha) <= %s"); params.append(hasta)
     where_sql = ("WHERE " + " AND ".join(where)) if where else ""
-
     cur = mysql.connection.cursor()
     try:
-        # Resumen
-        cur.execute(f"""
-            SELECT COALESCE(SUM(kg_factura),0) AS kg_totales,
-                   COALESCE(SUM(merma_kg),0) AS merma_total,
-                   COUNT(*) AS registros
-              FROM mermas_pollosgar
-            {where_sql}
-        """, tuple(params))
-        resumen = cur.fetchone() or {}
-
-        # Detalle por cliente
-        cur.execute(f"""
-            SELECT cliente,
-                   COALESCE(SUM(kg_factura),0) AS kg_cliente,
-                   COALESCE(SUM(merma_kg),0) AS merma_cliente
-              FROM mermas_pollosgar
-            {where_sql}
-             GROUP BY cliente
-             ORDER BY kg_cliente DESC
-        """, tuple(params))
-        detalle_rows = cur.fetchall() or []
-
-        # Serie diaria para % (se conserva por si se usa)
-        cur.execute(f"""
-            SELECT DATE(fecha) AS fecha,
-                   COALESCE(SUM(merma_kg),0)   AS merma_kg_dia,
-                   COALESCE(SUM(kg_factura),0) AS kg_factura_dia
-              FROM mermas_pollosgar
-            {where_sql}
-             GROUP BY DATE(fecha)
-             ORDER BY DATE(fecha) ASC
-        """, tuple(params))
-        serie_rows = cur.fetchall() or []
-
-        # Listado completo de operaciones (IMPORTANTE: fecha completa, no DATE(fecha))
-        cur.execute(f"""
-            SELECT fecha,
-                   cliente, vehiculo, factura,
-                   kg_factura, kg_entregados,
-                   merma_kg, merma_pct,
-                   operador_nombre
-              FROM mermas_pollosgar
-            {where_sql}
-             ORDER BY fecha ASC, cliente ASC, factura ASC
-        """, tuple(params))
-        ops_rows = cur.fetchall() or []
-    finally:
-        cur.close()
-
-    total_kg = float(resumen.get('kg_totales') or 0.0) or 0.0
-    merma_total = float(resumen.get('merma_total') or 0.0) or 0.0
-    merma_pct_total = (merma_total / total_kg * 100.0) if total_kg > 0 else 0.0
-
-    # Detalle por cliente (kilos, mermas y %)
+        cur.execute(f"SELECT COALESCE(SUM(kg_item),0) as kg, COALESCE(SUM(merma_kg),0) as merma, COUNT(*) as regs FROM mermas_pollosgar {where_sql}", tuple(params))
+        res = cur.fetchone()
+        cur.execute(f"SELECT cliente, COALESCE(SUM(kg_item),0) as kg, COALESCE(SUM(merma_kg),0) as merma FROM mermas_pollosgar {where_sql} GROUP BY cliente ORDER BY kg DESC", tuple(params))
+        det = cur.fetchall()
+        cur.execute(f"SELECT fecha, cliente, vehiculo, factura, kg_item, kg_entregados, merma_kg, merma_pct, operador_nombre FROM mermas_pollosgar {where_sql} ORDER BY fecha ASC", tuple(params))
+        ops = cur.fetchall()
+    finally: cur.close()
+    kg_tot = float(res['kg']) if isinstance(res, dict) else float(res[0])
+    merma_tot = float(res['merma']) if isinstance(res, dict) else float(res[1])
+    regs = res['regs'] if isinstance(res, dict) else res[2]
     detalle = []
-    for r in detalle_rows:
-        kgc = float(r.get('kg_cliente') or 0.0)
-        mc  = float(r.get('merma_cliente') or 0.0)
-        pct = (mc / kgc * 100.0) if kgc > 0 else 0.0
-        detalle.append({
-            'cliente': r.get('cliente') or '(sin cliente)',
-            'kg_cliente': round(kgc, 3),
-            'merma_cliente': round(mc, 3),
-            'pct_cliente': round(pct, 3),
-        })
-
-    # Serie % diario (no es el gráfico principal ahora, pero se deja para usos futuros)
-    serie_pct = []
-    for r in serie_rows:
-        kg_d = float(r.get('kg_factura_dia') or 0.0)
-        m_d  = float(r.get('merma_kg_dia') or 0.0)
-        pctd = (m_d / kg_d * 100.0) if kg_d > 0 else 0.0
-        serie_pct.append({'fecha': str(r.get('fecha')), 'merma_pct': round(pctd, 3)})
-
-    # Operaciones completas
+    for r in det:
+        c_cli = r['cliente'] if isinstance(r, dict) else r[0]
+        c_kg = float(r['kg']) if isinstance(r, dict) else float(r[1])
+        c_merma = float(r['merma']) if isinstance(r, dict) else float(r[2])
+        detalle.append({'cliente': c_cli, 'kg_cliente': c_kg, 'merma_cliente': c_merma, 'pct_cliente': (c_merma/c_kg*100) if c_kg>0 else 0})
     operaciones = []
-    for r in ops_rows:
-        operaciones.append({
-            'fecha': str(r.get('fecha')),
-            'cliente': r.get('cliente'),
-            'vehiculo': r.get('vehiculo'),
-            'factura': r.get('factura'),
-            'kg_factura': round(float(r.get('kg_factura') or 0.0), 3),
-            'kg_entregados': round(float(r.get('kg_entregados') or 0.0), 3),
-            'merma_kg': round(float(r.get('merma_kg') or 0.0), 3),
-            'merma_pct': round(float(r.get('merma_pct') or 0.0), 3),
-            'operador_nombre': r.get('operador_nombre')
-        })
-
-    # --------- Construcción del CHART según 'tipo' ---------
-    chart = {
-        'type': 'bar',
-        'labels': [],
-        'values': [],
-        'series_label': 'Merma (%)',
-        'x_title': '',
-        'y_title': 'Merma (%)'
-    }
-
+    for r in ops:
+        if isinstance(r, dict): op = r
+        else: op = {'fecha': r[0], 'cliente': r[1], 'factura': r[3], 'kg_item': r[4], 'kg_entregados': r[5], 'merma_kg': r[6], 'merma_pct': r[7]}
+        operaciones.append({'fecha': str(op['fecha']), 'cliente': op['cliente'], 'factura': op['factura'], 'kg_factura': float(op['kg_item']), 'kg_entregados': float(op['kg_entregados']), 'merma_kg': float(op['merma_kg']), 'merma_pct': float(op['merma_pct'])})
+    chart = {'type': 'bar', 'labels': [], 'values': [], 'series_label': 'Merma (%)'}
     if tipo in ('zona', 'vendedor'):
-        # Barras: merma % por cliente
-        chart['type'] = 'bar'
         chart['labels'] = [d['cliente'] for d in detalle]
         chart['values'] = [d['pct_cliente'] for d in detalle]
-        chart['x_title'] = 'Cliente'
-
     elif tipo == 'cliente':
-        # Barras: merma % por factura (agregada por factura)
-        fact_kg = {}
-        fact_merma = {}
-        for op in operaciones:
-            fac = (op['factura'] or '').strip()
-            if not fac:
-                continue
-            fact_kg[fac] = fact_kg.get(fac, 0.0) + float(op['kg_factura'] or 0.0)
-            fact_merma[fac] = fact_merma.get(fac, 0.0) + float(op['merma_kg'] or 0.0)
-        fact_labels = sorted(fact_kg.keys())
-        fact_values = []
-        for fac in fact_labels:
-            kg = fact_kg.get(fac, 0.0)
-            mk = fact_merma.get(fac, 0.0)
-            pct = (mk / kg * 100.0) if kg > 0 else 0.0
-            fact_values.append(round(pct, 3))
-        chart['type'] = 'bar'
-        chart['labels'] = fact_labels
-        chart['values'] = fact_values
-        chart['x_title'] = 'Factura'
-
+        fdata = {}
+        for o in operaciones:
+            f = o['factura']
+            if f not in fdata: fdata[f] = {'k':0, 'm':0}
+            fdata[f]['k'] += float(o['kg_factura'])
+            fdata[f]['m'] += float(o['merma_kg'])
+        chart['labels'] = list(fdata.keys())
+        chart['values'] = [(v['m']/v['k']*100 if v['k']>0 else 0) for v in fdata.values()]
     elif tipo == 'vehiculo':
-        # Puntos: merma % por fecha y hora de entrega
         chart['type'] = 'points'
-        # Usamos la fecha completa
-        chart['labels'] = [op['fecha'] for op in operaciones]
-        chart['values'] = [op['merma_pct'] for op in operaciones]
-        chart['x_title'] = 'Fecha y hora de entrega'
-
-    out = {
-        'success': True,
-        'filtros': {
-            'tipo': tipo,
-            'desde': desde,
-            'hasta': hasta,
-            'zona': j.get('zona'),
-            'vendedor': j.get('vendedor'),
-            'cliente': j.get('cliente'),
-            'vehiculo': j.get('vehiculo'),
-            'estatus': j.get('estatus')
-        },
-        'resumen': {
-            'kg_totales': round(total_kg, 3),
-            'merma_total': round(merma_total, 3),
-            'merma_pct_total': round(merma_pct_total, 3),
-            'registros': int(resumen.get('registros') or 0),
-        },
-        'detalle_clientes': detalle,
-        'serie_pct': serie_pct,     # se conserva
-        'operaciones': operaciones,
-        'chart': chart              # <-- NUEVO
-    }
-    return jsonify(out)
-
+        chart['labels'] = [o['fecha'] for o in operaciones]
+        chart['values'] = [o['merma_pct'] for o in operaciones]
+    return jsonify({'success': True, 'resumen': {'kg_totales': kg_tot, 'merma_total': merma_tot, 'merma_pct_total': (merma_tot/kg_tot*100) if kg_tot>0 else 0, 'registros': regs}, 'detalle_clientes': detalle, 'operaciones': operaciones, 'chart': chart, 'filtros': {'tipo': tipo, 'desde': desde, 'hasta': hasta}})
 
 @csrf.exempt
 @bp_gestion_mermas.route('/mermas/consulta/pdf', methods=['POST'])
 def mermas_consulta_pdf():
-    """
-    Recibe JSON con:
-      titulo, filtros, resumen, detalle_clientes, operaciones, chart_png
-    Devuelve un PDF descargable.
-    """
     j = request.get_json(force=True, silent=True) or {}
-    titulo = (j.get('titulo') or 'Informe de mermas').strip()
-    resumen = j.get('resumen') or {}
-    detalle = j.get('detalle_clientes') or []
+    res = j.get('resumen') or {}
     chart = j.get('chart_png')
-    operaciones = j.get('operaciones') or []
-
     buf = BytesIO()
     p = canvas.Canvas(buf, pagesize=landscape(A4))
     W, H = landscape(A4)
-
-    # Encabezado
     p.setFont("Helvetica-Bold", 16)
-    p.drawString(2*cm, H - 2*cm, titulo)
-
-    filtros = j.get('filtros') or {}
-    subt = []
-    if filtros.get('desde'): subt.append(f"Desde: {filtros['desde']}")
-    if filtros.get('hasta'): subt.append(f"Hasta: {filtros['hasta']}")
-    if filtros.get('tipo') == 'zona' and filtros.get('zona'): subt.append(f"Zona: {filtros['zona']}")
-    if filtros.get('tipo') == 'vendedor' and filtros.get('vendedor'): subt.append(f"Vendedor: {filtros['vendedor']}")
-    if filtros.get('tipo') == 'cliente' and filtros.get('cliente'): subt.append(f"Cliente: {filtros['cliente']}")
-    if filtros.get('tipo') == 'vehiculo' and filtros.get('vehiculo'): subt.append(f"Vehículo: {filtros['vehiculo']}")
-    if filtros.get('tipo') == 'general' and filtros.get('estatus'): subt.append(f"Estatus: {filtros['estatus']}")
-
-    p.setFont("Helvetica", 11)
-    p.drawString(2*cm, H - 2.7*cm, " • ".join(subt))
-
-    # Resumen
-    y = H - 3.8*cm
+    p.drawString(2*cm, H-2*cm, "Informe de Mermas - Energix360")
+    p.setFont("Helvetica", 10)
+    p.drawString(2*cm, H-2.7*cm, f"Generado el: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     p.setFont("Helvetica-Bold", 12)
-    p.drawString(2*cm, y, "Resumen")
-    p.setFont("Helvetica", 11)
-    y -= 0.6*cm
-    p.drawString(2*cm, y, f"KG totales: {resumen.get('kg_totales', 0)}")
-    y -= 0.5*cm
-    p.drawString(2*cm, y, f"Merma total (kg): {resumen.get('merma_total', 0)}")
-    y -= 0.5*cm
-    p.drawString(2*cm, y, f"Merma total (%): {resumen.get('merma_pct_total', 0)} %")
-    y -= 0.5*cm
-    p.drawString(2*cm, y, f"Registros: {resumen.get('registros', 0)}")
-
-    # Tabla por cliente
-    y -= 1.0*cm
-    p.setFont("Helvetica-Bold", 11)
-    p.drawString(2*cm, y, "Detalle por cliente")
-    y -= 0.4*cm
-    p.setFont("Helvetica-Bold", 10)
-    p.drawString(2*cm, y, "Cliente")
-    p.drawString(10*cm, y, "KG")
-    p.drawString(14*cm, y, "Merma (kg)")
-    p.drawString(18*cm, y, "Merma (%)")
-    y -= 0.4*cm
-    p.setFont("Helvetica", 10)
-    for row in detalle[:16]:
-        p.drawString(2*cm, y, str(row.get('cliente', '')))
-        p.drawRightString(13*cm, y, f"{row.get('kg_cliente', 0)}")
-        p.drawRightString(17*cm, y, f"{row.get('merma_cliente', 0)}")
-        p.drawRightString(21*cm, y, f"{row.get('pct_cliente', 0)} %")
-        y -= 0.42*cm
-        if y < 6.5*cm:
-            break
-
-    # Gráfico (imagen del canvas del front)
-    if chart and isinstance(chart, str) and chart.startswith('data:image'):
+    p.drawString(2*cm, H-4*cm, f"Total KG: {res.get('kg_totales')}  |  Merma: {res.get('merma_total')} kg  |  %: {float(res.get('merma_pct_total',0)):.2f}%")
+    y = H-6*cm
+    if chart and chart.startswith('data:image'):
         try:
-            b64 = chart.split(',', 1)[1]
-            img = ImageReader(BytesIO(base64.b64decode(b64)))
-            chart_w = W - 4*cm
-            chart_h = 8*cm
-            chart_x = 2*cm
-            chart_y = 4*cm
-            p.drawImage(img, chart_x, chart_y, width=chart_w, height=chart_h,
-                        preserveAspectRatio=True, anchor='sw', mask='auto')
-        except Exception:
-            pass
-
-    # Nueva página: listado completo de operaciones
-    p.showPage()
-    p.setFont("Helvetica-Bold", 14)
-    p.drawString(2*cm, H - 2*cm, "Detalle de operaciones")
-    p.setFont("Helvetica", 10)
-
-    y = H - 3*cm
-    def draw_ops_header(ypos):
-        p.setFont("Helvetica-Bold", 10)
-        p.drawString(2*cm,  ypos, "Fecha")
-        p.drawString(5*cm,  ypos, "Cliente")
-        p.drawString(12*cm, ypos, "Factura")
-        p.drawRightString(17*cm, ypos, "KG fac.")
-        p.drawRightString(20*cm, ypos, "KG ent.")
-        p.drawRightString(23*cm, ypos, "Merma (kg)")
-        p.drawRightString(26*cm, ypos, "Merma (%)")
-        p.setFont("Helvetica", 10)
-
-    draw_ops_header(y)
+            img = ImageReader(BytesIO(base64.b64decode(chart.split(',')[1])))
+            p.drawImage(img, 2*cm, y-8*cm, width=W-4*cm, height=8*cm, preserveAspectRatio=True)
+            y -= 9*cm
+        except: pass
+    p.setFont("Helvetica-Bold", 10)
+    p.drawString(2*cm, y, "Fecha")
+    p.drawString(5*cm, y, "Cliente")
+    p.drawString(12*cm, y, "Factura")
+    p.drawString(16*cm, y, "Merma (kg)")
+    p.drawString(20*cm, y, "%")
     y -= 0.5*cm
-    for op in operaciones:
-        p.drawString(2*cm,  y, str(op.get('fecha') or ''))
-        p.drawString(5*cm,  y, str(op.get('cliente') or '')[:35])
-        p.drawString(12*cm, y, str(op.get('factura') or ''))
-        p.drawRightString(17*cm, y, f"{op.get('kg_factura', 0)}")
-        p.drawRightString(20*cm, y, f"{op.get('kg_entregados', 0)}")
-        p.drawRightString(23*cm, y, f"{op.get('merma_kg', 0)}")
-        p.drawRightString(26*cm, y, f"{op.get('merma_pct', 0)} %")
-        y -= 0.42*cm
-        if y < 2.5*cm:
-            p.showPage()
-            p.setFont("Helvetica-Bold", 14)
-            p.drawString(2*cm, H - 2*cm, "Detalle de operaciones (cont.)")
-            y = H - 3*cm
-            draw_ops_header(y)
-            y -= 0.5*cm
+    p.setFont("Helvetica", 10)
+    for op in (j.get('operaciones') or [])[:40]: 
+        if y < 2*cm: p.showPage(); y = H-2*cm
+        p.drawString(2*cm, y, str(op.get('fecha')))
+        p.drawString(5*cm, y, str(op.get('cliente'))[:35])
+        p.drawString(12*cm, y, str(op.get('factura')))
+        p.drawString(16*cm, y, str(op.get('merma_kg')))
+        p.drawString(20*cm, y, str(op.get('merma_pct'))+"%")
+        y -= 0.5*cm
+    p.showPage(); p.save(); buf.seek(0)
+    return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name="Informe_Energix.pdf")
 
-    p.showPage()
-    p.save()
-    buf.seek(0)
-
-    fname = f"informe_mermas.pdf"
-    return send_file(buf, mimetype='application/pdf',
-                     as_attachment=True,
-                     download_name=fname)
+@bp_gestion_mermas.route('/mermas/opciones', methods=['GET'])
+def mermas_opciones():
+    tipo = (request.args.get('tipo') or '').lower()
+    empresa_id = session.get('empresa_id') or session.get('nit')
+    col = {'zona': 'zona', 'vendedor': 'operador_nombre', 'cliente': 'cliente', 'vehiculo': 'vehiculo'}.get(tipo)
+    if not col: return jsonify(success=False), 400
+    cur = mysql.connection.cursor()
+    sql = f"SELECT DISTINCT {col} AS val FROM mermas_pollosgar WHERE {col} IS NOT NULL AND {col} <> ''"
+    params = []
+    if empresa_id: sql += " AND empresa_id=%s"; params.append(empresa_id)
+    sql += f" ORDER BY {col} ASC"
+    cur.execute(sql, tuple(params))
+    rows = cur.fetchall()
+    cur.close()
+    items = []
+    for r in rows:
+        val = r['val'] if isinstance(r, dict) else r[0]
+        if val: items.append(val)
+    return jsonify(success=True, items=items)

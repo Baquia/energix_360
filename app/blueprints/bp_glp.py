@@ -53,7 +53,7 @@ def _guardar_testigo(base64_data, carpeta, nombre_archivo):
             binary_data = base64.b64decode(data_match.group('data'))
 
         # Asegurar la ruta estática
-        static_dir = os.path.join("static", carpeta) # No usar app.root_path en un entorno virtual
+        static_dir = os.path.join("static", carpeta) 
         if not os.path.exists(static_dir):
             os.makedirs(static_dir)
 
@@ -114,8 +114,6 @@ def _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha_
         except Exception:
             dias = 1
 
-    # Nota: Aquí se debería buscar la ID de la operación actual para actualizar *esa* fila,
-    # pero tu código original actualiza *todas* las filas con ese lote. Mantengo la lógica original.
     cur.execute("""
         UPDATE cardex_glp
            SET dias_operacion = %s
@@ -126,82 +124,73 @@ def _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha_
 
     return dias
 
-
-def _calcular_consumo_lote(cur, empresa, ubicacion, lote_id, id_operacion_actual, tanques):
+def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, tanques):
     """
-    Consumo entre operación previa y actual (kg), para todos los tanques.
-    Guarda kg_pollito y neto_gastado en fila actual.
+    AJUSTE 2 (CORREGIDO): Calcula consumo aplicando la 'Tabla Maestra V4.0'.
     """
     if not tanques:
-        return 0.0, 0.0, None
-
-    cur.execute("""
-        SELECT *
-        FROM cardex_glp
-        WHERE empresa = %s
-          AND TRIM(ubicacion) = TRIM(%s)
-          AND lote = %s
-          AND id < %s
-        ORDER BY fecha DESC, id DESC
-        LIMIT 1
-    """, (empresa, ubicacion, lote_id, id_operacion_actual))
-    prev = cur.fetchone()
-
-    if not prev:
-        return 0.0, 0.0, None
-
-    densidad = prev.get("densidad_suministrada") or prev.get("densidad_estimada") or 2.0
-    try:
-        densidad = float(densidad)
-        if densidad <= 0:
-            densidad = 2.0
-    except Exception:
-        densidad = 2.0
+        return 0.0, 0.0, 0
 
     consumo_total_kg = 0.0
-
-    # Lógica de cálculo de consumo por diferencia de nivel entre tanques.
-    # (Tu lógica original es compleja y depende de muchas columnas dinámicas). 
-    # Usaremos una aproximación simplificada para demostrar la integración.
     
-    # Asumo que en la tabla cardex_glp tienes columnas como `nivel 1`, `capacidad 1`, etc.
-    for tk in tanques:
-        num = tk.get("numero")
-        if not num:
-            continue
-        try:
-            cap = float(tk.get("capacidad", 0) or 0)
-        except Exception:
-            cap = 0.0
-        try:
-            nivel_act = float(tk.get("nivel", 0) or 0)
-        except Exception:
-            nivel_act = 0.0
-
-        col_nivel_prev = f"nivel {num}"
-        nivel_prev = prev.get(col_nivel_prev)
+    for t in tanques:
+        raw_num = str(t.get('numero', '')).lower().replace('tk-', '')
+        num_tanque = raw_num.strip()
         
-        if nivel_prev is None:
-            # Intenta obtener el nivel de la capacidad/nivel de las columnas genéricas
-            nivel_prev = float(prev.get(f"nivel_{num}", 0) or 0) 
-            cap = float(prev.get(f"capacidad_{num}", 0) or 0)
+        if not num_tanque: continue
 
-        if nivel_prev is None:
-            continue
-        try:
-            nivel_prev = float(nivel_prev)
-        except Exception:
-            nivel_prev = 0.0
+        valor_actual_cierre = t.get('nivel')
+        if valor_actual_cierre is None:
+            valor_actual_cierre = t.get('nivel_inicial')
+            
+        try: valor_actual_cierre = float(valor_actual_cierre)
+        except: valor_actual_cierre = 0.0
 
-        delta = nivel_prev - nivel_act
-        if delta <= 0:
-            continue
+        try: capacidad_galones = float(t.get('capacidad') or 250)
+        except: capacidad_galones = 250.0
 
-        # Convertir delta % a KG: Densidad * Capacidad * (Delta / 100)
-        consumo_total_kg += densidad * cap * (delta / 100.0)
+        query = f"""
+            SELECT operacion, 
+                   `nivel tk-{num_tanque}`, 
+                   `nivelfinal tk-{num_tanque}`, 
+                   densidad_suministrada
+            FROM cardex_glp 
+            WHERE empresa = %s 
+              AND TRIM(ubicacion) = TRIM(%s) 
+              AND lote = %s
+              AND id < %s
+              AND (
+                   `nivel tk-{num_tanque}` IS NOT NULL 
+                   OR `nivelfinal tk-{num_tanque}` IS NOT NULL
+              )
+            ORDER BY fecha DESC, id DESC 
+            LIMIT 1
+        """
+        
+        cur.execute(query, (empresa, ubicacion, lote, id_operacion_actual))
+        prev = cur.fetchone()
+        
+        if not prev: continue
 
+        op_anterior = prev['operacion']
+        nivel_anterior = 0.0
+        densidad_calculo = 2.0
 
-    # Obtener el total de pollitos del inicio de calefacción
+        if op_anterior == 'tanqueo':
+            nivel_anterior = float(prev.get(f'nivelfinal tk-{num_tanque}') or 0)
+            d_real = float(prev.get('densidad_suministrada') or 0)
+            if d_real > 0:
+                densidad_calculo = d_real
+        else:
+            nivel_anterior = float(prev.get(f'nivel tk-{num_tanque}') or 0)
+        
+        delta_pct = nivel_anterior - valor_actual_cierre
+        if delta_pct < 0: delta_pct = 0
+
+        kg_tanque = (delta_pct / 100.0) * capacidad_galones * densidad_calculo
+        consumo_total_kg += kg_tanque
+
+    # --- CORRECCIÓN AQUI: SOLO PEDIMOS 'pollitos' ---
     cur.execute("""
         SELECT pollitos
         FROM cardex_glp
@@ -211,19 +200,16 @@ def _calcular_consumo_lote(cur, empresa, ubicacion, lote_id, id_operacion_actual
           AND operacion = 'inicio_calefaccion'
         ORDER BY fecha ASC, id ASC
         LIMIT 1
-    """, (empresa, ubicacion, lote_id))
+    """, (empresa, ubicacion, lote))
     row_ini = cur.fetchone() or {}
-    pollitos = row_ini.get("pollitos") or 0
-    try:
-        pollitos = int(pollitos)
-    except Exception:
-        pollitos = 0
+    
+    # Solo usamos pollitos
+    pollitos = int(row_ini.get("pollitos") or 0)
 
     kg_pollito = 0.0
-    if pollitos and consumo_total_kg > 0:
+    if pollitos > 0 and consumo_total_kg > 0:
         kg_pollito = consumo_total_kg / float(pollitos)
 
-    # Actualizar la fila de la operación actual con el consumo
     cur.execute("""
         UPDATE cardex_glp
            SET kg_pollito = %s,
@@ -255,15 +241,12 @@ def _buscar_proveedor_principal(cur, empresa, ubicacion, tanques):
     return p.get("proveedor") if p else None
 
 
-# --- FUNCIÓN DE GENERACIÓN DE CÓDIGO ACTUALIZADA ---
-# Agregamos el parámetro 'proveedor'
 def _generar_codigo_pedido(cliente_nombre, lote_id, ubicacion, proveedor, cur):
     """
     Genera código y guarda el pedido INCLUYENDO EL PROVEEDOR.
     """
     mes = datetime.now().strftime("%m")
     
-    # 1. Generar iniciales del cliente
     partes = _re.sub(r'[^a-zA-Z\s]', '', cliente_nombre).upper().split()
     iniciales = "".join(p[0] for p in partes if len(p) > 2)[:3].ljust(3, 'X')
     
@@ -282,14 +265,12 @@ def _generar_codigo_pedido(cliente_nombre, lote_id, ubicacion, proveedor, cur):
     if codigo_pedido is None:
         raise Exception("No se pudo generar un código de pedido único.")
 
-    # 2. Registrar el pedido CON PROVEEDOR
     query = """
         INSERT INTO pedidos_gas_glp 
             (cliente, codigo_pedido, estatus, fecha_registro, lote, ubicacion, proveedor) 
         VALUES 
             (%s, %s, 'generado', NOW(), %s, %s, %s)
     """
-    # Pasamos 'proveedor' al query
     cur.execute(query, (cliente_nombre, codigo_pedido, lote_id, ubicacion, proveedor))
     
     return codigo_pedido
@@ -300,7 +281,6 @@ def _enviar_alerta_pedido_tanqueo(empresa, ubicacion, lote_id, proveedor_princip
     if not tanques_bajos:
         return False
 
-    # Usar variables locales leídas de os.environ (¡IMPORTANTE!)
     email_user = os.environ.get("EMAIL_USER")
     email_pass = os.environ.get("EMAIL_PASS")
     email_host = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
@@ -430,7 +410,6 @@ def _enviar_alerta_pedido_tanqueo(empresa, ubicacion, lote_id, proveedor_princip
     except Exception as e:
         app.logger.error(f"⛔ Error al enviar correo GLP: {e}")
         return False
-
 
 
 def _enviar_alerta_desviacion_tanqueo(
@@ -930,7 +909,10 @@ def registrar_inicio_calefaccion():
             saldo_estimado_kg = 0.0
 
             for tk in tanques:
-                numero = tk.get("numero")
+                # AJUSTE 2: Limpieza y prefijo tk-
+                raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
+                num = raw_num.strip()
+                if not num: continue
 
                 try:
                     nivel = float(tk.get("nivel", 0) or 0)
@@ -944,13 +926,12 @@ def registrar_inicio_calefaccion():
 
                 testigo = tk.get("testigo")
 
-                if numero:
-                    set_cols.append(f"`nivel {numero}`=%s"); set_vals.append(nivel)
-                    set_cols.append(f"`capacidad {numero}`=%s"); set_vals.append(capacidad)
+                set_cols.append(f"`nivel tk-{num}`=%s"); set_vals.append(nivel)
+                set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(capacidad)
 
-                if numero and testigo:
-                    ruta_web = _guardar_testigo(testigo, carpeta, f"{numero}_{id_operacion}.jpg")
-                    set_cols.append(f"`testigo nivel {numero}`=%s"); set_vals.append(ruta_web)
+                if testigo:
+                    ruta_web = _guardar_testigo(testigo, carpeta, f"tk{num}_{id_operacion}.jpg")
+                    set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta_web)
 
                 saldo_estimado_kg += densidad * capacidad * (nivel / 100.0)
 
@@ -1108,7 +1089,10 @@ def registrar_tanqueo():
             desviaciones_porcentuales = []
 
             for tk in tanques:
-                num = (tk.get("numero") or "").lower().strip()
+                # AJUSTE 2: Limpieza y prefijo tk-
+                raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
+                num = raw_num.strip()
+                if not num: continue
 
                 cap = float(tk.get("capacidad", 0) or 0.0)
                 nivel_ini = float(tk.get("nivel_inicial", 0) or 0.0)
@@ -1118,22 +1102,24 @@ def registrar_tanqueo():
                 foto_fin = tk.get("foto_nivel_final")
                 foto_bau = tk.get("foto_baucher")
 
-                if num:
-                    # Guardamos en la fila de tanqueo los NIVELES FINALES (post tanqueo)
-                    set_cols.append(f"`nivel {num}`=%s");     set_vals.append(nivel_fin)
-                    set_cols.append(f"`capacidad {num}`=%s"); set_vals.append(cap)
+                # Guardamos en la fila de tanqueo los NIVELES FINALES (post tanqueo)
+                # AJUSTE 2: Guardado CORRECTO con columnas separadas
+                set_cols.append(f"`nivel tk-{num}`=%s");     set_vals.append(nivel_ini)
+                if foto_ini:
+                    ruta_ini = _guardar_testigo(foto_ini, carpeta, f"tk{num}_ini_{id_operacion}.jpg")
+                    set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta_ini)
 
-                    if foto_ini:
-                        ruta_ini = _guardar_testigo(foto_ini, carpeta, f"{num}_nivel_inicial_tanqueo_{id_operacion}.jpg")
-                        set_cols.append(f"`testigo nivel {num}`=%s"); set_vals.append(ruta_ini)
-                    if foto_fin:
-                        ruta_fin = _guardar_testigo(foto_fin, carpeta, f"{num}_nivel_final_tanqueo_{id_operacion}.jpg")
-                        set_cols.append(f"`testigo nivel {num}`=%s"); set_vals.append(ruta_fin)
+                set_cols.append(f"`nivelfinal tk-{num}`=%s");     set_vals.append(nivel_fin)
+                if foto_fin:
+                    ruta_fin = _guardar_testigo(foto_fin, carpeta, f"tk{num}_fin_{id_operacion}.jpg")
+                    set_cols.append(f"`testigo nivelfinal tk-{num}`=%s"); set_vals.append(ruta_fin)
 
-                    if foto_bau:
-                        ruta_baucher = _guardar_testigo(foto_bau, carpeta, f"{num}_baucher_tanqueo_{id_operacion}.jpg")
-                        col_baucher = f"testigo_baucher_{num.replace('-', '_')}"
-                        set_cols.append(f"`{col_baucher}`=%s"); set_vals.append(ruta_baucher)
+                set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(cap)
+
+                if foto_bau:
+                    ruta_baucher = _guardar_testigo(foto_bau, carpeta, f"tk{num}_baucher_{id_operacion}.jpg")
+                    col_baucher = f"testigo_baucher_tk_{num}" # Formato de la BD
+                    set_cols.append(f"`{col_baucher}`=%s"); set_vals.append(ruta_baucher)
 
                 saldo_estimado_kg += densidad_estimada * cap * (nivel_fin/100.0)
 
@@ -1432,30 +1418,29 @@ def registrar_consumo():
             tanques_bajos = []
 
             for tk in tanques:
-                num = tk.get("numero")
-                try:
-                    niv = float(tk.get("nivel", 0) or 0)
-                except Exception:
-                    niv = 0.0
-                try:
-                    cap = float(tk.get("capacidad", 0) or 0)
-                except Exception:
-                    cap = 0.0
+                # AJUSTE 2: Limpieza y prefijo tk-
+                raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
+                num = raw_num.strip()
+                if not num: continue
+
+                try: val = float(tk.get("nivel", 0) or 0)
+                except: val = 0.0
+                try: cap = float(tk.get("capacidad", 0) or 0)
+                except: cap = 0.0
                 tst = tk.get("testigo")
 
                 # UMBRAL CONSUMO: tanques bajos si nivel <= 25%
-                if num and niv <= 25.0:
-                    tanques_bajos.append({"numero": num, "nivel": round(niv, 2)})
+                if num and val <= 25.0:
+                    tanques_bajos.append({"numero": num, "nivel": round(val, 2)})
 
-                if num:
-                    set_cols.append(f"`nivel {num}`=%s"); set_vals.append(niv)
-                    set_cols.append(f"`capacidad {num}`=%s"); set_vals.append(cap)
+                set_cols.append(f"`nivel tk-{num}`=%s"); set_vals.append(val)
+                set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(cap)
 
-                if num and tst:
-                    ruta = _guardar_testigo(tst, carpeta, f"{num}_consumo_{id_operacion}.jpg")
-                    set_cols.append(f"`testigo nivel {num}`=%s"); set_vals.append(ruta)
+                if tst:
+                    ruta = _guardar_testigo(tst, carpeta, f"tk{num}_consumo_{id_operacion}.jpg")
+                    set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta)
 
-                saldo_estimado_kg += densidad * cap * (niv/100.0)
+                saldo_estimado_kg += densidad * cap * (val/100.0)
 
             if set_cols:
                 cur.execute(
@@ -1633,7 +1618,11 @@ def finalizar_calefaccion_batch():
             saldo_estimado_kg = 0.0
 
             for tk in tanques:
-                num = tk.get("numero")
+                # AJUSTE 2: Limpieza y prefijo tk-
+                raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
+                num = raw_num.strip()
+                if not num: continue
+
                 try:
                     niv = float(tk.get("nivel", 0))
                 except Exception:
@@ -1644,13 +1633,12 @@ def finalizar_calefaccion_batch():
                     cap = 0.0
                 tst = tk.get("testigo")
 
-                if num and niv is not None:
-                    set_cols.append(f"`nivel {num}`=%s"); set_vals.append(niv)
-                if num and cap is not None:
-                    set_cols.append(f"`capacidad {num}`=%s"); set_vals.append(cap)
-                if num and tst:
-                    ruta = _guardar_testigo(tst, carpeta, f"{num}_final_{id_operacion}.jpg")
-                    set_cols.append(f"`testigo nivel {num}`=%s"); set_vals.append(ruta)
+                set_cols.append(f"`nivel tk-{num}`=%s"); set_vals.append(niv)
+                set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(cap)
+
+                if tst:
+                    ruta = _guardar_testigo(tst, carpeta, f"tk{num}_final_{id_operacion}.jpg")
+                    set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta)
 
                 saldo_estimado_kg += densidad * cap * (niv/100.0)
 

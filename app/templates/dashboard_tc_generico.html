@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dashboard TC | {{ empresa }}</title>
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#015249">
+
+    <style>
+        /* PALETA CORPORATIVA BQA-ONE */
+        :root {
+            --verde: #015249;        /* Color Principal */
+            --verde-osc: #003b35;    /* Hover / Oscuro */
+            --bg-grad-start: #d7f2ec; /* Inicio Gradiente */
+            
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e0e0e0;
+            --radius: 14px;
+            --shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Verdana, Geneva, Tahoma, sans-serif;
+            background: radial-gradient(circle at top, var(--bg-grad-start) 0, #f6f7f8 45%, #f6f7f8 100%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        a { text-decoration: none; color: inherit; }
+
+        .header {
+            width: 100%; max-width: 900px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 20px 20px 10px 20px;
+        }
+
+        .brand-area { display: flex; align-items: center; gap: 15px; }
+        .logo-cliente { max-height: 48px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
+        .brand-divider { width: 1px; height: 32px; background-color: #cbd5e1; display: block; }
+        .logo-app { max-height: 32px; width: auto; opacity: 0.9; }
+
+        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
+        .user-role { font-size: 10px; color: var(--text-muted); background: rgba(255, 255, 255, 0.6); padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
+
+        .wrap { width: 100%; max-width: 900px; margin: 20px auto 40px; padding: 0 20px; }
+
+        .welcome-title {
+            color: var(--verde); font-size: 22px; font-weight: 700; margin-bottom: 25px;
+            text-align: left; border-bottom: 2px solid rgba(1, 82, 73, 0.1); padding-bottom: 10px;
+        }
+
+        .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+
+        .module-card {
+            background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+            padding: 24px; transition: transform 0.2s, box-shadow 0.2s;
+            display: flex; flex-direction: column; height: 100%; cursor: pointer;
+            border: 1px solid transparent; position: relative; overflow: hidden;
+        }
+        .module-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(1, 82, 73, 0.15); border-color: var(--verde); }
+        .module-card::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+            background: var(--verde); opacity: 0; transition: opacity 0.2s;
+        }
+        .module-card:hover::before { opacity: 1; }
+
+        .card-icon {
+            font-size: 32px; margin-bottom: 15px; background: #eefcf9; /* Fondo verde muy suave */
+            width: 56px; height: 56px; display: flex; align-items: center; justify-content: center;
+            border-radius: 12px; color: var(--verde);
+        }
+
+        .card-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+        .card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px; flex-grow: 1; }
+
+        .btn-card {
+            background: var(--verde); color: white; text-align: center; padding: 12px;
+            border-radius: 10px; font-size: 14px; font-weight: 600; transition: background 0.2s;
+        }
+        .module-card:hover .btn-card { background: var(--verde-osc); }
+
+        .footer { margin-top: auto; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; width: 100%; border-top: 1px solid #eee; background: rgba(255, 255, 255, 0.5); }
+        .logout-btn {
+            display: inline-block; margin-top: 8px; color: var(--verde); font-weight: bold; font-size: 12px;
+            border: 1px solid currentColor; padding: 4px 12px; border-radius: 20px; transition: all 0.2s;
+        }
+        .logout-btn:hover { background: var(--verde); color: white; }
+
+        @media (max-width: 600px) {
+            .header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .brand-area { width: 100%; }
+            .user-info { width: 100%; flex-direction: row; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 10px; }
+            .modules-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="brand-area">
+            <img src="{{ url_for('static', filename='logo_' + nit + '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            <span class="brand-divider"></span>
+            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+        </div>
+        <div class="user-info">
+            <span class="user-name">{{ nombre }}</span>
+            <span class="user-role">Transporte Carga</span>
+        </div>
+    </header>
+
+    <main class="wrap">
+        <h2 class="welcome-title">Panel de Control</h2>
+        <div class="modules-grid">
+            <a href="{{ url_for('bp_transporte_carga.router_control_flota', nit=nit) }}" class="module-card">
+                <div class="card-icon">🚛</div>
+                <h3 class="card-title">Control de Flota</h3>
+                <p class="card-desc">Monitoreo de carga, asignación de rutas y manifiestos.</p>
+                <div class="btn-card">Ingresar &rarr;</div>
+            </a>
+            <a href="{{ url_for('bp_transporte_carga.ruta_conductores', nit=nit) }}" class="module-card">
+                <div class="card-icon">👮‍♂️</div>
+                <h3 class="card-title">Conductores</h3>
+                <p class="card-desc">Base de datos de conductores y gestión de permisos.</p>
+                <div class="btn-card">Gestionar &rarr;</div>
+            </a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2025 BQA ONE Technology.</p>
+        <a href="{{ url_for('logout') }}" class="logout-btn">Cerrar Sesión</a>
+    </footer>
+</body>
+</html>

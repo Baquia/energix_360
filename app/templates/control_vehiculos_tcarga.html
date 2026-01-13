@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Operaciones Carga | {{ empresa }}</title>
+    <meta name="theme-color" content="#015249">
+
+    <style>
+        /* PALETA CORPORATIVA BQA-ONE */
+        :root {
+            --verde: #015249;
+            --verde-osc: #003b35;
+            --bg-grad-start: #d7f2ec;
+            
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e0e0e0;
+            --radius: 14px;
+            --shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Verdana, Geneva, Tahoma, sans-serif;
+            background: radial-gradient(circle at top, var(--bg-grad-start) 0, #f6f7f8 45%, #f6f7f8 100%);
+            color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+        }
+
+        .header {
+            width: 100%; max-width: 900px; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        
+        .btn-back {
+            width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.8);
+            border: 1px solid rgba(1, 82, 73, 0.1); display: flex; align-items: center; justify-content: center;
+            color: var(--verde); font-size: 18px; text-decoration: none; transition: all 0.2s;
+        }
+        .btn-back:hover { background: var(--verde); color: white; transform: translateX(-3px); }
+
+        .page-title { font-size: 16px; font-weight: 700; color: var(--verde); margin: 0; line-height: 1.2; }
+        .page-subtitle { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+        .logo-small { height: 30px; width: auto; opacity: 0.8; }
+
+        .wrap { width: 100%; max-width: 900px; margin: 10px auto 40px; padding: 0 20px; }
+
+        .action-bar { display: flex; gap: 15px; margin-bottom: 25px; }
+        .action-btn {
+            flex: 1; background: var(--surface); padding: 15px; border-radius: var(--radius);
+            box-shadow: var(--shadow); text-align: center; cursor: pointer; transition: transform 0.2s;
+            border: 1px solid transparent; color: var(--text); display: flex; flex-direction: column; align-items: center;
+        }
+        .action-btn:hover { transform: translateY(-2px); border-color: var(--verde); }
+        .btn-icon { font-size: 24px; margin-bottom: 8px; color: var(--verde); }
+        .btn-text { font-size: 13px; font-weight: 700; }
+
+        .section-header {
+            display: flex; justify-content: space-between; align-items: flex-end;
+            margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid rgba(1, 82, 73, 0.1);
+        }
+        .section-title { font-size: 15px; font-weight: 700; color: var(--verde); }
+        .counter-badge { background: var(--verde); color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+
+        .item-card {
+            background: var(--surface); border-radius: 12px; padding: 16px; margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04); border-left: 4px solid var(--text-muted);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .status-activo { border-left-color: #10b981; } 
+        .status-ruta { border-left-color: #015249; }   /* Ahora usa el Verde BQA para "En Ruta" */
+        .status-mantenimiento { border-left-color: #f59e0b; }
+
+        .item-info h4 { margin: 0 0 4px 0; font-size: 15px; color: var(--text); }
+        .item-info p { margin: 0; font-size: 12px; color: var(--text-muted); }
+        
+        .item-meta { text-align: right; }
+        .meta-tag {
+            display: inline-block; font-size: 10px; padding: 3px 6px; border-radius: 4px;
+            background: #f3f4f6; color: #555; font-weight: 600; margin-bottom: 4px;
+        }
+
+        .btn-details {
+            display: inline-block; background: transparent; color: var(--verde);
+            border: 1px solid var(--verde); padding: 4px 10px; border-radius: 6px;
+            font-size: 11px; font-weight: 600; text-decoration: none; transition: 0.2s;
+        }
+        .btn-details:hover { background: var(--verde); color: white; }
+
+        @media (max-width: 600px) {
+            .action-bar { gap: 10px; }
+            .action-btn { padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <a href="javascript:history.back()" class="btn-back">&#8592;</a>
+            <div>
+                <h1 class="page-title">Control de Carga</h1>
+                <div class="page-subtitle">{{ empresa }}</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <img src="{{ url_for('static', filename='logo_' + nit + '.PNG') }}" class="logo-small" alt="Logo" onerror="this.style.display='none'">
+        </div>
+    </header>
+
+    <main class="wrap">
+        <div class="action-bar">
+            <div class="action-btn" onclick="alert('Escanear...')">
+                <div class="btn-icon">📷</div>
+                <div class="btn-text">Escanear Vehículo</div>
+            </div>
+            <div class="action-btn" onclick="alert('Buscar...')">
+                <div class="btn-icon">🔍</div>
+                <div class="btn-text">Buscar Placa</div>
+            </div>
+        </div>
+
+        <div class="section-header">
+            <span class="section-title">Vehículos en Operación</span>
+            <span class="counter-badge">3 Activos</span>
+        </div>
+
+        <div class="item-card status-ruta">
+            <div class="item-info">
+                <h4>WDX-123</h4>
+                <p>Conductor: Juan Pérez</p>
+                <p style="margin-top:2px;">Manifiesto: #900212</p>
+            </div>
+            <div class="item-meta">
+                <div class="meta-tag">En Ruta</div>
+                <br><a href="#" class="btn-details">Ver Detalle</a>
+            </div>
+        </div>
+        
+        <div class="item-card status-activo">
+            <div class="item-info">
+                <h4>STK-885</h4>
+                <p>Conductor: Pendiente</p>
+            </div>
+            <div class="item-meta">
+                <div class="meta-tag">Disponible</div>
+                <br><a href="#" class="btn-details">Asignar</a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

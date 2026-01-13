@@ -1,16 +1,15 @@
-/* BQA-ONE / Energix360 - Service Worker v10
+/* BQA-ONE / Energix360 - Service Worker v11-FIX
    - App shell cache-first
    - GLP APIs network-first
-   - HTML navegaciones cache-first con fallback SIEMPRE a algo (sin ERR_FAILED)
-   - MODO OFFLINE GARANTIZADO (opción 2): cuando FORCE_OFFLINE=true, BLOQUEA mutaciones (POST/PUT/DELETE)
+   - HTML navegaciones NETWORK-FIRST (Solución Usuario Fantasma)
+   - MODO OFFLINE GARANTIZADO
 */
 
-// 1. CAMBIO DE VERSIÓN PARA FORZAR ACTUALIZACIÓN
-const CACHE_STATIC = "bqa-one-shell-v10.5";
-const CACHE_DYNAMIC = "bqa-one-dyn-v10.5";
+// 1. CAMBIO DE VERSIÓN PARA FORZAR ACTUALIZACIÓN Y LIMPIAR FANTASMAS
+const CACHE_STATIC = "bqa-one-shell-v11-FIX-CRITICO";
+const CACHE_DYNAMIC = "bqa-one-dyn-v11-FIX-CRITICO";
 
 // ===== MODO OFFLINE GARANTIZADO =====
-// Se controla desde el frontend vía postMessage({type:"GLP_FORCE_OFFLINE", value:true/false})
 let FORCE_OFFLINE = false;
 
 self.addEventListener("message", (event) => {
@@ -18,14 +17,12 @@ self.addEventListener("message", (event) => {
   
   if (data.type === "GLP_FORCE_OFFLINE") {
     FORCE_OFFLINE = !!data.value;
-    console.log("[SW v10] FORCE_OFFLINE =", FORCE_OFFLINE);
+    console.log("[SW v11] FORCE_OFFLINE =", FORCE_OFFLINE);
 
-    // Sincronizar la cola cuando el sistema vuelva a online
     if (!FORCE_OFFLINE) {
       flushOfflineQueue();
     }
 
-    // Confirmación de mensaje al frontend
     try {
       if (event.source && typeof event.source.postMessage === "function") {
         event.source.postMessage({
@@ -33,25 +30,16 @@ self.addEventListener("message", (event) => {
           value: FORCE_OFFLINE
         });
       }
-    } catch (e) {
-      // sin acción
-    }
+    } catch (e) {}
   }
 });
 
-// App Shell mínimo y público
-// NOTA: Se eliminaron las páginas protegidas (/glp.html, /890707006.html)
-// para evitar fallos de instalación si el usuario no está logueado.
-// Esas páginas se cachearán dinámicamente apenas el usuario entre a ellas.
 const APP_SHELL = [
-  "/",                              // raíz -> login
+  "/",                              
   "/login_energix360_offline.html", 
   "/offline.html",
-  // "/890707006.html",       <-- REMOVIDO DEL SHELL (se cachea dinámicamente)
   "/890707006_offline.html",  
-  // "/glp.html",             <-- REMOVIDO DEL SHELL (se cachea dinámicamente)
   "/glp_offline.html",
-
   "/static/manifest.json",
   "/static/BQA_ONE_192.png",
   "/static/BQA_ONE_512.png",
@@ -70,18 +58,17 @@ async function limitCacheSize(cacheName, maxItems) {
   }
 }
 
-// INSTALL (no revienta si algo no cachea)
+// INSTALL
 self.addEventListener("install", (event) => {
-  console.log("[SW v10] install");
+  console.log("[SW v11] install");
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_STATIC);
       for (const url of APP_SHELL) {
         try {
           await cache.add(url);
-          console.log("[SW v10] cacheado en APP_SHELL:", url);
         } catch (err) {
-          console.warn("[SW v10] NO se pudo cachear", url, err);
+          console.warn("[SW v11] NO se pudo cachear", url, err);
         }
       }
     })()
@@ -91,14 +78,14 @@ self.addEventListener("install", (event) => {
 
 // ACTIVATE
 self.addEventListener("activate", (event) => {
-  console.log("[SW v10] activate");
+  console.log("[SW v11] activate");
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
           .filter((k) => ![CACHE_STATIC, CACHE_DYNAMIC].includes(k))
           .map((k) => {
-            console.log("[SW v10] borrando cache vieja:", k);
+            console.log("[SW v11] borrando cache vieja:", k);
             return caches.delete(k);
           })
       )
@@ -112,11 +99,9 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // Solo mismo origen
   if (url.origin !== location.origin) return;
 
-  // ===== CANDADO: MODO OFFLINE GARANTIZADO =====
-  // Si el frontend decidió OFFLINE, NUNCA permitimos mutaciones hacia el servidor.
+  // Bloqueo de mutaciones en modo offline forzado
   if (FORCE_OFFLINE && req.method !== "GET") {
     event.respondWith(
       new Response("offline-forced", {
@@ -127,7 +112,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Nunca cachear POST/PUT/DELETE (si no está FORCE_OFFLINE, se permite ir a red normal)
+  // Nunca cachear POST/PUT/DELETE
   if (req.method !== "GET") {
     event.respondWith(fetch(req));
     return;
@@ -152,76 +137,56 @@ self.addEventListener("fetch", (event) => {
         } catch (err) {
           const cached = await caches.match(req);
           if (cached) return cached;
-
-          return new Response(
-            JSON.stringify({
-              success: false,
-              offline: true,
-              message: "Sin conexión y sin copia cacheada de la API GLP."
-            }),
-            {
-              status: 503,
-              headers: { "Content-Type": "application/json" }
-            }
-          );
+          return new Response(JSON.stringify({ success: false, offline: true }), {
+            status: 503, headers: { "Content-Type": "application/json" }
+          });
         }
       })()
     );
     return;
   }
 
-  // ===== HTML / Navegación (login, 890707006, glp, dashboard, etc.) =====
+  // ===== HTML / Navegación: SOLUCIÓN CRÍTICA (NETWORK-FIRST) =====
+  // CAMBIO: Ahora intentamos red PRIMERO. Si falla, usamos caché.
   if (isHTML) {
     event.respondWith(
       (async () => {
         try {
-          // 1) CACHE-FIRST: si ya hay una copia en caché, la usamos SIEMPRE
-          let cached = await caches.match(req);
-          if (!cached) {
-            // Intento por path plano: /890707006.html, /glp.html, /dashboard/gas, etc.
-            cached = await caches.match(path);
-          }
-          if (cached) {
-            return cached;
-          }
-
-          // 2) Si no hay copia en cache, intentamos ir a la red (si hay internet)
+          // 1. INTENTO DE RED (Para obtener usuario real y salt de login)
           const res = await fetch(req);
           const copy = res.clone();
 
+          // Guardamos copia nueva en background para futuro offline
           caches.open(CACHE_DYNAMIC).then((cache) => {
-            cache.put(req, copy); // <--- AQUÍ SE GUARDA GLP.HTML AUTOMÁTICAMENTE
+            cache.put(req, copy);
             limitCacheSize(CACHE_DYNAMIC, MAX_DYNAMIC_ITEMS);
           });
 
           return res;
+
         } catch (err) {
-          console.warn("[SW v10] HTML offline FALLBACK para", path, "error:", err);
+          console.warn("[SW v11] Sin red, buscando fallback para HTML:", path);
 
-          // 3) OFFLINE / ERROR: devolvemos siempre algo
-
-          // 3.1) Buscar por path plano
-          let cached = await caches.match(path);
+          // 2. FALLBACK A CACHÉ (Solo si no hay red)
+          let cached = await caches.match(req);
+          if (!cached) {
+            cached = await caches.match(path);
+          }
           if (cached) return cached;
 
-          // 3.2) Si pidieron raíz "/", intentar raíz cacheada
+          // 3. FALLBACKS GENÉRICOS (Offline screens)
           if (path === "/") {
             const rootCached = await caches.match("/");
             if (rootCached) return rootCached;
           }
 
-          // 3.3) Fallback a offline.html
+          // Intentar devolver la página offline específica de la empresa si es posible deducirla
+          // o la genérica
           const offlineCached = await caches.match("/offline.html");
           if (offlineCached) return offlineCached;
 
-          // 3.4) Último recurso: HTML simple (para evitar ERR_FAILED)
           return new Response(
-            "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Sin conexión</title></head>" +
-              "<body style='font-family:sans-serif; padding:16px;'>" +
-              "<h2>Sin conexión a internet</h2>" +
-              "<p>No se encontró una copia guardada de esta página y no hay señal disponible.</p>" +
-              "<p>Cuando tengas internet, abre de nuevo la aplicación para que se actualice la información.</p>" +
-              "</body></html>",
+            "<!DOCTYPE html><html><body><h2>Sin conexión</h2><p>No se pudo contactar al servidor y no hay copia guardada.</p></body></html>",
             { status: 503, headers: { "Content-Type": "text/html" } }
           );
         }
@@ -230,12 +195,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ===== ESTÁTICOS (JS/CSS/IMG/FONTS) → cache-first =====
+  // ===== ESTÁTICOS (JS/CSS/IMG) → CACHE-FIRST (Esto se mantiene igual) =====
   event.respondWith(
     (async () => {
       const cached = await caches.match(req);
       if (cached) return cached;
-
       try {
         const res = await fetch(req);
         const copy = res.clone();
@@ -245,24 +209,20 @@ self.addEventListener("fetch", (event) => {
         });
         return res;
       } catch (err) {
-        // Si también falla aquí, devolvemos lo que tengamos cacheado (aunque sea null)
-        return cached || new Response("", { status: 504 });
+        return new Response("", { status: 504 });
       }
     })()
   );
 });
 
-// BACKGROUND SYNC: avisar a los clientes que deben vaciar la cola GLP
+// BACKGROUND SYNC
 self.addEventListener("sync", (event) => {
   if (event.tag === "sync-glp-queue") {
     event.waitUntil(
       (async () => {
         const clients = await self.clients.matchAll();
         for (const client of clients) {
-          client.postMessage({
-            type: "BQA_GLPSYNC",
-            action: "flushQueue"
-          });
+          client.postMessage({ type: "BQA_GLPSYNC", action: "flushQueue" });
         }
       })()
     );

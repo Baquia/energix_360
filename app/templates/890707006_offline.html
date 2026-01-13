@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Inicio OFFLINE | Pollos Gar</title>
+  <title>Inicio OFFLINE BQA-ONE | Pollos Gar</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- PWA -->
@@ -205,10 +205,11 @@
       <div class="icon-label">Electricidad</div>
     </div>
 
-    <div class="icon-btn" onclick="acceder('flota')">
-      <img src="{{ url_for('static', filename='icon_flota.png') }}" alt="Flota">
+    <a href="{{ url_for('bp_transporte_carga.dashboard_dinamico', nit='890707006') }}" class="icon-btn"
+      style="text-decoration: none; color: inherit;">
+      <div class="icon-bg">🚚</div>
       <div class="icon-label">Flota</div>
-    </div>
+    </a>
 
     <div class="icon-btn" onclick="acceder('mermas')">
       <img src="{{ url_for('static', filename='icon_mermas.png') }}" alt="Control de Mermas">

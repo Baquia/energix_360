@@ -4,12 +4,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="apple-touch-icon" href="/static/icon-192.png">
-  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='logo_energix360.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <meta name="theme-color" content="#015249">
-  <script src="/static/js/html5-qrcode.min.js"></script>
 
-  <title>Inicio | Pollos Gar</title>
+  <title>Inicio BQA-ONE | {{ empresa }}</title>
   <style>
     :root {
       --color-primary: #015249;
@@ -30,279 +29,234 @@
 
     body {
       margin: 0;
-      font-family: Verdana, sans-serif;
-      background: radial-gradient(circle at top, #d7f2ec 0, #f6f7f8 45%, #f6f7f8 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px 12px 70px;
-      position: relative;
-      min-height: 100vh;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background-color: var(--color-bg);
       color: var(--color-text);
-    }
-
-    header {
-      width: 100%;
-      max-width: 980px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      gap: 8px;
-    }
-
-    .logo {
-      max-height: 56px;
-      width: auto;
-    }
-
-    h1 {
-      width: 100%;
-      max-width: 980px;
-      font-size: clamp(1.2rem, 3.2vw, 1.6rem);
-      text-align: center;
-      margin: 0 0 18px;
-      color: var(--color-primary-dark);
-    }
-
-    .grid {
-      width: 100%;
-      max-width: 980px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-      gap: 14px;
-    }
-
-    .icon-btn {
-      background: var(--color-surface);
-      border-radius: var(--radius-card);
-      border: 1px solid var(--color-border);
-      box-shadow: var(--shadow-soft);
-      padding: 14px 12px;
       display: flex;
       flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    .app-header {
+      background-color: var(--color-primary);
+      padding: 16px 20px;
+      display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 8px;
-      cursor: pointer;
-      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+      justify-content: space-between;
+      color: white;
+      box-shadow: 0 4px 12px rgba(1, 82, 73, 0.2);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
-    .icon-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
-      background: #f0fdf9;
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
-    .icon-btn img {
-      width: 48px;
-      height: 48px;
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: white;
+      padding: 4px;
       object-fit: contain;
     }
 
-    .icon-label {
-      margin-top: 4px;
-      font-size: clamp(0.85rem, 2.5vw, 0.95rem);
-      color: var(--color-primary-dark);
-      text-align: center;
+    .user-info h1 {
+      margin: 0;
+      font-size: 16px;
       font-weight: 600;
+    }
+
+    .user-info p {
+      margin: 0;
+      font-size: 12px;
+      opacity: 0.9;
     }
 
     .logout-btn {
-      position: fixed;
-      left: 16px;
-      bottom: 16px;
-      background: var(--color-danger);
-      color: #fff;
-      border-radius: 999px;
-      padding: 8px 16px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      border: 1px solid var(--color-danger);
-      cursor: pointer;
-      box-shadow: 0 3px 10px rgba(180, 0, 32, 0.4);
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      z-index: 20;
+      color: white;
       text-decoration: none;
+      background: rgba(255, 255, 255, 0.15);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.2s;
     }
 
     .logout-btn:hover {
-      background: #8f0017;
+      background: rgba(255, 255, 255, 0.25);
     }
 
-    /* MODAL QR */
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
+    /* MAIN CONTENT */
+    .main-container {
+      flex: 1;
+      padding: 24px 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .welcome-text {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: 8px;
+    }
+
+    .welcome-sub {
+      color: var(--color-muted);
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    /* GRID MENU */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px;
+    }
+
+    /* CARD STYLE */
+    .card {
+      background: var(--color-surface);
+      border-radius: var(--radius-card);
+      padding: 24px 16px;
+      text-decoration: none;
+      color: var(--color-text);
+      display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: 2000;
-      padding: 12px;
-    }
-
-    .modal-content {
-      background: #ffffff;
-      border-radius: 14px;
-      padding: 16px;
-      width: 100%;
-      max-width: 480px;
-      box-shadow: var(--shadow-soft);
       text-align: center;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid transparent;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
     }
 
-    .btn-cancelar {
-      width: 100%;
-      margin-top: 12px;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid var(--color-border);
-      background: #f3f4f6;
+    .card:active {
+      transform: scale(0.97);
+    }
+
+    .card:hover {
+      border-color: var(--color-primary);
+      box-shadow: 0 8px 24px rgba(1, 82, 73, 0.12);
+    }
+
+    .card-icon {
+      font-size: 36px;
+      margin-bottom: 14px;
+      color: var(--color-primary);
+    }
+
+    .card-title {
+      font-size: 15px;
       font-weight: 600;
-      cursor: pointer;
+      line-height: 1.3;
+    }
+
+    /* OFFLINE INDICATOR */
+    #offline-indicator {
+      display: none;
+      background-color: var(--color-danger);
+      color: white;
+      text-align: center;
+      padding: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* FOOTER */
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: var(--color-muted);
     }
   </style>
 </head>
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js")
-        .then(reg => console.log("✅ SW registrado con scope:", reg.scope))
-        .catch(err => console.error("❌ Error registrando SW:", err));
-    });
-  }
-</script>
 
 <body>
 
-  <header>
-    <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" alt="Logo Cliente" class="logo">
-    <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix 360" class="logo">
+  <div id="offline-indicator">⚠️ Sin conexión a internet</div>
+
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-container">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" 
+             alt="App Logo" 
+             class="logo-img">
+        
+        {% if nit %}
+        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" 
+             alt="Logo Cliente" 
+             class="logo-img">
+        {% endif %}
+      </div>
+      
+      <div class="user-info" style="margin-left: 10px;">
+        <h1>{{ nombre }}</h1>
+        <p>{{ empresa }}</p>
+      </div>
+    </div>
+    <a href="/logout" class="logout-btn">Salir</a>
   </header>
 
-  <h1>Bienvenido {{ nombre }} | Empresa: {{ empresa }}</h1>
+  <div class="main-container">
+    <div class="welcome-text">Hola, {{ nombre }}</div>
+    <div class="welcome-sub">Selecciona un módulo para comenzar</div>
 
-  <div class="grid">
-    <div class="icon-btn" onclick="acceder('gas')">
-      <img src="{{ url_for('static', filename='icon_gas.png') }}" alt="Gas">
-      <div class="icon-label">Gas</div>
-    </div>
+    <div class="menu-grid">
 
-    <div class="icon-btn" onclick="acceder('carbon')">
-      <img src="{{ url_for('static', filename='icon_carbon.png') }}" alt="Carbón">
-      <div class="icon-label">Carbón</div>
-    </div>
+      <a href="{{ url_for('bp_890707006.router_universal', modulo='gas') }}" class="card">
+        <div class="card-icon">🔥</div>
+        <div class="card-title">Gas</div>
+      </a>
 
-    <div class="icon-btn" onclick="acceder('electricidad')">
-      <img src="{{ url_for('static', filename='icon_electricidad.png') }}" alt="Electricidad">
-      <div class="icon-label">Electricidad</div>
-    </div>
+      <a href="{{ url_for('bp_890707006.router_universal', modulo='mermas') }}" class="card">
+        <div class="card-icon">📉</div>
+        <div class="card-title">Control de Mermas</div>
+      </a>
 
-    <div class="icon-btn" onclick="acceder('flota')">
-      <img src="{{ url_for('static', filename='icon_flota.png') }}" alt="Flota">
-      <div class="icon-label">Flota</div>
-    </div>
+      <a href="{{ url_for('bp_890707006.router_universal', modulo='flota') }}" class="card">
+        <div class="card-icon">🚚</div>
+        <div class="card-title">Control Flota</div>
+      </a>
 
-    <div class="icon-btn" onclick="acceder('mermas')">
-      <img src="{{ url_for('static', filename='icon_mermas.png') }}" alt="Control de Mermas">
-      <div class="icon-label">Control de Mermas</div>
     </div>
   </div>
 
-  <a href="/logout" class="logout-btn">Salir</a>
-
-  <div id="modalFlotaQR" class="modal">
-    <div class="modal-content">
-      <h3>Escanee el QR del vehículo</h3>
-      <div id="qr-reader-flota" style="width:100%;"></div>
-      <p id="qr-msg-flota" style="margin-top:8px;font-weight:600;"></p>
-      <button onclick="cerrarFlotaQR()" class="btn-cancelar">Cancelar</button>
-    </div>
+  <div class="footer">
+    BQA-ONE v2.5 &copy; 2026<br>Energix360
   </div>
 
   <script>
-    let qrScannerFlota = null;
-
-    // --- FUNCIÓN CORREGIDA PARA EVITAR CACHÉ ---
-    function acceder(seccion) {
-      if (seccion === 'flota') {
-        abrirFlotaQR();
-        return;
-      }
-      
-      // TRUCO ANTI-CACHÉ SOLO PARA GAS:
-      // Agregamos "?v=" + la hora actual. 
-      // Esto obliga al navegador a ignorar la copia vieja y pedir la nueva al servidor.
-      if (seccion === 'gas') {
-          window.location.href = "/dashboard/gas?v=" + new Date().getTime();
-          return;
-      }
-
-      window.location.href = "/dashboard/" + seccion;
-    }
-
-    function abrirFlotaQR() {
-      const modal = document.getElementById("modalFlotaQR");
-      const msg = document.getElementById("qr-msg-flota");
-      msg.textContent = "";
-      modal.style.display = "flex";
-
-      qrScannerFlota = new Html5Qrcode("qr-reader-flota");
-      Html5Qrcode.getCameras().then(cameras => {
-        const camId = cameras && cameras.length ? cameras[0].id : null;
-        if (!camId) {
-          msg.textContent = "No se detectó cámara.";
-          return;
-        }
-
-        qrScannerFlota.start(
-          camId,
-          { fps: 10, qrbox: 250 },
-          (decodedText) => {
-            const placa = (decodedText || "").trim().toUpperCase();
-            msg.textContent = "QR leído: " + placa;
-
-            qrScannerFlota.stop().then(() => {
-              enviarPlacaPreloginFlota(placa);
-            });
-          }
-        );
-      }).catch(err => {
-        msg.textContent = "Error cámara: " + err;
-      });
-    }
-
-    function cerrarFlotaQR() {
-      const modal = document.getElementById("modalFlotaQR");
-      modal.style.display = "none";
-
-      if (qrScannerFlota) {
-        qrScannerFlota.stop().catch(() => { });
-        qrScannerFlota = null;
+    // Detección Offline / Online
+    function updateOnlineStatus() {
+      const indicator = document.getElementById('offline-indicator');
+      if (navigator.onLine) {
+        indicator.style.display = 'none';
+      } else {
+        indicator.style.display = 'block';
       }
     }
-
-    function enviarPlacaPreloginFlota(placa) {
-      fetch("/dashboard/flota/prelogin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ placa })
-      })
-        .then(r => r.json())
-        .then(res => {
-          if (res.success) {
-            window.location.href = res.redirect_url;
-          } else {
-            document.getElementById("qr-msg-flota").textContent = res.message;
-          }
-        })
-        .catch(() => {
-          document.getElementById("qr-msg-flota").textContent = "Error enviando placa.";
-        });
-    }
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus();
 
     // Logout seguro offline
     function activarLogoutSeguroOffline() {
@@ -317,10 +271,15 @@
         }
       });
     }
+    window.addEventListener('load', activarLogoutSeguroOffline);
+    window.addEventListener('offline', activarLogoutSeguroOffline);
 
-    window.addEventListener("load", activarLogoutSeguroOffline);
-    window.addEventListener("online", activarLogoutSeguroOffline);
-    window.addEventListener("offline", activarLogoutSeguroOffline);
+    // Service Worker (PWA)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js')
+        .then(reg => console.log('SW registrado', reg))
+        .catch(err => console.log('SW error', err));
+    }
   </script>
 
 </body>
