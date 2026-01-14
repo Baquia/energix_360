@@ -1839,3 +1839,72 @@ def validar_pedido():
         mysql.connection.rollback()
         app.logger.error(f"Error al validar pedido GLP: {traceback.format_exc()}")
         return jsonify({"success": False, "message": "Error interno al actualizar el pedido."}), 500
+
+# ==========================================
+# RUTA PARA VER LA PÁGINA DE FACTURAS (HTML)
+# ==========================================
+@bp_glp.route('/facturas', methods=['GET'])
+@login_required_custom
+def ver_facturas_glp():
+    """
+    Renderiza la plantilla HTML cargando los pedidos pendientes desde el servidor.
+    """
+    empresa = session.get('empresa')
+    nombre = session.get('nombre')
+    # Intentamos obtener cédula, si no está, usamos el user_id o un string vacío
+    cedula = session.get('cedula') or session.get('user_id') or 'N/D'
+
+    try:
+        cur = mysql.connection.cursor()
+        # Buscamos los pedidos 'generado'
+        query = """
+            SELECT 
+                p.id, 
+                p.codigo_pedido, 
+                p.fecha_registro,  
+                p.proveedor,       
+                p.ubicacion 
+            FROM pedidos_gas_glp p
+            WHERE p.cliente = %s AND p.estatus = 'generado'
+            ORDER BY p.fecha_registro DESC
+        """
+        cur.execute(query, (empresa,))
+        rows = cur.fetchall()
+        cur.close()
+
+        pedidos_listos = []
+        for row in rows:
+            # Manejo robusto (DictCursor o Tupla)
+            if isinstance(row, dict):
+                p_id = row['id']
+                p_cod = row['codigo_pedido']
+                p_fec = row['fecha_registro']
+                p_prov = row.get('proveedor')
+                p_ubi = row['ubicacion']
+            else:
+                # Orden en tupla: id, codigo, fecha, proveedor, ubicacion
+                p_id = row[0]
+                p_cod = row[1]
+                p_fec = row[2]
+                p_prov = row[3]
+                p_ubi = row[4]
+
+            pedidos_listos.append({
+                "id": p_id,
+                "codigo_pedido": p_cod,
+                # Formateamos la fecha para que se vea bien en el HTML
+                "fecha_generacion": p_fec.strftime('%Y-%m-%d %H:%M') if p_fec else 'N/A',
+                "proveedor": p_prov,
+                "ubicacion": p_ubi
+            })
+
+        # Renderizamos pasando las variables que el HTML necesita
+        return render_template('facturas_glp.html', 
+                               pedidos=pedidos_listos, 
+                               empresa=empresa, 
+                               nombre=nombre, 
+                               cedula=cedula)
+
+    except Exception:
+        app.logger.error(f"Error cargando vista facturas: {traceback.format_exc()}")
+        return "Error cargando la página de facturas.", 500
