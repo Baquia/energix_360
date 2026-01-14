@@ -86,6 +86,9 @@ def panel_pollosgar():
 # ==============================================================================
 # ENRUTADOR UNIVERSAL
 # ==============================================================================
+# ==============================================================================
+# ENRUTADOR UNIVERSAL (CORREGIDO)
+# ==============================================================================
 @bp_890707006.route('/router/<modulo>')
 @login_required_custom
 def router_universal(modulo):
@@ -130,17 +133,23 @@ def router_universal(modulo):
                 break
 
     if archivo_destino:
+        # --- CORRECCIÓN CRÍTICA AQUÍ ---
+        # Si el destino es 'facturas_glp.html', NO lo renderizamos directo.
+        # Redirigimos a la ruta del Blueprint GLP que carga los datos de la BD.
+        if archivo_destino == "facturas_glp.html":
+            return redirect(url_for('bp_glp.ver_facturas_glp'))
+            
+        # Para los demás archivos, renderizamos normal
         return render_template(
             archivo_destino, 
             nombre=session.get('nombre'), 
             empresa=session.get('empresa'),
             perfil=perfil_db,
-            nit=session.get('nit') # Pasamos el NIT a las vistas hijas
+            nit=session.get('nit') 
         )
     else:
         flash(f"Acceso denegado: Perfil '{perfil_db}' sin permiso para '{modulo}'.", "danger")
         return redirect(url_for('bp_890707006.panel_pollosgar'))
-
 
 # =========================================================
 # LÓGICA DE FLOTA (PRELOGIN)
