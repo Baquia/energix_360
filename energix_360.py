@@ -1,30 +1,35 @@
 # energix_360.py
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, current_app
 from app import create_app, mysql, csrf, bcrypt
 from app.forms import LoginForm, RegistroUsuarioForm
 from functools import wraps
-from flask import send_from_directory
-from flask import current_app
+import os
 
+# 1. DETERMINAR LA RUTA REAL DE LA CARPETA APP
+# Según tu aclaración, el logo está en la carpeta 'static' que está DENTRO de 'app'
+base_dir = os.path.abspath(os.path.dirname(__file__))
+# Forzamos la ruta a energix_360/app/static
+static_path = os.path.join(base_dir, "app", "static")
+
+# 2. INICIALIZAR LA APP
+# Usamos create_app() para cargar toda tu configuración
 app = create_app()
 
-# --- NUEVO: EVITAR CACHÉ DE NAVEGADOR EN HTML ---
+# 3. ASIGNAR LA CARPETA STATIC CORRECTA (DENTRO DE APP)
+# Esto recuperará el logo y las imágenes de la carpeta app/static
+app.static_folder = static_path
+app.static_url_path = "/static"
+
+# --- CONFIGURACIÓN DE SEGURIDAD Y CACHÉ ---
 @app.after_request
 def add_security_headers(response):
-    # Si la respuesta es HTML, prohibir que el navegador la guarde en su caché nativa
-    # Esto evita ver datos de sesión de otros usuarios al dar "Atrás" o si falla el SW.
     if "text/html" in response.headers.get("Content-Type", ""):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
-# -----------------------------------------------
 
-@app.route("/login_energix360_offline.html")
-def login_energix360_offline():
-    return render_template("login_energix360_offline.html")
-
-# Decorador para proteger rutas
+# --- DECORADORES ---
 def login_required_custom(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -34,12 +39,16 @@ def login_required_custom(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# --- RUTAS PRINCIPALES ---
+
+@app.route("/login_energix360_offline.html")
+def login_energix360_offline():
+    return render_template("login_energix360_offline.html")
 
 @app.route("/sw.js")
 def sw():
-    return send_from_directory(current_app.static_folder, "sw.js",
+    return send_from_directory(app.static_folder, "sw.js",
                            mimetype="application/javascript")
-
 
 @app.route('/', methods=['GET'])
 def index():
@@ -55,8 +64,7 @@ def index():
 @csrf.exempt
 def login():
     data = request.get_json(force=True)
-    print(">>> Datos recibidos:", data)
-
+    
     cedula = data.get('cedula')
     password = data.get('password')
     nombre_empresa = data.get('empresa')
@@ -65,7 +73,6 @@ def login():
         return jsonify(success=False, message="Datos incompletos")
 
     cur = mysql.connection.cursor()
-    
     cur.execute("SELECT nit, tipo_empresa FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
     empresa_resultado = cur.fetchone()
 
@@ -74,7 +81,6 @@ def login():
         return jsonify(success=False, message="EMPRESA NO ENCONTRADA")
 
     nit_empresa = str(empresa_resultado['nit'])
-    
     tipo_empresa = empresa_resultado.get('tipo_empresa') or 'general'
 
     cur.execute("SELECT * FROM usuarios WHERE cedula = %s", (cedula,))
@@ -90,7 +96,6 @@ def login():
     if str(usuario['empresa_id']) != nit_empresa:
         return jsonify(success=False, message="USUARIO NO PERTENECE A ESTA EMPRESA")
 
-    # Guardar sesión
     session['usuario_id'] = usuario['id']          
     session['cedula'] = usuario['cedula']          
     session['nombre'] = usuario['nombre']
@@ -98,7 +103,6 @@ def login():
     session['empresa'] = usuario['empresa']
     session['empresa_id'] = usuario['empresa_id']
 
-    # --- SALT PARA LOGIN OFFLINE ---
     offline_salt = f"{usuario['cedula']}|{usuario['empresa_id']}"
 
     if tipo_empresa == 'transporte_especial':
@@ -126,9 +130,15 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
+
+# --- BLOQUE DE ARRANQUE ---
 if __name__ == '__main__':
-    print("\n✅ RUTAS DISPONIBLES EN FLASK:")
-    for rule in app.url_map.iter_rules():
-        print(f"→ {rule}  →  {rule.endpoint}")
-        
+    print("\n--- REVISIÓN DE CARPETA ESTÁTICA ---")
+    print(f"Buscando logo y fotos en: {app.static_folder}")
+    
+    if os.path.exists(app.static_folder):
+        print("✅ LA CARPETA EXISTE FÍSICAMENTE.")
+    else:
+        print("❌ ERROR: LA CARPETA NO EXISTE EN ESA RUTA.")
+
     app.run(debug=True, port=5001)

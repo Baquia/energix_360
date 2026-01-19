@@ -317,8 +317,6 @@
 
 </head>
 
-
-
 <body>
   <div class="header">
     <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" class="logo" alt="Logo cliente">
@@ -337,10 +335,26 @@
 
 
     <div id="menuOpciones" class="menu" style="display:flex">
-      <button class="menu-btn" onclick="iniciarCalefaccion()">🔥 Iniciar calefacción</button>
-      <button class="menu-btn" onclick="registrarTanqueo()">⛽ Registrar tanqueo</button>
-      <button class="menu-btn" onclick="registrarConsumo()">📊 Registrar consumo</button>
-      <button class="menu-btn" onclick="finalizarCalefaccion()">🔥 Finalizar calefacción</button>
+
+      <button class="menu-btn"
+        onclick="solicitarConfirmacion('¿Deseas iniciar una nueva operación de CALEFACCIÓN?', iniciarCalefaccion)">
+        🔥 Iniciar calefacción
+      </button>
+
+      <button class="menu-btn" onclick="solicitarConfirmacion('¿Deseas registrar un nuevo TANQUEO?', registrarTanqueo)">
+        ⛽ Registrar tanqueo
+      </button>
+
+      <button class="menu-btn"
+        onclick="solicitarConfirmacion('¿Deseas registrar el CONSUMO actual?', registrarConsumo)">
+        📊 Registrar consumo
+      </button>
+
+      <button class="menu-btn"
+        onclick="solicitarConfirmacion('¿Estás seguro de que deseas FINALIZAR la calefacción de este lote?', finalizarCalefaccion)">
+        🔥 Finalizar calefacción
+      </button>
+
     </div>
 
     <div id="conversacion" style="display:none">
@@ -377,7 +391,66 @@
     <a class="logout" href="/logout">Cerrar sesión</a>
   </div>
 
+  <div id="modalConfirmacion"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center; backdrop-filter: blur(2px);">
+    <div
+      style="background:white; padding:24px 20px; border-radius:16px; width:90%; max-width:340px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+
+      <h3 id="modalTitulo" style="margin-top:0; color:#015249; font-size:20px; margin-bottom:10px;">Confirmar acción
+      </h3>
+
+      <p id="modalMensaje" style="color:#444; font-size:16px; margin-bottom:24px; line-height:1.5;">¿Estás seguro?</p>
+
+      <div style="display:flex; justify-content:center; gap:12px;">
+        <button onclick="cerrarModalConfirmacion()"
+          style="flex:1; padding:12px; border-radius:10px; border:none; background:#f4f6f7; color:#555; font-weight:600; font-size:16px; cursor:pointer;">
+          Cancelar
+        </button>
+
+        <button id="btnModalConfirmar"
+          style="flex:1; padding:12px; border-radius:10px; border:none; background:#015249; color:white; font-weight:600; font-size:16px; cursor:pointer;">
+          Sí, continuar
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <script>
+    /* ==========================================
+   LÓGICA DEL MODAL DE CONFIRMACIÓN
+   ========================================== */
+    let accionPendiente = null; // Aquí guardaremos la función a ejecutar (ej: iniciarCalefaccion)
+
+    function solicitarConfirmacion(mensaje, funcionCallback) {
+      const modal = document.getElementById("modalConfirmacion");
+      const txtMensaje = document.getElementById("modalMensaje");
+      const btnSi = document.getElementById("btnModalConfirmar");
+
+      // 1. Ponemos el mensaje personalizado
+      txtMensaje.textContent = mensaje;
+
+      // 2. Guardamos la función que queremos ejecutar
+      accionPendiente = funcionCallback;
+
+      // 3. Configuramos el botón SI para que ejecute esa función
+      btnSi.onclick = function () {
+        if (typeof accionPendiente === "function") {
+          accionPendiente(); // Ejecuta la acción original (ej: iniciarCalefaccion)
+        }
+        cerrarModalConfirmacion();
+      };
+
+      // 4. Mostramos el modal (usamos flex para centrar)
+      modal.style.display = "flex";
+    }
+
+    function cerrarModalConfirmacion() {
+      const modal = document.getElementById("modalConfirmacion");
+      modal.style.display = "none";
+      accionPendiente = null; // Limpiamos la memoria
+    }
+
     function generarOpId() {
       // Navegadores modernos
       if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -724,7 +797,7 @@
       const remaining = [];
       let needLoginForSync = false;
       let sincronizadosCount = 0;
-      let lastSuccessResponse = null; // Guardaremos la respuesta para mostrar el resumen
+      let lastSuccessResponse = null;
 
       for (const it of q) {
         if (needLoginForSync) {
@@ -750,16 +823,22 @@
           }
 
           const j = await r.json();
+
           if (j.success) {
             sincronizadosCount++;
-            lastSuccessResponse = j; // ¡Guardamos la respuesta exitosa!
+            lastSuccessResponse = j;
           } else {
-            // Error de lógica del servidor, mantener en cola por seguridad
-            console.error("❌ Error servidor:", j.message);
-            remaining.push(it);
+            // SI EL SERVIDOR DICE "NO" (ERROR LÓGICO)
+            // 1. Mostrar la alerta
+            alert("⚠️ El servidor rechazó una operación pendiente:\n\n" + (j.message || "Operación rechazada"));
+
+            // 2. Limpiamos la pantalla y volvemos al menú
+            if (typeof mostrarMenu === 'function') mostrarMenu();
+
+            // Nota: Al NO hacer 'remaining.push(it)', la operación se descarta de la cola.
           }
         } catch (e) {
-          // Error de red real
+          // Error de red real -> Se queda en la cola
           remaining.push(it);
         }
       }
@@ -768,21 +847,21 @@
 
       // === ACCIONES AL FINALIZAR ===
 
-      // 1. Si hubo éxito
-      if (sincronizadosCount > 0) {
-        // Si se vació la cola por completo
-        if (remaining.length === 0) {
-          const warningDiv = document.getElementById("syncWarning");
-          if (warningDiv) warningDiv.style.display = 'none';
+      // CORRECCIÓN CLAVE: Ocultar el aviso SIEMPRE que la cola quede vacía
+      // (Independientemente de si hubo "éxito" o "rechazo")
+      if (remaining.length === 0) {
+        const warningDiv = document.getElementById("syncWarning");
+        if (warningDiv) warningDiv.style.display = 'none';
+      }
 
-          // AQUÍ ESTÁ LA CORRECCIÓN:
-          // En vez de recargar, mostramos el resumen de la última operación
+      // 1. Si hubo éxitos reales (para mostrar resumen)
+      if (sincronizadosCount > 0) {
+        if (remaining.length === 0) {
           if (lastSuccessResponse && typeof mostrarResumenOperacion === 'function') {
             alert(`✅ Se han sincronizado ${sincronizadosCount} operaciones.`);
-            mostrarResumenOperacion(lastSuccessResponse); // ¡Pinta el resumen!
+            mostrarResumenOperacion(lastSuccessResponse);
           } else {
             alert(`✅ ¡Éxito! Se sincronizaron ${sincronizadosCount} operaciones.`);
-            // Solo recargamos si no pudimos mostrar el resumen
             window.location.reload();
           }
         }
@@ -790,11 +869,16 @@
 
       // 2. Si la sesión venció
       if (needLoginForSync) {
-        alert(
-          "⚠️ TU SESIÓN HA VENCIDO\n\n" +
-          "Tus datos están GUARDADOS en el celular. Para enviarlos, necesitamos que inicies sesión de nuevo.\n\n" +
-          "Dale Aceptar y el sistema te llevará al login."
-        );
+        // === NUEVA PROTECCIÓN: NO MOLESTAR SI EL USUARIO ESTÁ TRABAJANDO ===
+        // Si el usuario está en medio de una operación (QR, formulario, etc.),
+        // ignoramos el logout forzado por ahora para dejarle terminar offline.
+        if (typeof GLP_OPERACION_EN_CURSO !== 'undefined' && GLP_OPERACION_EN_CURSO) {
+             console.warn("⛔ Sesión vencida detectada en background, pero el usuario está operando. Se pospone el logout.");
+             return; 
+        }
+        // ===================================================================
+
+        alert("⚠️ TU SESIÓN HA VENCIDO\n\nDale Aceptar para iniciar sesión nuevamente.");
         window.location.href = "/logout";
       }
     }
@@ -902,7 +986,14 @@
           const d = await r.json();
           if (d.success && Array.isArray(d.tanques) && d.tanques.length) {
             cacheTanquesLocal(sede, d.tanques);
-            return { tanques: d.tanques, fuente: "bd" };
+            return {
+              tanques: d.tanques,
+              fuente: "bd",
+              // AGREGAMOS ESTOS DOS DATOS:
+              lote_activo: d.lote_activo,
+              info_lote: d.info_lote
+            };
+
           } else {
             console.warn("Respuesta JSON sin tanques válidos:", d);
           }
@@ -1003,7 +1094,23 @@
         }
 
         const j = await r.json();
-        if (!j.success) throw new Error(j.message || "Error servidor");
+
+        // Si el servidor dice que NO (ej: Lote activo), mostramos el mensaje y LIMPIAMOS
+        // (Código CORREGIDO)
+        // Si el servidor dice que NO (ej: Lote activo), mostramos el mensaje y VOLVEMOS AL MENÚ
+        if (!j.success) {
+          alert(j.message || "Operación rechazada.");
+
+          // CAMBIO CLAVE: Usamos mostrarMenu() en vez de solo limpiarEstadoOperacion().
+          // Esto asegura que se oculte la interfaz de ingreso de datos y reaparezca el menú principal.
+          if (typeof mostrarMenu === 'function') {
+            mostrarMenu();
+          } else {
+            // Fallback por seguridad
+            limpiarEstadoOperacion();
+          }
+          return j;
+        }
 
         if (typeof onSuccess === "function") onSuccess(j);
         limpiarEstadoOperacion();
@@ -1310,9 +1417,18 @@
     /* ============================
     Flujo común: cargar tanques
     ============================ */
-    async function cargarTanques(callback) {
+    // Modificamos para aceptar el parámetro 'bloquearSiActivo'
+    async function cargarTanques(callback, bloquearSiActivo = false) {
       try {
         const res = await obtenerTanquesConFallback(sedeQR);
+
+        // --- NUEVA LÓGICA DE BLOQUEO ---
+        if (bloquearSiActivo && res.lote_activo) {
+          alert("⛔ YA HAY UN LOTE ACTIVO (" + (res.info_lote || "") + ").\n\nNo puedes iniciar calefacción nuevamente en esta sede sin finalizar el anterior.");
+          mostrarMenu(); // Te devuelve al menú inmediatamente
+          return; // Detiene todo
+        }
+        // -------------------------------
 
         tanques = Array.isArray(res.tanques) ? res.tanques : [];
         if (tanques.length === 0) {
@@ -1321,7 +1437,6 @@
           return;
         }
 
-        // Normalizar numero/etiqueta a minúsculas (igual que antes)
         tanques = tanques.map(t => ({
           numero: String(t.numero || t.etiqueta || "").toLowerCase(),
           capacidad: Number(t.capacidad || 0),
@@ -1336,10 +1451,27 @@
       }
     }
 
+    // (Código CORREGIDO)
     function mostrarMenu() {
       desactivarProteccionOperacion();
-      document.getElementById("menuOpciones").style.display = "flex";
-      document.getElementById("conversacion").style.display = "none";
+
+      // CORRECCIÓN 1: Limpiamos explícitamente el texto de la pregunta para que no se quede "pegado"
+      const pregunta = document.getElementById("preguntaTexto");
+      if (pregunta) pregunta.textContent = "";
+
+      // CORRECCIÓN 2: Aseguramos visibilidad del menú y ocultamos lo demás
+      const menu = document.getElementById("menuOpciones");
+      const convo = document.getElementById("conversacion");
+      const panel = document.getElementById("panelResumen");
+
+      if (menu) menu.style.display = "flex";
+      if (convo) convo.style.display = "none";
+      if (panel) panel.style.display = "none";
+
+      // Aseguramos que se limpien las variables internas
+      if (typeof limpiarEstadoOperacion === 'function') {
+        limpiarEstadoOperacion();
+      }
     }
 
     // =======================================
@@ -1583,9 +1715,10 @@
         idx = 0;
 
         function despuesDeAvicola() {
+          // Pasamos 'true' para que active el bloqueo si hay lote activo
           cargarTanques(() => {
             preguntarNivelFoto(enviarInicio);
-          });
+          }, true);
         }
 
         if (EMPRESA_SESION === "Pollos GAR SAS") {
@@ -1702,14 +1835,14 @@
           sede: "",
           tanques: []
         };
-        
+
         tanqueActualIndex = 0;
 
         const info = await leerQR("Escanea el QR de la sede para registrar el tanqueo");
         sedeQR = info.sede;
         empresaQR = info.empresa;
         tanquesQR = Array.isArray(info.tanques) ? info.tanques : [];
-        
+
         registrarTanqueoData.sede = sedeQR;
 
         // 🔹 Limpiamos cualquier handler viejo antes de empezar el flujo nuevo

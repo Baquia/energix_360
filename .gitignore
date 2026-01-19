@@ -19,3 +19,10 @@ __pycache__/
 *.sqlite3
 .DS_Store
 
+# ... (todo lo que ya tenías arriba) ...
+
+# Ignorar carpeta de fotos (Testigos)
+app/static/testigos/
+
+# (Opcional) Ignorar archivos de sistema generados por mac/windows si aparecen
+Thumbs.db

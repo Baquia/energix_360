@@ -8,6 +8,7 @@ import os, base64, smtplib, traceback, random, string
 from email.mime.text import MIMEText
 from app import mysql, csrf
 import re as _re
+import holidays
 
 bp_glp = Blueprint('bp_glp', __name__, url_prefix='/glp')
 
@@ -34,26 +35,26 @@ def _normalize_sede(s):
 
 
 def _guardar_testigo(base64_data, carpeta, nombre_archivo):
-    """Guarda un archivo de testigo (imagen) en la carpeta de estáticos."""
+    """Guarda un archivo de testigo (imagen) en la carpeta de estáticos CORRECTA (app/static)."""
     if not base64_data:
         return None
 
     try:
         data_match = _re.match(r'data:image/(?P<ext>png|jpeg);base64,(?P<data>.+)', base64_data)
         if not data_match:
-            # Manejo de datos base64 que no tienen prefijo de tipo MIME
             if "," in base64_data:
                 base64_data = base64_data.split(",", 1)[1]
-
-            # Intenta determinar extensión si el archivo es solo el base64 raw (asumimos jpg)
             ext = 'jpg'
             binary_data = base64.b64decode(base64_data)
         else:
             ext = data_match.group('ext')
             binary_data = base64.b64decode(data_match.group('data'))
 
-        # Asegurar la ruta estática
-        static_dir = os.path.join("static", carpeta) 
+        # --- CAMBIO CRÍTICO: Usar app.static_folder ---
+        # Esto asegura que vaya a C:\Users\casti\energix_360\app\static
+        # en lugar de crear una carpeta nueva fuera de la app.
+        static_dir = os.path.join(app.static_folder, carpeta) 
+        
         if not os.path.exists(static_dir):
             os.makedirs(static_dir)
 
@@ -63,14 +64,17 @@ def _guardar_testigo(base64_data, carpeta, nombre_archivo):
         with open(file_path, 'wb') as f:
             f.write(binary_data)
 
-        # Retornar ruta relativa a static
-        ruta_web = os.path.relpath(file_path, "static").replace(os.path.sep, "/")
-        return f"/static/{ruta_web}"
+        # Calculamos la ruta relativa para la Base de Datos
+        # Esto genera strings como: testigos/Empresa/foto.jpg
+        ruta_relativa = os.path.relpath(file_path, app.static_folder).replace(os.path.sep, "/")
+        
+        # Flask siempre sirve los estáticos bajo el prefijo /static/
+        # Retornamos: /static/testigos/Empresa/foto.jpg
+        return f"/static/{ruta_relativa}"
+        
     except Exception as e:
         app.logger.error(f"Error al guardar testigo: {e}")
         return None
-
-
 def _resumen_tanques(tanques):
     salida = []
     for tk in tanques or []:
@@ -126,16 +130,20 @@ def _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha_
 
 def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, tanques):
     """
-    AJUSTE 2 (CORREGIDO): Calcula consumo aplicando la 'Tabla Maestra V4.0'.
+    AJUSTE 3: Soporta N tanques variables.
+    Acumula errores de todos los tanques y aborta al final si existe alguno.
     """
     if not tanques:
         return 0.0, 0.0, 0
 
     consumo_total_kg = 0.0
+    errores_detectados = []  # <--- Lista para acumular errores de 1 o varios tanques
     
+    # Este bucle se adapta a la cantidad de tanques que lleguen (1, 2, 5, etc.)
     for t in tanques:
-        raw_num = str(t.get('numero', '')).lower().replace('tk-', '')
-        num_tanque = raw_num.strip()
+        num_str = str(t.get('numero', ''))
+        match = _re.search(r'\d+', num_str)
+        num_tanque = match.group() if match else num_str 
         
         if not num_tanque: continue
 
@@ -149,6 +157,7 @@ def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, t
         try: capacidad_galones = float(t.get('capacidad') or 250)
         except: capacidad_galones = 250.0
 
+        # Consulta dinámica: busca la columna específica 'tk-X' según el tanque actual
         query = f"""
             SELECT operacion, 
                    `nivel tk-{num_tanque}`, 
@@ -185,12 +194,26 @@ def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, t
             nivel_anterior = float(prev.get(f'nivel tk-{num_tanque}') or 0)
         
         delta_pct = nivel_anterior - valor_actual_cierre
+
+        # === VALIDACIÓN (Consumo) ===
+        # Si el nivel sube (delta negativo), es un error.
+        if delta_pct < -0.1:
+            errores_detectados.append(
+                f"• TK-{num_tanque}: Ingresó {valor_actual_cierre}%, anterior {nivel_anterior}% (SUBIÓ)."
+            )
+        
         if delta_pct < 0: delta_pct = 0
 
         kg_tanque = (delta_pct / 100.0) * capacidad_galones * densidad_calculo
         consumo_total_kg += kg_tanque
 
-    # --- CORRECCIÓN AQUI: SOLO PEDIMOS 'pollitos' ---
+    # === AL FINAL DEL BUCLE: SI HUBO AL MENOS UN ERROR, ABORTAR ===
+    if errores_detectados:
+        mensaje_final = "⛔ ERRORES DETECTADOS:\n\n" + "\n".join(errores_detectados) + "\n\nEl nivel no puede subir sin un tanqueo."
+        raise ValueError(mensaje_final)
+    # ==============================================================
+
+    # Cálculo final de pollitos
     cur.execute("""
         SELECT pollitos
         FROM cardex_glp
@@ -202,8 +225,6 @@ def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, t
         LIMIT 1
     """, (empresa, ubicacion, lote))
     row_ini = cur.fetchone() or {}
-    
-    # Solo usamos pollitos
     pollitos = int(row_ini.get("pollitos") or 0)
 
     kg_pollito = 0.0
@@ -218,8 +239,6 @@ def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, t
     """, (kg_pollito, consumo_total_kg, id_operacion_actual))
 
     return consumo_total_kg, kg_pollito, pollitos
-
-
 def _buscar_proveedor_principal(cur, empresa, ubicacion, tanques):
     """
     Devuelve proveedor principal tomando el primer tanque reportado.
@@ -781,6 +800,7 @@ def obtener_tanques():
 
     try:
         with mysql.connection.cursor() as cur:
+            # 1. Buscar Tanques
             cur.execute("""
                 SELECT nombre_tanque AS numero,
                        capacidad_gls  AS capacidad
@@ -790,18 +810,48 @@ def obtener_tanques():
                 ORDER BY nombre_tanque
             """, (empresa, sede))
             rows = cur.fetchall() or []
-        tanques = [
-            {"numero": r.get("numero") or "",
-             "capacidad": float(r.get("capacidad") or 0),
-             "etiqueta": r.get("numero") or ""}
-            for r in rows
-        ]
-        return jsonify({"success": True, "tanques": tanques})
+            
+            tanques = []
+            for r in rows:
+                # Lectura Híbrida (Dict o Tupla) para tanques
+                num = r.get("numero") if isinstance(r, dict) else r[0]
+                cap = r.get("capacidad") if isinstance(r, dict) else r[1]
+                tanques.append({
+                    "numero": num or "",
+                    "capacidad": float(cap or 0),
+                    "etiqueta": num or ""
+                })
+
+            # 2. NUEVO: Verificar si hay lote ACTIVO en esta sede
+            cur.execute("""
+                SELECT lote FROM cardex_glp 
+                WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO' 
+                LIMIT 1
+            """, (empresa, sede))
+            row_lote = cur.fetchone()
+            
+            lote_activo = False
+            info_lote = ""
+            
+            if row_lote:
+                lote_activo = True
+                # Lectura Híbrida para el lote
+                if isinstance(row_lote, dict):
+                    info_lote = row_lote.get('lote', '')
+                else:
+                    info_lote = row_lote[0]
+
+        # Devolvemos tanques Y el estado del lote
+        return jsonify({
+            "success": True, 
+            "tanques": tanques, 
+            "lote_activo": lote_activo,
+            "info_lote": info_lote
+        })
+
     except Exception as e:
         traceback.print_exc()
         return jsonify({"success": False, "tanques": [], "message": f"Error: {e}"}), 500
-
-
 # ======================
 # Iniciar calefacción
 # ======================
@@ -857,28 +907,52 @@ def registrar_inicio_calefaccion():
 
     try:
         with mysql.connection.cursor() as cur:
-            # Verificar lote activo
+            # === 1. VALIDACIÓN BLINDADA DE LOTE ACTIVO (FIX KEYERROR) ===
             cur.execute("""
-                SELECT COUNT(*) AS activo
-                FROM cardex_glp
-                WHERE empresa = %s
-                  AND TRIM(ubicacion) = TRIM(%s)
+                SELECT COUNT(*) AS activo 
+                FROM cardex_glp 
+                WHERE empresa = %s 
+                  AND TRIM(ubicacion) = TRIM(%s) 
                   AND estatus_lote = 'ACTIVO'
             """, (empresa, ubicacion))
-            row = cur.fetchone() or {}
-            if (row.get("activo", 0) or 0) > 0:
-                cur.execute("""
-                    SELECT lote, fecha
-                    FROM cardex_glp
-                    WHERE empresa = %s
-                      AND TRIM(ubicacion) = TRIM(%s)
-                      AND estatus_lote = 'ACTIVO'
-                    ORDER BY fecha DESC, id DESC LIMIT 1
-                """, (empresa, ubicacion))
-                conf = cur.fetchone() or {}
-                msg = f"Ya existe un lote activo (lote {conf.get('lote')} de el: {conf.get('fecha')}). Dale RELOAD"
-                return jsonify({"success": False, "message": msg})
+            
+            row = cur.fetchone()
+            
+            # Lógica Híbrida: Detecta si la BD devolvió Diccionario o Tupla
+            activo = 0
+            if row:
+                if isinstance(row, dict):
+                    activo = row.get('activo', 0) # Si es Diccionario
+                else:
+                    activo = row[0] # Si es Tupla
 
+            if activo > 0:
+                # Buscamos el nombre del lote activo (también híbrido)
+                cur.execute("""
+                    SELECT lote 
+                    FROM cardex_glp 
+                    WHERE empresa=%s 
+                      AND TRIM(ubicacion)=TRIM(%s) 
+                      AND estatus_lote='ACTIVO' 
+                    LIMIT 1
+                """, (empresa, ubicacion))
+                
+                info = cur.fetchone()
+                nombre_lote = "Desconocido"
+                
+                if info:
+                    if isinstance(info, dict):
+                        nombre_lote = info.get('lote', 'Desconocido')
+                    else:
+                        nombre_lote = info[0]
+
+                # Retornamos el error controlado para que salga el Alert
+                return jsonify({
+                    "success": False, 
+                    "message": f"⛔ YA EXISTE UN LOTE ACTIVO ({nombre_lote}).\n\nNo puedes iniciar calefacción otra vez en esta sede sin finalizar el anterior."
+                })
+
+            # === 2. INSERCIÓN DE DATOS ===
             dias_operacion = 1
             fecha = datetime.now().date()
             lote_id = f"{fecha.strftime('%Y%m%d')}_{ubicacion.replace(' ', '')}"
@@ -909,9 +983,11 @@ def registrar_inicio_calefaccion():
             saldo_estimado_kg = 0.0
 
             for tk in tanques:
-                # AJUSTE 2: Limpieza y prefijo tk-
-                raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
-                num = raw_num.strip()
+                # === 3. FIX REGEX PARA NOMBRE DE TANQUE ===
+                num_str = str(tk.get("numero", ""))
+                match = _re.search(r'\d+', num_str)
+                num = match.group() if match else ""
+                
                 if not num: continue
 
                 try:
@@ -930,7 +1006,7 @@ def registrar_inicio_calefaccion():
                 set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(capacidad)
 
                 if testigo:
-                    ruta_web = _guardar_testigo(testigo, carpeta, f"tk{num}_{id_operacion}.jpg")
+                    ruta_web = _guardar_testigo(testigo, carpeta, f"tk{num}_{id_operacion}")
                     set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta_web)
 
                 saldo_estimado_kg += densidad * capacidad * (nivel / 100.0)
@@ -957,8 +1033,8 @@ def registrar_inicio_calefaccion():
             if tanques_bajos:
                 # Le pasamos 'proveedor_principal' que ya calculaste unas líneas antes
                 codigo_pedido = _generar_codigo_pedido(empresa, lote_id, ubicacion, proveedor_principal, cur)
-                # Enviar correo al proveedor listando SOLO los tanques bajos y adjuntando el código
-                # Requiere que _enviar_alerta_pedido_tanqueo reciba tanques_bajos (ver nota abajo).
+                
+                # === 4. FIX SINTAXIS (PARENTESIS CERRADO) ===
                 _enviar_alerta_pedido_tanqueo(
                     empresa,
                     ubicacion,
@@ -997,12 +1073,18 @@ def registrar_inicio_calefaccion():
 
         return jsonify({"success": True, "message": mensaje, "resumen": resumen})
 
+    except IntegrityError as e:
+        mysql.connection.rollback()
+        # Si es duplicado (1062), es éxito silencioso (Race condition)
+        if e.args[0] == 1062 and 'op_id' in str(e.args[1]):
+             return jsonify({"success": True, "message": "Operación ya recibida."}), 200
+        return jsonify({"success": False, "message": f"Error integridad: {e}"})
+
     except Exception:
         print("⛔ Error en registrar_inicio_calefaccion:")
         traceback.print_exc()
         mysql.connection.rollback()
         return jsonify({"success": False, "message": "Error al registrar los datos."})
-
 
 # ======================
 # Registrar tanqueo
@@ -1015,6 +1097,7 @@ def registrar_tanqueo():
     # CAMBIO: calcular y guardar precio_unitario / precio_total (proveedor->precio)
     # CAMBIO: mensaje final incluye "Valor estimado del tanqueo: $XXXX"
     # CAMBIO: alerta por desviación se evalúa con DESVÍO TOTAL, solo positivo > 8%
+    # AJUSTE FINAL: Acumula errores de todos los tanques antes de abortar.
     try:
         data = request.get_json(force=True) or {}
     except Exception:
@@ -1088,15 +1171,27 @@ def registrar_tanqueo():
             masas_facturadas = []
             desviaciones_porcentuales = []
 
+            # --- LISTA PARA ACUMULAR ERRORES DE LÓGICA ---
+            errores_tanqueo = [] 
+
             for tk in tanques:
                 # AJUSTE 2: Limpieza y prefijo tk-
-                raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
-                num = raw_num.strip()
+                num_str = str(tk.get("numero", ""))
+                match = _re.search(r'\d+', num_str)
+                num = match.group() if match else ""
                 if not num: continue
 
                 cap = float(tk.get("capacidad", 0) or 0.0)
                 nivel_ini = float(tk.get("nivel_inicial", 0) or 0.0)
                 nivel_fin = float(tk.get("nivel_final", 0) or 0.0)
+
+                # === NUEVA VALIDACIÓN: EL NIVEL DEBE SUBIR (ACUMULATIVA) ===
+                # Si el nivel final es menor que el inicial (con tolerancia de -0.1)
+                if (nivel_fin - nivel_ini) < -0.1:
+                     errores_tanqueo.append(
+                        f"• TK-{num}: Inicio {nivel_ini}% -> Fin {nivel_fin}% (BAJÓ)."
+                     )
+                # ===========================================================
 
                 foto_ini = tk.get("foto_nivel_inicial")
                 foto_fin = tk.get("foto_nivel_final")
@@ -1106,18 +1201,18 @@ def registrar_tanqueo():
                 # AJUSTE 2: Guardado CORRECTO con columnas separadas
                 set_cols.append(f"`nivel tk-{num}`=%s");     set_vals.append(nivel_ini)
                 if foto_ini:
-                    ruta_ini = _guardar_testigo(foto_ini, carpeta, f"tk{num}_ini_{id_operacion}.jpg")
+                    ruta_ini = _guardar_testigo(foto_ini, carpeta, f"tk{num}_ini_{id_operacion}")
                     set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta_ini)
 
                 set_cols.append(f"`nivelfinal tk-{num}`=%s");     set_vals.append(nivel_fin)
                 if foto_fin:
-                    ruta_fin = _guardar_testigo(foto_fin, carpeta, f"tk{num}_fin_{id_operacion}.jpg")
+                    ruta_fin = _guardar_testigo(foto_fin, carpeta, f"tk{num}_fin_{id_operacion}")
                     set_cols.append(f"`testigo nivelfinal tk-{num}`=%s"); set_vals.append(ruta_fin)
 
                 set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(cap)
 
                 if foto_bau:
-                    ruta_baucher = _guardar_testigo(foto_bau, carpeta, f"tk{num}_baucher_{id_operacion}.jpg")
+                    ruta_baucher = _guardar_testigo(foto_bau, carpeta, f"tk{num}_baucher_{id_operacion}")
                     col_baucher = f"testigo_baucher_tk_{num}" # Formato de la BD
                     set_cols.append(f"`{col_baucher}`=%s"); set_vals.append(ruta_baucher)
 
@@ -1140,6 +1235,12 @@ def registrar_tanqueo():
                     if kg_sumin > 0:
                         desvio = ((kg_sumin - masa_esp_tk)/masa_esp_tk)*100.0
                         desviaciones_porcentuales.append(desvio)
+
+            # === PUNTO DE QUIEBRE: SI HUBO ERRORES EN ALGÚN TANQUE, ABORTAR ===
+            if errores_tanqueo:
+                mensaje_final = "⛔ ERRORES EN DATOS DE TANQUEO:\n\n" + "\n".join(errores_tanqueo) + "\n\nEn un tanqueo el nivel debe SUBIR (Nivel Final > Nivel Inicial).\nVerifique si invirtió los valores."
+                raise ValueError(mensaje_final)
+            # ==================================================================
 
             if set_cols:
                 cur.execute(
@@ -1198,9 +1299,6 @@ def registrar_tanqueo():
 
             # ================================
             # CAMBIO: Precio del tanqueo (precio_unitario / precio_total)
-            # 1) Consultar precio del proveedor (proveedores.precio)
-            # 2) precio_total = precio_unitario * masa_kg_facturada (TOTAL)
-            # 3) Guardar en cardex_glp.precio_unitario y cardex_glp.precio_total
             # ================================
             precio_unitario = 0.0
             precio_total = 0.0
@@ -1233,10 +1331,7 @@ def registrar_tanqueo():
                 id_operacion
             ))
 
-            # ================================
-            # Alerta por desviación >8% SOLO POSITIVA (facturado > esperado)
-            # Usa tu función existente: _enviar_alerta_desviacion_tanqueo(...)
-            # ================================
+            # Alerta por desviación
             alerta_enviada = False
             if masa_esperada_total > 0 and desvio_total > 8.0 and proveedor_principal:
                 try:
@@ -1260,7 +1355,7 @@ def registrar_tanqueo():
             mysql.connection.commit()
 
         # ================================
-        # Mensaje final (ordenado, una sola vez)
+        # Mensaje final
         # ================================
         mensaje = "Tanqueo registrado correctamente."
 
@@ -1280,8 +1375,6 @@ def registrar_tanqueo():
                 if alerta_enviada:
                     mensaje += " Se envió alerta por email."
 
-        # Valor estimado del tanqueo: $XXXX (formato pesos CO con separador de miles)
-        # Ejemplo: 1234567.89 -> $1.234.568
         valor_pesos = round(float(precio_total or 0.0), 0)
         valor_formato = f"{valor_pesos:,.0f}".replace(",", ".")
         mensaje += f" Valor estimado del tanqueo: ${valor_formato}."
@@ -1312,11 +1405,20 @@ def registrar_tanqueo():
 
         return jsonify({"success": True, "message": mensaje, "resumen": resumen})
 
+    # === AGREGAR ESTO JUSTO ANTES DEL EXCEPT EXCEPTION ===
+    except ValueError as e:
+        # Aquí atrapamos el error del nivel y abortamos todo
+        mysql.connection.rollback()
+        # Devolvemos success:False para que el Frontend muestre la alerta roja
+        return jsonify({"success": False, "message": str(e)})
+    # =====================================================
+
     except Exception:
         print("⛔ Error en registrar_tanqueo:")
         traceback.print_exc()
         mysql.connection.rollback()
         return jsonify({"success": False, "message": "Error al registrar tanqueo."})
+
 
 # ======================
 # Registrar consumo
@@ -1326,7 +1428,7 @@ def registrar_tanqueo():
 @login_required_custom
 def registrar_consumo():
     # Registrar consumo:
-    # - Define tanques_bajos (umbral CONSUMO <= 25%)
+    # - Define tanques_bajos (umbral CONSUMO <= 25% O Proyección Viernes)
     # - Si hay tanques_bajos:
     #     - calcular ts_solicitado con algoritmo foto (depende de dias_operacion)
     #     - generar codigo_pedido
@@ -1417,10 +1519,15 @@ def registrar_consumo():
             saldo_estimado_kg = 0.0
             tanques_bajos = []
 
+            # Instancia de festivos Colombia para la proyección (Asegúrate de importar holidays al inicio del archivo)
+            co_holidays = holidays.CO()
+
             for tk in tanques:
-                # AJUSTE 2: Limpieza y prefijo tk-
-                raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
-                num = raw_num.strip()
+                # Limpieza y prefijo tk-
+                num_str = str(tk.get("numero", ""))
+                match = _re.search(r'\d+', num_str)
+                num = match.group() if match else ""
+                
                 if not num: continue
 
                 try: val = float(tk.get("nivel", 0) or 0)
@@ -1429,15 +1536,47 @@ def registrar_consumo():
                 except: cap = 0.0
                 tst = tk.get("testigo")
 
-                # UMBRAL CONSUMO: tanques bajos si nivel <= 25%
-                if num and val <= 25.0:
+                # ==============================================================================
+                # LÓGICA DE SOLICITUD DE TANQUEO (Estándar + Proyección Fin de Semana)
+                # ==============================================================================
+                es_bajo = False
+                
+                # 1. CRITERIO ESTÁNDAR: Nivel crítico inmediato (<= 25%)
+                if val <= 25.0:
+                    es_bajo = True
+                
+                # 2. CRITERIO PROYECCIÓN VIERNES: Si es Viernes y nivel > 25, proyectamos consumo
+                elif fecha.weekday() == 4: # 4 = Viernes
+                    # Calculamos el Lunes siguiente para ver si es festivo
+                    lunes_siguiente = fecha + timedelta(days=3)
+                    
+                    es_puente = lunes_siguiente in co_holidays
+                    
+                    # Definimos días de consumo sin recarga:
+                    # - Fin de semana normal: Consumo Sábado + Domingo (2 días) -> Nivel Lunes
+                    # - Puente Festivo: Consumo Sábado + Domingo + Lunes (3 días) -> Nivel Martes
+                    dias_proyeccion = 3 if es_puente else 2
+                    
+                    tasa_diaria = 8.0 # 8% de consumo por día
+                    consumo_proyectado = dias_proyeccion * tasa_diaria
+                    
+                    nivel_futuro_estimado = val - consumo_proyectado
+                    nivel_minimo_seguridad = 15.0
+                    
+                    # Si la proyección cae por debajo del mínimo de seguridad (15%), pedimos gas HOY.
+                    if nivel_futuro_estimado < nivel_minimo_seguridad:
+                        es_bajo = True
+                
+                # Si cumple cualquiera de los dos criterios, lo agregamos a la lista de solicitud
+                if num and es_bajo:
                     tanques_bajos.append({"numero": num, "nivel": round(val, 2)})
+                # ==============================================================================
 
                 set_cols.append(f"`nivel tk-{num}`=%s"); set_vals.append(val)
                 set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(cap)
 
                 if tst:
-                    ruta = _guardar_testigo(tst, carpeta, f"tk{num}_consumo_{id_operacion}.jpg")
+                    ruta = _guardar_testigo(tst, carpeta, f"tk{num}_consumo_{id_operacion}")
                     set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta)
 
                 saldo_estimado_kg += densidad * cap * (val/100.0)
@@ -1508,13 +1647,13 @@ def registrar_consumo():
 
         if codigo_pedido and tanques_bajos and ts_solicitado > 0:
             mensaje += (
-                f" ⚠️ Se solicitó tanqueo (CONSUMO) por tanques ≤ 25% "
+                f" ⚠️ Se solicitó tanqueo (CONSUMO) por tanques en nivel crítico o proyección de riesgo "
                 f"con código {codigo_pedido}. Nivel solicitado: {round(ts_solicitado,2)}%."
             )
         elif tanques_bajos and ts_solicitado <= 0:
-            mensaje += " ⚠️ Hay tanques ≤ 25%, pero el nivel solicitado calculado es 0% (no se generó pedido)."
+            mensaje += " ⚠️ Hay tanques bajos, pero el nivel solicitado calculado es 0% (no se generó pedido)."
         elif tanques_bajos and not codigo_pedido:
-            mensaje += " ⚠️ Hay tanques ≤ 25%, pero no se pudo generar código de pedido (ver logs)."
+            mensaje += " ⚠️ Hay tanques bajos, pero no se pudo generar código de pedido (ver logs)."
 
         resumen = {
             "operacion": "consumo",
@@ -1539,7 +1678,15 @@ def registrar_consumo():
         }
 
         return jsonify({"success": True, "message": mensaje, "resumen": resumen})
-
+    
+    # === AGREGAR ESTO JUSTO ANTES DEL EXCEPT EXCEPTION ===
+    except ValueError as e:
+        # Aquí atrapamos el error del nivel y abortamos todo
+        mysql.connection.rollback()
+        # Devolvemos success:False para que el Frontend muestre la alerta roja
+        return jsonify({"success": False, "message": str(e)})
+    # =====================================================
+    
     except Exception:
         print("⛔ Error en registrar_consumo:")
         traceback.print_exc()
@@ -1619,8 +1766,13 @@ def finalizar_calefaccion_batch():
 
             for tk in tanques:
                 # AJUSTE 2: Limpieza y prefijo tk-
-                raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
-                num = raw_num.strip()
+                # raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
+                # num = raw_num.strip()
+                
+                num_str = str(tk.get("numero", ""))
+                match = _re.search(r'\d+', num_str)
+                num = match.group() if match else ""  
+                
                 if not num: continue
 
                 try:
@@ -1637,7 +1789,7 @@ def finalizar_calefaccion_batch():
                 set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(cap)
 
                 if tst:
-                    ruta = _guardar_testigo(tst, carpeta, f"tk{num}_final_{id_operacion}.jpg")
+                    ruta = _guardar_testigo(tst, carpeta, f"tk{num}_final_{id_operacion}")
                     set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta)
 
                 saldo_estimado_kg += densidad * cap * (niv/100.0)
@@ -1698,6 +1850,14 @@ def finalizar_calefaccion_batch():
 
         return jsonify({"success": True, "message": mensaje, "resumen": resumen})
 
+    # === AGREGAR ESTO JUSTO ANTES DEL EXCEPT EXCEPTION ===
+    except ValueError as e:
+        # Aquí atrapamos el error del nivel y abortamos todo
+        mysql.connection.rollback()
+        # Devolvemos success:False para que el Frontend muestre la alerta roja
+        return jsonify({"success": False, "message": str(e)})
+    # =====================================================
+    
     except Exception:
         print("⛔ Error en finalizar_calefaccion_batch:")
         traceback.print_exc()

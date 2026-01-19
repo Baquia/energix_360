@@ -7,6 +7,13 @@ from flask_bcrypt import Bcrypt
 import traceback
 import math
 
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
 bcrypt = Bcrypt()
 
 bp_901811727 = Blueprint('bp_901811727', __name__)
@@ -151,7 +158,7 @@ def obtener_periodo():
 
 
 # ==============================================================================
-# LÓGICA DE INFORMES Y ESTADÍSTICAS (AJUSTADA A FÓRMULA DEL USUARIO)
+# LÓGICA DE INFORMES Y ESTADÍSTICAS (KPIs ACTUALIZADOS)
 # ==============================================================================
 
 def _procesar_resultados_glp(resultados, tipo_informe, periodo):
@@ -165,20 +172,20 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         except (ValueError, TypeError):
             return 0.0
 
-    # Inicializar contadores (KG)
+    # Inicializar contadores globales
     math_saldo_inicial_kg_global = 0.0
-    math_saldo_final_kg_global = 0.0
     math_ingresos_kg = 0.0
-    math_consumo_parcial_kg = 0.0 # Suma de neto_gastado (clase='egreso')
+    math_consumo_real_acumulado = 0.0 # <--- AQUÍ ACUMULAREMOS EL NETO_GASTADO TOTAL
+    math_dinero_total = 0.0 
     
     total_pollitos_global = 0
     lotes_procesados_global = set()
 
+    # Inicializar estructuras de datos para gráficos y tablas
     series = { 'fechas': [], 'kg_pollito': [], 'saldo_inicial': [], 'saldo_final': [], 'ingresos': [] }
-    
-    # Estructura para Tabla Resumen
     granjas_data = {}
 
+    # Ordenar resultados por fecha
     resultados.sort(key=lambda x: str(x.get('fecha')))
 
     for row in resultados:
@@ -187,112 +194,98 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         lote_id = row.get('lote')
         ubicacion = row.get('ubicacion') or 'Desconocida'
 
-        # Extracción de valores (TODO EN KG)
+        # Extracción segura de valores
         val_kg_saldo = safe_float(row.get('saldo_estimado_kg'))
         masa_fact = safe_float(row.get('masa_kg_facturada'))
-        neto_gast = safe_float(row.get('neto_gastado'))
+        neto_gast = safe_float(row.get('neto_gastado')) # <--- COLUMNA CRÍTICA
+        val_precio = safe_float(row.get('precio_total')) 
         kg_pollo  = safe_float(row.get('kg_pollito'))
         pollitos  = int(row.get('pollitos') or 0)
 
-        # 1. Series Gráficas
+        # -----------------------------------------------------------
+        # 1. CÁLCULO DIRECTO (SUMAS)
+        # -----------------------------------------------------------
+        
+        # A. Consumo Real: Suma directa de la columna neto_gastado (Sin importar la clase)
+        math_consumo_real_acumulado += neto_gast
+
+        # B. Inversión: Suma directa de precio_total
+        math_dinero_total += val_precio
+
+        # C. Saldo Inicial: Solo sumamos si la clase lo indica explícitamente
+        if clase == 'saldo inicial':
+            math_saldo_inicial_kg_global += val_kg_saldo
+
+        # D. Pedidos / Ingresos: Suma de lo facturado cuando es ingreso
+        if clase == 'ingreso':
+            math_ingresos_kg += masa_fact
+
+        # -----------------------------------------------------------
+        # 2. SERIES PARA GRÁFICOS
+        # -----------------------------------------------------------
         series['fechas'].append(fecha_str)
         series['kg_pollito'].append(kg_pollo)
         series['saldo_inicial'].append(val_kg_saldo if clase == 'saldo inicial' else None)
         series['saldo_final'].append(val_kg_saldo if clase == 'saldo final' else None)
         series['ingresos'].append(masa_fact if clase == 'ingreso' else None)
 
-        # 2. Acumuladores Globales
-        if clase == 'saldo inicial':
-            math_saldo_inicial_kg_global += val_kg_saldo
-        elif clase == 'saldo final':
-            math_saldo_final_kg_global += val_kg_saldo
-        elif clase == 'ingreso':
-            math_ingresos_kg += masa_fact
-        elif clase == 'egreso':
-            math_consumo_parcial_kg += neto_gast
-
+        # 3. CONTEO DE POLLITOS (Evitar duplicados por lote)
         if lote_id and lote_id not in lotes_procesados_global:
             total_pollitos_global += pollitos
             lotes_procesados_global.add(lote_id)
 
-        # 3. Datos por Granja (Tabla Resumen)
+        # 4. DATOS AGRUPADOS POR GRANJA (Para la Tabla Resumen)
         if ubicacion not in granjas_data:
             granjas_data[ubicacion] = {
-                'inicial': 0.0, 'final': 0.0, 'ingresos': 0.0, 'parciales': 0.0,
+                'inicial': 0.0, 'ingresos': 0.0, 'consumo_real': 0.0,
                 'pollitos': 0, 'lotes': set()
             }
         
         d = granjas_data[ubicacion]
+        
+        # Acumular consumo real por granja (Suma directa de neto_gastado)
+        d['consumo_real'] += neto_gast
+        
         if clase == 'saldo inicial': d['inicial'] += val_kg_saldo
-        elif clase == 'saldo final': d['final'] += val_kg_saldo
         elif clase == 'ingreso': d['ingresos'] += masa_fact
-        elif clase == 'egreso': d['parciales'] += neto_gast
         
         if lote_id and lote_id not in d['lotes']:
             d['pollitos'] += pollitos
             d['lotes'].add(lote_id)
 
-    # --- CÁLCULOS SEGÚN TIPO DE PERIODO ---
+    # --- CÁLCULOS KPI FINALES ---
     
-    kpis = {}
+    # Eficiencia = Consumo Real (Suma neto_gastado) / Pollitos
+    rendimiento = 0.0
+    if total_pollitos_global > 0:
+        rendimiento = math_consumo_real_acumulado / total_pollitos_global
     
-    if periodo == 'Actual':
-        # Estatus ACTIVO
-        kpis = {
-            "card1_label": "Saldo Inicial (kg)",
-            "card1_value": math_saldo_inicial_kg_global,
-            
-            "card2_label": "Pedidos Gas (kg)",
-            "card2_value": math_ingresos_kg,
-            
-            "card3_label": "Consumos Parciales (kg)",
-            "card3_value": math_consumo_parcial_kg, # Suma de neto_gastado
-            
-            "card4_label": "---",
-            "card4_value": 0,
-            
-            "card5_label": "Pollitos Activos",
-            "card5_value": total_pollitos_global
-        }
+    kpis = {
+        "card1_label": "Saldo Inicial (kg)",
+        "card1_value": math_saldo_inicial_kg_global,
         
-    else:
-        # Periodo Personalizado (Estatus INACTIVO)
+        "card2_label": "Pedidos Gas (kg)",
+        "card2_value": math_ingresos_kg,
         
-        # FÓRMULA ESPECÍFICA SOLICITADA POR EL USUARIO:
-        # Consumo = Suma(Inicial) + Suma(Ingresos) - Suma(Egresos_Parciales) - Suma(Final)
-        consumo_total = (math_saldo_inicial_kg_global + math_ingresos_kg) - math_consumo_parcial_kg - math_saldo_final_kg_global
+        "card3_label": "Consumo Real (kg)", # <--- AHORA ES LA SUMA DIRECTA DE NETO_GASTADO
+        "card3_value": math_consumo_real_acumulado,
         
-        rendimiento = consumo_total / total_pollitos_global if total_pollitos_global > 0 else 0.0
+        "card4_label": "Eficiencia (kg/ave)", 
+        "card4_value": rendimiento,
         
-        kpis = {
-            "card1_label": "Consumo Total (kg)",
-            "card1_value": consumo_total,
-            
-            "card2_label": "Rendimiento (kg/ave)",
-            "card2_value": rendimiento,
-            
-            "card3_label": "Saldo Final Total (kg)",
-            "card3_value": math_saldo_final_kg_global,
-            
-            "card4_label": "---",
-            "card4_value": 0,
-            
-            "card5_label": "Total Pollitos",
-            "card5_value": total_pollitos_global
-        }
+        "card5_label": "Pollitos",
+        "card5_value": total_pollitos_global,
 
-    # --- TABLA RESUMEN ---
+        "card6_label": "Inversión Total ($)",
+        "card6_value": math_dinero_total
+    }
+
+    # --- GENERACIÓN DE TABLA RESUMEN ---
     tabla_resumen = []
     lista_rendimientos = []
 
     for nombre_granja, datos in granjas_data.items():
-        consumo_granja = 0.0
-        if periodo == 'Actual':
-            # En periodo actual, el consumo observable son las lecturas parciales
-            consumo_granja = datos['parciales']
-        else:
-            # Fórmula específica por granja: Ini + Ing - Parciales - Fin
-            consumo_granja = (datos['inicial'] + datos['ingresos']) - datos['parciales'] - datos['final']
+        consumo_granja = datos['consumo_real'] # Usamos el acumulado directo
         
         rend_granja = 0.0
         if datos['pollitos'] > 0:
@@ -306,9 +299,11 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
             'kg_pollito': rend_granja
         })
 
+    # --- ESTADÍSTICAS ---
     media = 0.0
     desviacion = 0.0
     n = len(lista_rendimientos)
+    
     if n > 0:
         media = sum(lista_rendimientos) / n
         if n > 1:
@@ -322,7 +317,7 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         "estadisticas": { "media": media, "desviacion": desviacion },
         "periodo_tipo": periodo
     }
-
+    
 @csrf.exempt
 @bp_901811727.route('/generar_informe', methods=['POST'])
 @login_required_custom
@@ -360,17 +355,16 @@ def generar_informe():
             wheres.append("AND c.fecha BETWEEN %s AND %s")
             params.append(fecha_ini)
             params.append(fecha_fin)
-            # Para Personalizado, SIEMPRE INACTIVO
             wheres.append("AND c.estatus_lote = 'INACTIVO'")
-                
         elif periodo == 'Actual':
-            # Para Actual, SIEMPRE ACTIVO
             wheres.append("AND c.estatus_lote = 'ACTIVO'")
 
+        # SELECT ACTUALIZADO: INCLUYE precio_total
         sql = """
             SELECT c.fecha, c.ubicacion, c.lote, c.estatus_lote, c.operacion, c.clase, 
                    c.saldo_estimado_kg, c.saldo_estimado_galones,
-                   c.pollitos, c.kg_pollito, c.masa_kg_facturada, c.neto_gastado 
+                   c.pollitos, c.kg_pollito, c.masa_kg_facturada, c.neto_gastado,
+                   c.precio_total 
             FROM cardex_glp c
         """
         final_sql = f"{sql} {' '.join(wheres)} ORDER BY c.fecha ASC"
@@ -439,3 +433,295 @@ def obtener_ubicaciones():
         if cursor: cursor.close()
         print("Error ubicaciones:", e)
         return jsonify({"success": False, "message": str(e)}), 500
+    
+
+# ==============================================================================
+# NUEVO MÓDULO: VALIDACIÓN DE TANQUEOS (Similar a Investigación NC)
+# ==============================================================================
+
+
+# Configuración Email (Asegúrate de que estas variables de entorno existan o configúralas aquí)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = 587
+EMAIL_USER = os.environ.get("EMAIL_USER", "tu_email@ejemplo.com")
+EMAIL_PASS = os.environ.get("EMAIL_PASS", "tu_password")
+EMAIL_FROM = EMAIL_USER
+
+def _enviar_alerta_gerencia(empresa_id, datos, archivos):
+    """Busca contacto 'gerenciagranjas' y envía el correo"""
+    cur = mysql.connection.cursor()
+    # 1. Buscar el correo del área gerenciagranjas
+    cur.execute("SELECT email FROM contactos WHERE id_empresa = %s AND area_contacto = 'gerenciagranjas' LIMIT 1", (empresa_id,))
+    row = cur.fetchone()
+    cur.close()
+
+    destinatario = row['email'] if row and isinstance(row, dict) else (row[0] if row else None)
+
+    if not destinatario:
+        print("❌ No se encontró contacto 'gerenciagranjas' para enviar alerta.")
+        return False
+
+    # 2. Construir el correo
+    msg = MIMEMultipart()
+    msg['From'] = EMAIL_FROM
+    msg['To'] = destinatario
+    msg['Subject'] = f"🚨 ALERTA: Irregularidad en Tanqueo - {datos['ubicacion']}"
+
+    cuerpo = f"""
+    <h3>Reporte de Irregularidad en Tanqueo</h3>
+    <p>Se ha detectado una inconsistencia en la información validada por el tanqueo.</p>
+    <ul>
+        <li><strong>Fecha:</strong> {datos['fecha']}</li>
+        <li><strong>Ubicación:</strong> {datos['ubicacion']}</li>
+        <li><strong>Validado por:</strong> {session.get('nombre', 'Usuario Sistema')}</li>
+        <li><strong>Factura/Lote Ref:</strong> {datos['lote']}</li>
+    </ul>
+    <p style="color:red; font-weight:bold;">
+        Por favor contacte al responsable inmediato para que rinda explicaciones sobre las diferencias evidenciadas en las fotografías adjuntas.
+    </p>
+    <p style="font-size:0.8rem; color:#666;">Sistema BQA ONE - Gas Avícola</p>
+    """
+    msg.attach(MIMEText(cuerpo, 'html'))
+
+    # 3. Adjuntar Fotos
+    base_dir = current_app.static_folder
+    for ruta in archivos:
+        if ruta:
+            clean_path = ruta.replace('/static/', '')
+            full_path = os.path.join(base_dir, clean_path)
+            if os.path.exists(full_path):
+                try:
+                    with open(full_path, "rb") as f:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(f.read())
+                    encoders.encode_base64(part)
+                    part.add_header('Content-Disposition', f"attachment; filename={os.path.basename(full_path)}")
+                    msg.attach(part)
+                except Exception as e:
+                    print(f"Error adjuntando {full_path}: {e}")
+
+    # 4. Enviar
+    try:
+        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_FROM, destinatario, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Error enviando email: {e}")
+        return False
+    
+# ==============================================================================
+# VALIDACIÓN DE TANQUEOS (CORREGIDO)
+# ==============================================================================
+
+@csrf.exempt
+@bp_901811727.route('/obtener_tanqueos_validacion', methods=['POST'])
+@login_required_custom
+def obtener_tanqueos_validacion():
+    # --- FUNCIÓN AUXILIAR PARA CORREGIR RUTAS ---
+    def formatear_ruta(ruta):
+        if not ruta: return None
+        
+        # 1. Normalizar slashes (Windows usa \, web usa /)
+        ruta = ruta.strip().replace('\\', '/')
+        
+        # 2. Limpieza: Quitamos barra inicial si existe
+        if ruta.startswith('/'):
+            ruta = ruta[1:]
+            
+        # 3. Limpieza: Quitamos el prefijo 'static/' si ya viene en la BD
+        # Esto evita errores tipo: /static/static/testigos...
+        if ruta.startswith('static/'):
+            ruta = ruta.replace('static/', '', 1)
+
+        # 4. Construcción Final: 
+        # Agregamos /static/ al inicio. Como limpiamos la ruta antes,
+        # el resultado será limpio, ej: "/static/testigos/Empresa/foto.jpg"
+        return f"/static/{ruta}"
+
+    empresa_id = request.get_json().get('empresa_id')
+    if not empresa_id: 
+        return jsonify(success=False, message="ID Empresa requerido")
+
+    try:
+        cur = mysql.connection.cursor()
+        sql = """
+            SELECT * FROM cardex_glp 
+            WHERE id_empresa = %s 
+              AND clase = 'ingreso' 
+              AND (estatus_validacion IS NULL OR estatus_validacion = 'pendiente')
+            ORDER BY fecha DESC
+        """
+        cur.execute(sql, (empresa_id,))
+        rows = cur.fetchall()
+        
+        column_names = [d[0] for d in cur.description] if cur.description else []
+        items = []
+        
+        for row in rows:
+            if isinstance(row, dict):
+                r_dict = row
+            else:
+                r_dict = dict(zip(column_names, row))
+            
+            tanques_activos = []
+            
+            for i in range(1, 12):
+                k_nivel_antes = f'nivel tk-{i}'            
+                k_nivel_desp  = f'nivelfinal tk-{i}'       
+                k_foto_antes  = f'testigo nivel tk-{i}'    
+                k_foto_desp   = f'testigo nivelfinal tk-{i}'
+                k_foto_voucher = f'testigo_baucher_tk_{i}'
+
+                val_antes = r_dict.get(k_nivel_antes)
+                val_desp = r_dict.get(k_nivel_desp)
+                path_antes = r_dict.get(k_foto_antes)
+                path_desp = r_dict.get(k_foto_desp)
+                path_voucher = r_dict.get(k_foto_voucher)
+
+                tiene_valor = (val_antes is not None) or (val_desp is not None)
+                tiene_foto = bool(path_antes or path_desp or path_voucher)
+                
+                if tiene_valor or tiene_foto:
+                    # --- APLICAMOS FORMATEO AQUÍ ---
+                    tanques_activos.append({
+                        'numero': i,
+                        'pct_antes': val_antes if val_antes is not None else '-',
+                        'pct_despues': val_desp if val_desp is not None else '-',
+                        'foto_antes': formatear_ruta(path_antes), 
+                        'foto_despues': formatear_ruta(path_desp),
+                        'foto_voucher': formatear_ruta(path_voucher)
+                    })
+
+            if tanques_activos:
+                items.append({
+                    'id': r_dict.get('id'),
+                    'fecha': str(r_dict.get('fecha')),
+                    'ubicacion': r_dict.get('ubicacion') or 'Sin Ubicación',
+                    'lote': r_dict.get('lote') or 'Sin Lote',
+                    'empresa': r_dict.get('empresa'),
+                    'usuario': r_dict.get('registro') or 'Sistema',
+                    'subfilas': tanques_activos
+                })
+
+        cur.close()
+        return jsonify(success=True, items=items)
+
+    except Exception as e:
+        print("Error validacion:", traceback.format_exc())
+        return jsonify(success=False, message=str(e))
+
+@csrf.exempt
+@bp_901811727.route('/procesar_validacion_tanqueo', methods=['POST'])
+@login_required_custom
+def procesar_validacion_tanqueo():
+    data = request.get_json()
+    reg_id = data.get('id')
+    decision = data.get('decision') # 'SI' o 'NO'
+    validador = session.get('nombre') or 'Admin'
+    
+    if not reg_id or decision not in ['SI', 'NO']:
+        return jsonify(success=False, message="Datos incompletos")
+
+    cur = mysql.connection.cursor()
+    try:
+        # 1. Recuperar datos para procesar fotos y emails
+        cur.execute("SELECT * FROM cardex_glp WHERE id = %s", (reg_id,))
+        row = cur.fetchone()
+        if not row: return jsonify(success=False, message="Registro no encontrado")
+        
+        col_names = [d[0] for d in cur.description]
+        r_dict = dict(zip(col_names, row))
+
+        # 2. Recolectar rutas de fotos para eliminar (físicamente)
+        fotos_a_borrar = []
+        cols_sql_to_null = [] # Para limpiar la BD
+
+        for i in range(1, 12):
+            keys = [
+                f'testigo nivel tk-{i}', 
+                f'testigo nivelfinal tk-{i}', 
+                f'testigo_baucher_tk_{i}' # Recordar guion bajo para voucher
+            ]
+            for k in keys:
+                if r_dict.get(k):
+                    fotos_a_borrar.append(r_dict[k])
+                    cols_sql_to_null.append(f"`{k}` = NULL") # Backticks por si acaso
+
+        # 3. Lógica según decisión
+        if decision == 'SI':
+            # --- FLUJO APROBADO ---
+            # 1. Borrar fotos físicas
+            _borrar_evidencias_tanqueo(fotos_a_borrar)
+            
+            # 2. Actualizar BD (Validado + Poner rutas en NULL)
+            sql_set = ", ".join(cols_sql_to_null)
+            if sql_set: sql_set = ", " + sql_set # Añadir coma inicial si hay columnas
+
+            sql_update = f"""
+                UPDATE cardex_glp 
+                SET estatus_validacion = 'validado', 
+                    fecha_validacion = NOW(), 
+                    validador_id = %s
+                    {sql_set}
+                WHERE id = %s
+            """
+            cur.execute(sql_update, (validador, reg_id))
+
+        else:
+            # --- FLUJO RECHAZADO ---
+            # 1. Enviar Email a Gerencia
+            datos_email = {
+                'fecha': str(r_dict['fecha']),
+                'ubicacion': r_dict.get('ubicacion'),
+                'lote': r_dict.get('lote')
+            }
+            # Enviamos email (adjuntando fotos ANTES de borrarlas)
+            email_enviado = _enviar_alerta_gerencia(r_dict['id_empresa'], datos_email, fotos_a_borrar)
+            
+            # 2. Borrar fotos físicas (Se borran igual por política de limpieza)
+            _borrar_evidencias_tanqueo(fotos_a_borrar)
+
+            # 3. Actualizar BD (Rechazado + Poner rutas en NULL)
+            sql_set = ", ".join(cols_sql_to_null)
+            if sql_set: sql_set = ", " + sql_set
+
+            sql_update = f"""
+                UPDATE cardex_glp 
+                SET estatus_validacion = 'rechazado', 
+                    fecha_validacion = NOW(), 
+                    validador_id = %s
+                    {sql_set}
+                WHERE id = %s
+            """
+            cur.execute(sql_update, (validador, reg_id))
+
+        mysql.connection.commit()
+        return jsonify(success=True)
+
+    except Exception as e:
+        mysql.connection.rollback()
+        print(f"Error procesando validación: {e}")
+        return jsonify(success=False, message=str(e))
+    finally:
+        cur.close()
+
+def _borrar_evidencias_tanqueo(rutas):
+    """Elimina archivos físicos del servidor"""
+    base_dir = current_app.static_folder # Asegura obtener la ruta absoluta a /static
+    for rel_path in rutas:
+        if rel_path:
+            # Limpiar ruta relativa (ej: /static/img.jpg -> img.jpg)
+            clean_name = rel_path.lstrip('/').replace('static/', '')
+            full_path = os.path.join(base_dir, clean_name)
+            
+            if os.path.exists(full_path):
+                try:
+                    os.remove(full_path)
+                    print(f"🗑️ Eliminado: {full_path}")
+                except Exception as e:
+                    print(f"Error borrando {full_path}: {e}")
+
+
