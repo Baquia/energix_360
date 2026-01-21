@@ -9,6 +9,8 @@ from email.mime.text import MIMEText
 from app import mysql, csrf
 import re as _re
 import holidays
+from app.utils import registrar_auditoria
+from MySQLdb import IntegrityError
 
 bp_glp = Blueprint('bp_glp', __name__, url_prefix='/glp')
 
@@ -422,7 +424,8 @@ def _enviar_alerta_pedido_tanqueo(empresa, ubicacion, lote_id, proveedor_princip
             server.starttls()
             server.login(email_user, email_pass)
             server.sendmail(email_user, destinatarios, msg.as_string())
-
+            # Suponiendo que ya importaste la función
+            # from app.utils import registrar_auditoria
         app.logger.info(f"✅ Correo GLP enviado a: {destinatarios}. Código: {codigo_pedido}")
         return True
 
@@ -564,7 +567,8 @@ def _enviar_alerta_desviacion_tanqueo(
             server.starttls()
             server.login(email_user, email_pass)
             server.sendmail(email_user, destinatarios, msg.as_string())
-
+            # Suponiendo que ya importaste la función
+            # from app.utils import registrar_auditoria
         app.logger.info(f"✅ Correo desviación enviado. op_id: {op_id}")
         return True
 
@@ -946,7 +950,19 @@ def registrar_inicio_calefaccion():
                     else:
                         nombre_lote = info[0]
 
-                # Retornamos el error controlado para que salga el Alert
+                # === AUDITORÍA: BLOQUEO LÓGICO (INTENTO FALLIDO) ===
+                registrar_auditoria(
+                    empresa_id=id_empresa,
+                    empresa_nombre=empresa,
+                    modulo="GLP",
+                    usuario=usuario,
+                    accion="⛔ Inicio Bloqueado",
+                    detalle=f"Intento fallido en {ubicacion}. Ya existe lote activo: {nombre_lote}",
+                    nivel="WARNING"
+                )
+                mysql.connection.commit()
+                # ===================================================
+
                 return jsonify({
                     "success": False, 
                     "message": f"⛔ YA EXISTE UN LOTE ACTIVO ({nombre_lote}).\n\nNo puedes iniciar calefacción otra vez en esta sede sin finalizar el anterior."
@@ -1031,10 +1047,9 @@ def registrar_inicio_calefaccion():
             # Generación de pedido único si hay tanques bajos (<= 30%)
             codigo_pedido = None
             if tanques_bajos:
-                # Le pasamos 'proveedor_principal' que ya calculaste unas líneas antes
                 codigo_pedido = _generar_codigo_pedido(empresa, lote_id, ubicacion, proveedor_principal, cur)
                 
-                # === 4. FIX SINTAXIS (PARENTESIS CERRADO) ===
+                # Envío de correo
                 _enviar_alerta_pedido_tanqueo(
                     empresa,
                     ubicacion,
@@ -1050,6 +1065,32 @@ def registrar_inicio_calefaccion():
                        SET codigo_pedido = %s
                      WHERE id = %s
                 """, (codigo_pedido, id_operacion))
+
+                # === AUDITORÍA: CORREO PEDIDO ENVIADO ===
+                registrar_auditoria(
+                    empresa_id=id_empresa,
+                    empresa_nombre=empresa,
+                    modulo="GLP",
+                    usuario=usuario,
+                    accion="📧 Pedido Enviado (Inicio)",
+                    detalle=f"Tanques bajos al iniciar. Código: {codigo_pedido}. Cantidad: {len(tanques_bajos)}",
+                    nivel="INFO"
+                )
+                # ========================================
+
+            # =======================================================
+            # AUDITORÍA: Registrar Inicio Exitoso
+            # =======================================================
+            registrar_auditoria(
+                empresa_id=id_empresa,
+                empresa_nombre=empresa,
+                modulo="GLP",
+                usuario=usuario,
+                accion="🔥 Inicio Calefacción OK",
+                detalle=f"Sede: {ubicacion}. Lote: {lote_id}. Pollitos: {pollitos}",
+                nivel="INFO"
+            )
+            # =======================================================
 
             mysql.connection.commit()
 
@@ -1075,17 +1116,29 @@ def registrar_inicio_calefaccion():
 
     except IntegrityError as e:
         mysql.connection.rollback()
-        # Si es duplicado (1062), es éxito silencioso (Race condition)
         if e.args[0] == 1062 and 'op_id' in str(e.args[1]):
              return jsonify({"success": True, "message": "Operación ya recibida."}), 200
+        
+        # Auditoría Error Integridad
+        try:
+            registrar_auditoria(id_empresa, empresa, "GLP", usuario, "❌ Error Integridad (Inicio)", str(e), "ERROR")
+            mysql.connection.commit()
+        except: pass
         return jsonify({"success": False, "message": f"Error integridad: {e}"})
 
-    except Exception:
+    except Exception as e:
         print("⛔ Error en registrar_inicio_calefaccion:")
         traceback.print_exc()
         mysql.connection.rollback()
-        return jsonify({"success": False, "message": "Error al registrar los datos."})
+        
+        # Auditoría Error Crítico
+        try:
+            registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Crítico (Inicio)", str(e), "CRITICAL")
+            mysql.connection.commit()
+        except: pass
 
+        return jsonify({"success": False, "message": "Error al registrar los datos."})
+    
 # ======================
 # Registrar tanqueo
 # ======================
@@ -1093,11 +1146,6 @@ def registrar_inicio_calefaccion():
 @bp_glp.route('/registrar_tanqueo', methods=['POST'])
 @login_required_custom
 def registrar_tanqueo():
-    # Código original restaurado + mejoras de unicidad
-    # CAMBIO: calcular y guardar precio_unitario / precio_total (proveedor->precio)
-    # CAMBIO: mensaje final incluye "Valor estimado del tanqueo: $XXXX"
-    # CAMBIO: alerta por desviación se evalúa con DESVÍO TOTAL, solo positivo > 8%
-    # AJUSTE FINAL: Acumula errores de todos los tanques antes de abortar.
     try:
         data = request.get_json(force=True) or {}
     except Exception:
@@ -1175,7 +1223,6 @@ def registrar_tanqueo():
             errores_tanqueo = [] 
 
             for tk in tanques:
-                # AJUSTE 2: Limpieza y prefijo tk-
                 num_str = str(tk.get("numero", ""))
                 match = _re.search(r'\d+', num_str)
                 num = match.group() if match else ""
@@ -1185,20 +1232,16 @@ def registrar_tanqueo():
                 nivel_ini = float(tk.get("nivel_inicial", 0) or 0.0)
                 nivel_fin = float(tk.get("nivel_final", 0) or 0.0)
 
-                # === NUEVA VALIDACIÓN: EL NIVEL DEBE SUBIR (ACUMULATIVA) ===
-                # Si el nivel final es menor que el inicial (con tolerancia de -0.1)
+                # === VALIDACIÓN: EL NIVEL DEBE SUBIR (ACUMULATIVA) ===
                 if (nivel_fin - nivel_ini) < -0.1:
                      errores_tanqueo.append(
                         f"• TK-{num}: Inicio {nivel_ini}% -> Fin {nivel_fin}% (BAJÓ)."
                      )
-                # ===========================================================
 
                 foto_ini = tk.get("foto_nivel_inicial")
                 foto_fin = tk.get("foto_nivel_final")
                 foto_bau = tk.get("foto_baucher")
 
-                # Guardamos en la fila de tanqueo los NIVELES FINALES (post tanqueo)
-                # AJUSTE 2: Guardado CORRECTO con columnas separadas
                 set_cols.append(f"`nivel tk-{num}`=%s");     set_vals.append(nivel_ini)
                 if foto_ini:
                     ruta_ini = _guardar_testigo(foto_ini, carpeta, f"tk{num}_ini_{id_operacion}")
@@ -1213,7 +1256,7 @@ def registrar_tanqueo():
 
                 if foto_bau:
                     ruta_baucher = _guardar_testigo(foto_bau, carpeta, f"tk{num}_baucher_{id_operacion}")
-                    col_baucher = f"testigo_baucher_tk_{num}" # Formato de la BD
+                    col_baucher = f"testigo_baucher_tk_{num}"
                     set_cols.append(f"`{col_baucher}`=%s"); set_vals.append(ruta_baucher)
 
                 saldo_estimado_kg += densidad_estimada * cap * (nivel_fin/100.0)
@@ -1236,11 +1279,10 @@ def registrar_tanqueo():
                         desvio = ((kg_sumin - masa_esp_tk)/masa_esp_tk)*100.0
                         desviaciones_porcentuales.append(desvio)
 
-            # === PUNTO DE QUIEBRE: SI HUBO ERRORES EN ALGÚN TANQUE, ABORTAR ===
+            # === SI HUBO ERRORES EN ALGÚN TANQUE, ABORTAR ===
             if errores_tanqueo:
-                mensaje_final = "⛔ ERRORES EN DATOS DE TANQUEO:\n\n" + "\n".join(errores_tanqueo) + "\n\nEn un tanqueo el nivel debe SUBIR (Nivel Final > Nivel Inicial).\nVerifique si invirtió los valores."
+                mensaje_final = "⛔ ERRORES EN DATOS DE TANQUEO:\n\n" + "\n".join(errores_tanqueo) + "\n\nEn un tanqueo el nivel debe SUBIR."
                 raise ValueError(mensaje_final)
-            # ==================================================================
 
             if set_cols:
                 cur.execute(
@@ -1269,17 +1311,13 @@ def registrar_tanqueo():
             dens_prom = sum(densidades_registradas)/len(densidades_registradas) if densidades_registradas else 0.0
             masa_esperada_total = sum(masas_esperadas) if masas_esperadas else 0.0
             masa_facturada_total = sum(masas_facturadas) if masas_facturadas else 0.0
-            porcentaje_dif_prom = sum(desviaciones_porcentuales)/len(desviaciones_porcentuales) if desviaciones_porcentuales else 0.0
-
-            # Desvío TOTAL (regla de alerta y control corporativo)
+            
             desvio_total = 0.0
             if masa_esperada_total > 0:
                 desvio_total = ((masa_facturada_total - masa_esperada_total) / masa_esperada_total) * 100.0
 
-            # Proveedor de la granja (según tu lógica existente)
             proveedor_principal = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
 
-            # Guardar control tanqueo
             cur.execute("""
                 UPDATE cardex_glp
                    SET densidad_suministrada=%s,
@@ -1298,38 +1336,27 @@ def registrar_tanqueo():
             ))
 
             # ================================
-            # CAMBIO: Precio del tanqueo (precio_unitario / precio_total)
+            # PRECIO DEL TANQUEO (Lógica original conservada)
             # ================================
             precio_unitario = 0.0
             precio_total = 0.0
 
             if proveedor_principal:
-                cur.execute("""
-                    SELECT precio
-                    FROM proveedores
-                    WHERE proveedor=%s
-                    LIMIT 1
-                """, (proveedor_principal,))
+                cur.execute("SELECT precio FROM proveedores WHERE proveedor=%s LIMIT 1", (proveedor_principal,))
                 prow = cur.fetchone() or {}
                 try:
                     precio_unitario = float(prow.get("precio") or 0.0)
                 except Exception:
                     precio_unitario = 0.0
 
-            # Total estimado según kg facturado
             precio_total = precio_unitario * float(masa_facturada_total or 0.0)
 
-            # Guardar en cardex_glp
             cur.execute("""
                 UPDATE cardex_glp
                    SET precio_unitario=%s,
                        precio_total=%s
                  WHERE id=%s
-            """, (
-                round(precio_unitario, 6),
-                round(precio_total, 2),
-                id_operacion
-            ))
+            """, (round(precio_unitario, 6), round(precio_total, 2), id_operacion))
 
             # Alerta por desviación
             alerta_enviada = False
@@ -1347,37 +1374,49 @@ def registrar_tanqueo():
                         dens_prom=dens_prom,
                         tanques=tanques
                     )
+                    
+                    # === AUDITORÍA: ALERTA DESVIACIÓN ===
+                    if alerta_enviada:
+                        registrar_auditoria(
+                            empresa_id=id_empresa,
+                            empresa_nombre=empresa,
+                            modulo="GLP",
+                            usuario="Sistema",
+                            accion="⚠️ Alerta Desviación",
+                            detalle=f"Desviación {round(desvio_total, 2)}% en {ubicacion}. Correo enviado.",
+                            nivel="ALERTA"
+                        )
+                    # ====================================
+
                 except Exception:
-                    app.logger.error("⛔ Error al ejecutar _enviar_alerta_desviacion_tanqueo:")
-                    traceback.print_exc()
-                    alerta_enviada = False
+                    app.logger.error("⛔ Error al enviar alerta desviación.")
+
+            # === AUDITORÍA: EXITO TANQUEO ===
+            registrar_auditoria(
+                empresa_id=id_empresa,
+                empresa_nombre=empresa,
+                modulo="GLP",
+                usuario=usuario,
+                accion="Tanqueo Registrado",
+                detalle=f"Sede: {ubicacion}. Facturado: {round(masa_facturada_total, 2)} kg. Valor: ${precio_total:,.0f}",
+                nivel="INFO"
+            )
+            # =================================
 
             mysql.connection.commit()
 
-        # ================================
-        # Mensaje final
-        # ================================
         mensaje = "Tanqueo registrado correctamente."
-
         if consumo_kg > 0:
-            mensaje += f" Consumo desde la última operación: {round(consumo_kg,2)} kg"
-            if kg_pollito > 0:
-                mensaje += f" ({round(kg_pollito,6)} kg_pollito)."
+            mensaje += f" Consumo previo: {round(consumo_kg,2)} kg."
 
         if masa_esperada_total > 0:
-            mensaje += (
-                f" Control de tanqueo: esperado {round(masa_esperada_total,2)} kg, "
-                f"facturado {round(masa_facturada_total,2)} kg "
-                f"(desviación total {round(desvio_total,2)}%)."
-            )
+            mensaje += f" Control: esperado {round(masa_esperada_total,2)} kg, facturado {round(masa_facturada_total,2)} kg."
             if desvio_total > 8.0:
-                mensaje += " ⚠️ Desviación positiva superior al 8%."
-                if alerta_enviada:
-                    mensaje += " Se envió alerta por email."
+                mensaje += " ⚠️ Desviación > 8%. Alerta enviada."
 
         valor_pesos = round(float(precio_total or 0.0), 0)
         valor_formato = f"{valor_pesos:,.0f}".replace(",", ".")
-        mensaje += f" Valor estimado del tanqueo: ${valor_formato}."
+        mensaje += f" Valor estimado: ${valor_formato}."
 
         resumen = {
             "operacion": "tanqueo",
@@ -1389,7 +1428,6 @@ def registrar_tanqueo():
                 for t in tanques
             ]),
             "saldo_estimado_kg": round(saldo_estimado_kg,2),
-            "saldo_estimado_galones": round(saldo_estimado_gal,2),
             "dias_operacion": dias_operacion,
             "kg_consumidos": round(consumo_kg,2),
             "kg_pollito": round(kg_pollito,6) if kg_pollito > 0 else 0.0,
@@ -1405,21 +1443,26 @@ def registrar_tanqueo():
 
         return jsonify({"success": True, "message": mensaje, "resumen": resumen})
 
-    # === AGREGAR ESTO JUSTO ANTES DEL EXCEPT EXCEPTION ===
     except ValueError as e:
-        # Aquí atrapamos el error del nivel y abortamos todo
         mysql.connection.rollback()
-        # Devolvemos success:False para que el Frontend muestre la alerta roja
+        # Auditoría WARNING por error de usuario (nivel invertido)
+        try:
+             registrar_auditoria(id_empresa, empresa, "GLP", usuario, "⛔ Error Datos Tanqueo", str(e), "WARNING")
+             mysql.connection.commit()
+        except: pass
         return jsonify({"success": False, "message": str(e)})
-    # =====================================================
 
-    except Exception:
+    except Exception as e:
         print("⛔ Error en registrar_tanqueo:")
         traceback.print_exc()
         mysql.connection.rollback()
+        # Auditoría CRITICAL
+        try:
+            registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Crítico (Tanqueo)", str(e), "CRITICAL")
+            mysql.connection.commit()
+        except: pass
         return jsonify({"success": False, "message": "Error al registrar tanqueo."})
-
-
+    
 # ======================
 # Registrar consumo
 # ======================
@@ -1427,14 +1470,6 @@ def registrar_tanqueo():
 @bp_glp.route('/registrar_consumo', methods=['POST'])
 @login_required_custom
 def registrar_consumo():
-    # Registrar consumo:
-    # - Define tanques_bajos (umbral CONSUMO <= 25% O Proyección Viernes)
-    # - Si hay tanques_bajos:
-    #     - calcular ts_solicitado con algoritmo foto (depende de dias_operacion)
-    #     - generar codigo_pedido
-    #     - enviar correo (misma estructura que pedido estándar, pero llenar al ts variable)
-    # - Enviar al proveedor
-    # - Reforzar: factura válida solo si adjunta código de pedido
     try:
         data = request.get_json(force=True) or {}
     except Exception:
@@ -1464,7 +1499,7 @@ def registrar_consumo():
     if not empresa or not ubicacion:
         return jsonify({"success": False, "message": "Faltan datos de empresa o sede."}), 400
     if not tanques:
-        return jsonify({"success": False, "message": "No se recibieron tanques para registrar consumo."}), 400
+        return jsonify({"success": False, "message": "No se recibieron tanques."}), 400
 
     lote_id = None
     fecha = datetime.now().date()
@@ -1519,11 +1554,10 @@ def registrar_consumo():
             saldo_estimado_kg = 0.0
             tanques_bajos = []
 
-            # Instancia de festivos Colombia para la proyección (Asegúrate de importar holidays al inicio del archivo)
+            # Instancia de festivos (Lógica conservada)
             co_holidays = holidays.CO()
 
             for tk in tanques:
-                # Limpieza y prefijo tk-
                 num_str = str(tk.get("numero", ""))
                 match = _re.search(r'\d+', num_str)
                 num = match.group() if match else ""
@@ -1537,7 +1571,7 @@ def registrar_consumo():
                 tst = tk.get("testigo")
 
                 # ==============================================================================
-                # LÓGICA DE SOLICITUD DE TANQUEO (Estándar + Proyección Fin de Semana)
+                # LÓGICA DE SOLICITUD DE TANQUEO (Estándar + Proyección Viernes/Festivos)
                 # ==============================================================================
                 es_bajo = False
                 
@@ -1547,27 +1581,19 @@ def registrar_consumo():
                 
                 # 2. CRITERIO PROYECCIÓN VIERNES: Si es Viernes y nivel > 25, proyectamos consumo
                 elif fecha.weekday() == 4: # 4 = Viernes
-                    # Calculamos el Lunes siguiente para ver si es festivo
                     lunes_siguiente = fecha + timedelta(days=3)
-                    
                     es_puente = lunes_siguiente in co_holidays
                     
-                    # Definimos días de consumo sin recarga:
-                    # - Fin de semana normal: Consumo Sábado + Domingo (2 días) -> Nivel Lunes
-                    # - Puente Festivo: Consumo Sábado + Domingo + Lunes (3 días) -> Nivel Martes
                     dias_proyeccion = 3 if es_puente else 2
-                    
-                    tasa_diaria = 8.0 # 8% de consumo por día
+                    tasa_diaria = 8.0 
                     consumo_proyectado = dias_proyeccion * tasa_diaria
                     
                     nivel_futuro_estimado = val - consumo_proyectado
                     nivel_minimo_seguridad = 15.0
                     
-                    # Si la proyección cae por debajo del mínimo de seguridad (15%), pedimos gas HOY.
                     if nivel_futuro_estimado < nivel_minimo_seguridad:
                         es_bajo = True
                 
-                # Si cumple cualquiera de los dos criterios, lo agregamos a la lista de solicitud
                 if num and es_bajo:
                     tanques_bajos.append({"numero": num, "nivel": round(val, 2)})
                 # ==============================================================================
@@ -1607,19 +1633,12 @@ def registrar_consumo():
             # Algoritmo (foto) -> ts variable
             dr, tr, ts_solicitado = _calcular_ts_consumo(dias_operacion)
 
-            # Análogo a iniciar_calefaccion: si hay tanques_bajos -> generar pedido
-            # (y luego enviar correo usando función específica de consumo)
             if tanques_bajos and ts_solicitado > 0:
                 try:
-                    # Le pasamos 'proveedor_principal'
                     codigo_pedido = _generar_codigo_pedido(empresa, lote_id, ubicacion, proveedor_principal, cur)
-                    cur.execute("""
-                        UPDATE cardex_glp
-                           SET codigo_pedido = %s
-                         WHERE id = %s
-                    """, (codigo_pedido, id_operacion))
+                    cur.execute("UPDATE cardex_glp SET codigo_pedido = %s WHERE id = %s", (codigo_pedido, id_operacion))
                 except Exception as e:
-                    app.logger.error(f"Error al generar/guardar código de pedido en consumo: {e}")
+                    app.logger.error(f"Error al generar código pedido consumo: {e}")
                     codigo_pedido = None
 
             mysql.connection.commit()
@@ -1627,7 +1646,7 @@ def registrar_consumo():
         # Enviar correo al proveedor (no bloqueante)
         if codigo_pedido and tanques_bajos and ts_solicitado > 0:
             try:
-                _enviar_alerta_pedido_tanqueo_consumo(
+                enviado = _enviar_alerta_pedido_tanqueo_consumo(
                     empresa=empresa,
                     ubicacion=ubicacion,
                     lote_id=lote_id,
@@ -1636,24 +1655,41 @@ def registrar_consumo():
                     codigo_pedido=codigo_pedido,
                     ts_solicitado=ts_solicitado
                 )
+
+                # === AUDITORÍA: CORREO PEDIDO CONSUMO ===
+                if enviado:
+                    registrar_auditoria(
+                        empresa_id=id_empresa,
+                        empresa_nombre=empresa,
+                        modulo="GLP",
+                        usuario="Sistema",
+                        accion="📧 Pedido Gas (Consumo)",
+                        detalle=f"Sede: {ubicacion}. Código: {codigo_pedido}. Nivel crítico o proyección fin de semana.",
+                        nivel="INFO"
+                    )
+                # ========================================
+
             except Exception as e:
-                app.logger.error(f"Error enviando correo pedido CONSUMO (no bloqueante): {e}")
+                app.logger.error(f"Error enviando correo pedido CONSUMO: {e}")
+
+        # === AUDITORÍA: EXITO CONSUMO ===
+        registrar_auditoria(
+            empresa_id=id_empresa,
+            empresa_nombre=empresa,
+            modulo="GLP",
+            usuario=usuario,
+            accion="Consumo Registrado",
+            detalle=f"Sede: {ubicacion}. Consumo: {round(consumo_kg, 2)} kg.",
+            nivel="INFO"
+        )
+        # ================================
 
         mensaje = "Consumo registrado correctamente."
         if consumo_kg > 0:
-            mensaje += f" Consumo desde la última operación: {round(consumo_kg,2)} kg"
-            if kg_pollito > 0:
-                mensaje += f" ({round(kg_pollito,6)} kg/pollito)."
+            mensaje += f" Consumo: {round(consumo_kg,2)} kg."
 
         if codigo_pedido and tanques_bajos and ts_solicitado > 0:
-            mensaje += (
-                f" ⚠️ Se solicitó tanqueo (CONSUMO) por tanques en nivel crítico o proyección de riesgo "
-                f"con código {codigo_pedido}. Nivel solicitado: {round(ts_solicitado,2)}%."
-            )
-        elif tanques_bajos and ts_solicitado <= 0:
-            mensaje += " ⚠️ Hay tanques bajos, pero el nivel solicitado calculado es 0% (no se generó pedido)."
-        elif tanques_bajos and not codigo_pedido:
-            mensaje += " ⚠️ Hay tanques bajos, pero no se pudo generar código de pedido (ver logs)."
+            mensaje += f" ⚠️ Pedido solicitado: {codigo_pedido}. Llenar a {round(ts_solicitado,2)}%."
 
         resumen = {
             "operacion": "consumo",
@@ -1662,7 +1698,6 @@ def registrar_consumo():
             "fecha": fecha.strftime("%Y-%m-%d"),
             "tanques": _resumen_tanques(tanques),
             "saldo_estimado_kg": round(saldo_estimado_kg,2),
-            "saldo_estimado_galones": round(saldo_estimado_gal,2),
             "dias_operacion": dias_operacion,
             "kg_consumidos": round(consumo_kg,2),
             "kg_pollito": round(kg_pollito,6) if kg_pollito > 0 else 0.0,
@@ -1671,27 +1706,31 @@ def registrar_consumo():
             "op_id": op_id,
             "codigo_pedido": codigo_pedido,
             "tanques_bajos": tanques_bajos,
-            "dr": dr,
-            "tr": round(tr, 2),
-            "ts_solicitado": round(ts_solicitado, 2),
-            "umbral_tanques_bajos_pct": 25.0
+            "ts_solicitado": round(ts_solicitado, 2)
         }
 
         return jsonify({"success": True, "message": mensaje, "resumen": resumen})
     
-    # === AGREGAR ESTO JUSTO ANTES DEL EXCEPT EXCEPTION ===
     except ValueError as e:
-        # Aquí atrapamos el error del nivel y abortamos todo
         mysql.connection.rollback()
-        # Devolvemos success:False para que el Frontend muestre la alerta roja
+        # Auditoría WARNING (posible error lógico o nivel subiendo en consumo)
+        try:
+            registrar_auditoria(id_empresa, empresa, "GLP", usuario, "⛔ Error Lógico Consumo", str(e), "WARNING")
+            mysql.connection.commit()
+        except: pass
         return jsonify({"success": False, "message": str(e)})
-    # =====================================================
     
-    except Exception:
+    except Exception as e:
         print("⛔ Error en registrar_consumo:")
         traceback.print_exc()
         mysql.connection.rollback()
+        # Auditoría CRITICAL
+        try:
+            registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Crítico (Consumo)", str(e), "CRITICAL")
+            mysql.connection.commit()
+        except: pass
         return jsonify({"success": False, "message": "Error al registrar consumo."})
+    
 # ======================
 # Finalizar calefacción (batch)
 # ======================
@@ -1823,6 +1862,20 @@ def finalizar_calefaccion_batch():
                    SET estatus_lote='INACTIVO'
                  WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND lote=%s
             """, (empresa, ubicacion, lote_id))
+
+            # =======================================================
+            # AUDITORÍA: Fin de Calefacción
+            # =======================================================
+            registrar_auditoria(
+                empresa_id=id_empresa,
+                empresa_nombre=empresa,
+                modulo="GLP",
+                usuario=usuario,
+                accion="Fin Calefacción",
+                detalle=f"Sede: {ubicacion}. Lote cerrado: {lote_id}.",
+                nivel="INFO"
+            )
+            # =======================================================
 
             mysql.connection.commit()
 

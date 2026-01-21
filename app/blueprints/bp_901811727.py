@@ -447,21 +447,52 @@ EMAIL_USER = os.environ.get("EMAIL_USER", "tu_email@ejemplo.com")
 EMAIL_PASS = os.environ.get("EMAIL_PASS", "tu_password")
 EMAIL_FROM = EMAIL_USER
 
-def _enviar_alerta_gerencia(empresa_id, datos, archivos):
-    """Busca contacto 'gerenciagranjas' y envía el correo"""
+def _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos, archivos):
+    """
+    Busca contacto 'gerenciagranjas' de forma robusta (TRIM, Types) y envía correo.
+    """
+    # 1. Limpieza de datos de entrada para evitar errores de tipo
+    try:
+        e_id = int(empresa_id) if empresa_id else 0
+    except:
+        e_id = 0
+        
+    e_nombre = str(empresa_nombre).strip() if empresa_nombre else ""
+
+    print(f"🔍 DEBUG ALERTAS: Buscando 'gerenciagranjas' para ID=[{e_id}] o Nombre=[{e_nombre}]")
+
     cur = mysql.connection.cursor()
-    # 1. Buscar el correo del área gerenciagranjas
-    cur.execute("SELECT email FROM contactos WHERE id_empresa = %s AND area_contacto = 'gerenciagranjas' LIMIT 1", (empresa_id,))
+    
+    # 2. Consulta Blindada: Usa TRIM para ignorar espacios y busca por ambos campos.
+    # Intenta encontrar el contacto si coincide el ID numérico O si coincide el Nombre exacto.
+    query = """
+        SELECT email 
+        FROM contactos 
+        WHERE (id_empresa = %s OR TRIM(empresa) = %s) 
+          AND area_contacto = 'gerenciagranjas' 
+        LIMIT 1
+    """
+    cur.execute(query, (e_id, e_nombre))
     row = cur.fetchone()
     cur.close()
 
-    destinatario = row['email'] if row and isinstance(row, dict) else (row[0] if row else None)
+    # 3. Verificación del resultado (Soporta si el cursor devuelve Diccionario o Tupla)
+    destinatario = None
+    if row:
+        if isinstance(row, dict):
+            destinatario = row.get('email')
+        else:
+            destinatario = row[0]
 
     if not destinatario:
-        print("❌ No se encontró contacto 'gerenciagranjas' para enviar alerta.")
+        print(f"❌ ERROR: No se encontró email 'gerenciagranjas' en tabla contactos.")
+        # AQUÍ ESTABA EL ERROR ANTERIOR, YA CORREGIDO (Paréntesis cerrado correctamente):
+        print(f"   --> Verifique que exista un registro con id_empresa={e_id} OR empresa='{e_nombre}' en la tabla contactos.")
         return False
 
-    # 2. Construir el correo
+    print(f"✅ Contacto encontrado: {destinatario}. Preparando envío...")
+
+    # 4. Construir el correo
     msg = MIMEMultipart()
     msg['From'] = EMAIL_FROM
     msg['To'] = destinatario
@@ -483,35 +514,40 @@ def _enviar_alerta_gerencia(empresa_id, datos, archivos):
     """
     msg.attach(MIMEText(cuerpo, 'html'))
 
-    # 3. Adjuntar Fotos
+    # 5. Adjuntar Fotos
     base_dir = current_app.static_folder
-    for ruta in archivos:
-        if ruta:
-            clean_path = ruta.replace('/static/', '')
-            full_path = os.path.join(base_dir, clean_path)
-            if os.path.exists(full_path):
-                try:
-                    with open(full_path, "rb") as f:
-                        part = MIMEBase("application", "octet-stream")
-                        part.set_payload(f.read())
-                    encoders.encode_base64(part)
-                    part.add_header('Content-Disposition', f"attachment; filename={os.path.basename(full_path)}")
-                    msg.attach(part)
-                except Exception as e:
-                    print(f"Error adjuntando {full_path}: {e}")
+    if archivos:
+        for ruta in archivos:
+            if ruta:
+                # Limpieza de ruta para encontrar el archivo físico en el sistema
+                clean_path = ruta.replace('/static/', '').replace('\\', '/')
+                full_path = os.path.join(base_dir, clean_path)
+                
+                if os.path.exists(full_path):
+                    try:
+                        with open(full_path, "rb") as f:
+                            part = MIMEBase("application", "octet-stream")
+                            part.set_payload(f.read())
+                        encoders.encode_base64(part)
+                        part.add_header('Content-Disposition', f"attachment; filename={os.path.basename(full_path)}")
+                        msg.attach(part)
+                    except Exception as e:
+                        print(f"⚠️ Error adjuntando archivo {full_path}: {e}")
+                else:
+                     print(f"⚠️ Archivo no encontrado para adjuntar: {full_path}")
 
-    # 4. Enviar
+    # 6. Enviar vía SMTP
     try:
         server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
         server.starttls()
         server.login(EMAIL_USER, EMAIL_PASS)
         server.sendmail(EMAIL_FROM, destinatario, msg.as_string())
         server.quit()
+        print("📨 Correo enviado con éxito a Gerencia.")
         return True
     except Exception as e:
-        print(f"Error enviando email: {e}")
-        return False
-    
+        print(f"⛔ Error crítico enviando email SMTP: {e}")
+        return False        
 # ==============================================================================
 # VALIDACIÓN DE TANQUEOS (CORREGIDO)
 # ==============================================================================
@@ -617,111 +653,273 @@ def obtener_tanqueos_validacion():
 @bp_901811727.route('/procesar_validacion_tanqueo', methods=['POST'])
 @login_required_custom
 def procesar_validacion_tanqueo():
+    # 1. Obtener datos JSON
     data = request.get_json()
-    reg_id = data.get('id')
-    decision = data.get('decision') # 'SI' o 'NO'
-    validador = session.get('nombre') or 'Admin'
-    
-    if not reg_id or decision not in ['SI', 'NO']:
-        return jsonify(success=False, message="Datos incompletos")
+    if not data:
+        return jsonify({'status': 'error', 'message': 'Datos no recibidos'}), 400
+
+    id_registro = data.get('id')
+    decision = data.get('decision') 
+
+    if not id_registro:
+         return jsonify({'status': 'error', 'message': 'ID no proporcionado'})
 
     cur = mysql.connection.cursor()
-    try:
-        # 1. Recuperar datos para procesar fotos y emails
-        cur.execute("SELECT * FROM cardex_glp WHERE id = %s", (reg_id,))
-        row = cur.fetchone()
-        if not row: return jsonify(success=False, message="Registro no encontrado")
-        
-        col_names = [d[0] for d in cur.description]
-        r_dict = dict(zip(col_names, row))
-
-        # 2. Recolectar rutas de fotos para eliminar (físicamente)
-        fotos_a_borrar = []
-        cols_sql_to_null = [] # Para limpiar la BD
-
-        for i in range(1, 12):
-            keys = [
-                f'testigo nivel tk-{i}', 
-                f'testigo nivelfinal tk-{i}', 
-                f'testigo_baucher_tk_{i}' # Recordar guion bajo para voucher
-            ]
-            for k in keys:
-                if r_dict.get(k):
-                    fotos_a_borrar.append(r_dict[k])
-                    cols_sql_to_null.append(f"`{k}` = NULL") # Backticks por si acaso
-
-        # 3. Lógica según decisión
-        if decision == 'SI':
-            # --- FLUJO APROBADO ---
-            # 1. Borrar fotos físicas
-            _borrar_evidencias_tanqueo(fotos_a_borrar)
-            
-            # 2. Actualizar BD (Validado + Poner rutas en NULL)
-            sql_set = ", ".join(cols_sql_to_null)
-            if sql_set: sql_set = ", " + sql_set # Añadir coma inicial si hay columnas
-
-            sql_update = f"""
-                UPDATE cardex_glp 
-                SET estatus_validacion = 'validado', 
-                    fecha_validacion = NOW(), 
-                    validador_id = %s
-                    {sql_set}
-                WHERE id = %s
-            """
-            cur.execute(sql_update, (validador, reg_id))
-
-        else:
-            # --- FLUJO RECHAZADO ---
-            # 1. Enviar Email a Gerencia
-            datos_email = {
-                'fecha': str(r_dict['fecha']),
-                'ubicacion': r_dict.get('ubicacion'),
-                'lote': r_dict.get('lote')
-            }
-            # Enviamos email (adjuntando fotos ANTES de borrarlas)
-            email_enviado = _enviar_alerta_gerencia(r_dict['id_empresa'], datos_email, fotos_a_borrar)
-            
-            # 2. Borrar fotos físicas (Se borran igual por política de limpieza)
-            _borrar_evidencias_tanqueo(fotos_a_borrar)
-
-            # 3. Actualizar BD (Rechazado + Poner rutas en NULL)
-            sql_set = ", ".join(cols_sql_to_null)
-            if sql_set: sql_set = ", " + sql_set
-
-            sql_update = f"""
-                UPDATE cardex_glp 
-                SET estatus_validacion = 'rechazado', 
-                    fecha_validacion = NOW(), 
-                    validador_id = %s
-                    {sql_set}
-                WHERE id = %s
-            """
-            cur.execute(sql_update, (validador, reg_id))
-
-        mysql.connection.commit()
-        return jsonify(success=True)
-
-    except Exception as e:
-        mysql.connection.rollback()
-        print(f"Error procesando validación: {e}")
-        return jsonify(success=False, message=str(e))
-    finally:
+    
+    # Traemos TODO el registro
+    cur.execute("SELECT * FROM cardex_glp WHERE id = %s", (id_registro,))
+    row = cur.fetchone()
+    
+    if not row:
         cur.close()
+        return jsonify({'status': 'error', 'message': 'Registro no encontrado'})
 
+    # --- CORRECCIÓN CRÍTICA AQUÍ ---
+    # Detectamos si 'row' ya es un diccionario o es una tupla
+    if isinstance(row, dict):
+        row_dict = row
+    else:
+        # Si es tupla, hacemos la conversión manual
+        columns = [desc[0] for desc in cur.description]
+        row_dict = dict(zip(columns, row))
+    # -------------------------------
+
+    # Extraemos datos informativos con seguridad
+    empresa_id = row_dict.get('id_empresa')
+    empresa_nombre = row_dict.get('empresa')
+    ubicacion = row_dict.get('ubicacion')
+
+    # Debug para confirmar en consola que ahora sí toma los datos reales
+    print(f"DEBUG PROCESAMIENTO: ID_Empresa={empresa_id}, Nombre={empresa_nombre}")
+
+    # --- RECOLECCIÓN DE RUTAS DE FOTOS ---
+    archivos_adjuntos = []
+    
+    for key, value in row_dict.items():
+        # Buscamos columnas de tipo texto que contengan 'testigo' y tengan datos
+        if value and isinstance(value, str) and 'testigo' in key.lower():
+            archivos_adjuntos.append(value.strip())
+
+    msg = ""
+
+    # --- CASO RECHAZO (NO) ---
+    if decision == 'NO': 
+        datos_alerta = {
+            'ubicacion': ubicacion,
+            'fecha': str(row_dict.get('fecha')),
+            'lote': str(row_dict.get('lote'))
+        }
+        
+        # Enviamos alerta (Ahora empresa_id llevará el número correcto, ej: 890707006)
+        enviado = _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos_alerta, archivos_adjuntos)
+        
+        if enviado:
+            # Borramos evidencias físicas
+            _borrar_evidencias_tanqueo(archivos_adjuntos)
+            
+            # Borramos registro SQL
+            cur.execute("DELETE FROM cardex_glp WHERE id = %s", (id_registro,))
+            mysql.connection.commit()
+            msg = "Registro rechazado. Se envió alerta a Gerencia y se eliminaron las evidencias."
+        else:
+            cur.close()
+            # Si falla el envío de correo, avisamos al frontend
+            return jsonify({'success': False, 'message': 'Fallo el envío de correo. No se eliminó el registro por seguridad.'})
+            
+    # --- CASO VALIDACIÓN (SI) ---
+    elif decision == 'SI':
+        cur.execute("""
+            UPDATE cardex_glp 
+            SET estatus_validacion = 'validado', 
+                fecha_validacion = NOW(), 
+                validador_id = %s 
+            WHERE id = %s
+        """, (session.get('nombre'), id_registro))
+        mysql.connection.commit()
+        msg = "Registro validado correctamente."
+
+    cur.close()
+    return jsonify({'success': True, 'message': msg})        
 def _borrar_evidencias_tanqueo(rutas):
     """Elimina archivos físicos del servidor"""
-    base_dir = current_app.static_folder # Asegura obtener la ruta absoluta a /static
+    base_dir = current_app.static_folder 
+    
     for rel_path in rutas:
         if rel_path:
-            # Limpiar ruta relativa (ej: /static/img.jpg -> img.jpg)
-            clean_name = rel_path.lstrip('/').replace('static/', '')
+            # 1. Quitamos la barra inicial si existe
+            clean_name = rel_path.lstrip('/')
+            
+            # 2. Si empieza con 'static/', lo quitamos SOLO UNA VEZ para no romper nombres de archivos
+            if clean_name.startswith('static/'):
+                clean_name = clean_name.replace('static/', '', 1)
+            
+            # 3. Construimos la ruta absoluta
             full_path = os.path.join(base_dir, clean_name)
             
+            # 4. Verificamos y borramos
             if os.path.exists(full_path):
                 try:
                     os.remove(full_path)
                     print(f"🗑️ Eliminado: {full_path}")
                 except Exception as e:
-                    print(f"Error borrando {full_path}: {e}")
+                    print(f"⚠️ Error borrando {full_path}: {e}")
+            else:
+                print(f"⚠️ Archivo no encontrado para borrar: {full_path}")
+@csrf.exempt
+@bp_901811727.route('/obtener_audit_log', methods=['POST'])
+@login_required_custom
+def obtener_audit_log():
+    # Recibe el ID de la empresa seleccionada en el select
+    empresa_id = request.form.get('empresa_id') 
+    
+    cur = mysql.connection.cursor()
+    
+    # --- CAMBIO APLICADO ---
+    # En lugar de LIMIT 100, usamos DATE_SUB para restar 10 días a la fecha actual (NOW)
+    cur.execute("""
+        SELECT fecha, modulo, usuario, accion, detalle, nivel 
+        FROM audit_log 
+        WHERE empresa_id = %s 
+          AND fecha >= DATE_SUB(NOW(), INTERVAL 10 DAY)
+        ORDER BY fecha DESC 
+    """, (empresa_id,))
+    
+    logs = cur.fetchall()
+    cur.close()
+    
+    # Formateamos para JSON
+    data = []
+    for row in logs:
+        # Aseguramos que la fecha sea un objeto datetime antes de formatear
+        fecha_str = row['fecha'].strftime('%Y-%m-%d %H:%M:%S') if row['fecha'] else 'N/A'
+        
+        data.append({
+            'fecha': fecha_str,
+            'modulo': row['modulo'],
+            'usuario': row['usuario'],
+            'accion': row['accion'],
+            'detalle': row['detalle'],
+            'nivel': row['nivel']
+        }) 
+    return jsonify({'success': True, 'logs': data})
 
+@csrf.exempt
+@bp_901811727.route('/ejecutar_limpieza_automatica')
+@login_required_custom
+def ejecutar_limpieza_automatica():
+    """
+    Limpieza Profunda (60 días):
+    1. Borra testigos de gas (cardex_glp).
+    2. Borra evidencias de mermas (mermas_pollosgar).
+    3. Soporta fotos y videos.
+    """
+    dias_limite = 60
+    total_borrados = 0
+    base_dir = current_app.static_folder
+    
+    cur = mysql.connection.cursor()
+    try:
+        # ==============================================================================
+        # 1. LIMPIEZA DE TESTIGOS GLP (Tabla cardex_glp)
+        # ==============================================================================
+        cur.execute(f"""
+            SELECT * FROM cardex_glp 
+            WHERE fecha < DATE_SUB(NOW(), INTERVAL {dias_limite} DAY)
+        """)
+        filas_glp = cur.fetchall()
+        
+        # Obtenemos nombres de columnas para iterar
+        cols_glp = [desc[0] for desc in cur.description] if filas_glp else []
 
+        for fila in filas_glp:
+            row = dict(zip(cols_glp, fila)) if not isinstance(fila, dict) else fila
+            rutas_glp = []
+            cols_update_glp = []
+
+            for col, val in row.items():
+                # En cardex_glp las columnas clave contienen la palabra 'testigo'
+                if val and isinstance(val, str) and 'testigo' in col.lower():
+                    rutas_glp.append(val.strip())
+                    cols_update_glp.append(col)
+            
+            # Borrar archivos y limpiar BD
+            if rutas_glp:
+                count = _borrar_lista_archivos(base_dir, rutas_glp) # Función auxiliar abajo
+                total_borrados += count
+            
+            if cols_update_glp:
+                set_clause = ", ".join([f"`{c}` = NULL" for c in cols_update_glp])
+                cur.execute(f"UPDATE cardex_glp SET {set_clause} WHERE id = %s", (row['id'],))
+
+        # ==============================================================================
+        # 2. LIMPIEZA DE MERMAS (Tabla mermas_pollosgar)
+        # ==============================================================================
+        # En mermas, las evidencias están en columnas fijas: evidencia_url, url1, url2
+        cur.execute(f"""
+            SELECT id, evidencia_url, evidencia_url1, evidencia_url2 
+            FROM mermas_pollosgar 
+            WHERE fecha < DATE_SUB(NOW(), INTERVAL {dias_limite} DAY)
+        """)
+        filas_mermas = cur.fetchall()
+        
+        for fila in filas_mermas:
+            # Normalizar a diccionario si viene como tupla
+            if isinstance(fila, dict):
+                r_m = fila
+            else:
+                r_m = {'id': fila[0], 'evidencia_url': fila[1], 'evidencia_url1': fila[2], 'evidencia_url2': fila[3]}
+            
+            rutas_mermas = []
+            cols_update_mermas = []
+            
+            # Revisamos las 3 columnas de evidencia posibles
+            for col_name in ['evidencia_url', 'evidencia_url1', 'evidencia_url2']:
+                val = r_m.get(col_name)
+                if val and isinstance(val, str) and len(val) > 5: # Filtro básico
+                    rutas_mermas.append(val.strip())
+                    cols_update_mermas.append(col_name)
+            
+            # Borrar archivos y limpiar BD
+            if rutas_mermas:
+                count = _borrar_lista_archivos(base_dir, rutas_mermas)
+                total_borrados += count
+                
+            if cols_update_mermas:
+                set_clause = ", ".join([f"`{c}` = NULL" for c in cols_update_mermas])
+                cur.execute(f"UPDATE mermas_pollosgar SET {set_clause} WHERE id = %s", (r_m['id'],))
+
+        mysql.connection.commit()
+        mensaje = f"Mantenimiento completado: Se eliminaron {total_borrados} archivos (Fotos/Videos) antiguos de GLP y Mermas."
+        print(f"🧹 {mensaje}")
+        return jsonify({'success': True, 'message': mensaje})
+
+    except Exception as e:
+        print(f"⚠️ Error en limpieza automática: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+
+def _borrar_lista_archivos(base_dir, lista_rutas):
+    """Auxiliar para borrar archivos manejando rutas con/sin /static/"""
+    borrados = 0
+    for ruta in lista_rutas:
+        try:
+            # Limpieza inteligente de la ruta
+            clean = ruta.strip().replace('\\', '/')
+            
+            # Caso 1: Ruta viene como '/static/mermas/...' (Típico de cardex_glp)
+            if clean.startswith('/static/') or clean.startswith('static/'):
+                clean = clean.lstrip('/').replace('static/', '', 1)
+            
+            # Caso 2: Ruta viene como 'mermas/pollos_gar_sas/...' (Típico de mermas_pollosgar)
+            # No hacemos nada extra, ya que join(static_folder, 'mermas/...') funciona bien.
+            
+            full_path = os.path.join(base_dir, clean)
+            
+            if os.path.exists(full_path):
+                os.remove(full_path)
+                print(f"🗑️ Eliminado (+60d): {clean}")
+                borrados += 1
+        except Exception as ex:
+            print(f"Error borrando archivo {ruta}: {ex}")
+    return borrados

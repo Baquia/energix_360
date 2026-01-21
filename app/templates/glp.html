@@ -417,6 +417,24 @@
   </div>
 
   <script>
+
+    // ==========================================
+    // CONFIGURAR CÁMARA VS GALERÍA
+    // ==========================================
+    function configurarModoFoto(permitirGaleria) {
+      const input = document.getElementById("inputFoto");
+      if (!input) return;
+
+      if (permitirGaleria) {
+        // Para TANQUEO: Quitamos el atributo 'capture' para que el celular
+        // pregunte "¿Cámara o Archivos?" permitiendo subir desde galería.
+        input.removeAttribute("capture");
+      } else {
+        // Para los demás: Forzamos la cámara trasera por seguridad y auditoría.
+        input.setAttribute("capture", "environment");
+      }
+    }
+
     /* ==========================================
    LÓGICA DEL MODAL DE CONFIRMACIÓN
    ========================================== */
@@ -873,8 +891,8 @@
         // Si el usuario está en medio de una operación (QR, formulario, etc.),
         // ignoramos el logout forzado por ahora para dejarle terminar offline.
         if (typeof GLP_OPERACION_EN_CURSO !== 'undefined' && GLP_OPERACION_EN_CURSO) {
-             console.warn("⛔ Sesión vencida detectada en background, pero el usuario está operando. Se pospone el logout.");
-             return; 
+          console.warn("⛔ Sesión vencida detectada en background, pero el usuario está operando. Se pospone el logout.");
+          return;
         }
         // ===================================================================
 
@@ -1687,6 +1705,13 @@
     ============================ */
     async function iniciarCalefaccion() {
       activarProteccionOperacion();
+
+      // === CAMBIO: FORZAR CÁMARA (Bloquear Galería) ===
+      if (typeof configurarModoFoto === 'function') {
+        configurarModoFoto(false);
+      }
+      // ================================================
+
       try {
         const info = await leerQR("Escanea el QR de la sede para iniciar calefacción");
         sedeQR = info.sede;
@@ -1827,6 +1852,14 @@
     // Inicia la operación registrar tanqueo
     async function registrarTanqueo() {
       activarProteccionOperacion();
+
+      // === CAMBIO SOLICITADO: HABILITAR GALERÍA ===
+      // Esto quita el atributo "capture" del input, permitiendo elegir archivos.
+      if (typeof configurarModoFoto === 'function') {
+        configurarModoFoto(true);
+      }
+      // ============================================
+
       try {
         // CORRECCIÓN IMPORTANTE: Generar siempre un op_id nuevo al iniciar
         // Esto evita que se envíe un objeto sin ID si hubo una limpieza previa incorrecta.
@@ -1871,6 +1904,7 @@
         mostrarMenu();
       }
     }
+
     // Pregunta: ¿Desea tanquear el tanque TK-n?
     function preguntarSiTanquearTanqueActual() {
       const texto = document.getElementById("preguntaTexto");
@@ -2294,6 +2328,13 @@
     ============================ */
     async function registrarConsumo() {
       activarProteccionOperacion();
+
+      // === CAMBIO: FORZAR CÁMARA (Bloquear Galería) ===
+      if (typeof configurarModoFoto === 'function') {
+        configurarModoFoto(false);
+      }
+      // ================================================
+
       try {
         const info = await leerQR("Escanea el QR de la sede para registrar consumo");
         sedeQR = info.sede;
@@ -2343,9 +2384,16 @@
 
     /* ============================
        FINALIZAR CALEFACCIÓN
-       ============================ */
+    ============================ */
     async function finalizarCalefaccion() {
       activarProteccionOperacion();
+
+      // === CAMBIO: FORZAR CÁMARA (Bloquear Galería) ===
+      if (typeof configurarModoFoto === 'function') {
+        configurarModoFoto(false);
+      }
+      // ================================================
+
       try {
         const info = await leerQR("Escanea el QR de la sede para finalizar la calefacción");
 

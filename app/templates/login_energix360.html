@@ -152,6 +152,41 @@
         margin-bottom: 10px;
       }
     }
+
+    /* ... tus estilos anteriores ... */
+
+    /* CONTENEDOR RELATIVO PARA POSICIONAR EL OJO */
+    .password-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    /* ESTILO ESPECÍFICO PARA EL BOTÓN DEL OJO */
+    /* Usamos !important en algunas propiedades para sobrescribir los estilos globales de 'button' */
+    .btn-eye {
+      position: absolute !important;
+      right: 12px !important;
+      top: 38% !important;
+      /* Ajuste visual vertical */
+      transform: translateY(-50%) !important;
+      background: transparent !important;
+      border: none !important;
+      color: var(--color-muted) !important;
+      cursor: pointer !important;
+      padding: 5px !important;
+      width: auto !important;
+      /* Que no ocupe el 100% */
+      margin: 0 !important;
+      box-shadow: none !important;
+      font-size: 1.2rem !important;
+      z-index: 10;
+    }
+
+    .btn-eye:hover {
+      color: var(--color-primary) !important;
+      background: transparent !important;
+      transform: translateY(-50%) scale(1.1) !important;
+    }
   </style>
 </head>
 <script>
@@ -177,7 +212,12 @@
       {{ form.cedula(id="cedula") }}
 
       <label for="password">{{ form.password.label }}</label>
-      {{ form.password(id="password") }}
+      <div class="password-wrapper">
+        {{ form.password(id="password") }}
+        <button type="button" class="btn-eye" id="toggleBtn" onclick="togglePasswordVisibility()">
+          👁️
+        </button>
+      </div>
 
       <input type="text" id="empresa" name="empresa" placeholder="Escribe el nombre de tu empresa" autocomplete="off"
         list="lista_empresas" />
@@ -194,6 +234,21 @@
   </div>
 
   <script>
+    // FUNCIÓN PARA VER/OCULTAR CONTRASEÑA
+    function togglePasswordVisibility() {
+      const passwordInput = document.getElementById('password');
+      const toggleBtn = document.getElementById('toggleBtn');
+
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleBtn.textContent = '🙈'; // Icono de "Ocultar"
+      } else {
+        passwordInput.type = 'password';
+        toggleBtn.textContent = '👁️'; // Icono de "Ver"
+      }
+    }
+
+    // ... aquí sigue tu código existente: const form = document.getElementById('loginForm'); ...
     const form = document.getElementById('loginForm');
     const flashEl = document.getElementById('flash');
 
