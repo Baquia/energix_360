@@ -801,43 +801,64 @@ def _borrar_evidencias_tanqueo(rutas):
                     print(f"⚠️ Error borrando {full_path}: {e}")
             else:
                 print(f"⚠️ Archivo no encontrado para borrar: {full_path}")
+                
 @csrf.exempt
 @bp_901811727.route('/obtener_audit_log', methods=['POST'])
 @login_required_custom
 def obtener_audit_log():
-    # Recibe el ID de la empresa seleccionada en el select
+    # Recibe el ID de la empresa seleccionada
     empresa_id = request.form.get('empresa_id') 
     
-    cur = mysql.connection.cursor()
-    
-    # --- CAMBIO APLICADO ---
-    # En lugar de LIMIT 100, usamos DATE_SUB para restar 10 días a la fecha actual (NOW)
-    cur.execute("""
-        SELECT fecha, modulo, usuario, accion, detalle, nivel 
-        FROM audit_log 
-        WHERE empresa_id = %s 
-          AND fecha >= DATE_SUB(NOW(), INTERVAL 10 DAY)
-        ORDER BY fecha DESC 
-    """, (empresa_id,))
-    
-    logs = cur.fetchall()
-    cur.close()
-    
-    # Formateamos para JSON
-    data = []
-    for row in logs:
-        # Aseguramos que la fecha sea un objeto datetime antes de formatear
-        fecha_str = row['fecha'].strftime('%Y-%m-%d %H:%M:%S') if row['fecha'] else 'N/A'
+    if not empresa_id:
+        return jsonify({'success': False, 'logs': []})
+
+    try:
+        cur = mysql.connection.cursor()
         
-        data.append({
-            'fecha': fecha_str,
-            'modulo': row['modulo'],
-            'usuario': row['usuario'],
-            'accion': row['accion'],
-            'detalle': row['detalle'],
-            'nivel': row['nivel']
-        }) 
-    return jsonify({'success': True, 'logs': data})
+        # 1. Consulta explícita de las 6 columnas
+        cur.execute("""
+            SELECT fecha, modulo, usuario, accion, detalle, nivel 
+            FROM audit_log 
+            WHERE empresa_id = %s 
+              AND fecha >= DATE_SUB(NOW(), INTERVAL 10 DAY)
+            ORDER BY fecha DESC 
+        """, (empresa_id,))
+        
+        logs = cur.fetchall()
+        cur.close()
+        
+        data = []
+        # 2. Definimos nombres para mapear si llegan tuplas (0, 1, 2...)
+        nombres_cols = ['fecha', 'modulo', 'usuario', 'accion', 'detalle', 'nivel']
+
+        for row in logs:
+            # TRUCO: Si es tupla, la volvemos diccionario usando zip()
+            if isinstance(row, tuple):
+                r = dict(zip(nombres_cols, row))
+            else:
+                r = row # Ya es diccionario
+            
+            # 3. Formateo seguro de fecha (Esto solía romper el código)
+            fecha_val = r.get('fecha')
+            if fecha_val:
+                fecha_str = fecha_val.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                fecha_str = 'N/A'
+            
+            data.append({
+                'fecha': fecha_str,
+                'modulo': r.get('modulo'),
+                'usuario': r.get('usuario'),
+                'accion': r.get('accion'),
+                'detalle': r.get('detalle'),
+                'nivel': r.get('nivel')
+            }) 
+            
+        return jsonify({'success': True, 'logs': data})
+
+    except Exception as e:
+        print(f"Error Audit Log: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
 @csrf.exempt
 @bp_901811727.route('/ejecutar_limpieza_automatica')
