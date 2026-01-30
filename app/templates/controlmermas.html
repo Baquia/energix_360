@@ -9,11 +9,75 @@
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#015249">
 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
   <script src="/static/js/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <style>
-    /* ================= ESTILOS GENERALES ================= */
+    /* ================= BARRA DE FLUJO (WORKFLOW) ================= */
+    .flow-bar {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      border: 1px solid var(--bord);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .flow-btn {
+      flex: 1;
+      min-width: 140px;
+      padding: 10px;
+      border: 1px solid var(--bord);
+      background: #f8fafc;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 5px;
+      transition: all 0.2s;
+      color: var(--txt);
+    }
+
+    .flow-btn:hover {
+      background: #eff6ff;
+      border-color: var(--verde);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .flow-btn i {
+      font-size: 1.5rem;
+      color: var(--verde);
+    }
+
+    .flow-btn span {
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .flow-step-badge {
+      background: var(--verde);
+      color: white;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+
+    /* ================= ESTILOS GENERALES (ORIGINALES) ================= */
     :root {
       --verde: #015249;
       --verde-dark: #013d36;
@@ -21,11 +85,14 @@
       --txt: #111827;
       --muted: #6b7280;
       --ok: #15803d;
-      --warn: #b8860b;
-      --no: #b00020;
+      --warn: #b45309;
+      --no: #be123c;
       --bord: #e5e7eb;
       --bg: #ffffff;
       --orange: #f97316;
+      --purple: #1e3a8a;
+      ;
+      /* Nuevo color para Investigación */
     }
 
     * {
@@ -80,6 +147,9 @@
       cursor: pointer;
       font-size: 13px;
       transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .side-btn:hover {
@@ -100,6 +170,15 @@
       display: block;
       text-align: center;
       color: white;
+    }
+
+    .badge-count {
+      background: #ef4444;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      margin-left: auto;
     }
 
     .brand {
@@ -154,11 +233,32 @@
       overflow: hidden;
       border: 1px solid var(--bord);
       animation: slideIn 0.3s ease-out;
+      border-left: 5px solid transparent;
+    }
+
+    /* Indicadores visuales por tipo de bandeja */
+    .invoice-card.st-envivo {
+      border-left-color: var(--no);
+    }
+
+    .invoice-card.st-nocturna {
+      border-left-color: var(--warn);
+    }
+
+    .invoice-card.st-investigacion {
+      border-left-color: var(--purple);
     }
 
     @keyframes slideIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .invoice-header {
@@ -169,6 +269,16 @@
       justify-content: space-between;
       align-items: center;
       font-size: 0.95rem;
+    }
+
+    .invoice-header.header-nocturna {
+      background: var(--warn);
+      color: white;
+    }
+
+    .invoice-header.header-investigacion {
+      background: var(--purple);
+      color: white;
     }
 
     /* ================= FILA DE ÍTEM ================= */
@@ -285,20 +395,16 @@
     }
 
     .btn-object {
-      background: var(--orange);
+      background: var(--no);
     }
 
-    .btn-reject {
-      background: transparent;
-      color: var(--no);
-      border: 1px solid var(--no);
-      padding: 8px;
-      font-size: 0.75rem;
-      margin-top: 5px;
+    /* Cambio a rojo fuerte para objetar */
+    .btn-validate {
+      background: var(--warn);
     }
 
-    .btn-reject:hover {
-      background: #fef2f2;
+    .btn-investigate {
+      background: var(--purple);
     }
 
     /* ================= EMPTY STATE ================= */
@@ -320,32 +426,46 @@
       align-items: center;
     }
 
-    /* ================= MODAL DE VALIDACIÓN / AUDITORÍA ================= */
-    .validation-modal {
-      display: none; /* Oculto por defecto */
+    /* ================= MODAL DE INVESTIGACIÓN (NUEVO) ================= */
+    .inv-modal {
+      display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0, 0, 0, 0.6);
       z-index: 2000;
       justify-content: center;
       align-items: center;
       padding: 15px;
+      backdrop-filter: blur(3px);
     }
 
-    .val-card {
+    .inv-card {
       background: white;
       width: 100%;
-      max-width: 900px;
+      max-width: 700px;
       border-radius: 12px;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
       overflow: hidden;
       display: flex;
       flex-direction: column;
       max-height: 90vh;
+      animation: popUp 0.3s ease-out;
     }
 
-    .val-header {
-      background: #0f766e;
+    @keyframes popUp {
+      from {
+        transform: scale(0.9);
+        opacity: 0;
+      }
+
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .inv-header {
+      background: var(--purple);
       color: white;
       padding: 15px 20px;
       font-weight: bold;
@@ -355,68 +475,14 @@
       align-items: center;
     }
 
-    .val-body {
+    .inv-body {
       padding: 20px;
       overflow-y: auto;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
     }
 
-    .val-media {
-      background: #000;
-      padding: 15px;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      border-radius: 8px;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .val-media video {
+    .inv-textarea {
       width: 100%;
-      max-height: 300px;
-      background: #000;
-      object-fit: contain;
-    }
-
-    .val-thumbs {
-        display: flex;
-        gap: 10px;
-        width: 100%;
-        justify-content: center;
-    }
-
-    .val-thumbs img {
-        width: 80px;
-        height: 80px;
-        object-fit: cover;
-        border: 2px solid #fff;
-        cursor: pointer;
-        border-radius: 6px;
-        transition: transform 0.2s;
-    }
-    
-    .val-thumbs img:hover {
-        transform: scale(1.1);
-    }
-
-    .val-form h3 {
-      margin-top: 0;
-      font-size: 1.2rem;
-      color: var(--verde);
-    }
-
-    .val-form p {
-        font-size: 0.9rem;
-        color: #666;
-        margin-bottom: 10px;
-    }
-
-    .val-form textarea {
-      width: 100%;
-      height: 200px;
+      height: 150px;
       padding: 12px;
       border: 1px solid var(--bord);
       border-radius: 6px;
@@ -424,9 +490,10 @@
       font-family: inherit;
       font-size: 0.95rem;
       margin-top: 10px;
+      background: #f9fafb;
     }
 
-    .val-actions {
+    .inv-actions {
       padding: 20px;
       background: #f8fafc;
       border-top: 1px solid var(--bord);
@@ -643,10 +710,6 @@
       .action-group {
         flex-direction: row;
       }
-      
-      .val-body {
-          grid-template-columns: 1fr;
-      }
     }
   </style>
 </head>
@@ -655,121 +718,281 @@
   <div class="layout">
     <aside class="sidebar">
       <div class="side-title">Control Mermas</div>
-      
-      <button class="side-btn active" onclick="cambiarVista('pending', this)">📋 Aprobaciones</button>
-      <button class="side-btn" onclick="cambiarVista('review', this)">🕵️ Investigación NC</button>
-      <button id="btnOpenConsultas" class="side-btn">📊 Informes</button>
-      
-      <a class="side-btn logout" href="/logout">⏻ Salir</a>
+
+      <button class="side-btn active" onclick="cambiarVista('envivo', this)">
+        <i class="bi bi-broadcast"></i> En Vivo (Día)
+      </button>
+
+      <button class="side-btn" onclick="cambiarVista('nocturna', this)">
+        <i class="bi bi-moon-stars"></i> Rev. Nocturna
+      </button>
+
+      <button class="side-btn" onclick="cambiarVista('investigacion', this)">
+        <i class="bi bi-search"></i> Investigación
+      </button>
+
+      <div style="height: 1px; background: rgba(255,255,255,0.2); margin: 10px 0;"></div>
+
+      <button id="btnOpenConsultas" class="side-btn">
+        <i class="bi bi-bar-chart-line"></i> Informes
+      </button>
+
+      <a class="side-btn logout" href="/logout">
+        <i class="bi bi-box-arrow-left"></i> Salir
+      </a>
+
       <div class="brand">Energix-360</div>
     </aside>
 
     <main class="wrap">
       <div class="header">
-        <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" class="logo" onerror="this.style.display='none'">
+        <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" class="logo"
+          onerror="this.style.display='none'">
         <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo">
       </div>
 
       <div>
         <h1 id="page-title">Gestión de Mermas</h1>
-        <div class="subtitle">Administración de solicitudes y generación de informes.</div>
+        <div class="subtitle" id="page-subtitle">Bandeja de Aprobaciones en Tiempo Real</div>
       </div>
 
       <div id="list"></div>
-      
+
       <div id="empty" style="display:none;" class="empty-state">
         ✅ Todo al día.
       </div>
 
       <div id="report"></div>
+
+      <div class="flow-bar">
+        <button class="flow-btn" onclick="abrirModalReporteVentas()">
+          <div class="flow-step-badge">1</div>
+          <i class="bi bi-file-earmark-spreadsheet"></i>
+          <span>Reporte Ventas<br>(Gerencial)</span>
+        </button>
+
+        <button class="flow-btn" onclick="abrirModalNotas()">
+          <div class="flow-step-badge">2</div>
+          <i class="bi bi-files"></i>
+          <span>Consultar Notas<br>(Historial y PDF)</span>
+        </button>
+
+        <button class="flow-btn" onclick="activarFlujo(3)">
+          <div class="flow-step-badge">3</div>
+          <i class="bi bi-moon-stars-fill" style="color:var(--warn)"></i>
+          <span>Revisar Pendientes<br>(Nocturnas)</span>
+        </button>
+
+        <button class="flow-btn" onclick="activarFlujo('investigacion')">
+          <div class="flow-step-badge">4</div>
+          <i class="bi bi-search" style="color:var(--purple)"></i>
+          <span>Investigaciones<br>(Citar / Atender)</span>
+        </button>
+      </div>
     </main>
   </div>
 
-  <div id="lightbox" onclick="this.style.display='none'"><div id="lightbox-container"></div></div>
+  <div id="lightbox" onclick="this.style.display='none'">
+    <div id="lightbox-container"></div>
+  </div>
 
-  <div id="modalValidacion" class="validation-modal">
-    <div class="val-card">
-        <div class="val-header">
-            <span>AUDITORÍA Y VALIDACIÓN</span>
-            <button onclick="cerrarValidacion()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
+  <div id="modalInv" class="inv-modal">
+    <div class="inv-card">
+
+      <div class="inv-header">
+        <span>⚖️ GESTIÓN DE INVESTIGACIÓN</span>
+        <button onclick="cerrarInv()"
+          style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div id="inv-note-info"
+        style="background: #eff6ff; padding: 10px 20px; border-bottom: 1px solid #dbeafe; display:none; align-items:center; gap:10px;">
+        <span style="font-size: 1.5rem;">📄</span>
+        <div>
+          <strong style="color:#1e3a8a; font-size:0.9rem;">Nota Crédito Generada: <span
+              id="inv_nc_num"></span></strong><br>
+          <a id="inv_nc_link" href="#" target="_blank"
+            style="color:#2563eb; font-size:0.8rem; text-decoration:underline;">Ver Documento PDF</a>
         </div>
-        <div class="val-body">
-            <div class="val-media">
-                <video id="v_video" controls></video>
-                <div class="val-thumbs">
-                    <img id="v_img1" onclick="verGrande('img', this.src)">
-                    <img id="v_img2" onclick="verGrande('img', this.src)">
-                </div>
-            </div>
-            
-            <div class="val-form">
-                <h3>Hechos y Argumentos</h3>
-                <p>Escriba los detalles de la investigación. Si decide rechazar, este texto se enviará por correo al área de Talento Humano.</p>
-                <textarea id="v_argumentos" placeholder="Describa los hallazgos de la auditoría y la justificación de la decisión..."></textarea>
-                
-                <div style="margin-top:15px; font-size:0.8rem; color:#d97706; background:#fffbeb; padding:10px; border-radius:6px; border:1px solid #fcd34d;">
-                    <b>⚠ Nota Importante:</b>
-                    <ul style="margin:5px 0; padding-left:20px;">
-                        <li><b>Conforme:</b> Cierra el caso como validado y borra evidencias.</li>
-                        <li><b>No Conforme:</b> Envía email con evidencias a Talento Humano y luego las borra del sistema.</li>
-                    </ul>
-                </div>
-            </div>
+      </div>
+
+      <div class="inv-body">
+        <p style="color:#666; font-size:0.9rem;">
+          Este caso se encuentra en etapa de investigación. Por favor registre el testimonio del operador y tome una
+          decisión final.
+        </p>
+
+        <label style="font-weight:bold; color:var(--verde);">Testimonio / Descargo del Operador:</label>
+        <textarea id="inv_testimonio" class="inv-textarea"
+          placeholder="Escriba aquí la explicación detallada del operador sobre la diferencia..."></textarea>
+
+        <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+          <button class="btn primary" style="background:var(--verde);" onclick="guardarTestimonio()">💾 Guardar
+            Progreso</button>
+          <span id="save_msg" style="font-size:0.8rem; color:green;"></span>
         </div>
-        <div class="val-actions">
-            <button class="btn-action" style="background:#b91c1c; width:auto; padding:12px 25px;" onclick="enviarValidacion('no_conforme')">✖ NO CONFORME</button>
-            <button class="btn-action" style="background:#15803d; width:auto; padding:12px 25px;" onclick="enviarValidacion('conforme')">✔ CONFORME</button>
+
+        <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
+
+        <div
+          style="background:#fff7ed; padding:10px; border-radius:6px; border:1px solid #fed7aa; font-size:0.85rem; color:#9a3412;">
+          <b>Dictamen Final:</b><br>
+          • <b>Cerrar Caso (Conforme):</b> Se acepta la explicación. El caso se archiva.<br>
+          • <b>A RRHH (No Conforme):</b> Se rechaza la explicación. Se envía reporte y evidencias a Talento Humano.
         </div>
+      </div>
+
+      <div class="inv-actions">
+        <button class="btn-action" style="background:#64748b; width:auto; padding:12px 25px;"
+          onclick="cerrarInv()">Cancelar / Salir</button>
+
+        <button class="btn-action" style="background:#b91c1c; width:auto; padding:12px 25px;"
+          onclick="decisionFinal('no_conforme')">A RRHH (Sanción)</button>
+
+        <button class="btn-action" style="background:#15803d; width:auto; padding:12px 25px;"
+          onclick="decisionFinal('conforme')">Cerrar Caso</button>
+      </div>
+
     </div>
   </div>
 
   <div id="modalConsultas" class="modal-backdrop">
-    <div class="modal">
+    <div class="modal" style="height: auto; max-height: 90vh;">
       <div class="modal-head">
-        <div class="modal-title">Consultar Mermas</div>
+        <div class="modal-title">📊 Informe Operativo por Vehículo</div>
         <button class="btn secondary" id="btnCloseModal">✕</button>
       </div>
-      <div class="modal-body">
-        <div>
-          <button class="pill active" data-section="zona">Por Zona</button>
-          <button class="pill" data-section="vendedor">Por Vendedor</button>
-          <button class="pill" data-section="cliente">Por Cliente</button>
-          <button class="pill" data-section="vehiculo">Por Vehículo</button>
+
+      <div class="modal-body" style="display: block; padding: 20px;">
+
+        <p style="color:#666; font-size:0.9rem; margin-top:0; margin-bottom: 20px;">
+          Este informe analiza el comportamiento físico de la carga (Curva de Descongelamiento) filtrado por placa.
+        </p>
+
+        <label style="font-weight:bold; font-size:0.85rem; display:block; margin-bottom: 5px;">Seleccione
+          Vehículo:</label>
+        <select id="qVehiculo" class="inp">
+          <option value="">Cargando lista...</option>
+        </select>
+
+        <label
+          style="font-weight:bold; font-size:0.85rem; display:block; margin-top:15px; margin-bottom: 10px;">Seleccione
+          Periodo:</label>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button class="pill active" id="btnRuta" onclick="setRangoRapido('ruta', this)">
+            🚚 Última Ruta (Hoy)
+          </button>
+          <button class="pill" id="btnSemana" onclick="setRangoRapido('semana', this)">
+            📅 Última Semana (7 Días)
+          </button>
+          <button class="pill" id="btnMes" onclick="setRangoRapido('mes', this)">
+            🗓️ Último Mes (30 Días)
+          </button>
         </div>
-        <div>
-          <div class="sec sec-zona">
-            <h3>Filtros de Zona</h3>
-            <select id="qZona" class="inp"><option value="">Selecciona...</option></select>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-              <input id="fDesde_z" type="date" class="inp"> <input id="fHasta_z" type="date" class="inp">
-            </div>
-          </div>
-          <div class="sec sec-vendedor" style="display:none;">
-            <h3>Filtros de Vendedor</h3>
-            <select id="qVendedor" class="inp"><option value="">Selecciona...</option></select>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-              <input id="fDesde_v" type="date" class="inp"> <input id="fHasta_v" type="date" class="inp">
-            </div>
-          </div>
-          <div class="sec sec-cliente" style="display:none;">
-            <h3>Filtros de Cliente</h3>
-            <select id="qCliente" class="inp"><option value="">Selecciona...</option></select>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-              <input id="fDesde_c" type="date" class="inp"> <input id="fHasta_c" type="date" class="inp">
-            </div>
-          </div>
-          <div class="sec sec-vehiculo" style="display:none;">
-            <h3>Filtros de Vehículo</h3>
-            <select id="qVehiculo" class="inp"><option value="">Selecciona...</option></select>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-              <input id="fDesde_ve" type="date" class="inp"> <input id="fHasta_ve" type="date" class="inp">
-            </div>
-          </div>
-        </div>
+
+        <input type="hidden" id="fDesde_ve">
+        <input type="hidden" id="fHasta_ve">
+
       </div>
       <div class="modal-foot">
         <button class="btn secondary" id="btnCerrar">Cancelar</button>
-        <button class="btn primary" id="btnEjecutarConsulta">Generar</button>
+        <button class="btn primary" id="btnEjecutarConsulta">Generar Gráficas</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalFechasReporte" class="modal-backdrop">
+    <div class="modal" style="width: 400px; height: auto;">
+      <div class="modal-head">
+        <div class="modal-title">📅 Reporte de Ventas y Operación</div>
+        <button class="btn secondary" onclick="cerrarModalFechas()">✕</button>
+      </div>
+      <div class="modal-body" style="display:block;">
+        <p style="color:#666; font-size:0.9rem; margin-bottom:15px;">
+          Seleccione el periodo para generar el PDF consolidado (Ventas, Mermas, Rankings y Netos).
+        </p>
+
+        <label style="font-weight:bold; font-size:0.85rem;">Rango de Fechas:</label>
+        <div style="display:flex; gap:10px; margin-top:5px;">
+          <input type="date" id="rep_inicio" class="inp">
+          <input type="date" id="rep_fin" class="inp">
+        </div>
+
+        <div style="margin-top:15px; display:flex; gap:10px;">
+          <button class="pill" onclick="setFechas('ayer')">Ayer</button>
+          <button class="pill" onclick="setFechas('hoy')">Hoy</button>
+          <button class="pill" onclick="setFechas('mes')">Este Mes</button>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn secondary" onclick="cerrarModalFechas()">Cancelar</button>
+        <button class="btn primary" onclick="generarReporteFinal()">🖨️ Generar PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalBuscadorNotas" class="modal-backdrop">
+    <div class="modal" style="width: 800px; max-height: 85vh;">
+      <div class="modal-head">
+        <div class="modal-title">🔍 Historial de Notas Crédito</div>
+        <button class="btn secondary" onclick="cerrarModalNotas()">✕</button>
+      </div>
+      <div class="modal-body" style="display:block; padding:0;">
+
+        <div style="padding: 20px; background: #f8fafc; border-bottom: 1px solid var(--bord);">
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+            <div>
+              <label style="font-size:0.8rem; font-weight:bold;">Desde:</label>
+              <input type="date" id="nc_desde" class="inp" style="margin:0;">
+            </div>
+            <div>
+              <label style="font-size:0.8rem; font-weight:bold;">Hasta:</label>
+              <input type="date" id="nc_hasta" class="inp" style="margin:0;">
+            </div>
+            <div>
+              <label style="font-size:0.8rem; font-weight:bold;">Operador (Opcional):</label>
+              <select id="nc_operador_sel" class="inp" style="margin:0;">
+                <option value="">Todos</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button class="pill" style="width:auto; padding:5px 15px;" onclick="setFechasNC('hoy')">Hoy</button>
+            <button class="pill" style="width:auto; padding:5px 15px;" onclick="setFechasNC('ayer')">Ayer</button>
+            <button class="pill" style="width:auto; padding:5px 15px;" onclick="setFechasNC('mes')">Este Mes</button>
+
+            <div style="flex:1;"></div>
+            <button class="btn primary" onclick="buscarNotasCredito()">🔎 BUSCAR</button>
+          </div>
+        </div>
+
+        <div style="height: 400px; overflow-y: auto; padding: 0;">
+          <table class="tbl" style="width:100%;">
+            <thead style="position:sticky; top:0; z-index:10;">
+              <tr>
+                <th>Nº Nota</th>
+                <th>Fecha</th>
+                <th>Factura</th>
+                <th>Cliente</th>
+                <th>Operador</th>
+                <th style="text-align:center;">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="nc_tabla_resultados">
+              <tr>
+                <td colspan="6" style="text-align:center; padding:20px; color:#999;">Utilice los filtros para buscar.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+      <div class="modal-foot">
+        <span style="font-size:0.8rem; color:#666; margin-right:auto;" id="nc_status_bar"></span>
+        <button class="btn secondary" onclick="cerrarModalNotas()">Cerrar</button>
       </div>
     </div>
   </div>
@@ -780,351 +1003,796 @@
     const list = document.getElementById("list");
     const empty = document.getElementById("empty");
     const alertSound = document.getElementById('alert-sound');
-    
-    let currentView = 'pending'; 
-    let lastDataStr = "";
-    
-    // Almacena datos del ítem activo para el modal de auditoría
-    let activeItemData = null;
 
-    // === CONFIGURACIÓN DE POLLING Y HORARIO ===
-    // Configurado para: Intervalo de 15 segundos y horario de 4:00 AM a 10:00 PM
-    const HORA_INICIO = 4;   // 4:00 AM
-    const HORA_FIN = 17;     // 5:00 PM (17:00)
-    const INTERVALO = 15000; // 15 Segundos
+    // VARIABLE DE ESTADO PRINCIPAL: 'envivo', 'nocturna', 'investigacion'
+    let currentView = 'envivo';
+    let lastDataStr = "";
+
+    // ID del ítem activo para el modal de investigación
+    let activeInvId = null;
+
+    // === CONFIGURACIÓN DE POLLING ===
+    // Eliminada restricción horaria en frontend para permitir visibilidad 24/7
+    const INTERVALO = 15000;
 
     function cambiarVista(vista, btn) {
-        currentView = vista;
-        document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
-        if(btn) btn.classList.add('active');
+      currentView = vista;
+      document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
 
-        const title = document.getElementById('page-title');
-        title.innerText = vista === 'pending' ? 'Gestión de Mermas' : 'Investigación No Conformes';
-        title.style.color = vista === 'pending' ? 'var(--verde)' : '#b45309';
+      // Actualizar títulos
+      const title = document.getElementById('page-title');
+      const sub = document.getElementById('page-subtitle');
 
-        list.innerHTML = '<div style="text-align:center; padding:20px; color:#aaa;">Cargando...</div>';
-        lastDataStr = "";
-        
-        // Ejecutar polling inmediatamente al cambiar de vista
-        polling();
+      if (vista === 'envivo') {
+        title.innerText = 'Gestión de Mermas (Día)';
+        title.style.color = 'var(--verde)';
+        sub.innerText = 'Bandeja de Aprobaciones en Tiempo Real';
+      } else if (vista === 'nocturna') {
+        title.innerText = 'Revisión Nocturna';
+        title.style.color = 'var(--warn)';
+        sub.innerText = 'Mermas pre-aprobadas en horario nocturno para validación';
+      } else {
+        title.innerText = 'Investigación (Etapa 3)';
+        title.style.color = 'var(--purple)';
+        sub.innerText = 'Casos complejos, testimonios y dictámenes finales';
+      }
+
+      list.innerHTML = '<div style="text-align:center; padding:20px; color:#aaa;">Cargando...</div>';
+      lastDataStr = "";
+
+      // Ejecutar polling inmediatamente
+      polling();
     }
 
     async function polling() {
-      // === 1. CHEQUEO DE HORARIO (AHORRO RECURSOS) ===
-      const ahora = new Date();
-      const horaActual = ahora.getHours();
-
-      // Si estamos fuera del horario laboral, detenemos la petición
-      if (horaActual < HORA_INICIO || horaActual >= HORA_FIN) {
-          console.log("💤 Sistema en reposo nocturno (Fuera de horario).");
-          if(list.innerHTML === "" || list.innerHTML.includes("Cargando")) {
-             list.innerHTML = '<div class="empty-state">💤 Sistema en reposo nocturno (4:00 AM - 10:00 PM)</div>';
-          }
-          return; 
-      }
-
-      // === 2. LÓGICA NORMAL DE CONSULTA ===
+      // Usamos la nueva ruta unificada del backend con el parámetro ?view=
       try {
-        const url = currentView === 'pending' 
-            ? '/mermas/pending?t=' + Date.now() 
-            : '/mermas/review_list?t=' + Date.now();
+        const url = `/mermas/list_dashboard?view=${currentView}&t=${Date.now()}`;
 
         const r = await fetch(url);
         const data = await r.json();
-        
+
         const currentDataStr = JSON.stringify(data.items);
         if (currentDataStr === lastDataStr) return;
         lastDataStr = currentDataStr;
 
         if (data.success && data.items && data.items.length > 0) {
-            renderDashboard(data.items);
-            empty.style.display = 'none';
+          renderDashboard(data.items);
+          empty.style.display = 'none';
         } else {
-            list.innerHTML = '';
-            empty.style.display = 'block';
-            empty.innerText = currentView === 'pending' 
-                ? '✅ Todo al día. No hay solicitudes pendientes.' 
-                : '✅ Excelente. No hay casos pendientes de investigación.';
+          list.innerHTML = '';
+          empty.style.display = 'block';
+
+          let msg = '✅ Todo al día.';
+          if (currentView === 'nocturna') msg = '🌙 No hay revisiones nocturnas pendientes.';
+          if (currentView === 'investigacion') msg = '🕵️ No hay casos en investigación.';
+          empty.innerText = msg;
         }
       } catch (e) { console.error(e); }
     }
-    
+
     // Iniciar el ciclo de polling
     setInterval(polling, INTERVALO);
-    // Ejecutar una vez al cargar la página
     polling();
 
     function renderDashboard(items) {
-        const groups = {};
-        items.forEach(it => {
-            if (!groups[it.factura]) {
-                groups[it.factura] = { factura: it.factura, cliente: it.cliente, vehiculo: it.vehiculo, items: [] };
-            }
-            groups[it.factura].items.push(it);
-        });
+      const groups = {};
+      items.forEach(it => {
+        if (!it.factura) it.factura = 'Sin Factura';
+        if (!groups[it.factura]) {
+          groups[it.factura] = { factura: it.factura, cliente: it.cliente || 'Sin Cliente', vehiculo: it.vehiculo || 'Sin Vehículo', items: [] };
+        }
+        groups[it.factura].items.push(it);
+      });
 
-        list.innerHTML = ''; 
+      list.innerHTML = '';
 
-        Object.values(groups).forEach(group => {
-            const card = document.createElement('div');
-            card.className = 'invoice-card';
-            
-            const headerStyle = currentView === 'review' ? 'background:#b45309;' : '';
-            
-            card.innerHTML = `
-                <div class="invoice-header" style="${headerStyle}">
+      Object.values(groups).forEach(group => {
+        const card = document.createElement('div');
+
+        // Estilo de tarjeta según vista
+        let cardClass = 'invoice-card';
+        let headerClass = 'invoice-header';
+
+        if (currentView === 'envivo') cardClass += ' st-envivo';
+        if (currentView === 'nocturna') { cardClass += ' st-nocturna'; headerClass += ' header-nocturna'; }
+        if (currentView === 'investigacion') { cardClass += ' st-investigacion'; headerClass += ' header-investigacion'; }
+
+        card.className = cardClass;
+
+        card.innerHTML = `
+                <div class="${headerClass}">
                     <div><strong>Factura: ${group.factura}</strong> | Cliente: ${group.cliente}</div>
                     <div>Vehículo: ${group.vehiculo}</div>
                 </div>
             `;
 
-            const rowsContainer = document.createElement('div');
+        const rowsContainer = document.createElement('div');
 
-            group.items.forEach(it => {
-                const row = document.createElement('div');
-                row.className = 'item-row';
-                row.id = `row-${it.id}`;
+        group.items.forEach(it => {
+          const row = document.createElement('div');
+          row.className = 'item-row';
+          row.id = `row-${it.id}`;
 
-                const pctItem = parseFloat(it.merma_pct).toFixed(2);
-                let pctTotal = "0.00";
-                
-                if (it.total_factura_kg && parseFloat(it.total_factura_kg) > 0) {
-                    pctTotal = ((parseFloat(it.merma_kg) / parseFloat(it.total_factura_kg)) * 100).toFixed(4);
-                }
+          const pctItem = parseFloat(it.merma_pct || 0).toFixed(2);
+          let infoExtra = `<span><b>Operador:</b> ${it.operador_nombre || 'Desconocido'}</span>`;
 
-                const infoExtra = currentView === 'review' 
-                    ? `
-                    <div style="font-size:0.8rem; background:#fef3c7; padding:8px; border-radius:6px; margin-top:5px; border:1px solid #fcd34d; color:#92400e;">
-                       <div><b>Vendedor:</b> ${it.operador_nombre}</div>
-                       <div><b>Nota:</b> ${it.nota_descuento || 'Pendiente'}</div>
-                       <div style="margin-top:5px; border-top:1px solid #fcd34d; padding-top:4px;">
-                           % vs Ítem: <b>${pctItem}%</b> <br>
-                           % vs Total Factura: <b>${pctTotal}%</b>
-                       </div>
-                    </div>
-                    ` 
-                    : `<span><b>Operador:</b> ${it.operador_nombre}</span>`;
+          // --- LOGICA DEL BOTÓN PDF (NUEVO) ---
+          let pdfBtn = '';
+          // Verificamos si existe número de nota Y ruta del archivo
+          if (it.nota_descuento && it.evidencia_nota) {
+            const urlPdf = `/static/${it.evidencia_nota}`;
+            // Botón estilizado para ver el PDF
+            pdfBtn = `
+                  <a href="${urlPdf}" target="_blank" class="btn-action" 
+                     style="background:#fff; border:1px solid var(--verde); color:var(--verde); text-align:center; text-decoration:none; display:block; margin-bottom:5px; font-size:0.8rem; padding:8px;">
+                     📄 Ver Nota ${it.nota_descuento}
+                  </a>
+              `;
+          }
 
-                // --- BOTONES ---
-                let botonesHTML = '';
-                if (currentView === 'pending') {
-                    // Vista Normal: Solo APROBAR u OBJETAR
-                    botonesHTML = `
+          // --- GENERACIÓN DINÁMICA DE BOTONES SEGÚN VISTA ---
+          let botonesHTML = '';
+
+          if (currentView === 'envivo') {
+            // ETAPA 1 (DÍA)
+            const retryAlert = it.estatus === 'segunda_revision'
+              ? '<span style="color:#d97706; font-weight:bold; font-size:0.8rem; background:#fffbeb; padding:2px 5px; border-radius:4px;">⚠️ RECTIFICACIÓN</span>'
+              : '';
+
+            infoExtra += retryAlert;
+
+            botonesHTML = `
                         <button class="btn-action btn-approve" onclick="procesar(${it.id}, 'aprobar')">✓ APROBAR</button>
-                        <button class="btn-action btn-object" onclick="procesar(${it.id}, 'objetar')">⚠️ OBJETAR</button>
+                        <button class="btn-action btn-object" onclick="procesar(${it.id}, 'objetar')">❌ OBJETAR</button>
                     `;
-                } else {
-                    // Vista Investigación: Solo VALIDADO (Abre Modal)
-                    // Convertimos el objeto item a string seguro para pasarlo a la función
-                    const itemJson = JSON.stringify(it).replace(/"/g, '&quot;');
-                    botonesHTML = `
-                        <button class="btn-action" style="background:#0f766e;" onclick="abrirValidacion(${itemJson})">
-                           🧐 VALIDAR
+          }
+          else if (currentView === 'nocturna') {
+            // ETAPA 2 (NOCHE - DIFERIDA)
+            botonesHTML = `
+                        ${pdfBtn} <div style="display:flex; gap:5px;">
+                            <button class="btn-action btn-approve" style="flex:1;" onclick="procesar(${it.id}, 'aprobar')">✅ VALIDAR</button>
+                            <button class="btn-action btn-validate" style="flex:1;" onclick="procesar(${it.id}, 'a_investigacion')">🔍 INVESTIGAR</button>
+                        </div>
+                    `;
+          }
+          else if (currentView === 'investigacion') {
+            // ETAPA 3 (INVESTIGACIÓN)
+            const txtSafe = (it.testimonio_operador || '').replace(/"/g, '&quot;');
+            const notaNum = it.nota_descuento || '';
+            const notaUrl = it.evidencia_nota ? `/static/${it.evidencia_nota}` : '';
+
+            botonesHTML = `
+                        ${pdfBtn} <button class="btn-action btn-investigate" onclick="abrirInvestigacion(${it.id}, '${txtSafe}', '${notaNum}', '${notaUrl}')">
+                           📝 GESTIONAR CASO
                         </button>
                     `;
-                }
-                
-                const isRetry = it.estatus === 'segunda_revision';
-                const retryAlert = isRetry ? '<div style="color:#d97706; font-weight:bold; font-size:0.8rem; background:#fffbeb; padding:2px 5px; border-radius:4px;">⚠️ SEGUNDO INTENTO (RECTIFICADO)</div>' : '';
+          }
 
-                row.innerHTML = `
+          const urlVid = it.evidencia_url1 ? `/static/${it.evidencia_url1}` : '#';
+          const urlImg1 = it.evidencia_url ? `/static/${it.evidencia_url}` : '#';
+          const urlImg2 = it.evidencia_url2 ? `/static/${it.evidencia_url2}` : '#';
+
+          row.innerHTML = `
                     <div class="media-group">
-                        <video class="thumb-video" src="/static/${it.evidencia_url1}" 
+                        <video class="thumb-video" src="${urlVid}" 
                                onclick="verGrande('video', this.src)" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>
-                        <img class="thumb-img" src="/static/${it.evidencia_url}" onclick="verGrande('img', this.src)">
-                        <img class="thumb-img" src="/static/${it.evidencia_url2}" onclick="verGrande('img', this.src)">
+                        <img class="thumb-img" src="${urlImg1}" onclick="verGrande('img', this.src)">
+                        <img class="thumb-img" src="${urlImg2}" onclick="verGrande('img', this.src)">
                     </div>
                     <div class="info-group">
-                        <div class="item-title">${it.item} ${retryAlert}</div>
+                        <div class="item-title">${it.item || 'Item'}</div>
                         <div class="item-meta">${infoExtra}</div>
-                        <div class="merma-badge">Merma: ${it.merma_kg} kg (${pctItem}%)</div>
+                        <div class="merma-badge">Merma: ${it.merma_kg || 0} kg (${pctItem}%)</div>
                     </div>
                     <div class="action-group">
                         ${botonesHTML}
                     </div>
                 `;
-                rowsContainer.appendChild(row);
-            });
-
-            card.appendChild(rowsContainer);
-            list.appendChild(card);
+          rowsContainer.appendChild(row);
         });
-        
-        if(currentView === 'pending' && items.length > 0) { 
-            try { alertSound.play(); } catch(e){} 
-        }
+
+        card.appendChild(rowsContainer);
+        list.appendChild(card);
+      });
+
+      // Sonido solo en Envivo
+      if (currentView === 'envivo' && items.length > 0) {
+        try { alertSound.play(); } catch (e) { }
+      }
     }
 
     async function procesar(id, accion) {
-        const row = document.getElementById(`row-${id}`);
-        if(row) {
-            row.style.opacity = '0.5';
-        }
+      if (!id) return;
+      if (accion === 'objetar' && !confirm("¿Está seguro de objetar? Esto devolverá la solicitud al conductor.")) return;
+      if (accion === 'aprobar' && !confirm("¿Confirmar Aprobación?")) return;
 
-        await fetch('/mermas/accion', {
-            method: 'POST', 
-            body: JSON.stringify({ id: id, accion: accion }) 
+      const row = document.getElementById(`row-${id}`);
+      if (row) row.style.opacity = '0.5';
+
+      try {
+        const res = await fetch('/mermas/accion', {
+          method: 'POST',
+          body: JSON.stringify({ id: id, accion: accion })
         });
-        
-        setTimeout(polling, 500); 
+        if (res.ok) setTimeout(polling, 500);
+      } catch (e) {
+        alert("Hubo un error al procesar la solicitud.");
+        if (row) row.style.opacity = '1';
+      }
     }
 
     function verGrande(type, src) {
-        const box = document.getElementById('lightbox');
-        const container = document.getElementById('lightbox-container');
-        box.style.display = 'flex';
-        container.innerHTML = type === 'video' 
-            ? `<video src="${src}" controls autoplay style="max-width:90vw; max-height:90vh"></video>`
-            : `<img src="${src}" style="max-width:90vw; max-height:90vh; object-fit:contain;">`;
+      if (src.endsWith('#')) return;
+      const box = document.getElementById('lightbox');
+      const container = document.getElementById('lightbox-container');
+      box.style.display = 'flex';
+      container.innerHTML = type === 'video'
+        ? `<video src="${src}" controls autoplay style="max-width:90vw; max-height:90vh"></video>`
+        : `<img src="${src}" style="max-width:90vw; max-height:90vh; object-fit:contain;">`;
     }
 
-    // === LÓGICA MODAL DE VALIDACIÓN (AUDITORÍA) ===
-    function abrirValidacion(item) {
-        activeItemData = item;
-        // Cargar datos en el modal
-        document.getElementById('v_video').src = '/static/' + item.evidencia_url1;
-        document.getElementById('v_img1').src = '/static/' + item.evidencia_url;
-        document.getElementById('v_img2').src = '/static/' + item.evidencia_url2;
-        document.getElementById('v_argumentos').value = ""; // Limpiar texto anterior
-        
-        document.getElementById('modalValidacion').style.display = 'flex';
+    // === LÓGICA MODAL DE INVESTIGACIÓN (ETAPA 3) ===
+    // === ACTUALIZACIÓN DE LA FUNCIÓN ABRIR INVESTIGACIÓN ===
+    function abrirInvestigacion(id, testimonioActual, notaNum, notaUrl) {
+      activeInvId = id;
+      document.getElementById('inv_testimonio').value = testimonioActual || '';
+      document.getElementById('save_msg').innerText = '';
+
+      // Lógica para mostrar la barra de la nota crédito
+      const infoBox = document.getElementById('inv-note-info');
+      if (notaNum && notaUrl) {
+        document.getElementById('inv_nc_num').innerText = notaNum;
+        document.getElementById('inv_nc_link').href = notaUrl;
+        infoBox.style.display = 'flex';
+      } else {
+        infoBox.style.display = 'none';
+      }
+
+      document.getElementById('modalInv').style.display = 'flex';
     }
 
-    function cerrarValidacion() {
-        document.getElementById('modalValidacion').style.display = 'none';
-        activeItemData = null;
-        // Detener video si estaba reproduciéndose
-        const v = document.getElementById('v_video');
-        v.pause();
-        v.src = "";
+    function cerrarInv() {
+      document.getElementById('modalInv').style.display = 'none';
+      activeInvId = null;
     }
 
-    async function enviarValidacion(decision) {
-        if(!activeItemData) return;
-        
-        const args = document.getElementById('v_argumentos').value;
-        // Validación simple: Si es No Conforme, exigir argumentos
-        if (decision === 'no_conforme' && args.trim().length < 5) {
-            alert("Para declarar NO CONFORME, es obligatorio escribir los argumentos y hechos.");
-            return;
+    async function guardarTestimonio() {
+      if (!activeInvId) return;
+      const txt = document.getElementById('inv_testimonio').value;
+      const btn = event.target;
+      btn.innerText = 'Guardando...';
+
+      try {
+        const r = await fetch('/mermas/guardar_testimonio', {
+          method: 'POST',
+          body: JSON.stringify({ id: activeInvId, testimonio: txt })
+        });
+        const d = await r.json();
+        if (d.success) {
+          document.getElementById('save_msg').innerText = 'Guardado Correctamente ✅';
+          setTimeout(() => document.getElementById('save_msg').innerText = '', 2000);
         }
-
-        // Bloquear botón para evitar doble envío
-        const btn = event.target;
-        const textoOriginal = btn.innerText;
-        btn.innerText = "Procesando..."; 
-        btn.disabled = true;
-
-        try {
-            const resp = await fetch('/mermas/validar_investigacion', {
-                method: 'POST',
-                body: JSON.stringify({
-                    id: activeItemData.id,
-                    decision: decision,
-                    argumentos: args
-                })
-            });
-            const data = await resp.json();
-            
-            if(data.success) {
-                cerrarValidacion();
-                setTimeout(polling, 500); // Refrescar lista
-            } else {
-                alert("Error: " + (data.message || "No se pudo procesar."));
-            }
-        } catch(e) {
-            alert("Error de conexión");
-        } finally {
-            btn.innerText = textoOriginal;
-            btn.disabled = false;
-        }
+      } catch (e) { alert("Error guardando"); }
+      btn.innerText = '💾 Guardar Progreso';
     }
 
-    // === LÓGICA MODAL DE CONSULTAS / REPORTES ===
+    async function decisionFinal(decision) {
+      if (!activeInvId) return;
+      const txt = document.getElementById('inv_testimonio').value;
+
+      if (decision === 'no_conforme' && txt.length < 5) {
+        alert("⚠️ Requerido: Para enviar a RRHH debe escribir el testimonio/descargo del operador.");
+        return;
+      }
+
+      const msg = decision === 'conforme'
+        ? "¿Confirmar cierre del caso (CONFORME)?"
+        : "¿Confirmar reporte a RRHH (NO CONFORME)? Esta acción es irreversible.";
+
+      if (!confirm(msg)) return;
+
+      try {
+        await fetch('/mermas/decision_final', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: activeInvId,
+            decision: decision,
+            comentario: "Gestión desde Panel"
+          })
+        });
+        cerrarInv();
+        polling();
+      } catch (e) { alert("Error de conexión"); }
+    }
+
+    // === LÓGICA MODAL DE INFORMES (SIMPLIFICADO) ===
     const modal = document.getElementById('modalConsultas');
     const report = document.getElementById('report');
     let chartRef = null;
 
+    // BOTÓN "INFORMES" DEL MENÚ LATERAL
     document.getElementById('btnOpenConsultas').onclick = () => {
       modal.style.display = 'flex';
-      ['zona', 'vendedor', 'cliente', 'vehiculo'].forEach(t => loadOpts(t));
+
+      // 1. Cargar lista de vehículos
+      loadVehiculosOptions();
+
+      // 2. Por defecto seleccionamos "Última Ruta" (Hoy)
+      setRangoRapido('ruta', document.getElementById('btnRuta'));
     };
+
     function closeModal() { modal.style.display = 'none'; }
     document.getElementById('btnCloseModal').onclick = closeModal;
     document.getElementById('btnCerrar').onclick = closeModal;
 
-    async function loadOpts(tipo) {
-      const sel = document.getElementById('q' + tipo.charAt(0).toUpperCase() + tipo.slice(1));
-      const r = await fetch(`/mermas/opciones?tipo=${tipo}`);
-      const j = await r.json();
-      sel.innerHTML = '<option value="">Selecciona...</option>';
-      j.items.forEach(v => sel.innerHTML += `<option value="${v}">${v}</option>`);
+    // NUEVA FUNCIÓN PARA GESTIONAR LOS BOTONES DE TIEMPO
+    function setRangoRapido(tipo, btnElement) {
+      // 1. Gestión visual (clase active)
+      document.querySelectorAll('#modalConsultas .pill').forEach(b => b.classList.remove('active'));
+      if (btnElement) btnElement.classList.add('active');
+
+      // 2. Cálculo de fechas
+      const hoy = new Date();
+      const fmt = d => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      let fechaInicio = new Date(hoy);
+
+      if (tipo === 'ruta') {
+        // Última ruta = Hoy (Asumimos operación en curso o recién terminada)
+        // Si quisieras "Ayer", cambiarías 0 por 1 abajo
+        fechaInicio.setDate(hoy.getDate() - 0);
+      } else if (tipo === 'semana') {
+        fechaInicio.setDate(hoy.getDate() - 7);
+      } else if (tipo === 'mes') {
+        fechaInicio.setDate(hoy.getDate() - 30);
+      }
+
+      // 3. Asignar a los inputs ocultos
+      document.getElementById('fDesde_ve').value = fmt(fechaInicio);
+      document.getElementById('fHasta_ve').value = fmt(hoy);
     }
 
-    document.querySelectorAll('.pill').forEach(p => {
-      p.onclick = () => {
-        document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
-        p.classList.add('active');
-        document.querySelectorAll('.sec').forEach(s => s.style.display = 'none');
-        document.querySelector('.sec-' + p.dataset.section).style.display = 'block';
+    async function loadVehiculosOptions() {
+      const sel = document.getElementById('qVehiculo');
+      sel.innerHTML = '<option value="">Cargando...</option>';
+      try {
+        const r = await fetch(`/mermas/opciones?tipo=vehiculo`);
+        const j = await r.json();
+        sel.innerHTML = '<option value="">Todos los vehículos</option>';
+        if (j.success && j.items) {
+          j.items.forEach(v => sel.innerHTML += `<option value="${v}">${v}</option>`);
+        }
+      } catch (e) {
+        sel.innerHTML = '<option value="">Error al cargar</option>';
       }
-    });
+    }
 
+    // GENERAR INFORME (Siempre fuerza tipo 'vehiculo')
     document.getElementById('btnEjecutarConsulta').onclick = async () => {
-      const type = document.querySelector('.pill.active').dataset.section;
-      const payload = { tipo: type };
-      const setP = (k, v) => payload[k] = document.getElementById(v).value;
-      if(type==='zona') { setP('zona','qZona'); setP('desde','fDesde_z'); }
-      else if(type==='vendedor') { setP('vendedor','qVendedor'); setP('desde','fDesde_v'); }
-      else if(type==='cliente') { setP('cliente','qCliente'); setP('desde','fDesde_c'); }
-      else if(type==='vehiculo') { setP('vehiculo','qVehiculo'); setP('desde','fDesde_ve'); }
+      const vehiculo = document.getElementById('qVehiculo').value;
+      const desde = document.getElementById('fDesde_ve').value;
+      const hasta = document.getElementById('fHasta_ve').value;
 
-      const r = await fetch('/mermas/consulta', { method: 'POST', body: JSON.stringify(payload) });
-      const data = await r.json();
-      closeModal();
-      renderReport(data);
+      if (!desde || !hasta) return alert("Por favor seleccione el rango de fechas.");
+
+      const payload = {
+        tipo: 'vehiculo', // Hardcodeado: Solo nos interesa este tipo
+        vehiculo: vehiculo,
+        desde: desde,
+        hasta: hasta
+      };
+
+      const btn = document.getElementById('btnEjecutarConsulta');
+      const originalText = btn.innerText;
+      btn.innerText = "Generando...";
+      btn.disabled = true;
+
+      try {
+        const r = await fetch('/mermas/consulta', { method: 'POST', body: JSON.stringify(payload) });
+        const data = await r.json();
+
+        if (data.success) {
+          closeModal();
+
+          // === CAMBIO CRÍTICO AQUÍ ===
+          // Guardamos la placa elegida dentro de los datos para que el reporte sepa de quién es
+          data.placa = vehiculo; 
+          // ===========================
+
+          renderReport(data);
+        } else {
+          alert("No se encontraron datos para ese rango.");
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Error de conexión");
+      } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+      }
     };
 
     function renderReport(data) {
       document.getElementById('list').innerHTML = '';
       document.getElementById('empty').style.display = 'none';
 
+      // 1. PROCESAMIENTO DE DATOS (CURVAS POR DÍA)
+      const viajes = {};
+
+      data.operaciones.forEach(op => {
+        // op.fecha viene como "YYYY-MM-DD HH:MM:SS"
+        // Ejemplo: "2026-01-28 08:20:00"
+
+        if (!op.fecha || op.fecha.length < 16) return; // Validación seguridad
+
+        const fechaKey = op.fecha.substring(0, 10); // "2026-01-28"
+
+        // PARSEO MANUAL DE HORA (Más robusto que new Date())
+        // Extraemos caracteres de hora y minutos directamente del string
+        const hh = parseInt(op.fecha.substring(11, 13));
+        const mm = parseInt(op.fecha.substring(14, 16));
+
+        // Convertimos a decimal (Ej: 08:30 -> 8.5)
+        const horaDecimal = hh + (mm / 60.0);
+
+        if (!viajes[fechaKey]) viajes[fechaKey] = [];
+
+        viajes[fechaKey].push({
+          x: horaDecimal,
+          y: parseFloat(op.merma_pct || 0),
+          cliente: op.cliente,
+          factura: op.factura
+        });
+      });
+
+      // 2. CONSTRUIR DATASETS (LÍNEAS)
+      const datasets = [];
+      // Colores vivos para diferenciar días
+      const colores = ['#006d77', '#e63946', '#f4a261', '#2a9d8f', '#264653', '#e76f51', '#457b9d'];
+      let colorIdx = 0;
+
+      // Ordenar fechas para que la leyenda salga cronológica
+      Object.keys(viajes).sort().forEach(fecha => {
+        // Ordenar puntos por hora (para que la línea no retroceda)
+        viajes[fecha].sort((a, b) => a.x - b.x);
+
+        datasets.push({
+          label: fecha, // Cada día es una línea
+          data: viajes[fecha],
+          borderColor: colores[colorIdx % colores.length],
+          backgroundColor: colores[colorIdx % colores.length],
+          borderWidth: 3,
+          pointRadius: 5,
+          pointHoverRadius: 8,
+          fill: false,
+          tension: 0.3 // Curva suave
+        });
+        colorIdx++;
+      });
+
+      // 3. RENDER HTML
       report.innerHTML = `
             <div class="report-head">
                 <div>
-                   <h3 style="margin:0 0 5px 0; color:var(--verde);">Informe Generado</h3>
-                   <div style="display:flex; gap:5px;">
-                     <span class="stat-badge">Total: ${data.resumen.kg_totales} kg</span>
-                     <span class="stat-badge" style="background:#fff5f5; color:#c53030; border-color:#feb2b2;">Merma: ${data.resumen.merma_total} kg (${data.resumen.merma_pct_total}%)</span>
+                   <h3 style="margin:0 0 5px 0; color:var(--verde);">📈 Evolución Térmica - ${data.placa || 'Vehículo'}</h3>
+                   <div style="font-size:0.9rem; color:#666;">
+                     Análisis de la merma a lo largo del turno (Hora vs %)
                    </div>
                 </div>
-                <button id="btnPDF" class="btn primary">📥 Descargar PDF</button>
+                <div style="text-align:right;">
+                     <button id="btnPDF" class="btn primary" style="margin-bottom:5px;">📥 Descargar PDF</button><br>
+                     <span class="stat-badge">Total: ${data.resumen.kg_totales} kg</span>
+                     <span class="stat-badge" style="background:#fff5f5; color:#c53030; border-color:#feb2b2;">Merma Global: ${data.resumen.merma_pct_total.toFixed(2)}%</span>
+                </div>
             </div>
-            <div class="chart-box"><div style="height:300px;"><canvas id="cvMerma"></canvas></div></div>
+
             <div class="chart-box">
-                <table class="tbl">
-                    <thead><tr><th>Fecha</th><th>Cliente</th><th>Factura</th><th>KG Ent</th><th>Merma</th><th>%</th></tr></thead>
-                    <tbody>${data.operaciones.map(o => `<tr><td>${o.fecha}</td><td>${o.cliente}</td><td>${o.factura}</td><td>${o.kg_entregados}</td><td style="color:#b00020">${o.merma_kg}</td><td><b>${o.merma_pct}%</b></td></tr>`).join('')}</tbody>
-                </table>
+                <div style="height:400px;">
+                    <canvas id="cvMerma"></canvas>
+                </div>
+                <div style="font-size:0.8rem; color:#666; text-align:center; margin-top:10px; font-weight:bold;">
+                    HORA DEL DÍA (EJE X)
+                </div>
             </div>
-            <button onclick="location.reload()" class="btn secondary" style="margin-top:20px;">Volver al inicio</button>
+
+            <div class="chart-box">
+                <div style="max-height:300px; overflow-y:auto;">
+                    <table class="tbl">
+                        <thead><tr><th>Hora</th><th>Fecha</th><th>Cliente</th><th>Kg Ent</th><th>Merma</th><th>%</th></tr></thead>
+                        <tbody>
+                            ${data.operaciones.map(o => {
+        const horaStr = o.fecha.substring(11, 16);
+        const fechaStr = o.fecha.substring(0, 10);
+        const pct = parseFloat(o.merma_pct).toFixed(2);
+        return `<tr><td><b>${horaStr}</b></td><td>${fechaStr}</td><td>${o.cliente.substring(0, 20)}</td><td>${o.kg_entregados}</td><td style="color:#b00020">${o.merma_kg}</td><td><b>${pct}%</b></td></tr>`;
+      }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <button onclick="location.reload()" class="btn secondary" style="margin-top:20px;">Volver</button>
         `;
 
+      // 4. INICIALIZAR CHART.JS
       if (chartRef) chartRef.destroy();
+
       chartRef = new Chart(document.getElementById('cvMerma'), {
-        type: data.chart.type === 'points' ? 'line' : 'bar',
-        data: { labels: data.chart.labels, datasets: [{ label: 'Merma %', data: data.chart.values, backgroundColor: '#015249', borderColor: '#015249' }] },
-        options: { maintainAspectRatio: false }
+        type: 'line',
+        data: { datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              type: 'linear',
+              position: 'bottom',
+              min: 5,  // Desde las 5 AM
+              max: 22, // Hasta las 10 PM
+              title: { display: true, text: 'Hora (Formato 24h)' },
+              ticks: { stepSize: 1, callback: v => v + ':00' }
+            },
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: '% de Merma' }
+            }
+          },
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: {
+              callbacks: {
+                title: ctx => `Hora: ${Math.floor(ctx[0].raw.x)}:${Math.round((ctx[0].raw.x % 1) * 60).toString().padStart(2, '0')}`,
+                label: ctx => `${ctx.dataset.label}: ${ctx.raw.y.toFixed(2)}% (${ctx.raw.cliente})`
+              }
+            }
+          }
+        }
       });
 
+      // 5. DESCARGA PDF (NOMBRE CORRECTO)
       document.getElementById('btnPDF').onclick = async () => {
-        data.chart_png = chartRef.toBase64Image();
-        const r = await fetch('/mermas/consulta/pdf', { method: 'POST', body: JSON.stringify(data) });
-        const blob = await r.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'Reporte_Energix.pdf'; a.click();
+        const btn = document.getElementById('btnPDF');
+        btn.innerText = "Generando...";
+        btn.disabled = true;
+
+        try {
+          const placaClean = (data.placa || 'Vehiculo').toUpperCase().trim().replace(/\s+/g, '_');
+          const pdfPayload = {
+            ...data,
+            chart_png: chartRef.toBase64Image(),
+            filename: `mermas_${placaClean}.pdf`, // Nombre solicitado
+            titulo: `Reporte Operativo - ${placaClean}`
+          };
+
+          const r = await fetch('/mermas/consulta/pdf', { method: 'POST', body: JSON.stringify(pdfPayload) });
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = pdfPayload.filename;
+          a.click();
+        } catch (e) {
+          alert("Error generando PDF");
+        } finally {
+          btn.innerText = "📥 Descargar PDF";
+          btn.disabled = false;
+        }
       };
+    }
+
+    // === FUNCIONES DE FLUJO DE TRABAJO ===
+
+    // ACCIÓN 1: Listado detallado del día anterior (PDF)
+    function descargarReporteDiaAnterior() {
+      const ayer = new Date();
+      ayer.setDate(ayer.getDate() - 1);
+      const fechaStr = ayer.toISOString().split('T')[0];
+
+      if (confirm(`¿Generar reporte detallado de Mermas Bajos Impacto (<=2%) del día ${fechaStr}?`)) {
+        window.open(`/mermas/reporte_controlador_diario?fecha=${fechaStr}`, '_blank');
+      }
+    }
+
+    // ACCIÓN 2: PDF Masivo de Notas Crédito
+    function descargarNotasMasivas() {
+      const ayer = new Date();
+      ayer.setDate(ayer.getDate() - 1);
+      const fechaStr = ayer.toISOString().split('T')[0];
+
+      if (confirm(`¿Descargar TODAS las Notas Crédito (PDF unificado) del día ${fechaStr}?`)) {
+        window.open(`/mermas/notas_masivas_diario?fecha=${fechaStr}`, '_blank');
+      }
+    }
+
+    // ACCIONES 3, 4, 5, 6: Navegación inteligente
+    // ACCIONES DE NAVEGACIÓN INTELIGENTE
+    function activarFlujo(paso) {
+      if (paso === 3) {
+        // Ir a revisión nocturna
+        // El índice [1] corresponde al segundo botón del sidebar (Rev. Nocturna)
+        cambiarVista('nocturna', document.querySelectorAll('.side-btn')[1]);
+        alert("PASO 3: Revise la lista de 'Revisión Nocturna'.\n\n- Use 'Validar' si la evidencia es correcta.\n- Use 'A Investigación' si tiene dudas o requiere explicación.");
+      }
+      else if (paso === 'investigacion') {
+        // Ir a investigaciones (Unificado)
+        // El índice [2] corresponde al tercer botón del sidebar (Investigación)
+        cambiarVista('investigacion', document.querySelectorAll('.side-btn')[2]);
+        alert("PASO 4 (INVESTIGACIONES):\n\nAquí están los casos pendientes de explicación.\n1. Contacte al operador (Citar).\n2. Haga clic en 'Gestionar Caso' para escribir el testimonio y decidir.");
+      }
+    }
+
+    // === LÓGICA REPORTE DE VENTAS (INFO 1, 2 y 3) ===
+
+    function abrirModalReporteVentas() {
+      // Pre-seleccionar "Ayer" por defecto
+      setFechas('ayer');
+      document.getElementById('modalFechasReporte').style.display = 'flex';
+    }
+
+    function cerrarModalFechas() {
+      document.getElementById('modalFechasReporte').style.display = 'none';
+    }
+
+    function setFechas(tipo) {
+      const hoy = new Date();
+      const inicio = document.getElementById('rep_inicio');
+      const fin = document.getElementById('rep_fin');
+
+      // Función auxiliar para formato YYYY-MM-DD local
+      const fmt = d => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      if (tipo === 'hoy') {
+        inicio.value = fmt(hoy);
+        fin.value = fmt(hoy);
+      } else if (tipo === 'ayer') {
+        const ayer = new Date(hoy);
+        ayer.setDate(hoy.getDate() - 1);
+        inicio.value = fmt(ayer);
+        fin.value = fmt(ayer);
+      } else if (tipo === 'mes') {
+        const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        inicio.value = fmt(primerDia);
+        fin.value = fmt(hoy);
+      }
+    }
+
+    function generarReporteFinal() {
+      const ini = document.getElementById('rep_inicio').value;
+      const f = document.getElementById('rep_fin').value;
+
+      if (!ini || !f) return alert("Seleccione fechas válidas.");
+
+      // Abrir PDF en nueva pestaña
+      const url = `/mermas/reporte_ventas_avanzado?inicio=${ini}&fin=${f}`;
+      window.open(url, '_blank');
+      cerrarModalFechas();
+    }
+
+    // === LÓGICA DE BUSCADOR DE NOTAS CRÉDITO ===
+
+    function abrirModalNotas() {
+      // 1. Pre-seleccionar fechas (Ayer por defecto)
+      setFechasNC('ayer');
+
+      // 2. Cargar lista de operadores si está vacía
+      const sel = document.getElementById('nc_operador_sel');
+      if (sel.options.length <= 1) {
+        cargarOperadoresEnSelect();
+      }
+
+      // 3. Limpiar tabla
+      document.getElementById('nc_tabla_resultados').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#666;">Presione "BUSCAR" para ver resultados.</td></tr>';
+
+      document.getElementById('modalBuscadorNotas').style.display = 'flex';
+    }
+
+    function cerrarModalNotas() {
+      document.getElementById('modalBuscadorNotas').style.display = 'none';
+    }
+
+    async function cargarOperadoresEnSelect() {
+      try {
+        const r = await fetch(`/mermas/opciones?tipo=vendedor`); // Reutilizamos tu API existente
+        const j = await r.json();
+        const sel = document.getElementById('nc_operador_sel');
+        if (j.success) {
+          j.items.forEach(op => {
+            const opt = document.createElement('option');
+            opt.value = op;
+            opt.innerText = op;
+            sel.appendChild(opt);
+          });
+        }
+      } catch (e) { console.error("Error cargando operadores", e); }
+    }
+
+    function setFechasNC(tipo) {
+      const hoy = new Date();
+      const inicio = document.getElementById('nc_desde');
+      const fin = document.getElementById('nc_hasta');
+
+      const fmt = d => d.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+
+      if (tipo === 'hoy') {
+        inicio.value = fmt(hoy);
+        fin.value = fmt(hoy);
+      } else if (tipo === 'ayer') {
+        const ayer = new Date(hoy);
+        ayer.setDate(hoy.getDate() - 1);
+        inicio.value = fmt(ayer);
+        fin.value = fmt(ayer);
+      } else if (tipo === 'mes') {
+        const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        inicio.value = fmt(primerDia);
+        fin.value = fmt(hoy);
+      }
+    }
+
+    async function buscarNotasCredito() {
+      const desde = document.getElementById('nc_desde').value;
+      const hasta = document.getElementById('nc_hasta').value;
+      const operador = document.getElementById('nc_operador_sel').value;
+      const tbody = document.getElementById('nc_tabla_resultados');
+      const statusBar = document.getElementById('nc_status_bar');
+
+      if (!desde || !hasta) return alert("Seleccione rango de fechas.");
+
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">⏳ Buscando...</td></tr>';
+
+      try {
+        const r = await fetch('/mermas/buscar_notas_historial', {
+          method: 'POST',
+          body: JSON.stringify({ desde, hasta, operador })
+        });
+        const data = await r.json();
+
+        if (data.success) {
+          if (data.notas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No se encontraron notas en ese periodo.</td></tr>';
+            statusBar.innerText = "0 resultados";
+            return;
+          }
+
+          let html = '';
+          data.notas.forEach(n => {
+            // Botón: Si hay URL, muestra PDF. Si no, muestra alerta.
+            const btnAccion = n.url
+              ? `<a href="${n.url}" target="_blank" class="btn primary" style="padding:5px 10px; font-size:0.75rem; text-decoration:none;">👁️ VER PDF</a>`
+              : `<span style="color:#999; font-size:0.8rem;">(Sin PDF)</span>`;
+
+            html += `
+                    <tr>
+                        <td style="font-weight:bold; color:#b91c1c;">${n.nota}</td>
+                        <td>${n.fecha.substring(0, 16)}</td>
+                        <td>${n.factura}</td>
+                        <td>${n.cliente.substring(0, 20)}</td>
+                        <td style="font-size:0.8rem;">${n.operador.substring(0, 15)}</td>
+                        <td style="text-align:center;">${btnAccion}</td>
+                    </tr>
+                `;
+          });
+          tbody.innerHTML = html;
+          statusBar.innerText = `${data.notas.length} notas encontradas.`;
+        } else {
+          alert("Error: " + data.message);
+        }
+      } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Error de conexión.</td></tr>';
+      }
     }
   </script>
 </body>
+
 </html>

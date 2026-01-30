@@ -40,48 +40,53 @@ def create_app():
     else:
         print("DEBUG ENTORNO = LOCAL (desarrollo)")
         app.config['MYSQL_HOST'] = 'localhost'
-        app.config['MYSQL_USER'] = 'root'          
-        app.config['MYSQL_PASSWORD'] = ''          
-        app.config['MYSQL_DB'] = 'energix_360'     
-        
-        print("DEBUG MYSQL_HOST CONFIG =", app.config['MYSQL_HOST'])
+        app.config['MYSQL_USER'] = 'root'
+        app.config['MYSQL_PASSWORD'] = ''
+        app.config['MYSQL_DB'] = 'energix_360'
 
-    app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
-
-    # ==========================
     # INICIALIZAR EXTENSIONES
-    # ==========================
     mysql.init_app(app)
-    csrf.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
+    csrf.init_app(app)
 
+    # Configuración Login
     login_manager.login_view = 'index'
-    login_manager.login_message_category = 'warning'
+    login_manager.login_message = "Por favor inicie sesión."
 
-    # ==========================
-    # REGISTRO DE BLUEPRINTS
-    # ==========================
-    
-    # 1. Módulos Existentes
-    from app.blueprints.bp_890707006 import bp_890707006
-    from app.blueprints.bp_901811727 import bp_901811727
-    from app.blueprints.bp_glp import bp_glp
-    from app.blueprints.bp_gestion_mermas import bp_gestion_mermas
-    
-    # 2. Transporte Especial (TE)
-    from app.blueprints.bp_transporte_especial import bp_transporte_especial
+    # =========================================================
+    #  REGISTRO DE BLUEPRINTS (Arquitectura A/B)
+    # =========================================================
 
-    # 3. Transporte Carga (TC) - ¡NUEVO!
-    from app.blueprints.bp_transporte_carga import bp_transporte_carga
+    # ---------------------------------------------------------
+    #  GRUPO A: CONTROLADORES PRINCIPALES / EMPRESAS
+    #  (Gestionan la lógica de negocio de alto nivel)
+    # ---------------------------------------------------------
+    from app.blueprints.bp_890707006 import bp_890707006    # Pollos GAR
+    from app.blueprints.bp_901811727 import bp_901811727    # Webmaster / Admin
+    from app.blueprints.A_bp_logistica import logistica_bp  # Logística y Distribución (NUEVO)
 
-    # Registro en la App
     app.register_blueprint(bp_890707006)
     app.register_blueprint(bp_901811727)
+    app.register_blueprint(logistica_bp)
+
+    # ---------------------------------------------------------
+    #  GRUPO B: MÓDULOS FUNCIONALES / SERVICIOS
+    #  (Proveen herramientas: Gas, Mermas, Transporte...)
+    # ---------------------------------------------------------
+    
+    # --SUBMODULOS PARA EMPRESAS AVICOLAS --#
+    from app.blueprints.bp_glp import bp_glp #modulo de control GLP
+    from app.blueprints.bp_gestion_mermas import bp_gestion_mermas #modulo de gestion Mermas
+    
+    # --SUBMODULOS PARA VENTAS Y DISTRIBICION --#
+    from app.blueprints.B_bp_bodegas import bp_bodegas#modulo de gestion Mermas
+    from app.blueprints.B_bp_flotacarga import bp_flotacarga #modulo de gestion Mermas
+   
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
-    app.register_blueprint(bp_transporte_especial)
-    app.register_blueprint(bp_transporte_carga)  # <--- Registro del nuevo Blueprint
+    app.register_blueprint(bp_bodegas)
+    app.register_blueprint(bp_flotacarga)
 
     return app
 
@@ -99,20 +104,23 @@ def load_user(user_id):
         )
         user_data = cur.fetchone()
         cur.close()
-    except Exception:
+    except Exception as e:
+        print(f"Error load_user: {e}")
         return None
 
     if user_data:
-        from .models import Usuario
-        return Usuario(
-            id=user_data['id'],
-            nombre=user_data['nombre'],
-            cedula=user_data['cedula'],
-            tipo=user_data['tipo'],
-            clase=user_data['clase'],
-            rol=user_data['rol'],
-            empresa_id=user_data['empresa_id']
+        from app.models import User
+        # Ajustamos para instanciar User correctamente según tu modelo
+        # (id, nombre, cedula, tipo, clase, rol, empresa_id)
+        # Nota: Asegúrate de que tu clase User acepte estos argumentos en este orden
+        user_obj = User(
+            user_data[0],  # id
+            user_data[1],  # nombre
+            user_data[2],  # cedula
+            user_data[3],  # tipo
+            user_data[4],  # clase
+            user_data[5],  # rol
+            user_data[6]   # empresa_id
         )
-
+        return user_obj
     return None
-

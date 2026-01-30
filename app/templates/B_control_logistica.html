@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CONTROL BODEGA | {{ empresa }}</title>
+    <meta name="theme-color" content="#015249">
+
+    <style>
+        :root {
+            --color-primary: #015249;
+            --color-primary-dark: #013d36;
+            --color-bg: #f6f7f8;
+            --color-surface: #ffffff;
+            --color-border: #e5e7eb;
+            --color-text: #111827;
+            --color-muted: #6b7280;
+            --color-hover: #f3f4f6;
+            --shadow-soft: 0 4px 14px rgba(15, 23, 42, .08);
+            --radius-card: 18px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh; /* Altura fija para scroll interno */
+            overflow: hidden;
+        }
+
+        /* --- HEADER (IGUAL A 'A') --- */
+        .app-header {
+            background-color: var(--color-primary);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 200;
+            flex-shrink: 0;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo-container { display: flex; align-items: center; gap: 10px; }
+        
+        .logo-img {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: white; padding: 3px; object-fit: contain;
+        }
+
+        .user-info h1 { margin: 0; font-size: 14px; font-weight: 600; }
+        .user-info p { margin: 0; font-size: 11px; opacity: 0.9; }
+
+        .logout-btn {
+            color: white; text-decoration: none;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px 12px; border-radius: 6px;
+            font-size: 12px; font-weight: 500;
+            transition: background 0.2s;
+        }
+        .logout-btn:hover { background: rgba(255, 255, 255, 0.25); }
+
+        /* --- LAYOUT PRINCIPAL (SIDEBAR + CONTENT) --- */
+        .layout-wrapper {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* --- SIDEBAR (MENÚ LATERAL) --- */
+        .sidebar {
+            width: 260px;
+            background: var(--color-surface);
+            border-right: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+            flex-shrink: 0;
+        }
+
+        .menu-label {
+            padding: 0 20px 10px;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--color-muted);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .menu-item {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--color-text);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .menu-item:hover {
+            background-color: var(--color-hover);
+            color: var(--color-primary);
+        }
+
+        .menu-item.active {
+            background-color: #f0fdfa; /* Verde muy suave */
+            color: var(--color-primary);
+            border-left-color: var(--color-primary);
+        }
+
+        .menu-icon { font-size: 18px; width: 24px; text-align: center; }
+
+        /* --- ÁREA DE CONTENIDO --- */
+        .content-area {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .welcome-card {
+            background: linear-gradient(135deg, #015249 0%, #037569 100%);
+            color: white;
+            padding: 30px;
+            border-radius: var(--radius-card);
+            margin-bottom: 20px;
+            box-shadow: 0 10px 20px rgba(1, 82, 73, 0.15);
+        }
+
+        /* --- MODAL (POP-UP) --- */
+        .modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+            z-index: 1000;
+            display: none; /* Oculto por defecto */
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-backdrop.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-window {
+            background: var(--color-surface);
+            width: 100%;
+            max-width: 600px;
+            border-radius: var(--radius-card);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            padding: 30px;
+            position: relative;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-backdrop.show .modal-window {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin: 0;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--color-muted);
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .btn-close:hover { color: var(--color-danger); }
+
+        /* --- ESTILOS INTERNOS DEL MODAL (TU DISEÑO DE CARGA) --- */
+        .upload-dashed-area {
+            border: 2px dashed var(--color-border);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            transition: border-color 0.2s;
+            background: #fafafa;
+        }
+
+        .upload-dashed-area:hover {
+            border-color: var(--color-primary);
+            background: #fff;
+        }
+
+        .icon-folder { font-size: 48px; margin-bottom: 10px; display: block; }
+        
+        .btn-select {
+            background-color: var(--color-primary);
+            color: white;
+            padding: 10px 24px;
+            border-radius: 50px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            display: inline-block;
+        }
+
+        .btn-select:hover { background-color: var(--color-primary-dark); }
+        
+        input[type="file"] { display: none; }
+
+        /* Feedback Status */
+        .status-box {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            text-align: center;
+            display: none;
+        }
+        .status-loading { background: #e0f2fe; color: #0284c7; }
+        .status-success { background: #dcfce7; color: #166534; }
+        .status-error   { background: #fee2e2; color: #991b1b; }
+
+    </style>
+</head>
+
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo" class="logo-img">
+                {% if nit %}
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" alt="Cliente" class="logo-img">
+                {% endif %}
+            </div>
+            <div class="user-info" style="margin-left: 10px;">
+                <h1>{{ nombre }}</h1>
+                <p>{{ empresa }}</p>
+            </div>
+        </div>
+        <a href="/logout" class="logout-btn">Salir</a>
+    </header>
+
+    <div class="layout-wrapper">
+        
+        <aside class="sidebar">
+            <div class="menu-label">Operaciones</div>
+            
+            <a href="#" class="menu-item active">
+                <span class="menu-icon">📊</span> Dashboard
+            </a>
+
+            <div class="menu-item" onclick="openUploadModal()">
+                <span class="menu-icon">📥</span> Cargar picking para alistar
+            </div>
+
+            <div class="menu-label" style="margin-top: 20px;">Reportes</div>
+            <a href="#" class="menu-item">
+                <span class="menu-icon">📋</span> Historial de Cargas
+            </a>
+        </aside>
+
+        <main class="content-area">
+            <div class="welcome-card">
+                <h2 style="margin: 0 0 10px;">Panel de Control Logístico</h2>
+                <p style="margin: 0; opacity: 0.9;">Selecciona una opción del menú lateral para comenzar tus labores.</p>
+            </div>
+
+            <h3 style="color: var(--color-text);">Resumen de Bodega</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
+                <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow-soft);">
+                    <h4 style="margin: 0; color: var(--color-muted);">Pedidos Pendientes</h4>
+                    <p style="font-size: 24px; font-weight: bold; margin: 10px 0 0; color: var(--color-primary);">0</p>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow-soft);">
+                    <h4 style="margin: 0; color: var(--color-muted);">En Picking</h4>
+                    <p style="font-size: 24px; font-weight: bold; margin: 10px 0 0; color: #eab308;">0</p>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow-soft);">
+                    <h4 style="margin: 0; color: var(--color-muted);">Despachados Hoy</h4>
+                    <p style="font-size: 24px; font-weight: bold; margin: 10px 0 0; color: #10b981;">0</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="uploadModal" class="modal-backdrop">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 class="modal-title">Carga de Pedidos</h3>
+                <button class="btn-close" onclick="closeUploadModal()">&times;</button>
+            </div>
+            
+            <p style="color: var(--color-muted); font-size: 14px; margin-top: -10px; margin-bottom: 20px;">
+                Importa el archivo Excel para iniciar el Picking
+            </p>
+
+            <form id="uploadForm">
+                <div class="upload-dashed-area">
+                    <span class="icon-folder">📁</span>
+                    <h4 style="margin: 0; color: var(--color-text);">Selecciona tu archivo</h4>
+                    <p style="margin: 5px 0 0; color: var(--color-muted); font-size: 12px;">Formatos: .xlsx, .xls</p>
+                    
+                    <label for="fileInput" class="btn-select">
+                        Buscar Excel
+                    </label>
+                    <input type="file" id="fileInput" name="file" accept=".xlsx, .xls">
+
+                    <div id="file-name" style="margin-top: 15px; font-weight: 600; color: var(--color-primary);"></div>
+                </div>
+
+                <button type="button" onclick="subirArchivo()" id="btnProcesar" 
+                    style="width: 100%; margin-top: 20px; padding: 12px; border-radius: 8px; border: none; background: #eab308; color: black; font-weight: bold; cursor: pointer; display: none;">
+                    🚀 Procesar Archivo
+                </button>
+            </form>
+
+            <div id="statusMsg" class="status-box"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- LÓGICA DEL MODAL ---
+        const modal = document.getElementById('uploadModal');
+
+        function openUploadModal() {
+            modal.classList.add('show');
+        }
+
+        function closeUploadModal() {
+            modal.classList.remove('show');
+            // Limpiar estado al cerrar si se desea
+            document.getElementById('statusMsg').style.display = 'none';
+        }
+
+        // Cerrar al dar click fuera del modal
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                closeUploadModal();
+            }
+        }
+
+        // --- LÓGICA DE CARGA (Misma de antes) ---
+        const fileInput = document.getElementById('fileInput');
+        const fileNameDisplay = document.getElementById('file-name');
+        const btnProcesar = document.getElementById('btnProcesar');
+        const statusMsg = document.getElementById('statusMsg');
+
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                fileNameDisplay.textContent = "📄 " + this.files[0].name;
+                btnProcesar.style.display = 'block';
+                statusMsg.style.display = 'none';
+            }
+        });
+
+        function subirArchivo() {
+            const formData = new FormData(document.getElementById('uploadForm'));
+            
+            statusMsg.className = 'status-box status-loading';
+            statusMsg.textContent = "⏳ Analizando archivo...";
+            statusMsg.style.display = 'block';
+            btnProcesar.disabled = true;
+
+            fetch('/bodegas/upload_excel', { 
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    statusMsg.className = 'status-box status-error';
+                    statusMsg.textContent = "❌ Error: " + data.error;
+                    btnProcesar.disabled = false;
+                } else {
+                    statusMsg.className = 'status-box status-success';
+                    statusMsg.innerHTML = `✅ <b>Éxito:</b> ${data.message}`;
+                    
+                    // Opcional: Cerrar modal automáticamente tras éxito
+                    setTimeout(() => {
+                        closeUploadModal();
+                        // Aquí podrías recargar los widgets del dashboard
+                        // location.reload();
+                    }, 2000);
+                }
+            })
+            .catch(error => {
+                statusMsg.className = 'status-box status-error';
+                statusMsg.textContent = "⚠️ Error de conexión.";
+                btnProcesar.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>

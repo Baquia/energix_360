@@ -881,181 +881,181 @@
 
     <div class="modal fade" id="modalAuditLog" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered"">
-        <div class="modal-content">
-          <div class="modal-header" style="background-color: #015249; color: white;">
-            <h5 class="modal-title">
-              Bitácora de Eventos
-              <small style="font-size: 0.7rem; color: #82e9de; margin-left: 10px;">
-                <span class="live-indicator"></span> En vivo
-              </small>
-            </h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="p-3 bg-white border-bottom">
-            <select id="selectEmpresaAudit" class="form-select" onchange="cargarLogAudit()">
-              <option value="">-- Seleccione Empresa --</option>
-              {% for empresa in empresas %}
-              <option value="{{ empresa.nit }}">{{ empresa.nombre_comercial }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="audit-modal-body">
-            <div id="auditTimeline" class="timeline">
-              <div class="text-center text-muted mt-4">Selecciona una empresa...</div>
-            </div>
+        <div class=" modal-content">
+        <div class="modal-header" style="background-color: #015249; color: white;">
+          <h5 class="modal-title">
+            Bitácora de Eventos
+            <small style="font-size: 0.7rem; color: #82e9de; margin-left: 10px;">
+              <span class="live-indicator"></span> En vivo
+            </small>
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="p-3 bg-white border-bottom">
+          <select id="selectEmpresaAudit" class="form-select" onchange="cargarLogAudit()">
+            <option value="">-- Seleccione Empresa --</option>
+            {% for empresa in empresas %}
+            <option value="{{ empresa.nit }}">{{ empresa.nombre_comercial }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="audit-modal-body">
+          <div id="auditTimeline" class="timeline">
+            <div class="text-center text-muted mt-4">Selecciona una empresa...</div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div id="lightboxSimple"
-      style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center;"
-      onclick="this.style.display='none'">
-      <img id="lbImg" src="" style="max-width:90%; max-height:90%; border:2px solid white; border-radius:4px;">
-    </div>
+  <div id="lightboxSimple"
+    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center;"
+    onclick="this.style.display='none'">
+    <img id="lbImg" src="" style="max-width:90%; max-height:90%; border:2px solid white; border-radius:4px;">
+  </div>
 
-    <div id="contenedorFantasma">
-      <div id="reporteImpresion">
-        <div class="rep-header">
-          <img id="repLogoCliente" src="" class="rep-logo">
-          <div class="rep-title text-center">
-            <h2>Informe de Gestión GLP</h2>
-            <p>Generado por Webmaster BQA-ONE</p>
-          </div>
-          <img src="/static/logo_energix360.png" class="rep-logo">
+  <div id="contenedorFantasma">
+    <div id="reporteImpresion">
+      <div class="rep-header">
+        <img id="repLogoCliente" src="" class="rep-logo">
+        <div class="rep-title text-center">
+          <h2>Informe de Gestión GLP</h2>
+          <p>Generado por Webmaster BQA-ONE</p>
         </div>
-        <div class="rep-grid-info">
-          <div class="rep-item"><label>Cliente</label><span id="repCliente">---</span></div>
-          <div class="rep-item"><label>Ubicación</label><span id="repUbicacion">---</span></div>
-          <div class="rep-item"><label>Periodo</label><span id="repPeriodo">---</span></div>
-          <div class="rep-item"><label>Fecha</label><span id="repFecha">---</span></div>
-          <div class="rep-item"><label>Responsable</label><span id="repUsuario">{{ nombre }}</span></div>
+        <img src="/static/logo_energix360.png" class="rep-logo">
+      </div>
+      <div class="rep-grid-info">
+        <div class="rep-item"><label>Cliente</label><span id="repCliente">---</span></div>
+        <div class="rep-item"><label>Ubicación</label><span id="repUbicacion">---</span></div>
+        <div class="rep-item"><label>Periodo</label><span id="repPeriodo">---</span></div>
+        <div class="rep-item"><label>Fecha</label><span id="repFecha">---</span></div>
+        <div class="rep-item"><label>Responsable</label><span id="repUsuario">{{ nombre }}</span></div>
+      </div>
+      <div class="rep-section-title">Indicadores Clave</div>
+      <div class="rep-kpis">
+        <div class="rep-card">
+          <div class="rep-card-label" id="lblKpi1"></div>
+          <div class="rep-card-value" id="valKpi1"></div>
         </div>
-        <div class="rep-section-title">Indicadores Clave</div>
-        <div class="rep-kpis">
-          <div class="rep-card">
-            <div class="rep-card-label" id="lblKpi1"></div>
-            <div class="rep-card-value" id="valKpi1"></div>
-          </div>
-          <div class="rep-card">
-            <div class="rep-card-label" id="lblKpi2"></div>
-            <div class="rep-card-value" id="valKpi2"></div>
-          </div>
-          <div class="rep-card">
-            <div class="rep-card-label" id="lblKpi3"></div>
-            <div class="rep-card-value" id="valKpi3"></div>
-          </div>
-          <div class="rep-card">
-            <div class="rep-card-label" id="lblKpi4"></div>
-            <div class="rep-card-value" id="valKpi4"></div>
-          </div>
-          <div class="rep-card">
-            <div class="rep-card-label" id="lblKpi5"></div>
-            <div class="rep-card-value" id="valKpi5"></div>
-          </div>
-          <div class="rep-card">
-            <div class="rep-card-label" id="lblKpi6"></div>
-            <div class="rep-card-value" id="valKpi6"></div>
-          </div>
+        <div class="rep-card">
+          <div class="rep-card-label" id="lblKpi2"></div>
+          <div class="rep-card-value" id="valKpi2"></div>
         </div>
-        <div class="rep-section-title">Gráfica</div>
-        <img id="repGraficoImg" src="">
-        <div class="rep-section-title" style="margin-top:20px;">Detalle</div>
-        <table class="rep-table">
-          <thead>
-            <tr>
-              <th>Granja</th>
-              <th>Consumo (kg)</th>
-              <th>Población</th>
-              <th>Eficiencia</th>
-            </tr>
-          </thead>
-          <tbody id="repTablaBody"></tbody>
-        </table>
-        <div
-          style="margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 10px; color: #888; text-align: center;">
-          Generado automáticamente por BQA ONE. <span id="repFooterFecha"></span>
+        <div class="rep-card">
+          <div class="rep-card-label" id="lblKpi3"></div>
+          <div class="rep-card-value" id="valKpi3"></div>
+        </div>
+        <div class="rep-card">
+          <div class="rep-card-label" id="lblKpi4"></div>
+          <div class="rep-card-value" id="valKpi4"></div>
+        </div>
+        <div class="rep-card">
+          <div class="rep-card-label" id="lblKpi5"></div>
+          <div class="rep-card-value" id="valKpi5"></div>
+        </div>
+        <div class="rep-card">
+          <div class="rep-card-label" id="lblKpi6"></div>
+          <div class="rep-card-value" id="valKpi6"></div>
         </div>
       </div>
+      <div class="rep-section-title">Gráfica</div>
+      <img id="repGraficoImg" src="">
+      <div class="rep-section-title" style="margin-top:20px;">Detalle</div>
+      <table class="rep-table">
+        <thead>
+          <tr>
+            <th>Granja</th>
+            <th>Consumo (kg)</th>
+            <th>Población</th>
+            <th>Eficiencia</th>
+          </tr>
+        </thead>
+        <tbody id="repTablaBody"></tbody>
+      </table>
+      <div
+        style="margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 10px; color: #888; text-align: center;">
+        Generado automáticamente por BQA ONE. <span id="repFooterFecha"></span>
+      </div>
     </div>
+  </div>
 
-    <script>
-      // 1. CONTROL DE MENÚ MÓVIL (NUEVO)
-      function toggleMenu() {
-        const sidebar = document.getElementById('sidebarMenu');
-        const overlay = document.getElementById('mobileOverlay');
-        sidebar.classList.toggle('show');
-        overlay.classList.toggle('show');
-      }
+  <script>
+    // 1. CONTROL DE MENÚ MÓVIL (NUEVO)
+    function toggleMenu() {
+      const sidebar = document.getElementById('sidebarMenu');
+      const overlay = document.getElementById('mobileOverlay');
+      sidebar.classList.toggle('show');
+      overlay.classList.toggle('show');
+    }
 
-      // Cerrar menú al hacer clic en opciones (Solo móvil)
-      document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', () => {
-          if (window.innerWidth < 992) {
-            toggleMenu();
-          }
-        });
+    // Cerrar menú al hacer clic en opciones (Solo móvil)
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        if (window.innerWidth < 992) {
+          toggleMenu();
+        }
       });
+    });
 
-      // 2. LOGICA AUDIT LOG
-      let auditInterval = null;
-      function abrirAuditLog() {
-        new bootstrap.Modal(document.getElementById('modalAuditLog')).show();
-        document.getElementById('selectEmpresaAudit').value = "";
-        document.getElementById('auditTimeline').innerHTML = '<div class="text-center text-muted mt-4">Selecciona una empresa...</div>';
+    // 2. LOGICA AUDIT LOG
+    let auditInterval = null;
+    function abrirAuditLog() {
+      new bootstrap.Modal(document.getElementById('modalAuditLog')).show();
+      document.getElementById('selectEmpresaAudit').value = "";
+      document.getElementById('auditTimeline').innerHTML = '<div class="text-center text-muted mt-4">Selecciona una empresa...</div>';
+      if (auditInterval) clearInterval(auditInterval);
+      document.getElementById('modalAuditLog').addEventListener('hidden.bs.modal', function () {
         if (auditInterval) clearInterval(auditInterval);
-        document.getElementById('modalAuditLog').addEventListener('hidden.bs.modal', function () {
-          if (auditInterval) clearInterval(auditInterval);
-        });
-      }
-      function cargarLogAudit() {
-        const nit = document.getElementById('selectEmpresaAudit').value;
-        if (!nit) return;
-        fetchAuditData(nit);
-        if (auditInterval) clearInterval(auditInterval);
-        auditInterval = setInterval(() => { fetchAuditData(nit); }, 5000);
-      }
-      function fetchAuditData(nit) {
-        const formData = new FormData(); formData.append('empresa_id', nit);
-        fetch('/obtener_audit_log', { method: 'POST', body: formData })
-          .then(r => r.json())
-          .then(data => { if (data.success) renderTimeline(data.logs); });
-      }
-      function renderTimeline(logs) {
-        const container = document.getElementById('auditTimeline');
+      });
+    }
+    function cargarLogAudit() {
+      const nit = document.getElementById('selectEmpresaAudit').value;
+      if (!nit) return;
+      fetchAuditData(nit);
+      if (auditInterval) clearInterval(auditInterval);
+      auditInterval = setInterval(() => { fetchAuditData(nit); }, 5000);
+    }
+    function fetchAuditData(nit) {
+      const formData = new FormData(); formData.append('empresa_id', nit);
+      fetch('/obtener_audit_log', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => { if (data.success) renderTimeline(data.logs); });
+    }
+    function renderTimeline(logs) {
+      const container = document.getElementById('auditTimeline');
 
-        if (logs.length === 0) {
-          container.innerHTML = '<div class="text-center text-muted">No hay eventos.</div>';
-          return;
+      if (logs.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted">No hay eventos.</div>';
+        return;
+      }
+
+      let html = '';
+
+      logs.forEach(log => {
+        // 1. Lógica para el Borde Lateral (Módulo)
+        let modClass = 'mod-admin'; // Por defecto
+        if (log.modulo === 'GLP') modClass = 'mod-glp';
+
+        // 2. Lógica para Iconos de Estado (Éxito vs Error)
+        const nivel = (log.nivel || 'INFO').toUpperCase();
+        let iconStatus = '✅';        // Por defecto: Chulito Verde
+        let titleColor = '#198754';   // Verde Bootstrap (text-success)
+
+        // Si detectamos palabras clave de error
+        if (nivel.includes('ERROR') || nivel.includes('ALERTA') || nivel.includes('FALLO') || nivel.includes('CRITICO')) {
+          modClass = 'mod-alerta';  // Borde rojo
+          iconStatus = '❌';        // X Roja
+          titleColor = '#dc3545';   // Rojo Bootstrap (text-danger)
+        }
+        // Opcional: Si es una advertencia
+        else if (nivel.includes('WARN') || nivel.includes('ADVERTENCIA')) {
+          iconStatus = '⚠️';
+          titleColor = '#ffc107';   // Amarillo
         }
 
-        let html = '';
+        const userIcon = log.usuario === 'Sistema' ? '🤖' : '👤';
 
-        logs.forEach(log => {
-          // 1. Lógica para el Borde Lateral (Módulo)
-          let modClass = 'mod-admin'; // Por defecto
-          if (log.modulo === 'GLP') modClass = 'mod-glp';
-
-          // 2. Lógica para Iconos de Estado (Éxito vs Error)
-          const nivel = (log.nivel || 'INFO').toUpperCase();
-          let iconStatus = '✅';        // Por defecto: Chulito Verde
-          let titleColor = '#198754';   // Verde Bootstrap (text-success)
-
-          // Si detectamos palabras clave de error
-          if (nivel.includes('ERROR') || nivel.includes('ALERTA') || nivel.includes('FALLO') || nivel.includes('CRITICO')) {
-            modClass = 'mod-alerta';  // Borde rojo
-            iconStatus = '❌';        // X Roja
-            titleColor = '#dc3545';   // Rojo Bootstrap (text-danger)
-          }
-          // Opcional: Si es una advertencia
-          else if (nivel.includes('WARN') || nivel.includes('ADVERTENCIA')) {
-            iconStatus = '⚠️';
-            titleColor = '#ffc107';   // Amarillo
-          }
-
-          const userIcon = log.usuario === 'Sistema' ? '🤖' : '👤';
-
-          html += `
+        html += `
             <div class="timeline-item ${modClass}">
                 <div class="timeline-dot"></div>
                 <div class="t-header">
@@ -1070,90 +1070,90 @@
                 <div class="t-user" style="font-size:0.8rem; color:#555;">${userIcon} ${log.usuario}</div>
                 <div class="t-detail text-muted small">${log.detalle}</div>
             </div>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // 3. NAVEGACION
+    function activarMenu(elemento, formularioId) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      if (elemento) elemento.classList.add('active');
+      mostrarFormulario(formularioId);
+      cerrarInforme();
+    }
+
+    function cargarOperacionesModerno(elemento, clienteId) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      if (elemento) elemento.classList.add('active');
+      const contenedor = document.getElementById("contenedorOperaciones");
+      const lista = document.getElementById("listaOperacionesDinamica");
+      lista.innerHTML = '';
+
+      // Actualizar select oculto para compatibilidad
+      const selectViejo = document.getElementById("clienteSelect");
+      if (selectViejo) { selectViejo.value = clienteId; }
+
+      if (operaciones[clienteId]) {
+        contenedor.style.display = 'block';
+        operaciones[clienteId].forEach(op => {
+          const btn = document.createElement("button");
+          btn.className = "nav-item submenu-operacion";
+          btn.innerHTML = `<span class="icon-spacer">🔹</span> ${op.replace('Gestion ', '')}`;
+          if (op === "Gestion Gas Avicola") {
+            btn.onclick = function () {
+              document.querySelectorAll('.submenu-operacion').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              activarLógicaInteractividadInformes(clienteId);
+            };
+            lista.appendChild(btn);
+          } else {
+            btn.onclick = function () { alert("Opción: " + op); };
+            lista.appendChild(btn);
+          }
         });
+      } else { contenedor.style.display = 'none'; }
 
-        container.innerHTML = html;
-      }
+      document.querySelectorAll('.form-section').forEach(div => div.style.display = 'none');
+      cerrarInforme();
+      if (typeof cerrarValidacionView === 'function') cerrarValidacionView();
+    }
 
-      // 3. NAVEGACION
-      function activarMenu(elemento, formularioId) {
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        if (elemento) elemento.classList.add('active');
-        mostrarFormulario(formularioId);
-        cerrarInforme();
-      }
+    // 4. VALIDACIÓN DE TANQUEOS (MODIFICADO PARA MÓVIL)
+    let idTanqueoSeleccionado = null;
+    function cerrarValidacionView() { document.getElementById('seccionValidacionTanqueos').style.display = 'none'; }
+    function verFoto(src) { document.getElementById('lbImg').src = src; document.getElementById('lightboxSimple').style.display = 'flex'; }
 
-      function cargarOperacionesModerno(elemento, clienteId) {
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        if (elemento) elemento.classList.add('active');
-        const contenedor = document.getElementById("contenedorOperaciones");
-        const lista = document.getElementById("listaOperacionesDinamica");
-        lista.innerHTML = '';
+    function cargarValidacionesTanqueos(empresaId) {
+      // Mostrar sección
+      document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none');
+      document.getElementById('seccionValidacionTanqueos').style.display = 'block';
 
-        // Actualizar select oculto para compatibilidad
-        const selectViejo = document.getElementById("clienteSelect");
-        if (selectViejo) { selectViejo.value = clienteId; }
+      const grid = document.getElementById('gridTanqueos');
+      const loading = document.getElementById('loadingTanqueos');
+      const empty = document.getElementById('emptyTanqueos');
 
-        if (operaciones[clienteId]) {
-          contenedor.style.display = 'block';
-          operaciones[clienteId].forEach(op => {
-            const btn = document.createElement("button");
-            btn.className = "nav-item submenu-operacion";
-            btn.innerHTML = `<span class="icon-spacer">🔹</span> ${op.replace('Gestion ', '')}`;
-            if (op === "Gestion Gas Avicola") {
-              btn.onclick = function () {
-                document.querySelectorAll('.submenu-operacion').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                activarLógicaInteractividadInformes(clienteId);
-              };
-              lista.appendChild(btn);
-            } else {
-              btn.onclick = function () { alert("Opción: " + op); };
-              lista.appendChild(btn);
-            }
-          });
-        } else { contenedor.style.display = 'none'; }
+      grid.innerHTML = '';
+      loading.style.display = 'block';
+      empty.style.display = 'none';
 
-        document.querySelectorAll('.form-section').forEach(div => div.style.display = 'none');
-        cerrarInforme();
-        if (typeof cerrarValidacionView === 'function') cerrarValidacionView();
-      }
+      fetch('/obtener_tanqueos_validacion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresaId })
+      })
+        .then(r => r.json())
+        .then(data => {
+          loading.style.display = 'none';
+          if (data.success && data.items.length > 0) {
+            data.items.forEach(item => {
+              let filasHtml = '';
+              item.subfilas.forEach(t => {
+                const imgA = t.foto_antes ? `<img src="${t.foto_antes}" class="thumb-val" onclick="verFoto(this.src)">` : '<span class="badge bg-light text-dark border">Sin foto</span>';
+                const imgD = t.foto_despues ? `<img src="${t.foto_despues}" class="thumb-val" onclick="verFoto(this.src)">` : '<span class="badge bg-light text-dark border">Sin foto</span>';
+                const imgV = t.foto_voucher ? `<img src="${t.foto_voucher}" class="thumb-val" onclick="verFoto(this.src)">` : '<span class="badge bg-warning text-dark">Pendiente</span>';
 
-      // 4. VALIDACIÓN DE TANQUEOS (MODIFICADO PARA MÓVIL)
-      let idTanqueoSeleccionado = null;
-      function cerrarValidacionView() { document.getElementById('seccionValidacionTanqueos').style.display = 'none'; }
-      function verFoto(src) { document.getElementById('lbImg').src = src; document.getElementById('lightboxSimple').style.display = 'flex'; }
-
-      function cargarValidacionesTanqueos(empresaId) {
-        // Mostrar sección
-        document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none');
-        document.getElementById('seccionValidacionTanqueos').style.display = 'block';
-
-        const grid = document.getElementById('gridTanqueos');
-        const loading = document.getElementById('loadingTanqueos');
-        const empty = document.getElementById('emptyTanqueos');
-
-        grid.innerHTML = '';
-        loading.style.display = 'block';
-        empty.style.display = 'none';
-
-        fetch('/obtener_tanqueos_validacion', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ empresa_id: empresaId })
-        })
-          .then(r => r.json())
-          .then(data => {
-            loading.style.display = 'none';
-            if (data.success && data.items.length > 0) {
-              data.items.forEach(item => {
-                let filasHtml = '';
-                item.subfilas.forEach(t => {
-                  const imgA = t.foto_antes ? `<img src="${t.foto_antes}" class="thumb-val" onclick="verFoto(this.src)">` : '<span class="badge bg-light text-dark border">Sin foto</span>';
-                  const imgD = t.foto_despues ? `<img src="${t.foto_despues}" class="thumb-val" onclick="verFoto(this.src)">` : '<span class="badge bg-light text-dark border">Sin foto</span>';
-                  const imgV = t.foto_voucher ? `<img src="${t.foto_voucher}" class="thumb-val" onclick="verFoto(this.src)">` : '<span class="badge bg-warning text-dark">Pendiente</span>';
-
-                  filasHtml += `
+                filasHtml += `
                     <tr>
                         <td class="fw-bold text-primary">TK-${t.numero}</td>
                         <td class="text-center border-start"><div class="small text-muted">Antes</div><strong>${t.pct_antes}%</strong>${imgA}</td>
@@ -1161,14 +1161,14 @@
                         <td class="text-center border-start"><div class="small text-muted">Voucher</div>${imgV}</td>
                         <td class="text-center align-middle border-start"><input type="checkbox" class="chk-pre form-check-input" style="width:20px;height:20px;"></td>
                     </tr>`;
-                });
+              });
 
-                // --- AQUÍ ESTÁ EL CAMBIO CLAVE PARA RESPONSIVE (BOOTSTRAP GRID) ---
-                const card = document.createElement('div');
-                card.className = 'tanqueo-card shadow-sm mb-3';
-                card.id = `card-t-${item.id}`;
+              // --- AQUÍ ESTÁ EL CAMBIO CLAVE PARA RESPONSIVE (BOOTSTRAP GRID) ---
+              const card = document.createElement('div');
+              card.className = 'tanqueo-card shadow-sm mb-3';
+              card.id = `card-t-${item.id}`;
 
-                card.innerHTML = `
+              card.innerHTML = `
                     <div class="tanqueo-header d-flex justify-content-between">
                         <span>📅 ${item.fecha}</span>
                         <span>${item.ubicacion}</span>
@@ -1198,132 +1198,132 @@
                         </div>
                     </div>
                 `;
-                grid.appendChild(card);
-              });
-            } else { empty.style.display = 'block'; }
-          })
-          .catch(err => { loading.style.display = 'none'; console.error(err); alert("Error cargando datos."); });
-      }
-
-      function validarChecks(id) {
-        const card = document.getElementById(`card-t-${id}`);
-        const checks = card.querySelectorAll('.chk-pre');
-        let ok = true;
-        checks.forEach(c => { if (!c.checked) ok = false; });
-        if (!ok) { alert("⚠️ Marca todos los checkboxes de revisión."); return; }
-        idTanqueoSeleccionado = id;
-        confirmarDecisionTanqueo('SI');
-      }
-
-      function abrirModalDecision(id, tipo) {
-        idTanqueoSeleccionado = id;
-        if (tipo === 'NO') { if (confirm("¿Rechazar y alertar a Gerencia?")) confirmarDecisionTanqueo('NO'); }
-        else { new bootstrap.Modal(document.getElementById('modalDecisionTanqueo')).show(); }
-      }
-
-      function confirmarDecisionTanqueo(decision) {
-        if (!idTanqueoSeleccionado) return;
-        const card = document.getElementById(`card-t-${idTanqueoSeleccionado}`);
-        if (card) card.style.opacity = '0.5';
-
-        // Cerrar modal si está abierto
-        const modalEl = document.getElementById('modalDecisionTanqueo');
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) modal.hide();
-
-        fetch('/procesar_validacion_tanqueo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: idTanqueoSeleccionado, decision: decision })
+              grid.appendChild(card);
+            });
+          } else { empty.style.display = 'block'; }
         })
-          .then(r => r.json())
-          .then(resp => {
-            if (resp.success) {
-              if (card) card.remove();
-              if (document.getElementById('gridTanqueos').children.length === 0) document.getElementById('emptyTanqueos').style.display = 'block';
-              alert(decision === 'SI' ? "✅ Validado" : "📩 Rechazado");
-            } else { if (card) card.style.opacity = '1'; alert(resp.message); }
-          })
-          .catch(() => { if (card) card.style.opacity = '1'; alert("Error conexión"); });
-      }
+        .catch(err => { loading.style.display = 'none'; console.error(err); alert("Error cargando datos."); });
+    }
 
-      // 5. UTILIDADES FORMULARIOS
-      document.addEventListener('DOMContentLoaded', function () {
-        window.mostrarFormulario = function (id) {
-          document.querySelectorAll('.form-section').forEach(div => div.style.display = 'none');
-          const t = document.getElementById(id); if (t) t.style.display = 'block';
+    function validarChecks(id) {
+      const card = document.getElementById(`card-t-${id}`);
+      const checks = card.querySelectorAll('.chk-pre');
+      let ok = true;
+      checks.forEach(c => { if (!c.checked) ok = false; });
+      if (!ok) { alert("⚠️ Marca todos los checkboxes de revisión."); return; }
+      idTanqueoSeleccionado = id;
+      confirmarDecisionTanqueo('SI');
+    }
+
+    function abrirModalDecision(id, tipo) {
+      idTanqueoSeleccionado = id;
+      if (tipo === 'NO') { if (confirm("¿Rechazar y alertar a Gerencia?")) confirmarDecisionTanqueo('NO'); }
+      else { new bootstrap.Modal(document.getElementById('modalDecisionTanqueo')).show(); }
+    }
+
+    function confirmarDecisionTanqueo(decision) {
+      if (!idTanqueoSeleccionado) return;
+      const card = document.getElementById(`card-t-${idTanqueoSeleccionado}`);
+      if (card) card.style.opacity = '0.5';
+
+      // Cerrar modal si está abierto
+      const modalEl = document.getElementById('modalDecisionTanqueo');
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+
+      fetch('/procesar_validacion_tanqueo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: idTanqueoSeleccionado, decision: decision })
+      })
+        .then(r => r.json())
+        .then(resp => {
+          if (resp.success) {
+            if (card) card.remove();
+            if (document.getElementById('gridTanqueos').children.length === 0) document.getElementById('emptyTanqueos').style.display = 'block';
+            alert(decision === 'SI' ? "✅ Validado" : "📩 Rechazado");
+          } else { if (card) card.style.opacity = '1'; alert(resp.message); }
+        })
+        .catch(() => { if (card) card.style.opacity = '1'; alert("Error conexión"); });
+    }
+
+    // 5. UTILIDADES FORMULARIOS
+    document.addEventListener('DOMContentLoaded', function () {
+      window.mostrarFormulario = function (id) {
+        document.querySelectorAll('.form-section').forEach(div => div.style.display = 'none');
+        const t = document.getElementById(id); if (t) t.style.display = 'block';
+      }
+    });
+
+    let formularioActivo = null;
+    function confirmarEnvioGenerico(formId) {
+      const form = document.getElementById(formId); if (!form) return;
+      formularioActivo = form;
+      document.getElementById('modalMensajeGlobal').textContent = form.dataset.confirmar || "¿Continuar?";
+      new bootstrap.Modal(document.getElementById('modalConfirmacionGlobal')).show();
+    }
+    document.getElementById('btnConfirmarGlobal').addEventListener('click', () => {
+      if (!formularioActivo) return;
+      const url = formularioActivo.dataset.url;
+      const data = new FormData(formularioActivo);
+      fetch(url, { method: 'POST', body: data }).then(res => res.json()).then(result => {
+        alert(result.message);
+        if (result.success) { formularioActivo.reset(); document.querySelectorAll('.form-section').forEach(e => e.style.display = 'none'); }
+      });
+      bootstrap.Modal.getInstance(document.getElementById('modalConfirmacionGlobal')).hide();
+    });
+
+    // 6. INFORMES Y GRAFICOS
+    const operaciones = {
+      "890707006": ["Gestion Electricidad", "Gestion Gas Avicola", "Gestion Carbón", "Gestion Flota Cautiva", "Gestion Transporte Especial", "Gestion Mantenimiento", "Gestion Procesos Industriales", "Gestion EDS"],
+      "900977113": ["Gestion Electricidad", "Gestion Gas Avicola", "Gestion Carbón"],
+      "901370428": ["Gestion Electricidad", "Gestion Gas Avicola"]
+    };
+    let chartInstancia = null, datosGlobales = null;
+
+    function cerrarInforme() { document.getElementById('seccionInforme').style.display = 'none'; }
+
+    function activarLógicaInteractividadInformes(cid) {
+      let opts = [{ value: "granja", text: "Por Granja" }, { value: "zona", text: "Por Zona" }, { value: "general", text: "General" }];
+      if (cid === '890707006') opts.push({ value: "validacion", text: "🧐 Validación Tanqueos" });
+
+      mostrarPregunta("Tipo de informe", opts, (t) => {
+        if (t === "validacion") { cargarValidacionesTanqueos(cid); return; }
+        if (t === "general") { pregPeriodo(cid, t, null); }
+        else {
+          fetch('/obtener_ubicaciones', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo: t, empresa_id: cid }) })
+            .then(r => r.json()).then(d => {
+              if (d.success) mostrarPregunta(`Seleccione ${t}`, d.ubicaciones.map(u => ({ value: u, text: u })), (u) => pregPeriodo(cid, t, u));
+            });
         }
       });
+    }
 
-      let formularioActivo = null;
-      function confirmarEnvioGenerico(formId) {
-        const form = document.getElementById(formId); if (!form) return;
-        formularioActivo = form;
-        document.getElementById('modalMensajeGlobal').textContent = form.dataset.confirmar || "¿Continuar?";
-        new bootstrap.Modal(document.getElementById('modalConfirmacionGlobal')).show();
-      }
-      document.getElementById('btnConfirmarGlobal').addEventListener('click', () => {
-        if (!formularioActivo) return;
-        const url = formularioActivo.dataset.url;
-        const data = new FormData(formularioActivo);
-        fetch(url, { method: 'POST', body: data }).then(res => res.json()).then(result => {
-          alert(result.message);
-          if (result.success) { formularioActivo.reset(); document.querySelectorAll('.form-section').forEach(e => e.style.display = 'none'); }
-        });
-        bootstrap.Modal.getInstance(document.getElementById('modalConfirmacionGlobal')).hide();
+    function pregPeriodo(cid, t, u) {
+      mostrarPregunta("Periodo", [{ value: "Actual", text: "Actual" }, { value: "Personalizado", text: "Histórico" }], (p) => {
+        if (p === "Personalizado") mostrarSelectorFechas((ini, fin) => generarInformeFinal(cid, t, u, p, ini, fin));
+        else generarInformeFinal(cid, t, u, p, null, null);
       });
+    }
 
-      // 6. INFORMES Y GRAFICOS
-      const operaciones = {
-        "890707006": ["Gestion Electricidad", "Gestion Gas Avicola", "Gestion Carbón", "Gestion Flota Cautiva", "Gestion Transporte Especial", "Gestion Mantenimiento", "Gestion Procesos Industriales", "Gestion EDS"],
-        "900977113": ["Gestion Electricidad", "Gestion Gas Avicola", "Gestion Carbón"],
-        "901370428": ["Gestion Electricidad", "Gestion Gas Avicola"]
-      };
-      let chartInstancia = null, datosGlobales = null;
+    function mostrarPregunta(txt, opts, cb) {
+      const ov = document.createElement("div"); ov.className = "pregunta-overlay";
+      const card = document.createElement("div"); card.className = "pregunta-card";
+      card.innerHTML = `<h5 class="text-center mb-3 text-primary">${txt}</h5>`;
+      const sel = document.createElement("select"); sel.className = "form-select mb-3";
+      sel.innerHTML = '<option value="">Seleccione...</option>';
+      opts.forEach(o => sel.innerHTML += `<option value="${o.value}">${o.text}</option>`);
+      card.appendChild(sel);
+      const row = document.createElement("div"); row.className = "d-flex gap-2";
+      row.innerHTML = `<button class="btn btn-secondary flex-fill" onclick="this.closest('.pregunta-overlay').remove()">Cancelar</button>`;
+      const b2 = document.createElement("button"); b2.className = "btn btn-custom flex-fill"; b2.innerText = "Continuar";
+      b2.onclick = () => { if (sel.value) { ov.remove(); cb(sel.value); } };
+      row.appendChild(b2); card.appendChild(row); ov.appendChild(card); document.body.appendChild(ov);
+    }
 
-      function cerrarInforme() { document.getElementById('seccionInforme').style.display = 'none'; }
-
-      function activarLógicaInteractividadInformes(cid) {
-        let opts = [{ value: "granja", text: "Por Granja" }, { value: "zona", text: "Por Zona" }, { value: "general", text: "General" }];
-        if (cid === '890707006') opts.push({ value: "validacion", text: "🧐 Validación Tanqueos" });
-
-        mostrarPregunta("Tipo de informe", opts, (t) => {
-          if (t === "validacion") { cargarValidacionesTanqueos(cid); return; }
-          if (t === "general") { pregPeriodo(cid, t, null); }
-          else {
-            fetch('/obtener_ubicaciones', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo: t, empresa_id: cid }) })
-              .then(r => r.json()).then(d => {
-                if (d.success) mostrarPregunta(`Seleccione ${t}`, d.ubicaciones.map(u => ({ value: u, text: u })), (u) => pregPeriodo(cid, t, u));
-              });
-          }
-        });
-      }
-
-      function pregPeriodo(cid, t, u) {
-        mostrarPregunta("Periodo", [{ value: "Actual", text: "Actual" }, { value: "Personalizado", text: "Histórico" }], (p) => {
-          if (p === "Personalizado") mostrarSelectorFechas((ini, fin) => generarInformeFinal(cid, t, u, p, ini, fin));
-          else generarInformeFinal(cid, t, u, p, null, null);
-        });
-      }
-
-      function mostrarPregunta(txt, opts, cb) {
-        const ov = document.createElement("div"); ov.className = "pregunta-overlay";
-        const card = document.createElement("div"); card.className = "pregunta-card";
-        card.innerHTML = `<h5 class="text-center mb-3 text-primary">${txt}</h5>`;
-        const sel = document.createElement("select"); sel.className = "form-select mb-3";
-        sel.innerHTML = '<option value="">Seleccione...</option>';
-        opts.forEach(o => sel.innerHTML += `<option value="${o.value}">${o.text}</option>`);
-        card.appendChild(sel);
-        const row = document.createElement("div"); row.className = "d-flex gap-2";
-        row.innerHTML = `<button class="btn btn-secondary flex-fill" onclick="this.closest('.pregunta-overlay').remove()">Cancelar</button>`;
-        const b2 = document.createElement("button"); b2.className = "btn btn-custom flex-fill"; b2.innerText = "Continuar";
-        b2.onclick = () => { if (sel.value) { ov.remove(); cb(sel.value); } };
-        row.appendChild(b2); card.appendChild(row); ov.appendChild(card); document.body.appendChild(ov);
-      }
-
-      function mostrarSelectorFechas(cb) {
-        const ov = document.createElement("div"); ov.className = "pregunta-overlay";
-        ov.innerHTML = `
+    function mostrarSelectorFechas(cb) {
+      const ov = document.createElement("div"); ov.className = "pregunta-overlay";
+      ov.innerHTML = `
            <div class="pregunta-card">
              <h5 class="text-center mb-3 text-primary">Seleccione Rango</h5>
              <label class="small fw-bold">Inicio</label><input type="date" id="tIni" class="form-control mb-2">
@@ -1333,113 +1333,177 @@
                <button class="btn btn-custom flex-fill" id="btnOkF">Generar</button>
              </div>
            </div>`;
-        document.body.appendChild(ov);
-        document.getElementById('btnOkF').onclick = () => {
-          const i = document.getElementById('tIni').value, f = document.getElementById('tFin').value;
-          if (i && f) { ov.remove(); cb(i, f); } else alert("Fechas incompletas");
-        };
+      document.body.appendChild(ov);
+      document.getElementById('btnOkF').onclick = () => {
+        const i = document.getElementById('tIni').value, f = document.getElementById('tFin').value;
+        if (i && f) { ov.remove(); cb(i, f); } else alert("Fechas incompletas");
+      };
+    }
+
+    function generarInformeFinal(eid, t, u, p, ini, fin) {
+      // 1. ACTUALIZAR UI (TÍTULOS Y FECHAS)
+      let tituloTexto = "Informe General GLP";
+      if (t === 'granja') tituloTexto = `Informe Granja: ${u}`;
+      else if (t === 'zona') tituloTexto = `Informe Zona: ${u}`;
+
+      document.getElementById('tituloInforme').textContent = tituloTexto;
+
+      let periodoTexto = `Periodo: ${p}`;
+      if (p === 'Personalizado' && ini && fin) {
+        periodoTexto += ` (${ini} al ${fin})`;
       }
+      document.getElementById('subtituloPeriodo').textContent = periodoTexto;
 
-      function generarInformeFinal(eid, t, u, p, ini, fin) {
-        fetch('/generar_informe', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tipo_informe: t, periodo: p, fecha_inicio: ini, fecha_fin: fin, ubicacion: u, empresa_id: eid })
-        }).then(r => r.json()).then(resp => {
-          if (resp.success) { datosGlobales = resp.data; renderizarInforme(resp.data); } else alert(resp.message);
-        });
-      }
-
-      function renderizarInforme(data) {
-        document.getElementById('seccionInforme').style.display = 'block';
-        const k = data.kpis;
-        document.getElementById('kpi1Value').textContent = Number(k.card1_value).toLocaleString();
-        document.getElementById('kpi2Value').textContent = Number(k.card2_value).toLocaleString();
-        document.getElementById('kpi3Value').textContent = Number(k.card3_value).toLocaleString();
-        document.getElementById('kpi4Value').textContent = Number(k.card4_value).toFixed(4);
-        document.getElementById('kpi5Value').textContent = Number(k.card5_value).toLocaleString();
-        document.getElementById('kpi6Value').textContent = "$ " + Number(k.card6_value).toLocaleString();
-
-        const tb = document.getElementById('tablaConsumo').querySelector('tbody'); tb.innerHTML = '';
-        data.tabla_resumen.forEach(r => {
-          tb.innerHTML += `<tr><td class="text-start fw-bold">${r.granja}</td><td>${Number(r.total_kg).toLocaleString()}</td><td>${Number(r.pollitos).toLocaleString()}</td><td>${Number(r.kg_pollito).toFixed(4)}</td></tr>`;
-        });
-        cambiarVistaGrafico('rendimiento');
-      }
-
-      function cambiarVistaGrafico(vista) {
-        if (!datosGlobales) return;
-        const ctx = document.getElementById('graficoConsumo').getContext('2d');
-        if (chartInstancia) chartInstancia.destroy();
-        const s = datosGlobales.series;
-        let d = [];
-        if (vista === 'rendimiento') d = [{ label: 'Rendimiento', data: s.kg_pollito, borderColor: '#6366f1', fill: true, backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 }];
-        else d = [{ label: 'Saldos', data: s.saldo_inicial, borderColor: '#3b82f6' }];
-        chartInstancia = new Chart(ctx, { type: 'line', data: { labels: s.fechas, datasets: d }, options: { responsive: true, maintainAspectRatio: false } });
-      }
-
-      // PDF
-      function descargarPDF() {
-        const btn = document.getElementById('btnDescargarPdf'); btn.textContent = "Generando..."; btn.disabled = true;
-
-        // Llenar datos fantasma...
-        document.getElementById("repCliente").textContent = document.getElementById("clienteSelect").options[document.getElementById("clienteSelect").selectedIndex].text;
-        const tit = document.getElementById("tituloInforme").textContent;
-        document.getElementById("repUbicacion").textContent = tit.replace("Informe GLP", "") || "General";
-        document.getElementById("repGraficoImg").src = document.getElementById('graficoConsumo').toDataURL("image/jpeg", 1.0);
-        document.getElementById("repTablaBody").innerHTML = document.getElementById('tablaConsumo').querySelector('tbody').innerHTML;
-
-        // KPIs para PDF
-        for (let i = 1; i <= 6; i++) {
-          document.getElementById(`lblKpi${i}`).textContent = document.getElementById(`kpi${i}Label`).textContent;
-          document.getElementById(`valKpi${i}`).textContent = document.getElementById(`kpi${i}Value`).textContent;
+      // 2. PETICIÓN AL SERVIDOR
+      fetch('/generar_informe', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo_informe: t, periodo: p, fecha_inicio: ini, fecha_fin: fin, ubicacion: u, empresa_id: eid })
+      }).then(r => r.json()).then(resp => {
+        if (resp.success) {
+          datosGlobales = resp.data;
+          renderizarInforme(resp.data);
+        } else {
+          alert(resp.message);
         }
-
-        const phantom = document.getElementById('reporteImpresion');
-        phantom.style.display = 'block';
-
-        html2pdf().set({ margin: 0.5, filename: 'Informe_GLP.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter' } })
-          .from(phantom).save().then(() => { phantom.style.display = 'none'; btn.textContent = "Descargar PDF"; btn.disabled = false; });
-      }
-
-      function actualizarEmpresaUsuario() {
-        const s = document.getElementById('empresa_select_usuario');
-        document.getElementById('empresa_id').value = s.options[s.selectedIndex].getAttribute('data-id') || '';
-        actualizarPerfilesPorEmpresaYOperacion();
-      }
-      function actualizarPerfilesPorEmpresaYOperacion() {
-        const eid = document.getElementById('empresa_id').value;
-        const op = document.getElementById('operacion_usuario').value;
-        if (!eid || !op) return;
-        fetch(`/obtener_perfiles?empresa_id=${eid}&operacion=${op}`).then(r => r.json()).then(d => {
-          const s = document.getElementById('perfil_usuario'); s.innerHTML = '';
-          d.perfiles.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; s.appendChild(o); });
-        });
-      }
-      function actualizarNit() {
-        const s = document.querySelector('[name="empresa_select"]');
-        const nit = s.options[s.selectedIndex].getAttribute('data-nit');
-        document.getElementById('nit').value = nit || '';
-      }
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        // Llamada silenciosa al backend para limpiar fotos viejas
-        fetch('/ejecutar_limpieza_automatica')
-          .then(response => response.json())
-          .then(data => {
-            // CONDICIÓN: Si fue exitoso Y el mensaje NO dice "limpio" (es decir, sí borró algo)
-            if (data.success && !data.message.includes('limpio')) {
-              // Muestra la alerta visual que pediste
-              alert("🧹 MANTENIMIENTO: " + data.message);
-            } else {
-              // Si no borró nada, solo lo registra en consola (F12) para no molestar
-              console.log("Sistema limpio o sin cambios: ", data.message);
-            }
-          })
-          .catch(err => console.log("Error en limpieza automática:", err));
       });
-    </script>
+    }
+
+    function renderizarInforme(data) {
+      document.getElementById('seccionInforme').style.display = 'block';
+      const k = data.kpis;
+
+      // 1. ACTUALIZAR ETIQUETAS (Aquí es donde aparece el "kg")
+      document.getElementById('kpi1Label').textContent = k.card1_label; // Ej: "Saldo Inicial (kg)"
+      document.getElementById('kpi2Label').textContent = k.card2_label;
+      document.getElementById('kpi3Label').textContent = k.card3_label;
+      document.getElementById('kpi4Label').textContent = k.card4_label;
+      document.getElementById('kpi5Label').textContent = k.card5_label;
+      document.getElementById('kpi6Label').textContent = k.card6_label;
+
+      // 2. ACTUALIZAR VALORES
+      document.getElementById('kpi1Value').textContent = Number(k.card1_value).toLocaleString();
+      document.getElementById('kpi2Value').textContent = Number(k.card2_value).toLocaleString();
+      document.getElementById('kpi3Value').textContent = Number(k.card3_value).toLocaleString();
+      document.getElementById('kpi4Value').textContent = Number(k.card4_value).toFixed(4);
+      document.getElementById('kpi5Value').textContent = Number(k.card5_value).toLocaleString();
+      document.getElementById('kpi6Value').textContent = "$ " + Number(k.card6_value).toLocaleString();
+
+      // 3. TABLA
+      const tb = document.getElementById('tablaConsumo').querySelector('tbody'); tb.innerHTML = '';
+      data.tabla_resumen.forEach(r => {
+        tb.innerHTML += `<tr><td class="text-start fw-bold">${r.granja}</td><td>${Number(r.total_kg).toLocaleString()}</td><td>${Number(r.pollitos).toLocaleString()}</td><td>${Number(r.kg_pollito).toFixed(4)}</td></tr>`;
+      });
+      cambiarVistaGrafico('rendimiento');
+    }
+
+    function cambiarVistaGrafico(vista) {
+      if (!datosGlobales) return;
+      const ctx = document.getElementById('graficoConsumo').getContext('2d');
+      if (chartInstancia) chartInstancia.destroy();
+      const s = datosGlobales.series;
+      let d = [];
+      if (vista === 'rendimiento') d = [{ label: 'Rendimiento', data: s.kg_pollito, borderColor: '#6366f1', fill: true, backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 }];
+      else d = [{ label: 'Saldos', data: s.saldo_inicial, borderColor: '#3b82f6' }];
+      chartInstancia = new Chart(ctx, { type: 'line', data: { labels: s.fechas, datasets: d }, options: { responsive: true, maintainAspectRatio: false } });
+    }
+
+    // PDF
+    function descargarPDF() {
+      const btn = document.getElementById('btnDescargarPdf');
+      btn.textContent = "Generando...";
+      btn.disabled = true;
+
+      // 1. LLENAR DATOS DE ENCABEZADO PARA EL PDF
+      // Cliente
+      const selCliente = document.getElementById("clienteSelect");
+      document.getElementById("repCliente").textContent = selCliente.options[selCliente.selectedIndex].text;
+
+      // Ubicación (Tomado del título que corregimos en el Paso 1)
+      const tit = document.getElementById("tituloInforme").textContent;
+      // Si dice "Informe Granja: La Cabaña", extraemos "La Cabaña"
+      let ubicacionLimpia = "General";
+      if (tit.includes(":")) {
+        ubicacionLimpia = tit.split(":")[1].trim();
+      } else if (tit.includes("General")) {
+        ubicacionLimpia = "Consolidado General";
+      }
+      document.getElementById("repUbicacion").textContent = ubicacionLimpia;
+
+      // Periodo (Tomado del subtítulo que corregimos en el Paso 1)
+      // ESTA LINEA FALTABA:
+      document.getElementById("repPeriodo").textContent = document.getElementById("subtituloPeriodo").textContent;
+
+      // Fecha Generación
+      document.getElementById("repFecha").textContent = new Date().toLocaleString();
+
+      // Gráfico y Tabla
+      document.getElementById("repGraficoImg").src = document.getElementById('graficoConsumo').toDataURL("image/jpeg", 1.0);
+      document.getElementById("repTablaBody").innerHTML = document.getElementById('tablaConsumo').querySelector('tbody').innerHTML;
+
+      // 2. COPIAR KPIs AL PDF (Incluyendo las etiquetas con kg)
+      for (let i = 1; i <= 6; i++) {
+        document.getElementById(`lblKpi${i}`).textContent = document.getElementById(`kpi${i}Label`).textContent;
+        document.getElementById(`valKpi${i}`).textContent = document.getElementById(`kpi${i}Value`).textContent;
+      }
+
+      // 3. GENERAR
+      const phantom = document.getElementById('reporteImpresion');
+      phantom.style.display = 'block';
+
+      html2pdf().set({
+        margin: 0.5,
+        filename: 'Informe_GLP.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter' }
+      })
+        .from(phantom).save()
+        .then(() => {
+          phantom.style.display = 'none';
+          btn.textContent = "Descargar PDF";
+          btn.disabled = false;
+        });
+    }
+
+    function actualizarEmpresaUsuario() {
+      const s = document.getElementById('empresa_select_usuario');
+      document.getElementById('empresa_id').value = s.options[s.selectedIndex].getAttribute('data-id') || '';
+      actualizarPerfilesPorEmpresaYOperacion();
+    }
+    function actualizarPerfilesPorEmpresaYOperacion() {
+      const eid = document.getElementById('empresa_id').value;
+      const op = document.getElementById('operacion_usuario').value;
+      if (!eid || !op) return;
+      fetch(`/obtener_perfiles?empresa_id=${eid}&operacion=${op}`).then(r => r.json()).then(d => {
+        const s = document.getElementById('perfil_usuario'); s.innerHTML = '';
+        d.perfiles.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; s.appendChild(o); });
+      });
+    }
+    function actualizarNit() {
+      const s = document.querySelector('[name="empresa_select"]');
+      const nit = s.options[s.selectedIndex].getAttribute('data-nit');
+      document.getElementById('nit').value = nit || '';
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Llamada silenciosa al backend para limpiar fotos viejas
+      fetch('/ejecutar_limpieza_automatica')
+        .then(response => response.json())
+        .then(data => {
+          // CONDICIÓN: Si fue exitoso Y el mensaje NO dice "limpio" (es decir, sí borró algo)
+          if (data.success && !data.message.includes('limpio')) {
+            // Muestra la alerta visual que pediste
+            alert("🧹 MANTENIMIENTO: " + data.message);
+          } else {
+            // Si no borró nada, solo lo registra en consola (F12) para no molestar
+            console.log("Sistema limpio o sin cambios: ", data.message);
+          }
+        })
+        .catch(err => console.log("Error en limpieza automática:", err));
+    });
+  </script>
 </body>
 
 </html>

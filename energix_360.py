@@ -50,15 +50,49 @@ def sw():
     return send_from_directory(app.static_folder, "sw.js",
                            mimetype="application/javascript")
 
-@app.route('/', methods=['GET'])
+# EN energix_360.py
+
+@app.route('/')
 def index():
+    # 1. Si ya tiene sesión, redirigir a su panel correspondiente
+    if 'usuario_id' in session:
+        # Recuperamos el tipo guardado en sesión
+        tipo_str = str(session.get('tipo_empresa', '')).strip().lower()
+        
+        # Lógica de redirección (reutilizando tu lógica de login)
+        if 'ventas_distribucion' in tipo_str:
+             return redirect('/control_logistica.html')
+        elif 'webmaster' in tipo_str:
+             return redirect('/901811727.html')
+        
+        # Redirección por defecto
+        return redirect(f"/{session.get('empresa_id')}.html")
+
     form = LoginForm()
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT nit, nombre_comercial FROM empresas")
-    empresas = cur.fetchall()
-    form.empresa.choices = [(e['nit'], e['nombre_comercial']) for e in empresas]
-    cur.close()
-    return render_template('login_energix360.html', form=form, empresas=empresas)
+
+    # --- CORRECCIÓN CLAVE AQUÍ ---
+    import MySQLdb.cursors 
+    
+    # 2. Usamos DictCursor para que la BD devuelva nombres de columnas
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("SELECT nit, nombre_comercial FROM empresas")
+        empresas = cur.fetchall()
+        cur.close()
+
+        # 3. Llenamos el SelectField
+        # Ahora sí funcionará e['nit'] porque estamos usando DictCursor
+        form.empresa.choices = [(e['nit'], e['nombre_comercial']) for e in empresas]
+    
+    except Exception as err:
+        print(f"Error cargando empresas: {err}")
+        form.empresa.choices = []
+
+    return render_template('login_energix360.html', form=form) 
+    # NOTA: Si tu archivo HTML de login se llama 'login.html', cambia 'index.html' por 'login.html'
+
+from flask import jsonify, request, session
+import MySQLdb.cursors # Importante para que funcionen los diccionarios
 
 @app.route('/login', methods=['POST'])
 @csrf.exempt
@@ -72,7 +106,10 @@ def login():
     if not cedula or not password or not nombre_empresa:
         return jsonify(success=False, message="Datos incompletos")
 
-    cur = mysql.connection.cursor()
+    import MySQLdb.cursors
+    # Usamos DictCursor para acceder por nombre de columna
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    
     cur.execute("SELECT nit, tipo_empresa FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
     empresa_resultado = cur.fetchone()
 
@@ -105,8 +142,12 @@ def login():
 
     offline_salt = f"{usuario['cedula']}|{usuario['empresa_id']}"
 
-    if tipo_empresa == 'transporte_especial':
-        ruta_html = f"te/{nit_empresa}.html"
+    # --- LÓGICA DE REDIRECCIÓN ACTUALIZADA ---
+    tipo_str = tipo_empresa.lower()
+
+    # Ahora buscamos el término exacto que pusiste en la BD
+    if 'ventas_distribucion' in tipo_str:
+        ruta_html = "control_logistica.html"
     else:
         ruta_html = f"{nit_empresa}.html"
 

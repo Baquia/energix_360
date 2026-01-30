@@ -1,499 +1,1440 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-  <meta charset="UTF-8">
-  <title>Registro Mermas | BQA ONE</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#015249">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <style>
-    :root { --primary: #015249; --bg-body: #f8fafc; --text-dark: #1e293b; --border-color: #cbd5e1; --radius: 12px; }
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: var(--text-dark); margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-    
-    .app-header { width: 100%; max-width: 500px; background: white; padding: 12px 20px; border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 3px solid var(--primary); }
-    .logos-container { display: flex; align-items: center; gap: 15px; }
-    .logo-img { height: 35px; width: auto; object-fit: contain; }
-    .divider { width: 1px; height: 25px; background: var(--border-color); }
-    .btn-logout { font-size: 0.75rem; color: #ef4444; text-decoration: none; font-weight: bold; }
+    <meta charset="UTF-8">
+    <title>Registro Mermas | BQA ONE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#015249">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    .card { background: white; width: 100%; max-width: 500px; padding: 25px 20px; border-radius: var(--radius); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .hidden { display: none !important; }
-    h2 { color: var(--primary); font-size: 1.3rem; margin: 0 0 15px 0; text-align: center; }
-    label { display: block; font-weight: 600; margin-bottom: 6px; margin-top: 15px; font-size: 0.9rem; }
-    input, select { width: 100%; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; }
-    
-    .btn { width: 100%; padding: 16px; font-size: 1rem; font-weight: 700; border-radius: 10px; border: none; cursor: pointer; margin-top: 25px; }
-    .btn:disabled { background: #94a3b8; }
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); margin-top: 10px; }
-    .btn-danger { background: #b91c1c; color: white; margin-top: 10px; }
+    <style>
+        /* =========================================
+           1. ESTILOS GENERALES Y ESTRUCTURA (ORIGINALES)
+           ========================================= */
+        :root {
+            --primary: #015249;
+            --primary-dark: #013d36;
+            --bg-body: #f8fafc;
+            --text-dark: #1e293b;
+            --border-color: #cbd5e1;
+            --radius: 12px;
+            --danger: #b91c1c;
+            --warning: #d97706;
+            --success: #15803d;
+        }
 
-    /* ESTILOS DE EVIDENCIA */
-    .upload-box { border: 2px dashed #cbd5e1; padding: 15px; text-align: center; border-radius: 8px; margin-top: 10px; position: relative; background: #fafafa; }
-    .upload-box input { position: absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor: pointer; }
-    .upload-box.file-loaded { background: #dcfce7; border-color: #16a34a; color: #166534; font-weight: bold; }
-    .upload-box.file-loaded::after { content: "✅ Listo"; display: block; font-size: 0.8rem; margin-top: 5px; }
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-    /* ESTILOS CÁMARA WEB */
-    #camera-container { display: none; margin-top: 15px; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
-    #camera-preview { width: 100%; height: 250px; object-fit: cover; background: #000; }
-    .rec-indicator { position: absolute; top: 10px; right: 10px; background: red; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; animation: blink 1s infinite; display: none; }
-    @keyframes blink { 50% { opacity: 0.5; } }
-    
-    .video-status { font-size: 0.9rem; margin-top: 5px; text-align: center; color: #666; font-weight: bold; }
-    .video-status.success { color: #16a34a; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
 
-    .summary-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
-    .summary-table th { background: #f1f5f9; padding: 8px; text-align: left; }
-    .summary-table td { border-bottom: 1px solid #eee; padding: 8px; }
-    .info-bar { background: #f0fdf4; color: #15803d; padding: 10px; border-radius: 8px; text-align: center; font-size: 0.85rem; font-weight: bold; margin-bottom: 15px; }
-  </style>
+        /* --- HEADER --- */
+        .app-header {
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .logos-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-img {
+            height: 35px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .divider {
+            width: 1px;
+            height: 25px;
+            background: var(--border-color);
+        }
+
+        .btn-logout {
+            font-size: 0.8rem;
+            color: var(--danger);
+            text-decoration: none;
+            font-weight: bold;
+            padding: 5px 10px;
+            border: 1px solid var(--danger);
+            border-radius: 6px;
+        }
+
+        /* --- TARJETAS (CONTENEDORES) --- */
+        .card {
+            background: white;
+            width: 100%;
+            max-width: 500px;
+            padding: 25px 20px;
+            border-radius: var(--radius);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- TIPOGRAFÍA Y FORMULARIOS --- */
+        h2 {
+            color: var(--primary);
+            font-size: 1.4rem;
+            margin: 0 0 20px 0;
+            text-align: center;
+        }
+
+        h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.2rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            margin-top: 15px;
+            font-size: 0.95rem;
+            color: #334155;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: #fff;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(1, 82, 73, 0.1);
+        }
+
+        /* --- BOTONES --- */
+        .btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 1rem;
+            font-weight: 700;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            margin-top: 25px;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            margin-top: 10px;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+            margin-top: 10px;
+        }
+
+        /* =========================================
+           2. ESTILOS ESPECÍFICOS (CÁMARA Y ARCHIVOS)
+           ========================================= */
+
+        .upload-box {
+            border: 2px dashed #cbd5e1;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin-top: 10px;
+            position: relative;
+            background: #fafafa;
+            transition: all 0.3s;
+        }
+
+        .upload-box input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-box.file-loaded {
+            background: #dcfce7;
+            border-color: var(--success);
+            color: #166534;
+            font-weight: bold;
+        }
+
+        /* Contenedor de la cámara */
+        #camera-container {
+            display: none;
+            margin-top: 15px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        #camera-preview {
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+            background: #000;
+        }
+
+        .rec-indicator {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: red;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            animation: blink 1s infinite;
+            display: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .video-status {
+            text-align: center;
+            font-weight: bold;
+            color: #64748b;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        /* =========================================
+           3. ESTILOS AUTOCOMPLETE (GOOGLE STYLE)
+           ========================================= */
+        .autocomplete-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #d4d4d4;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: #fff;
+            max-height: 250px;
+            overflow-y: auto;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .autocomplete-items div {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.95rem;
+        }
+
+        .autocomplete-items div:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-items div:hover {
+            background-color: #e2e8f0;
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        /* =========================================
+           4. ESTILOS MODALES FLOTANTES (NUEVOS)
+           ========================================= */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+            z-index: 1000;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal-float {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1001;
+            width: 90%;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 2px solid var(--primary);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes popIn {
+            from {
+                transform: translate(-50%, -45%) scale(0.95);
+                opacity: 0;
+            }
+
+            to {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* =========================================
+           5. TABLAS Y RESUMEN
+           ========================================= */
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            border: 1px solid #e2e8f0;
+        }
+
+        .summary-table th {
+            background: #f1f5f9;
+            padding: 10px;
+            text-align: left;
+            color: #475569;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .summary-table td {
+            border-bottom: 1px solid #f1f5f9;
+            padding: 10px;
+        }
+
+        .info-header-bar {
+            background: #f0fdf4;
+            color: #166534;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+            font-weight: bold;
+            border: 1px solid #bbf7d0;
+        }
+    </style>
 </head>
+
 <body>
 
-  <header class="app-header">
-    <div class="logos-container">
-        <img src="{{ url_for('static', filename='logo_' + session.get('empresa', 'default') + '.png') }}" class="logo-img" onerror="this.style.display='none'">
-        <div class="divider"></div>
-        <img src="/static/logo_energix360.png" class="logo-img">
-    </div>
-    <a href="/logout" class="btn-logout">Salir</a>
-  </header>
-
-  <div id="step-header" class="card">
-    <h2>🚚 Datos del Viaje</h2>
-    <label>NIT Cliente (Sin DV)</label> 
-    <input type="number" id="cliente_nit" placeholder="Ej: 890900608">
-    <label>Vehículo</label>
-    <select id="vehiculo">
-        <option value="" disabled selected>Seleccione...</option>
-        <option value="TGU321">TGU321</option><option value="WNV689">WNV689</option>
-        <option value="TGT260">TGT260</option><option value="TGN967">TGN967</option>
-        <option value="TGU158">TGU158</option><option value="WTL092">WTL092</option>
-        <option value="WTL606">WTL606</option><option value="TGM827">TGM827</option>
-        <option value="WTP830">WTP830</option><option value="TGT894">TGT894</option>
-        <option value="TGU357">TGU357</option><option value="GIL637">GIL637</option>
-        <option value="WTN176">WTN176</option>
-    </select>
-    <label>Número de Factura</label> 
-    <input type="text" id="factura" placeholder="Ej: F-12345">
-    <label>Total Kg Factura</label>
-    <input type="number" id="total_factura_kg" step="0.01" placeholder="Ej: 5000.00">
-    <button class="btn btn-primary" onclick="goToItems()">Iniciar Factura</button>
-  </div>
-
-  <div id="step-item" class="card hidden">
-    <div class="info-bar" id="lbl_info_header"></div>
-    <h2 id="item-title-text">📦 Agregar Ítem</h2>
-    <label>Producto</label>
-    <input type="text" id="item_name" list="list_prods" placeholder="Buscar producto...">
-    <datalist id="list_prods">
-        <option value="Pollo en Canal"><option value="Pechuga"><option value="Muslo"><option value="Alas"><option value="Menudencia">
-    </datalist>
-    <div style="display:flex; gap:15px;">
-        <div style="flex:1;"><label>Kg Fact.</label><input type="number" id="kg_f" step="0.01"></div>
-        <div style="flex:1;"><label>Kg Entr.</label><input type="number" id="kg_e" step="0.01"></div>
-    </div>
-    
-    <label style="margin-top:20px;">Evidencias</label>
-    
-    <div style="border:1px solid #ddd; padding:10px; border-radius:8px; margin-bottom:10px;">
-        <div class="video-status" id="video-status-text">📹 Video requerido (Max 6 seg)</div>
-        
-        <button id="btn-open-camera" class="btn btn-outline" style="margin-top:5px; padding:10px;" onclick="openCamera()">Abrir Cámara</button>
-        
-        <div id="camera-container">
-            <video id="camera-preview" autoplay muted playsinline></video>
-            <div id="rec-dot" class="rec-indicator">GRABANDO</div>
+    <header class="app-header">
+        <div class="logos-container">
+            <img src="{{ url_for('static', filename='logo_' + session.get('empresa', 'default') + '.png') }}"
+                class="logo-img" onerror="this.style.display='none'">
+            <div class="divider"></div>
+            <img src="/static/logo_energix360.png" class="logo-img">
         </div>
-        
-        <button id="btn-record" class="btn btn-danger hidden" style="margin-top:5px; padding:10px;" onclick="startRecording()">🔴 GRABAR (6s)</button>
-    </div>
+        <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+    </header>
 
-    <div style="display:flex; gap:10px;">
-        <div class="upload-box" id="box_f1" style="flex:1;">
-            📸 Foto 1 <input type="file" id="f_1" accept="image/*" capture="environment" onchange="processImage(this, 'box_f1')">
+    <div id="step-header" class="card">
+        <h2>🚚 Datos del Viaje</h2>
+
+        <label>NIT Cliente (Sin Dígito Verificación)</label>
+        <input type="number" id="cliente_nit" placeholder="Ej: 890900608">
+
+        <label>Vehículo</label>
+        <div class="autocomplete-container">
+            <input type="text" id="vehiculo" placeholder="Escriba placa (ej: TGU...)" autocomplete="off"
+                style="text-transform: uppercase;">
+            <div id="autocomplete-list-veh" class="autocomplete-items"></div>
         </div>
-        <div class="upload-box" id="box_f2" style="flex:1;">
-            📸 Foto 2 <input type="file" id="f_2" accept="image/*" capture="environment" onchange="processImage(this, 'box_f2')">
+
+        <label>Número de Factura</label>
+        <input type="text" id="factura" placeholder="Ej: F-12345">
+
+        <label>Total Kg Factura</label>
+        <input type="number" id="total_factura_kg" step="0.01" placeholder="Ej: 5000.00">
+
+        <button class="btn btn-primary" onclick="goToItems()">Iniciar Factura</button>
+    </div>
+
+    <div id="step-item" class="card hidden">
+        <div id="lbl_info_header" class="info-header-bar"></div>
+
+        <h2 id="item-title-text">📦 Agregar Ítem</h2>
+
+        <label>Producto</label>
+        <div class="autocomplete-container">
+            <input type="text" id="item_name" placeholder="Buscar producto..." autocomplete="off">
+            <div id="autocomplete-list" class="autocomplete-items"></div>
+        </div>
+
+        <div style="display:flex; gap:15px;">
+            <div style="flex:1;">
+                <label>Kg Facturados</label>
+                <input type="number" id="kg_f" step="0.01" placeholder="0.00">
+            </div>
+            <div style="flex:1;">
+                <label>Kg Entregados</label>
+                <input type="number" id="kg_e" step="0.01" placeholder="0.00">
+            </div>
+        </div>
+
+        <label style="margin-top:25px;">Evidencias Requeridas</label>
+        <div style="border:1px solid #e2e8f0; padding:15px; border-radius:8px; margin-bottom:15px; background: #fff;">
+            <div id="video-status-text" class="video-status">📹 Video de Pesaje (Max 6s)</div>
+
+            <button id="btn-open-camera" class="btn btn-outline" style="margin-top:5px; padding:10px;"
+                onclick="openCamera()">
+                Abrir Cámara
+            </button>
+
+            <div id="camera-container">
+                <video id="camera-preview" autoplay muted playsinline></video>
+                <div id="rec-dot" class="rec-indicator">🔴 GRABANDO</div>
+            </div>
+
+            <button id="btn-record" class="btn btn-danger hidden" style="margin-top:10px; padding:12px;"
+                onclick="startRecording()">
+                🔴 INICIAR GRABACIÓN
+            </button>
+        </div>
+
+        <div style="display:flex; gap:15px;">
+            <div class="upload-box" id="box_f1" style="flex:1;">
+                📸 Foto Báscula
+                <input type="file" id="f_1" accept="image/*" capture="environment"
+                    onchange="processImage(this, 'box_f1')">
+            </div>
+            <div class="upload-box" id="box_f2" style="flex:1;">
+                📸 Foto Guía
+                <input type="file" id="f_2" accept="image/*" capture="environment"
+                    onchange="processImage(this, 'box_f2')">
+            </div>
+        </div>
+
+        <button id="btn-submit-item" class="btn btn-primary" onclick="submitItem()">Registrar Ítem</button>
+    </div>
+
+    <div id="step-wait" class="card hidden" style="text-align:center; padding: 40px 20px;">
+        <h3 style="color: var(--warning); font-size: 1.5rem;">Esperando Aprobación</h3>
+        <div style="font-size: 4rem; margin: 20px 0;">⏳</div>
+        <p style="font-size: 1.1rem; color: #475569;">
+            La merma reportada excede el límite permitido.
+        </p>
+        <p style="color: #64748b; font-size: 0.9rem;">
+            El controlador está revisando su solicitud en este momento. Por favor espere...
+        </p>
+    </div>
+
+    <div id="step-decide" class="card hidden" style="text-align:center; padding: 40px 20px;">
+        <div style="font-size: 4rem; margin-bottom: 15px;">✅</div>
+        <h2 style="color: var(--success);">Ítem Finalizado</h2>
+        <p style="color: #475569; margin-bottom: 30px;">El registro ha sido procesado exitosamente.</p>
+
+        <button class="btn btn-primary" onclick="nextItem(true)">Agregar otro ítem a esta factura</button>
+        <button class="btn btn-outline" onclick="nextItem(false)">Ver Resumen / Terminar Factura</button>
+    </div>
+
+    <div id="step-summary" class="card hidden">
+        <h2>📄 Resumen de Factura</h2>
+        <div id="summary-info" style="margin-bottom: 15px; color: #475569;"></div>
+
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Fact.</th>
+                    <th>Entr.</th>
+                    <th>% Merma</th>
+                </tr>
+            </thead>
+            <tbody id="table_body">
+            </tbody>
+        </table>
+
+        <div
+            style="margin-top: 30px; background: #eff6ff; border: 1px solid #1d4ed8; padding: 15px; border-radius: 8px; text-align: center;">
+            <p style="margin:0; color: #1e40af; font-weight: bold; font-size: 0.9rem;">NOTA CRÉDITO:</p>
+            <p style="margin: 5px 0 0 0; color: #1e3a8a; font-size: 1.1rem;">
+                Se generará automáticamente al finalizar.
+            </p>
+        </div>
+
+        <button class="btn btn-primary" onclick="askWhatsapp()">CONTINUAR A FIRMA</button>
+    </div>
+    <div id="step-sign" class="card hidden" style="text-align:center;">
+        <h2>✍️ Firma de Recibido</h2>
+        <p style="color:#64748b; font-size:0.9rem;">
+            Por favor, solicite al cliente que firme en el recuadro para aceptar la Nota Crédito.
+        </p>
+
+        <div
+            style="border: 2px dashed #cbd5e1; border-radius: 8px; background: #fff; touch-action: none; margin: 15px 0; height: 200px; width: 100%; overflow: hidden;">
+            <canvas id="signature-pad" style="width: 100%; height: 100%; display: block;"></canvas>
+        </div>
+
+        <button class="btn btn-outline" onclick="clearSignature()"
+            style="margin-top:0; padding:8px; font-size:0.9rem;">Borrar y firmar de nuevo</button>
+
+        <button class="btn btn-primary" onclick="saveSignatureAndContinue()">CONTINUAR</button>
+    </div>
+
+    <div id="step-whatsapp" class="card hidden" style="text-align:center;">
+        <h2 style="color: var(--success);">📲 Enviar Comprobante</h2>
+        <p style="color: #475569; margin-bottom: 20px;">
+            Ingrese el número de WhatsApp del cliente para enviar el PDF de la Nota Crédito generada:
+        </p>
+
+        <input type="number" id="cli_whatsapp" placeholder="Ej: 3001234567"
+            style="text-align: center; font-size: 1.2rem; padding: 15px;">
+
+        <button class="btn btn-primary" onclick="finishFinal()">ENVIAR Y FINALIZAR</button>
+    </div>
+
+    <div id="modal-backdrop" class="modal-backdrop hidden"></div>
+
+    <div id="modal-question" class="card modal-float hidden" style="text-align:center;">
+        <h3 id="mq-title">Pregunta</h3>
+        <div style="display:flex; gap:15px; justify-content:center; margin-top:25px;">
+            <button class="btn btn-primary" style="margin-top:0;" id="mq-yes">SÍ</button>
+            <button class="btn btn-outline" style="margin-top:0;" id="mq-no">NO</button>
         </div>
     </div>
-    
-    <button id="btn-submit-item" class="btn btn-primary" onclick="submitItem()">Registrar Ítem</button>
-  </div>
 
-  <div id="step-wait" class="card hidden status-wait">
-    <h3 style="color:#d97706;">Esperando Aprobación</h3>
-    <div style="font-size:3rem;">⏳</div>
-    <p>La merma excede el límite permitido.</p>
-    <div style="background:#fff7ed; padding:15px; border-radius:8px; color:#9a3412; font-size:0.9rem; margin-top:15px;">
-        El controlador está revisando su solicitud.
+    <div id="modal-timing" class="card modal-float hidden" style="text-align:center;">
+        <h3>¿Cuándo desea realizar este registro?</h3>
+        <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Puede hacerlo ya mismo o dejarlo en cola para
+            el final.</p>
+
+        <button class="btn btn-primary" id="mt-now">AHORA MISMO</button>
+        <button class="btn btn-outline" id="mt-later">AL TERMINAR LA FACTURA</button>
     </div>
-  </div>
 
-  <div id="step-decide" class="card hidden" style="text-align:center;">
-    <div style="font-size:3rem; margin-bottom:10px;">✅</div>
-    <h2>Ítem Registrado</h2>
-    <p>¿Desea agregar otro ítem a esta factura?</p>
-    <button class="btn btn-primary" onclick="nextItem(true)">Sí, agregar otro</button>
-    <button class="btn btn-outline" onclick="nextItem(false)">No, terminar factura</button>
-  </div>
+    <div id="form-discount" class="card modal-float hidden">
+        <h3 style="color: #2563eb; text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">
+            💰 Registro de Descuento
+        </h3>
 
-  <div id="step-summary" class="card hidden">
-    <h2>📄 Resumen Factura</h2>
-    <div style="margin-bottom:10px; font-size:0.9rem;">
-        <b>Cliente:</b> <span id="sum_cli"></span> | <b>Factura:</b> <span id="sum_fac"></span>
+        <div
+            style="background: #eff6ff; padding: 12px; border-radius: 6px; margin: 15px 0; text-align: center; border: 1px solid #bfdbfe;">
+            <span style="display:block; font-size: 0.8rem; color: #1e3a8a;">Base de Cálculo (Kg Entregados)</span>
+            <b id="lbl_d_kg" style="font-size: 1.2rem; color: #1e40af;">0.00</b>
+        </div>
+
+        <label>Cantidad (Unidades Físicas)</label>
+        <input type="number" id="d_unidad" placeholder="0">
+
+        <label>Valor Unitario Factura ($)</label>
+        <input type="number" id="d_vunit_f" placeholder="$ 0">
+
+        <label>Valor Unitario CON Descuento ($)</label>
+        <input type="number" id="d_vunit" placeholder="$ 0">
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-outline" onclick="cancelExtra()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveExtra('descuento')"
+                style="margin-top: 10px;">REGISTRAR</button>
+        </div>
     </div>
-    <table class="summary-table">
-        <thead><tr><th>Prod</th><th>Fact</th><th>Entr</th><th>%</th></tr></thead>
-        <tbody id="table_body"></tbody>
-    </table>
-    <div style="margin-top:20px; text-align:right; font-weight:bold; font-size:1.1rem;">
-        Total Merma: <span id="total_merma_kg" style="color:#b91c1c;">0.00</span> kg
+
+    <div id="form-return" class="card modal-float hidden">
+        <h3 style="color: #b91c1c; text-align: center; border-bottom: 2px solid #b91c1c; padding-bottom: 10px;">
+            ↩️ Registro de Devolución
+        </h3>
+
+        <div
+            style="background: #fef2f2; padding: 12px; border-radius: 6px; margin: 15px 0; text-align: center; border: 1px solid #fecaca;">
+            <span style="display:block; font-size: 0.8rem; color: #7f1d1d;">Base Facturada (Max):</span>
+            <b id="lbl_dv_kg" style="font-size: 1.2rem; color: #991b1b;">0.00</b> kg
+        </div>
+
+        <label>Cantidad (Unidades)</label>
+        <input type="number" id="dv_unidad" placeholder="0">
+
+        <label>Kilos Devueltos</label>
+        <input type="number" id="dv_kg" placeholder="0.00" step="0.01" style="font-weight:bold; color:#b91c1c;">
+
+        <label>Valor Unitario Factura ($)</label>
+        <input type="number" id="dv_vunit_f" placeholder="$ 0">
+        <small style="color: #64748b; font-size: 0.8rem; display: block; margin-top: 5px;">
+            (Precio sin descuento)
+        </small>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-outline" onclick="cancelExtra()">Cancelar</button>
+            <button class="btn btn-danger" onclick="saveExtra('devolucion')"
+                style="margin-top: 10px;">REGISTRAR</button>
+        </div>
     </div>
-    <label style="margin-top:30px; color:#d97706;">Número de Nota General</label>
-    <input type="text" id="nota_general" placeholder="Ingrese consecutivo..." style="border:2px solid #fbbf24; background:#fffbeb; text-align:center; font-weight:bold;">
-    <button class="btn btn-primary" onclick="finishInvoice()">TERMINAR FACTURA</button>
-  </div>
 
-  <div id="step-next-inv" class="card hidden" style="text-align:center;">
-    <h2>Factura Finalizada</h2>
-    <p>¿Otra factura para <b id="next_cli_name"></b>?</p>
-    <button class="btn btn-primary" onclick="sameClientNewInvoice()">Sí, mismo cliente</button>
-    <button class="btn btn-outline" onclick="location.reload()">No, otro cliente</button>
-  </div>
+    <div id="modal-confirm-start" class="modal-backdrop hidden">
+        <div class="card modal-float" style="text-align:center;">
+            <h3 style="color:var(--primary); border-bottom:1px solid #eee; padding-bottom:10px;">
+                🛡️ Confirmar Datos del Viaje
+            </h3>
+            <p style="color:#64748b; font-size:0.9rem;">
+                Por favor verifique que la información sea exacta antes de iniciar.
+            </p>
 
-  <script>
-    let HEADER_DATA = {};
-    let CURRENT_ITEMS_LOCAL = []; 
-    let IS_RETRY_MODE = false;
-    let RETRY_ITEM_ID = null;
-    
-    // Variables para archivos
-    let finalVideoBlob = null;
-    let finalVideoBase64 = null;
-    let processedFiles = { f1: null, f2: null };
-    
-    // Variables de cámara
-    let mediaStream = null;
-    let mediaRecorder = null;
-    let recordedChunks = [];
+            <div
+                style="background:#f8fafc; padding:15px; border-radius:8px; text-align:left; margin:15px 0; border:1px solid #e2e8f0;">
+                <div style="margin-bottom:8px;"><strong>🏢 Cliente:</strong> <span id="conf_cli"></span></div>
+                <div style="margin-bottom:8px;"><strong>🚚 Vehículo:</strong> <span id="conf_veh"></span></div>
+                <div style="margin-bottom:8px;"><strong>📄 Factura:</strong> <span id="conf_fac"
+                        style="color:#b91c1c; font-weight:bold;"></span></div>
+                <div><strong>⚖️ Total Kg:</strong> <span id="conf_kg"></span></div>
+            </div>
 
-    const getEl = id => document.getElementById(id);
-    const showStep = (id) => {
-        ['step-header', 'step-item', 'step-wait', 'step-decide', 'step-summary', 'step-next-inv'].forEach(sid => getEl(sid).classList.add('hidden'));
-        getEl(id).classList.remove('hidden');
-    };
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-outline" onclick="closeConfirmModal()">Corregir</button>
+                <button class="btn btn-primary" onclick="executeStartSession()">CONFIRMAR E INICIAR</button>
+            </div>
+        </div>
+    </div>
 
-    // --- LÓGICA DE CÁMARA INTEGRADA (BAJO PESO) ---
-    async function openCamera() {
-        try {
-            // Pedimos video de baja resolución (480p ideal, 240p minimo)
-            const constraints = { 
-                video: { 
-                    facingMode: "environment",
-                    width: { ideal: 640 }, 
-                    height: { ideal: 480 } 
-                }, 
-                audio: false 
+    <script>
+        // --- VARIABLES GLOBALES DE ESTADO ---
+
+        let HEADER_DATA = {};
+        let SESSION_ID = null; // <--- NUEVA VARIABLE
+        // ... resto de variables
+        let CURRENT_ITEMS_LOCAL = [];
+        let IS_RETRY_MODE = false;
+        let RETRY_ITEM_ID = null;
+
+        // --- VARIABLES PARA EL FLUJO DE EXTRAS ---
+        let PENDING_TASKS = []; // Cola de tareas pospuestas
+        let CURR_EXTRA_ITEM = null; // Ítem actual en proceso de extras
+        let CACHED_VUNIT = null; // Para compartir precio entre descuento y devolución
+
+        // --- VARIABLES DE MULTIMEDIA ---
+        let finalVideoBase64 = null;
+        let processedFiles = { f1: null, f2: null };
+        let mediaStream = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+
+        // --- UTILIDADES DE SELECCIÓN ---
+        const getEl = (id) => document.getElementById(id);
+
+        const hideAllSteps = () => {
+            const steps = ['step-header', 'step-item', 'step-wait', 'step-decide', 'step-summary', 'step-whatsapp'];
+            steps.forEach(id => getEl(id).classList.add('hidden'));
+        };
+
+        const showStep = (id) => {
+            hideAllSteps();
+            getEl(id).classList.remove('hidden');
+            window.scrollTo(0, 0); // Ir arriba al cambiar de paso
+        };
+
+        // ===============================================
+        // 1. LÓGICA DE NAVEGACIÓN Y DATOS INICIALES
+        // ===============================================
+
+        // --- LÓGICA DE INICIO SEGURA ---
+
+        function goToItems() {
+            // 1. Recoger datos
+            const cli = getEl('cliente_nit').value.trim();
+            const veh = getEl('vehiculo').value.trim();
+            const fac = getEl('factura').value.trim();
+            const tot = getEl('total_factura_kg').value.trim();
+
+            // 2. Validación básica
+            if (!cli || !veh || !fac || !tot) {
+                return alert("⚠️ FALTAN DATOS.\nPor favor complete toda la información del viaje.");
+            }
+
+            // 3. Llenar Modal de Confirmación
+            getEl('conf_cli').innerText = cli;
+            getEl('conf_veh').innerText = veh;
+            getEl('conf_fac').innerText = fac;
+            getEl('conf_kg').innerText = tot;
+
+            // 4. Mostrar Modal
+            getEl('modal-confirm-start').classList.remove('hidden');
+        }
+
+        function closeConfirmModal() {
+            getEl('modal-confirm-start').classList.add('hidden');
+        }
+
+        async function executeStartSession() {
+            const fac = getEl('factura').value.trim();
+            const btn = document.querySelector('#modal-confirm-start .btn-primary');
+
+            btn.innerText = "Verificando...";
+            btn.disabled = true;
+
+            try {
+                // 5. LLAMADA AL CANDADO EN EL BACKEND
+                const response = await fetch('/mermas/iniciar_sesion', {
+                    method: 'POST',
+                    body: JSON.stringify({ factura: fac })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // EXITO: Guardamos la huella digital y avanzamos
+                    SESSION_ID = data.session_id;
+
+                    HEADER_DATA = {
+                        cliente: getEl('cliente_nit').value,
+                        vehiculo: getEl('vehiculo').value,
+                        factura: fac,
+                        total_kg: getEl('total_factura_kg').value
+                    };
+
+                    getEl('lbl_info_header').innerText = `Factura: ${fac} | Vehículo: ${getEl('vehiculo').value}`;
+
+                    closeConfirmModal();
+                    resetCameraUI();
+                    showStep('step-item');
+
+                } else {
+                    // ERROR: Factura duplicada
+                    alert(data.message || "No se pudo iniciar la sesión.");
+                }
+
+            } catch (e) {
+                alert("Error de conexión al verificar la factura.");
+            } finally {
+                btn.innerText = "CONFIRMAR E INICIAR";
+                btn.disabled = false;
+            }
+        }
+
+        // ===============================================
+        // 2. REGISTRO DEL ÍTEM (LÓGICA PRINCIPAL MODIFICADA)
+        // ===============================================
+
+        async function submitItem() {
+            const prod = getEl('item_name').value;
+            const kgf = parseFloat(getEl('kg_f').value);
+            const kge = parseFloat(getEl('kg_e').value);
+
+            // Validaciones
+            if (!prod || isNaN(kgf) || isNaN(kge)) return alert("Datos del ítem incompletos.");
+            if (!finalVideoBase64) return alert("Debe grabar el video de evidencia.");
+            if (!processedFiles.f1 || !processedFiles.f2) return alert("Debe tomar las 2 fotos requeridas.");
+
+            // UI Feedback
+            const btn = getEl('btn-submit-item');
+            const originalText = btn.innerText;
+            btn.innerText = "Enviando al servidor...";
+            btn.disabled = true;
+
+            try {
+                // Construir Payload
+                const itemPayload = {
+                    item: prod,
+                    kg_facturados: kgf,
+                    kg_entregados: kge,
+                    evidencia_url: finalVideoBase64,
+                    evidencia_url2: processedFiles.f1,
+                    evidencia_url3: processedFiles.f2
+                };
+
+                const fullPayload = {
+                    ...HEADER_DATA,
+                    items: [itemPayload],
+                    is_retry: IS_RETRY_MODE,
+                    retry_id: RETRY_ITEM_ID,
+                    session_id: SESSION_ID // <--- IMPORTANTE: ENVIAR LA HUELLA
+                };
+
+                // Enviar al Backend
+                const response = await fetch('/mermas/registrar', {
+                    method: 'POST',
+                    body: JSON.stringify(fullPayload)
+                });
+
+                if (!response.ok) throw new Error("Error de red o servidor.");
+                const data = await response.json();
+
+                if (!data.success) throw new Error(data.message || "Error desconocido");
+
+                // --- ÉXITO ---
+                // Actualizar lista local para el resumen
+                if (IS_RETRY_MODE) CURRENT_ITEMS_LOCAL.pop(); // Reemplazar si era reintento
+
+                CURRENT_ITEMS_LOCAL.push({
+                    id: data.id,
+                    prod: prod,
+                    kgf: kgf,
+                    kge: kge,
+                    merma: kgf - kge,
+                    pct: ((kgf - kge) / kgf) * 100
+                });
+
+                // === LÓGICA MODIFICADA PARA MODO NOCTURNO Y ESTADOS ===
+                // Aceptamos 'aprobada_pendiente_revision' (Noche) como ÉXITO
+                if (data.status === 'aprobada' || data.status === 'validada' || data.status === 'aprobada_pendiente_revision') {
+
+                    IS_RETRY_MODE = false;
+
+                    if (data.status === 'aprobada_pendiente_revision') {
+                        // Mensaje específico para el modo nocturno
+                        alert("🌙 REGISTRO NOCTURNO GUARDADO.\n\nSu merma ha sido pre-aprobada para no detener el viaje.\nSerá auditada mañana por el controlador.");
+                    }
+
+                    // Iniciar flujo de extras
+                    startExtraFlow({
+                        id: data.id,
+                        prod_name: prod,
+                        kgf: kgf,
+                        kge: kge
+                    });
+
+                } else if (data.status === 'pendiente' || data.status === 'segunda_revision') {
+                    // Semáforo ROJO/AMARILLO: Esperar aprobación (Solo pasa de DÍA)
+                    showStep('step-wait');
+                    startPolling(HEADER_DATA.factura);
+                } else {
+                    alert("Estado desconocido del servidor: " + data.status);
+                }
+
+            } catch (e) {
+                alert("Error: " + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // ===============================================
+        // 3. FLUJO DE EXTRAS (DESCUENTOS Y DEVOLUCIONES)
+        // ===============================================
+
+        function startExtraFlow(itemData) {
+            CURR_EXTRA_ITEM = itemData;
+            CACHED_VUNIT = null; // Reiniciar caché de precio para este nuevo ítem
+
+            // Paso 1: Preguntar Descuento
+            askDiscount();
+        }
+
+        // --- PREGUNTA 1: DESCUENTO ---
+        function askDiscount() {
+            modalQuestion("¿Desea registrar un DESCUENTO sobre este ítem?",
+                () => {
+                    // SI: Preguntar cuándo (Ahora o Luego)
+                    askTiming('descuento');
+                },
+                () => {
+                    // NO: Pasar a la siguiente pregunta (Devolución)
+                    askReturn();
+                }
+            );
+        }
+
+        // --- PREGUNTA 2: DEVOLUCIÓN ---
+        function askReturn() {
+            modalQuestion("¿Desea registrar una DEVOLUCIÓN sobre este ítem?",
+                () => {
+                    // SI: Preguntar cuándo
+                    askTiming('devolucion');
+                },
+                () => {
+                    // NO: Terminar el ciclo de este ítem
+                    finishItemCycle();
+                }
+            );
+        }
+
+        // --- PREGUNTA 3: CUÁNDO (AHORA O LUEGO) ---
+        function askTiming(type) {
+            getEl('modal-question').classList.add('hidden');
+            getEl('modal-backdrop').classList.remove('hidden');
+            getEl('modal-timing').classList.remove('hidden');
+
+            // Botón AHORA MISMO
+            getEl('mt-now').onclick = () => {
+                getEl('modal-timing').classList.add('hidden');
+
+                if (type === 'descuento') {
+                    openDiscountForm();
+                } else {
+                    openReturnForm();
+                }
             };
-            
-            mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-            const videoEl = getEl('camera-preview');
-            videoEl.srcObject = mediaStream;
-            
-            getEl('camera-container').style.display = 'block';
-            getEl('btn-open-camera').classList.add('hidden');
-            getEl('btn-record').classList.remove('hidden');
-            getEl('video-status-text').innerText = "Encuadre y presione GRABAR";
-            
-        } catch (err) {
-            alert("No se pudo acceder a la cámara. Asegúrese de dar permisos.");
-            console.error(err);
-        }
-    }
 
-    function startRecording() {
-        recordedChunks = [];
-        let options = { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 500000 }; 
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options = { mimeType: 'video/mp4', videoBitsPerSecond: 500000 }; 
-             if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options = {}; 
-             }
+            // Botón AL TERMINAR (COLA DE TAREAS)
+            getEl('mt-later').onclick = () => {
+                getEl('modal-timing').classList.add('hidden');
+                getEl('modal-backdrop').classList.add('hidden');
+
+                // Agregar a la cola de pendientes
+                PENDING_TASKS.push({
+                    type: type,
+                    item: CURR_EXTRA_ITEM,
+                    vunit_cache: CACHED_VUNIT
+                });
+
+                alert("Recordatorio guardado. Se le pedirá al terminar la factura.");
+
+                // Continuar el flujo
+                if (type === 'descuento') {
+                    askReturn();
+                } else {
+                    finishItemCycle();
+                }
+            };
         }
 
-        try {
-            mediaRecorder = new MediaRecorder(mediaStream, options);
-        } catch (e) {
-            mediaRecorder = new MediaRecorder(mediaStream);
+        // --- ABRIR FORMULARIOS ---
+        function openDiscountForm() {
+            getEl('modal-backdrop').classList.remove('hidden');
+            getEl('form-discount').classList.remove('hidden');
+
+            // Llenar datos base
+            getEl('lbl_d_kg').innerText = CURR_EXTRA_ITEM.kge.toFixed(2);
+            getEl('d_unidad').value = "";
+            getEl('d_vunit_f').value = CACHED_VUNIT || "";
+            getEl('d_vunit').value = "";
         }
 
-        mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) recordedChunks.push(event.data);
-        };
+        function openReturnForm() {
+            getEl('modal-backdrop').classList.remove('hidden');
+            getEl('form-return').classList.remove('hidden');
 
-        mediaRecorder.onstop = async () => {
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            finalVideoBlob = blob;
-            finalVideoBase64 = await blobToBase64(blob);
-            
-            getEl('camera-container').style.display = 'none';
-            getEl('btn-record').classList.add('hidden');
-            getEl('video-status-text').innerText = `✅ Video grabado (${(blob.size/1024).toFixed(0)} KB)`;
-            getEl('video-status-text').classList.add('success');
-            
-            if(mediaStream) {
-                mediaStream.getTracks().forEach(track => track.stop());
-                mediaStream = null;
+            getEl('lbl_dv_kg').innerText = CURR_EXTRA_ITEM.kgf.toFixed(2);
+            getEl('dv_unidad').value = "";
+            getEl('dv_kg').value = ""; // Limpiar nuevo campo
+            getEl('dv_vunit_f').value = CACHED_VUNIT || "";
+        }
+
+        // --- GUARDAR DATOS EXTRAS ---
+        async function saveExtra(type) {
+            if (!confirm("¿Confirma que los datos ingresados son correctos?")) return;
+
+            let payload = {
+                id: CURR_EXTRA_ITEM.id,
+                tipo: type
+            };
+
+            if (type === 'descuento') {
+                payload.d_unidad = getEl('d_unidad').value;
+                payload.vunit_f = getEl('d_vunit_f').value;
+                payload.d_vunit = getEl('d_vunit').value;
+
+                if (!payload.d_unidad || !payload.vunit_f || !payload.d_vunit) {
+                    return alert("Por favor complete todos los campos de descuento.");
+                }
+                CACHED_VUNIT = payload.vunit_f;
             }
-        };
+            else { // DEVOLUCIÓN
+                payload.dv_unidad = getEl('dv_unidad').value;
+                payload.dv_kg = getEl('dv_kg').value;
+                payload.vunit_f = getEl('dv_vunit_f').value;
 
-        mediaRecorder.start();
-        getEl('rec-dot').style.display = 'block';
-        
-        // UI grabando
-        const btnRec = getEl('btn-record');
-        btnRec.disabled = true;
-        btnRec.innerText = "Grabando...";
-
-        setTimeout(() => {
-            if(mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                getEl('rec-dot').style.display = 'none';
+                if (!payload.dv_unidad || !payload.dv_kg) {
+                    return alert("Por favor ingrese unidades y KILOS devueltos.");
+                }
             }
-        }, 6000);
-    }
 
-    // --- PROCESAMIENTO DE FOTOS (COMPRESIÓN) ---
-    async function processImage(input, boxId) {
-        const file = input.files[0];
-        if (!file) return;
-        
-        const box = getEl(boxId);
-        box.style.opacity = '0.5';
-        
-        try {
-            const compressed = await compressImage(file);
-            if(boxId === 'box_f1') processedFiles.f1 = compressed;
-            if(boxId === 'box_f2') processedFiles.f2 = compressed;
-            
-            box.classList.add('file-loaded');
-            box.style.opacity = '1';
-        } catch (e) {
-            alert("Error procesando imagen");
-            box.style.opacity = '1';
+            try {
+                const r = await fetch('/mermas/actualizar_extras', {
+                    method: 'POST', body: JSON.stringify(payload)
+                });
+                const d = await r.json();
+
+                if (d.success) {
+                    alert("Registrado correctamente.");
+                    closeModals();
+                    if (type === 'descuento') askReturn();
+                    else finishItemCycle();
+                } else {
+                    alert("Error: " + d.message);
+                }
+            } catch (e) { alert("Error red"); }
         }
-    }
 
-    function compressImage(file) {
-        return new Promise((resolve, reject) => {
+        function cancelExtra() {
+            closeModals();
+            if (CACHED_VUNIT === null && PENDING_TASKS.length === 0) {
+                // Estábamos probablemente en el primer paso (descuento)
+                askReturn();
+            } else {
+                finishItemCycle();
+            }
+        }
+
+        function finishItemCycle() {
+            closeModals();
+            if (!getEl('step-summary').classList.contains('hidden')) {
+                processNextPending(); // Ir al siguiente pendiente si estamos vaciando cola
+            } else {
+                showStep('step-decide'); // Flujo normal
+            }
+        }
+
+        // ===============================================
+        // 4. GESTIÓN FINAL DE FACTURA (PENDIENTES Y CIERRE)
+        // ===============================================
+
+        function nextItem(addAnother) {
+            if (addAnother) {
+                // Limpiar formulario para nuevo ítem
+                getEl('item_name').value = "";
+                getEl('kg_f').value = "";
+                getEl('kg_e').value = "";
+                resetCameraUI();
+                showStep('step-item');
+            } else {
+                // El usuario quiere terminar. Primero revisamos pendientes.
+                checkPendingsAndSummary();
+            }
+        }
+
+        function checkPendingsAndSummary() {
+            renderSummaryTable();
+            showStep('step-summary');
+
+            if (PENDING_TASKS.length > 0) {
+                alert(`⚠️ Tiene ${PENDING_TASKS.length} registros pendientes que eligió completar al final.\n\nEl sistema los abrirá uno por uno ahora.`);
+                processNextPending();
+            }
+        }
+
+        function processNextPending() {
+            if (PENDING_TASKS.length === 0) return;
+
+            const task = PENDING_TASKS.shift();
+            CURR_EXTRA_ITEM = task.item;
+            CACHED_VUNIT = task.vunit_cache;
+
+            if (task.type === 'descuento') openDiscountForm();
+            else openReturnForm();
+        }
+
+        function askWhatsapp() {
+            // ... validación de pendientes (igual) ...
+            if (PENDING_TASKS.length > 0) {
+                alert("Aún hay registros pendientes. Debe completarlos.");
+                processNextPending();
+                return;
+            }
+
+            // CAMBIO CLAVE AQUÍ:
+            // 1. Inicializa el canvas para poder dibujar
+            initSignaturePad();
+
+            // 2. En vez de ir a whatsapp, lo mandamos a FIRMAR primero
+            showStep('step-sign');
+        }
+
+        async function finishFinal() {
+            // 1. Obtener datos del formulario
+            const num = getEl('cli_whatsapp').value;
+
+            // 2. Validaciones estrictas
+            if (!num) {
+                return alert("Por favor ingrese el número de WhatsApp del cliente.");
+            }
+
+            // Validamos que exista la firma capturada en el paso anterior
+            if (!signatureData) {
+                return alert("Falta la firma del cliente. Por favor regrese y firme.");
+            }
+
+            // 3. Feedback visual (Bloquear botón)
+            const btn = document.querySelector('#step-whatsapp .btn-primary');
+            const originalText = btn.innerText;
+            btn.innerText = "Procesando y Generando PDF...";
+            btn.disabled = true;
+
+            try {
+                // 4. Enviar petición al Backend
+                const response = await fetch('/mermas/finalizar_con_nota', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        factura: HEADER_DATA.factura,
+                        whatsapp: num,
+                        firma_base64: signatureData  // <--- AQUÍ SE ENVÍA LA FIRMA
+                    })
+                });
+
+                const data = await response.json();
+
+                // 5. Manejar respuesta
+                if (data.success) {
+                    alert(`✅ FACTURA FINALIZADA EXITOSAMENTE.\n\nSe generó la Nota Crédito Nº: ${data.nota}\nEl PDF firmado ha sido enviado a WhatsApp.`);
+                    location.reload(); // Reiniciar la app para el siguiente viaje
+                } else {
+                    alert("Error del servidor: " + (data.message || "No se pudo finalizar."));
+                }
+
+            } catch (e) {
+                console.error(e);
+                alert("Error de conexión al intentar finalizar. Verifique su internet.");
+            } finally {
+                // 6. Restaurar botón (solo si hubo error y no se recargó la página)
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // ===============================================
+        // 5. CÁMARA Y ARCHIVOS
+        // ===============================================
+
+        async function openCamera() {
+            try {
+                const constraints = { video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false };
+                mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                const videoEl = getEl('camera-preview');
+                videoEl.srcObject = mediaStream;
+
+                getEl('camera-container').style.display = 'block';
+                getEl('btn-open-camera').classList.add('hidden');
+                getEl('btn-record').classList.remove('hidden');
+                getEl('video-status-text').innerText = "Encuadre y presione GRABAR";
+
+            } catch (err) {
+                alert("No se pudo acceder a la cámara. Verifique permisos.");
+            }
+        }
+
+        function startRecording() {
+            recordedChunks = [];
+            let options = { mimeType: 'video/webm;codecs=vp8' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/mp4' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) options = {};
+
+            try {
+                mediaRecorder = new MediaRecorder(mediaStream, options);
+            } catch (e) {
+                mediaRecorder = new MediaRecorder(mediaStream);
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) recordedChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                finalVideoBase64 = await blobToBase64(blob);
+
+                getEl('camera-container').style.display = 'none';
+                getEl('btn-record').classList.add('hidden');
+                getEl('video-status-text').innerText = "✅ Video grabado correctamente";
+                getEl('video-status-text').style.color = "#15803d";
+
+                if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            getEl('rec-dot').style.display = 'block';
+            getEl('btn-record').disabled = true;
+            getEl('btn-record').innerText = "GRABANDO...";
+
+            setTimeout(() => {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    getEl('rec-dot').style.display = 'none';
+                }
+            }, 6000);
+        }
+
+        function processImage(input, boxId) {
+            const file = input.files[0];
+            if (!file) return;
+
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = (event) => {
                 const img = new Image();
                 img.src = event.target.result;
+
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800; 
+                    const MAX_WIDTH = 800;
                     const scaleSize = MAX_WIDTH / img.width;
                     const width = (img.width > MAX_WIDTH) ? MAX_WIDTH : img.width;
                     const height = (img.width > MAX_WIDTH) ? (img.height * scaleSize) : img.height;
-                    canvas.width = width; canvas.height = height;
+
+                    canvas.width = width;
+                    canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.6));
+
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                    if (boxId === 'box_f1') processedFiles.f1 = compressedBase64;
+                    if (boxId === 'box_f2') processedFiles.f2 = compressedBase64;
+
+                    const box = getEl(boxId);
+                    box.classList.add('file-loaded');
+                    box.style.backgroundColor = '#dcfce7';
                 };
             };
-        });
-    }
-
-    const blobToBase64 = blob => new Promise((resolve, _) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-    });
-
-    // --- FUNCION DE LIMPIEZA DE CÁMARA (CORRECCIÓN) ---
-    function resetCameraUI() {
-        // 1. Limpiar variables
-        finalVideoBase64 = null;
-        processedFiles = { f1: null, f2: null };
-        mediaStream = null;
-        mediaRecorder = null;
-
-        // 2. Restaurar Textos y Clases de UI
-        const statusTxt = getEl('video-status-text');
-        statusTxt.innerText = "📹 Video requerido (Max 6 seg)";
-        statusTxt.classList.remove('success');
-
-        const btnOpen = getEl('btn-open-camera');
-        btnOpen.classList.remove('hidden');
-
-        const btnRec = getEl('btn-record');
-        btnRec.classList.add('hidden');
-        btnRec.disabled = false;       // <--- Importante: Reactivar botón
-        btnRec.innerText = "🔴 GRABAR (6s)"; // <--- Importante: Restaurar texto
-
-        getEl('camera-container').style.display = 'none';
-        getEl('rec-dot').style.display = 'none';
-
-        // 3. Limpiar Inputs Fotos
-        getEl('box_f1').classList.remove('file-loaded');
-        getEl('box_f2').classList.remove('file-loaded');
-        getEl('f_1').value = "";
-        getEl('f_2').value = "";
-    }
-
-    // --- FLUJO DE NAVEGACIÓN ---
-    function goToItems() {
-        const cli = getEl('cliente_nit').value;
-        const veh = getEl('vehiculo').value;
-        const fac = getEl('factura').value;
-        const tot = getEl('total_factura_kg').value;
-        if(!cli || !veh || !fac || !tot) return alert("Complete los datos del viaje.");
-        HEADER_DATA = { cliente: cli, vehiculo: veh, factura: fac, total_kg: tot };
-        getEl('lbl_info_header').innerText = `Fac: ${fac} | Veh: ${veh}`;
-        IS_RETRY_MODE = false;
-        resetCameraUI(); // Asegurar limpieza al entrar
-        showStep('step-item');
-    }
-
-    async function submitItem() {
-        const prod = getEl('item_name').value;
-        const kgf = parseFloat(getEl('kg_f').value);
-        const kge = parseFloat(getEl('kg_e').value);
-
-        if(!prod || isNaN(kgf) || isNaN(kge)) return alert("Complete los datos del ítem.");
-        if(!finalVideoBase64) return alert("Debe grabar el video de evidencia.");
-        if(!processedFiles.f1 || !processedFiles.f2) return alert("Debe tomar las 2 fotos.");
-
-        const btn = getEl('btn-submit-item');
-        const originalText = btn.innerText;
-        btn.innerText = "Enviando..."; btn.disabled = true;
-
-        try {
-            const itemPayload = { 
-                item: prod, kg_facturados: kgf, kg_entregados: kge, 
-                evidencia_url: finalVideoBase64, 
-                evidencia_url2: processedFiles.f1, 
-                evidencia_url3: processedFiles.f2 
-            };
-            const payload = { ...HEADER_DATA, items: [itemPayload], is_retry: IS_RETRY_MODE, retry_id: RETRY_ITEM_ID };
-
-            const r = await fetch('/mermas/registrar', { method: 'POST', body: JSON.stringify(payload) });
-            
-            // Manejo de HTML error response
-            if (!r.ok) {
-               throw new Error("Error del Servidor. Intente nuevamente.");
-            }
-
-            const resp = await r.json();
-            
-            if(!resp.success) throw new Error(resp.message || "Error");
-
-            if(IS_RETRY_MODE) CURRENT_ITEMS_LOCAL.pop(); 
-            CURRENT_ITEMS_LOCAL.push({ prod, kgf, kge, merma: kgf-kge, pct: ((kgf-kge)/kgf)*100 });
-
-            if(resp.status === 'pendiente' || resp.status === 'segunda_revision') {
-                showStep('step-wait');
-                startPolling(HEADER_DATA.factura);
-            } else {
-                IS_RETRY_MODE = false;
-                showStep('step-decide');
-            }
-        } catch(e) { alert("Error: " + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
-    }
-
-    let pollInterval;
-    function startPolling(fac) {
-        if(pollInterval) clearInterval(pollInterval);
-        pollInterval = setInterval(async () => {
-            try {
-                const r = await fetch(`/mermas/check_status_live?factura=${fac}&nc=${Date.now()}`);
-                const d = await r.json();
-                
-                if(d.completed) {
-                    clearInterval(pollInterval);
-
-                    // CASO 1: PRIMER RECHAZO (Controlador pide rectificar)
-                    if(d.status === 'en_revision') {
-                        alert("⚠️ SU PESAJE FUE OBJETADO. Rectifique.");
-                        prepareRectification(d.id);
-                    
-                    // CASO 2: SEGUNDO RECHAZO (Controlador objeta definitivamente) -> NUEVA LÓGICA
-                    } else if (d.status === 'objetada') {
-                        alert("🚨 ATENCIÓN: La validación sigue NO CONFORME.\n\nEl registro se ha guardado, pero el caso pasará a INVESTIGACIÓN.\n\nPuede continuar con el siguiente ítem.");
-                        IS_RETRY_MODE = false;
-                        showStep('step-decide');
-
-                    // CASO 3: APROBADO (Todo OK)
-                    } else {
-                        // Aquí entra 'aprobada' o 'validada'
-                        IS_RETRY_MODE = false;
-                        showStep('step-decide');
-                    }
-                }
-            } catch(e) {}
-        }, 5000);
-    }
-
-    function prepareRectification(id) {
-        showStep('step-item');
-        IS_RETRY_MODE = true; RETRY_ITEM_ID = id;
-        resetCameraUI(); // Limpiar UI para la nueva toma
-        
-        getEl('item-title-text').innerText = "⚠️ RECTIFICAR";
-        getEl('item-title-text').style.color = "#b45309";
-        getEl('kg_f').value = ""; getEl('kg_e').value = "";
-    }
-
-    function nextItem(addAnother) {
-        if(addAnother) {
-            getEl('item_name').value = ""; getEl('kg_f').value = ""; getEl('kg_e').value = "";
-            resetCameraUI(); // <--- AQUÍ SE CORRIGE EL BUG
-            
-            IS_RETRY_MODE = false;
-            getEl('item-title-text').innerText = "📦 Agregar Ítem";
-            getEl('item-title-text').style.color = "var(--primary)";
-            showStep('step-item');
-        } else {
-            buildSummary();
-            showStep('step-summary');
         }
-    }
 
-    function buildSummary() {
-        getEl('sum_cli').innerText = HEADER_DATA.cliente;
-        getEl('sum_fac').innerText = HEADER_DATA.factura;
-        const tbody = getEl('table_body');
-        tbody.innerHTML = '';
-        let totalMerma = 0;
-        CURRENT_ITEMS_LOCAL.forEach(it => {
-            totalMerma += it.merma;
-            tbody.innerHTML += `<tr><td>${it.prod}</td><td>${it.kgf}</td><td>${it.kge}</td><td>${it.pct.toFixed(1)}%</td></tr>`;
+        const blobToBase64 = blob => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
         });
-        getEl('total_merma_kg').innerText = totalMerma.toFixed(2);
-    }
 
-    async function finishInvoice() {
-        const nota = getEl('nota_general').value;
-        if(!nota) return alert("Ingrese Nota General");
-        const btn = document.querySelector('#step-summary .btn-primary');
-        btn.innerText = "Finalizando..."; btn.disabled = true;
-        try {
-            await fetch('/mermas/finalizar_con_nota', { method: 'POST', body: JSON.stringify({ factura: HEADER_DATA.factura, nota: nota }) });
-            getEl('next_cli_name').innerText = HEADER_DATA.cliente;
-            showStep('step-next-inv');
-        } catch(e) { alert("Error"); } finally { btn.innerText = "TERMINAR"; btn.disabled = false; }
-    }
+        function resetCameraUI() {
+            finalVideoBase64 = null;
+            processedFiles = { f1: null, f2: null };
+            getEl('f_1').value = "";
+            getEl('f_2').value = "";
+            const b1 = getEl('box_f1'); b1.classList.remove('file-loaded'); b1.style.backgroundColor = '#fafafa';
+            const b2 = getEl('box_f2'); b2.classList.remove('file-loaded'); b2.style.backgroundColor = '#fafafa';
+            getEl('video-status-text').innerText = "📹 Video requerido (Max 6s)";
+            getEl('video-status-text').style.color = "#64748b";
+            getEl('btn-open-camera').classList.remove('hidden');
+            getEl('btn-record').classList.add('hidden');
+            getEl('btn-record').disabled = false;
+            getEl('btn-record').innerText = "🔴 INICIAR GRABACIÓN";
+            getEl('camera-container').style.display = 'none';
+        }
 
-    function sameClientNewInvoice() {
-        location.reload(); 
-    }
-  </script>
+        // ===============================================
+        // 6. AUTOCOMPLETE & UI HELPERS
+        // ===============================================
+
+        let debounceTimerProd;
+        const inpProd = getEl("item_name");
+        inpProd.addEventListener("input", function () {
+            clearTimeout(debounceTimerProd);
+            const val = this.value;
+            getEl("autocomplete-list").innerHTML = '';
+            if (!val) return;
+
+            debounceTimerProd = setTimeout(async () => {
+                try {
+                    const r = await fetch(`/mermas/buscar_productos?q=${encodeURIComponent(val)}`);
+                    const d = await r.json();
+                    if (d.success && d.items) {
+                        d.items.forEach(i => {
+                            const div = document.createElement("div");
+                            div.innerHTML = i.label;
+                            div.onclick = () => { inpProd.value = i.value; getEl("autocomplete-list").innerHTML = ''; };
+                            getEl("autocomplete-list").appendChild(div);
+                        });
+                    }
+                } catch (e) { }
+            }, 300);
+        });
+
+        let debounceTimerVeh;
+        const inpVeh = getEl("vehiculo");
+        inpVeh.addEventListener("input", function () {
+            this.value = this.value.toUpperCase();
+            clearTimeout(debounceTimerVeh);
+            const val = this.value;
+            getEl("autocomplete-list-veh").innerHTML = '';
+            if (!val) return;
+
+            debounceTimerVeh = setTimeout(async () => {
+                try {
+                    const r = await fetch(`/mermas/buscar_vehiculos?q=${encodeURIComponent(val)}`);
+                    const d = await r.json();
+                    if (d.success && d.items) {
+                        d.items.forEach(i => {
+                            const div = document.createElement("div");
+                            div.innerHTML = `🚚 ${i.label}`;
+                            div.onclick = () => { inpVeh.value = i.value; getEl("autocomplete-list-veh").innerHTML = ''; };
+                            getEl("autocomplete-list-veh").appendChild(div);
+                        });
+                    }
+                } catch (e) { }
+            }, 300);
+        });
+
+        document.addEventListener("click", e => {
+            if (e.target !== inpProd) getEl("autocomplete-list").innerHTML = '';
+            if (e.target !== inpVeh) getEl("autocomplete-list-veh").innerHTML = '';
+        });
+
+        // POLLING CON MANEJO DE RETRY Y ETAPAS
+        let pollInterval;
+        function startPolling(fac) {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(async () => {
+                try {
+                    const r = await fetch(`/mermas/check_status_live?factura=${fac}&nc=${Date.now()}`);
+                    const d = await r.json();
+
+                    if (d.completed) {
+                        clearInterval(pollInterval);
+
+                        if (d.status === 'en_revision') {
+                            // Objeción de Etapa 1 -> Reintento
+                            alert("⚠️ SU PESAJE FUE OBJETADO. Por favor rectifique la cantidad o evidencia.");
+                            IS_RETRY_MODE = true;
+                            RETRY_ITEM_ID = d.id;
+                            resetCameraUI();
+                            showStep('step-item');
+                        } else {
+                            // Aprobado, Validado o A Investigación (Etapa 3)
+                            // En cualquiera de estos casos, el conductor termina.
+                            const last = CURRENT_ITEMS_LOCAL[CURRENT_ITEMS_LOCAL.length - 1];
+                            startExtraFlow({
+                                id: d.id,
+                                prod_name: last.prod,
+                                kgf: last.kgf,
+                                kge: last.kge
+                            });
+                        }
+                    }
+                } catch (e) { }
+            }, 5000);
+        }
+
+        // --- MANEJO DE MODALES ---
+        function modalQuestion(txt, yesCallback, noCallback) {
+            getEl('mq-title').innerText = txt;
+            getEl('modal-backdrop').classList.remove('hidden');
+            getEl('modal-question').classList.remove('hidden');
+            const btnYes = getEl('mq-yes');
+            const btnNo = getEl('mq-no');
+            const newYes = btnYes.cloneNode(true);
+            const newNo = btnNo.cloneNode(true);
+            btnYes.parentNode.replaceChild(newYes, btnYes);
+            btnNo.parentNode.replaceChild(newNo, btnNo);
+            newYes.onclick = () => { closeModals(); yesCallback(); };
+            newNo.onclick = () => { closeModals(); noCallback(); };
+        }
+
+        function closeModals() {
+            document.querySelectorAll('.modal-float, .modal-backdrop').forEach(e => e.classList.add('hidden'));
+        }
+
+        function renderSummaryTable() {
+            const tb = getEl('table_body');
+            tb.innerHTML = "";
+            CURRENT_ITEMS_LOCAL.forEach(i => {
+                tb.innerHTML += `<tr><td>${i.prod}</td><td>${i.kgf}</td><td>${i.kge}</td><td>${i.pct.toFixed(1)}%</td></tr>`;
+            });
+            getEl('summary-info').innerHTML = `<p><b>Factura:</b> ${HEADER_DATA.factura}</p>`;
+        }
+
+        // --- LÓGICA DE FIRMA ---
+        let signaturePad = null;
+        let signatureData = null; // Aquí guardaremos la imagen Base64
+
+        function initSignaturePad() {
+            const canvas = document.getElementById('signature-pad');
+            // Ajustar tamaño del canvas al contenedor visual
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            canvas.width = canvas.offsetWidth * ratio;
+            canvas.height = canvas.offsetHeight * ratio;
+            canvas.getContext("2d").scale(ratio, ratio);
+
+            // Eventos de dibujo (Ratón y Táctil)
+            let isDrawing = false;
+            const ctx = canvas.getContext('2d');
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 2;
+
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return { x: clientX - rect.left, y: clientY - rect.top };
+            };
+
+            const start = (e) => { isDrawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); };
+            const move = (e) => { if (!isDrawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); };
+            const end = () => { isDrawing = false; };
+
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', move);
+            canvas.addEventListener('mouseup', end);
+            canvas.addEventListener('touchstart', start, { passive: false });
+            canvas.addEventListener('touchmove', move, { passive: false });
+            canvas.addEventListener('touchend', end);
+        }
+
+        function clearSignature() {
+            const canvas = document.getElementById('signature-pad');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            signatureData = null;
+        }
+
+        function saveSignatureAndContinue() {
+            const canvas = document.getElementById('signature-pad');
+            // Validar si está vacío (opcional, pero recomendado)
+            // Por simplicidad, asumimos que firmaron si dan continuar
+            signatureData = canvas.toDataURL('image/png');
+
+            // Pasar al siguiente paso (WhatsApp)
+            showStep('step-whatsapp');
+        }
+    </script>
 </body>
+
 </html>

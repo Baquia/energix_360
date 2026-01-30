@@ -15,9 +15,8 @@ ACCESO_MODULOS = {
     "gas": {
         "operador_gas":        "glp.html",
         "controlfacturas_gas": "facturas_glp.html",
-        "controlador_gas":     "control_glp.html",
-        "webmaster":           "control_glp.html",
-        "admin":               "control_glp.html"
+        "auditor_gas":     "auditor_glp.html"
+       
     },
     # --- MÓDULO MERMAS ---
     "mermas": {
@@ -29,9 +28,9 @@ ACCESO_MODULOS = {
     # --- MÓDULO FLOTA ---
     "flota": {
         "Operador_transporteespecial":    "vehiculos_tespecial.html",
-        "Operador_transportecarga":       "vehiculos_tcarga.html",
+        "Operador_transportecarga":       "A_control_logistica.html",
         "Controlador_transproteespecial": "control_vehiculos_tespecial.html",
-        "Controlador_transportecarga":    "control_vehiculos_tcarga.html",
+        "Controlador_transportecarga":    "control_logistica.html",
         "webmaster":                      "control_vehiculos_tcarga.html", 
         "admin":                          "control_vehiculos_tcarga.html"
     }
@@ -83,9 +82,7 @@ def panel_pollosgar():
     )
 
 
-# ==============================================================================
-# ENRUTADOR UNIVERSAL
-# ==============================================================================
+
 # ==============================================================================
 # ENRUTADOR UNIVERSAL (CORREGIDO)
 # ==============================================================================

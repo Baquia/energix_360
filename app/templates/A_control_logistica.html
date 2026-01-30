@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LOGISTICA BQA-ONE| {{ empresa }}</title>
+    <meta name="theme-color" content="#015249">
+
+    <style>
+        :root {
+            --color-primary: #015249;
+            --color-primary-dark: #013d36;
+            --color-bg: #f6f7f8;
+            --color-surface: #ffffff;
+            --color-border: #e5e7eb;
+            --color-text: #111827;
+            --color-muted: #6b7280;
+            --color-danger: #b00020;
+            --shadow-soft: 0 4px 14px rgba(15, 23, 42, .08);
+            --radius-card: 18px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* HEADER */
+        .app-header {
+            background-color: var(--color-primary);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: white;
+            box-shadow: 0 4px 12px rgba(1, 82, 73, 0.2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            padding: 4px;
+            object-fit: contain;
+        }
+
+        .user-info h1 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .user-info p {
+            margin: 0;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .logout-btn {
+            color: white;
+            text-decoration: none;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        /* MAIN CONTENT */
+        .main-container {
+            flex: 1;
+            padding: 24px 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .welcome-text {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: 8px;
+        }
+
+        .welcome-sub {
+            color: var(--color-muted);
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        /* GRID MENU */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+        }
+
+        /* CARD STYLE */
+        .card {
+            background: var(--color-surface);
+            border-radius: var(--radius-card);
+            padding: 24px 16px;
+            text-decoration: none;
+            color: var(--color-text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: var(--shadow-soft);
+            border: 1px solid transparent;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .card:active {
+            transform: scale(0.97);
+        }
+
+        .card:hover {
+            border-color: var(--color-primary);
+            box-shadow: 0 8px 24px rgba(1, 82, 73, 0.12);
+        }
+
+        .card-icon {
+            font-size: 36px;
+            margin-bottom: 14px;
+            color: var(--color-primary);
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        /* OFFLINE INDICATOR */
+        #offline-indicator {
+            display: none;
+            background-color: var(--color-danger);
+            color: white;
+            text-align: center;
+            padding: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* FOOTER */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: var(--color-muted);
+        }
+    </style>
+</head>
+
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="App Logo" class="logo-img">
+
+                {% if nit %}
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" alt="Logo Cliente" class="logo-img">
+                {% endif %}
+            </div>
+
+            <div class="user-info" style="margin-left: 10px;">
+                <h1>{{ nombre }}</h1>
+                <p>{{ empresa }}</p>
+            </div>
+        </div>
+        <a href="/logout" class="logout-btn">Salir</a>
+    </header>
+
+    <div class="main-container">
+        <div class="welcome-text">Hola, {{ nombre }}</div>
+        <div class="welcome-sub">Selecciona un módulo para comenzar</div>
+
+        <div class="menu-grid">
+
+            <a href="{{ url_for('logistica_bp.router_universal', modulo='aws') }}" class="card">
+                <div class="card-icon">✔️</div>
+                <div class="card-title">AWS</div>
+            </a>
+
+            <a href="{{ url_for('logistica_bp.router_universal', modulo='flota_carga') }}" class="card">
+                <div class="card-icon">🚚</div>
+                <div class="card-title">Gestion de Flota</div>
+            </a>
+        </div>
+    </div>
+
+    <main class="wrap">
+    </main>
+</body>
+
+</html>

@@ -339,6 +339,7 @@ def generar_informe():
         wheres = ["WHERE c.id_empresa = %s"]
         params = [empresa_id]
 
+        # Filtros por Ubicación (Zona o Granja)
         if tipo_informe == 'zona' and ubicacion:
             cursor.execute("SELECT DISTINCT ubicacion FROM tanques_sedes WHERE zona = %s AND empresa_id = %s", (ubicacion, empresa_id))
             granjas = [r['ubicacion'] if isinstance(r, dict) else r[0] for r in cursor.fetchall()]
@@ -351,15 +352,19 @@ def generar_informe():
             wheres.append("AND c.ubicacion = %s")
             params.append(ubicacion)
 
+        # --- LÓGICA DE PERIODOS AJUSTADA ---
         if periodo == 'Personalizado' and fecha_ini and fecha_fin:
+            # HISTÓRICO: Filtramos solo por fechas.
+            # Trae tanto lotes ACTIVOS como INACTIVOS que tuvieron movimiento en ese rango.
             wheres.append("AND c.fecha BETWEEN %s AND %s")
             params.append(fecha_ini)
             params.append(fecha_fin)
-            wheres.append("AND c.estatus_lote = 'INACTIVO'")
+            
         elif periodo == 'Actual':
+            # ACTUAL: Solo lo que está vivo hoy (ACTIVO)
             wheres.append("AND c.estatus_lote = 'ACTIVO'")
 
-        # SELECT ACTUALIZADO: INCLUYE precio_total
+        # SELECT
         sql = """
             SELECT c.fecha, c.ubicacion, c.lote, c.estatus_lote, c.operacion, c.clase, 
                    c.saldo_estimado_kg, c.saldo_estimado_galones,
@@ -393,7 +398,7 @@ def generar_informe():
         if cursor: cursor.close()
         traceback.print_exc()
         return jsonify({"success": False, "message": str(e)}), 500
-
+    
 @csrf.exempt
 @bp_901811727.route('/obtener_ubicaciones', methods=['POST'])
 @login_required_custom
