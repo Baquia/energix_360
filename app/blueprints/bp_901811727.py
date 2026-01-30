@@ -28,12 +28,33 @@ def panel_webmaster():
     form = RegistroUsuarioForm()
     try:
         cur = mysql.connection.cursor()
+        
+        # --- CORRECCIÓN AQUÍ ---
         cur.execute("SELECT nit, nombre_comercial FROM empresas")
-        empresas = cur.fetchall()
+        data_empresas = cur.fetchall()
+        
+        # Convertimos las tuplas a diccionarios para que el HTML pueda usar .nit y .nombre_comercial
+        empresas = []
+        if data_empresas:
+            # Verificamos si la BD devolvió tuplas (lo normal) o diccionarios
+            if isinstance(data_empresas[0], dict):
+                empresas = data_empresas
+            else:
+                # Mapeo manual: columna 0 es nit, columna 1 es nombre
+                empresas = [{'nit': row[0], 'nombre_comercial': row[1]} for row in data_empresas]
+        # -----------------------
+
         cur.execute("SELECT nombre_comercial FROM empresas")
         clientes = cur.fetchall()
+        
         cur.close()
-        return render_template('901811727.html', nombre=session.get('nombre'), empresa=session.get('empresa'), form=form, empresas=empresas, clientes=clientes)
+        
+        return render_template('901811727.html', 
+                               nombre=session.get('nombre'), 
+                               empresa=session.get('empresa'), 
+                               form=form, 
+                               empresas=empresas, # Ahora enviamos la lista limpia
+                               clientes=clientes)
     except Exception as e:
         print("Error panel:", e)
         return "Error cargando panel", 500
