@@ -172,20 +172,46 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         except (ValueError, TypeError):
             return 0.0
 
-    # Inicializar contadores globales
+    # ==========================================================================
+    # PASO 0: DETECTAR POBLACIÓN (POLLITOS) DENTRO DEL RANGO SELECCIONADO
+    # ==========================================================================
+    # Escaneamos los datos para encontrar el número de pollitos de cada lote.
+    # Priorizamos si la operación es 'inicio_calefaccion'.
+    mapa_pollitos_lote = {}
+    
+    for row in resultados:
+        lote = row.get('lote')
+        pollitos = int(row.get('pollitos') or 0)
+        operacion = str(row.get('operacion') or '').lower()
+        
+        if lote:
+            # Si aún no tenemos dato para este lote, o encontramos un dato mejor:
+            dato_actual = mapa_pollitos_lote.get(lote, 0)
+            
+            # CASO A: Encontramos la operación "inicio" (Prioridad Máxima)
+            if 'inicio' in operacion and pollitos > 0:
+                mapa_pollitos_lote[lote] = pollitos
+            
+            # CASO B: Encontramos un número mayor al que teníamos (y no habíamos encontrado un inicio)
+            elif pollitos > dato_actual:
+                 mapa_pollitos_lote[lote] = pollitos
+
+    # ==========================================================================
+    # INICIO DEL PROCESAMIENTO NORMAL (SUMAS Y PROMEDIOS)
+    # ==========================================================================
+
     math_saldo_inicial_kg_global = 0.0
     math_ingresos_kg = 0.0
-    math_consumo_real_acumulado = 0.0 # <--- AQUÍ ACUMULAREMOS EL NETO_GASTADO TOTAL
+    math_consumo_real_acumulado = 0.0
     math_dinero_total = 0.0 
     
     total_pollitos_global = 0
     lotes_procesados_global = set()
 
-    # Inicializar estructuras de datos para gráficos y tablas
     series = { 'fechas': [], 'kg_pollito': [], 'saldo_inicial': [], 'saldo_final': [], 'ingresos': [] }
     granjas_data = {}
 
-    # Ordenar resultados por fecha
+    # Ordenamos por fecha para que el gráfico salga bien
     resultados.sort(key=lambda x: str(x.get('fecha')))
 
     for row in resultados:
@@ -194,47 +220,38 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         lote_id = row.get('lote')
         ubicacion = row.get('ubicacion') or 'Desconocida'
 
-        # Extracción segura de valores
         val_kg_saldo = safe_float(row.get('saldo_estimado_kg'))
         masa_fact = safe_float(row.get('masa_kg_facturada'))
-        neto_gast = safe_float(row.get('neto_gastado')) # <--- COLUMNA CRÍTICA
+        neto_gast = safe_float(row.get('neto_gastado'))
         val_precio = safe_float(row.get('precio_total')) 
         kg_pollo  = safe_float(row.get('kg_pollito'))
-        pollitos  = int(row.get('pollitos') or 0)
-
-        # -----------------------------------------------------------
-        # 1. CÁLCULO DIRECTO (SUMAS)
-        # -----------------------------------------------------------
         
-        # A. Consumo Real: Suma directa de la columna neto_gastado (Sin importar la clase)
-        math_consumo_real_acumulado += neto_gast
+        # AQUÍ USAMOS EL DATO CORREGIDO DEL PASO 0
+        pollitos_reales = mapa_pollitos_lote.get(lote_id, 0)
 
-        # B. Inversión: Suma directa de precio_total
+        # 1. CÁLCULO DIRECTO (SUMAS)
+        math_consumo_real_acumulado += neto_gast
         math_dinero_total += val_precio
 
-        # C. Saldo Inicial: Solo sumamos si la clase lo indica explícitamente
         if clase == 'saldo inicial':
             math_saldo_inicial_kg_global += val_kg_saldo
 
-        # D. Pedidos / Ingresos: Suma de lo facturado cuando es ingreso
         if clase == 'ingreso':
             math_ingresos_kg += masa_fact
 
-        # -----------------------------------------------------------
         # 2. SERIES PARA GRÁFICOS
-        # -----------------------------------------------------------
         series['fechas'].append(fecha_str)
         series['kg_pollito'].append(kg_pollo)
         series['saldo_inicial'].append(val_kg_saldo if clase == 'saldo inicial' else None)
         series['saldo_final'].append(val_kg_saldo if clase == 'saldo final' else None)
         series['ingresos'].append(masa_fact if clase == 'ingreso' else None)
 
-        # 3. CONTEO DE POLLITOS (Evitar duplicados por lote)
+        # 3. CONTEO DE POLLITOS (Usando el valor real encontrado en el rango)
         if lote_id and lote_id not in lotes_procesados_global:
-            total_pollitos_global += pollitos
+            total_pollitos_global += pollitos_reales
             lotes_procesados_global.add(lote_id)
 
-        # 4. DATOS AGRUPADOS POR GRANJA (Para la Tabla Resumen)
+        # 4. DATOS AGRUPADOS POR GRANJA
         if ubicacion not in granjas_data:
             granjas_data[ubicacion] = {
                 'inicial': 0.0, 'ingresos': 0.0, 'consumo_real': 0.0,
@@ -242,20 +259,18 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
             }
         
         d = granjas_data[ubicacion]
-        
-        # Acumular consumo real por granja (Suma directa de neto_gastado)
         d['consumo_real'] += neto_gast
         
         if clase == 'saldo inicial': d['inicial'] += val_kg_saldo
         elif clase == 'ingreso': d['ingresos'] += masa_fact
         
         if lote_id and lote_id not in d['lotes']:
-            d['pollitos'] += pollitos
+            # Si este lote tiene pollitos registrados en el rango, los sumamos
+            if pollitos_reales > 0:
+                d['pollitos'] += pollitos_reales
             d['lotes'].add(lote_id)
 
     # --- CÁLCULOS KPI FINALES ---
-    
-    # Eficiencia = Consumo Real (Suma neto_gastado) / Pollitos
     rendimiento = 0.0
     if total_pollitos_global > 0:
         rendimiento = math_consumo_real_acumulado / total_pollitos_global
@@ -263,31 +278,27 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
     kpis = {
         "card1_label": "Saldo Inicial (kg)",
         "card1_value": math_saldo_inicial_kg_global,
-        
         "card2_label": "Pedidos Gas (kg)",
         "card2_value": math_ingresos_kg,
-        
-        "card3_label": "Consumo Real (kg)", # <--- AHORA ES LA SUMA DIRECTA DE NETO_GASTADO
+        "card3_label": "Consumo Real (kg)",
         "card3_value": math_consumo_real_acumulado,
-        
         "card4_label": "Eficiencia (kg/ave)", 
         "card4_value": rendimiento,
-        
         "card5_label": "Pollitos",
         "card5_value": total_pollitos_global,
-
         "card6_label": "Inversión Total ($)",
         "card6_value": math_dinero_total
     }
 
-    # --- GENERACIÓN DE TABLA RESUMEN ---
+    # --- TABLA RESUMEN ---
     tabla_resumen = []
     lista_rendimientos = []
 
     for nombre_granja, datos in granjas_data.items():
-        consumo_granja = datos['consumo_real'] # Usamos el acumulado directo
-        
+        consumo_granja = datos['consumo_real']
         rend_granja = 0.0
+        
+        # Cálculo seguro de eficiencia por granja
         if datos['pollitos'] > 0:
             rend_granja = consumo_granja / datos['pollitos']
             lista_rendimientos.append(rend_granja)
@@ -303,7 +314,6 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
     media = 0.0
     desviacion = 0.0
     n = len(lista_rendimientos)
-    
     if n > 0:
         media = sum(lista_rendimientos) / n
         if n > 1:
