@@ -107,8 +107,16 @@ def _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha_
           AND TRIM(ubicacion) = TRIM(%s)
           AND lote = %s
     """, (empresa, ubicacion, lote_id))
-    row = cur.fetchone() or {}
-    fecha_ini = row.get("fecha_ini")
+    
+    # --- BLINDAJE ---
+    row = cur.fetchone()
+    fecha_ini = None
+    if row:
+        if isinstance(row, dict):
+            fecha_ini = row.get("fecha_ini")
+        else:
+            fecha_ini = row[0]
+    # ----------------
 
     dias = 1
     if fecha_ini:
@@ -179,11 +187,25 @@ def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, t
         """
         
         cur.execute(query, (empresa, ubicacion, lote, id_operacion_actual))
-        prev = cur.fetchone()
+        prev_raw = cur.fetchone()
         
-        if not prev: continue
+        if not prev_raw: continue
+        
+        # --- BLINDAJE ---
+        prev = {}
+        if isinstance(prev_raw, dict):
+             prev = prev_raw
+        elif isinstance(prev_raw, tuple):
+             # orden: operacion, nivel, nivelfinal, densidad
+             prev = {
+                 'operacion': prev_raw[0],
+                 f'nivel tk-{num_tanque}': prev_raw[1],
+                 f'nivelfinal tk-{num_tanque}': prev_raw[2],
+                 'densidad_suministrada': prev_raw[3]
+             }
+        # ----------------
 
-        op_anterior = prev['operacion']
+        op_anterior = prev.get('operacion')
         nivel_anterior = 0.0
         densidad_calculo = 2.0
 
@@ -226,8 +248,16 @@ def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, t
         ORDER BY fecha ASC, id ASC
         LIMIT 1
     """, (empresa, ubicacion, lote))
-    row_ini = cur.fetchone() or {}
-    pollitos = int(row_ini.get("pollitos") or 0)
+    
+    # --- BLINDAJE ---
+    row_ini = cur.fetchone()
+    pollitos = 0
+    if row_ini:
+        if isinstance(row_ini, dict):
+            pollitos = int(row_ini.get("pollitos") or 0)
+        else:
+            pollitos = int(row_ini[0] or 0)
+    # ----------------
 
     kg_pollito = 0.0
     if pollitos > 0 and consumo_total_kg > 0:
@@ -241,13 +271,15 @@ def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, t
     """, (kg_pollito, consumo_total_kg, id_operacion_actual))
 
     return consumo_total_kg, kg_pollito, pollitos
+
 def _buscar_proveedor_principal(cur, empresa, ubicacion, tanques):
     """
     Devuelve proveedor principal tomando el primer tanque reportado.
+    BLINDADA CONTRA TUPLAS.
     """
     if not tanques:
         return None
-    # Asumo que la columna 'nombre_tanque' en tanques_sedes coincide con el campo 'numero' en 'tanques'
+    
     primer_num = str(tanques[0].get("numero") or "").upper().strip()
     if not primer_num:
         return None
@@ -258,8 +290,17 @@ def _buscar_proveedor_principal(cur, empresa, ubicacion, tanques):
         WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND UPPER(nombre_tanque)=UPPER(%s)
         LIMIT 1
     """, (empresa, ubicacion, primer_num))
+    
     p = cur.fetchone()
-    return p.get("proveedor") if p else None
+    
+    # --- BLINDAJE: Tupla o Dict ---
+    if p:
+        if isinstance(p, dict):
+            return p.get("proveedor")
+        else:
+            return p[0] # Tupla: columna 0 es proveedor
+    # ------------------------------
+    return None
 
 
 def _generar_codigo_pedido(cliente_nombre, lote_id, ubicacion, proveedor, cur):
@@ -317,7 +358,17 @@ def _enviar_alerta_pedido_tanqueo(empresa, ubicacion, lote_id, proveedor_princip
 
     cur = mysql.connection.cursor()
     cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor = %s", (proveedor_principal,))
-    c = cur.fetchone() or {}
+    
+    # --- BLINDAJE ---
+    c_raw = cur.fetchone()
+    c = {}
+    if c_raw:
+        if isinstance(c_raw, dict):
+            c = c_raw
+        else:
+            c = {'email1': c_raw[0], 'email2': c_raw[1]}
+    # ----------------
+    
     destinatarios = [e for e in [c.get("email1"), c.get("email2")] if e]
     cur.close()
 
@@ -424,8 +475,6 @@ def _enviar_alerta_pedido_tanqueo(empresa, ubicacion, lote_id, proveedor_princip
             server.starttls()
             server.login(email_user, email_pass)
             server.sendmail(email_user, destinatarios, msg.as_string())
-            # Suponiendo que ya importaste la función
-            # from app.utils import registrar_auditoria
         app.logger.info(f"✅ Correo GLP enviado a: {destinatarios}. Código: {codigo_pedido}")
         return True
 
@@ -457,7 +506,17 @@ def _enviar_alerta_desviacion_tanqueo(
 
     cur = mysql.connection.cursor()
     cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor = %s", (proveedor_principal,))
-    c = cur.fetchone() or {}
+    
+    # --- BLINDAJE ---
+    c_raw = cur.fetchone()
+    c = {}
+    if c_raw:
+        if isinstance(c_raw, dict):
+            c = c_raw
+        else:
+            c = {'email1': c_raw[0], 'email2': c_raw[1]}
+    # ----------------
+    
     destinatarios = [e for e in [c.get("email1"), c.get("email2")] if e]
     cur.close()
 
@@ -567,8 +626,6 @@ def _enviar_alerta_desviacion_tanqueo(
             server.starttls()
             server.login(email_user, email_pass)
             server.sendmail(email_user, destinatarios, msg.as_string())
-            # Suponiendo que ya importaste la función
-            # from app.utils import registrar_auditoria
         app.logger.info(f"✅ Correo desviación enviado. op_id: {op_id}")
         return True
 
@@ -579,17 +636,10 @@ def _enviar_alerta_desviacion_tanqueo(
 def _calcular_ts_consumo(dias_operacion: int):
     """
     Algoritmo (foto) para CONSUMO:
-
       dr = 15 - dias_operacion
       tr = 8 * dr
       si tr > 80  -> ts = 80
       si tr <= 80 -> ts = tr
-
-    Retorna: (dr, tr, ts)
-
-    Salvaguardas:
-      - dr >= 0
-      - ts en [0, 80]
     """
     try:
         d = int(dias_operacion or 0)
@@ -638,7 +688,7 @@ def _enviar_alerta_pedido_tanqueo_consumo(
     if ts_val <= 0.0:
         return False
 
-    # Usar variables locales (Igual que en las funciones anteriores)
+    # Usar variables locales
     email_user = os.environ.get("EMAIL_USER")
     email_pass = os.environ.get("EMAIL_PASS")
     email_host = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
@@ -654,7 +704,17 @@ def _enviar_alerta_pedido_tanqueo_consumo(
 
     cur = mysql.connection.cursor()
     cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor = %s", (proveedor_principal,))
-    c = cur.fetchone() or {}
+    
+    # --- BLINDAJE ---
+    c_raw = cur.fetchone()
+    c = {}
+    if c_raw:
+        if isinstance(c_raw, dict):
+            c = c_raw
+        else:
+            c = {'email1': c_raw[0], 'email2': c_raw[1]}
+    # ----------------
+
     destinatarios = [e for e in [c.get("email1"), c.get("email2")] if e]
     cur.close()
 
@@ -781,10 +841,8 @@ def _enviar_alerta_pedido_tanqueo_consumo(
 
 @csrf.exempt
 @bp_glp.route('/context', methods=['GET'])
-# @login_required_custom  <--- COMENTADO O BORRADO
+# @login_required_custom
 def glp_context():
-    # Al ser público, el celular recibirá SIEMPRE un JSON {success:true}
-    # y sabrá que tiene internet, activando el envío de datos inmediatamente.
     return jsonify({"success": True, "message": "Servidor disponible"})
 
 # ======================
@@ -845,7 +903,6 @@ def obtener_tanques():
                 else:
                     info_lote = row_lote[0]
 
-        # Devolvemos tanques Y el estado del lote
         return jsonify({
             "success": True, 
             "tanques": tanques, 
@@ -856,6 +913,7 @@ def obtener_tanques():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"success": False, "tanques": [], "message": f"Error: {e}"}), 500
+
 # ======================
 # Iniciar calefacción
 # ======================
@@ -880,7 +938,7 @@ def registrar_inicio_calefaccion():
     if not op_id:
         return jsonify({"success": False, "message": "Falta op_id en la operación"}), 400
 
-    # Idempotencia por op_id (tolerancia a reintentos offline/online)
+    # Idempotencia por op_id
     cur_check = mysql.connection.cursor()
     cur_check.execute("SELECT 1 FROM cardex_glp WHERE op_id=%s LIMIT 1", (op_id,))
     if cur_check.fetchone():
@@ -895,7 +953,6 @@ def registrar_inicio_calefaccion():
     pollitos = data.get('pollitos')
     tanques  = data.get('tanques', []) or []
 
-    # Regla real: NO promedio. Pedido único si existe al menos un tanque con nivel <= 30.
     tanques_bajos = []
     for tk in (tanques or []):
         try:
@@ -911,7 +968,7 @@ def registrar_inicio_calefaccion():
 
     try:
         with mysql.connection.cursor() as cur:
-            # === 1. VALIDACIÓN BLINDADA DE LOTE ACTIVO (FIX KEYERROR) ===
+            # === 1. VALIDACIÓN BLINDADA DE LOTE ACTIVO ===
             cur.execute("""
                 SELECT COUNT(*) AS activo 
                 FROM cardex_glp 
@@ -926,12 +983,11 @@ def registrar_inicio_calefaccion():
             activo = 0
             if row:
                 if isinstance(row, dict):
-                    activo = row.get('activo', 0) # Si es Diccionario
+                    activo = row.get('activo', 0)
                 else:
-                    activo = row[0] # Si es Tupla
+                    activo = row[0]
 
             if activo > 0:
-                # Buscamos el nombre del lote activo (también híbrido)
                 cur.execute("""
                     SELECT lote 
                     FROM cardex_glp 
@@ -944,13 +1000,14 @@ def registrar_inicio_calefaccion():
                 info = cur.fetchone()
                 nombre_lote = "Desconocido"
                 
+                # Blindaje Segunda Consulta
                 if info:
                     if isinstance(info, dict):
                         nombre_lote = info.get('lote', 'Desconocido')
                     else:
                         nombre_lote = info[0]
 
-                # === AUDITORÍA: BLOQUEO LÓGICO (INTENTO FALLIDO) ===
+                # Auditoría bloqueo
                 registrar_auditoria(
                     empresa_id=id_empresa,
                     empresa_nombre=empresa,
@@ -961,7 +1018,6 @@ def registrar_inicio_calefaccion():
                     nivel="WARNING"
                 )
                 mysql.connection.commit()
-                # ===================================================
 
                 return jsonify({
                     "success": False, 
@@ -999,22 +1055,16 @@ def registrar_inicio_calefaccion():
             saldo_estimado_kg = 0.0
 
             for tk in tanques:
-                # === 3. FIX REGEX PARA NOMBRE DE TANQUE ===
                 num_str = str(tk.get("numero", ""))
                 match = _re.search(r'\d+', num_str)
                 num = match.group() if match else ""
                 
                 if not num: continue
 
-                try:
-                    nivel = float(tk.get("nivel", 0) or 0)
-                except Exception:
-                    nivel = 0.0
-
-                try:
-                    capacidad = float(tk.get("capacidad", 0) or 0)
-                except Exception:
-                    capacidad = 0.0
+                try: nivel = float(tk.get("nivel", 0) or 0)
+                except Exception: nivel = 0.0
+                try: capacidad = float(tk.get("capacidad", 0) or 0)
+                except Exception: capacidad = 0.0
 
                 testigo = tk.get("testigo")
 
@@ -1044,43 +1094,24 @@ def registrar_inicio_calefaccion():
                  WHERE id=%s
             """, (round(saldo_estimado_kg, 2), round(saldo_estimado_gal, 2), proveedor_principal, id_operacion))
 
-            # Generación de pedido único si hay tanques bajos (<= 30%)
             codigo_pedido = None
             if tanques_bajos:
                 codigo_pedido = _generar_codigo_pedido(empresa, lote_id, ubicacion, proveedor_principal, cur)
-                
-                # Envío de correo
                 _enviar_alerta_pedido_tanqueo(
-                    empresa,
-                    ubicacion,
-                    lote_id,
-                    proveedor_principal,
-                    tanques_bajos,
-                    codigo_pedido
+                    empresa, ubicacion, lote_id, proveedor_principal, tanques_bajos, codigo_pedido
                 )
-
-                # Guardar el código en el registro del inicio
-                cur.execute("""
-                    UPDATE cardex_glp
-                       SET codigo_pedido = %s
-                     WHERE id = %s
-                """, (codigo_pedido, id_operacion))
-
-                # === AUDITORÍA: CORREO PEDIDO ENVIADO ===
+                cur.execute("UPDATE cardex_glp SET codigo_pedido = %s WHERE id = %s", (codigo_pedido, id_operacion))
+                
                 registrar_auditoria(
                     empresa_id=id_empresa,
                     empresa_nombre=empresa,
                     modulo="GLP",
                     usuario=usuario,
                     accion="📧 Pedido Enviado (Inicio)",
-                    detalle=f"Tanques bajos al iniciar. Código: {codigo_pedido}. Cantidad: {len(tanques_bajos)}",
+                    detalle=f"Tanques bajos al iniciar. Código: {codigo_pedido}.",
                     nivel="INFO"
                 )
-                # ========================================
 
-            # =======================================================
-            # AUDITORÍA: Registrar Inicio Exitoso
-            # =======================================================
             registrar_auditoria(
                 empresa_id=id_empresa,
                 empresa_nombre=empresa,
@@ -1090,7 +1121,6 @@ def registrar_inicio_calefaccion():
                 detalle=f"Sede: {ubicacion}. Lote: {lote_id}. Pollitos: {pollitos}",
                 nivel="INFO"
             )
-            # =======================================================
 
             mysql.connection.commit()
 
@@ -1118,8 +1148,6 @@ def registrar_inicio_calefaccion():
         mysql.connection.rollback()
         if e.args[0] == 1062 and 'op_id' in str(e.args[1]):
              return jsonify({"success": True, "message": "Operación ya recibida."}), 200
-        
-        # Auditoría Error Integridad
         try:
             registrar_auditoria(id_empresa, empresa, "GLP", usuario, "❌ Error Integridad (Inicio)", str(e), "ERROR")
             mysql.connection.commit()
@@ -1130,13 +1158,10 @@ def registrar_inicio_calefaccion():
         print("⛔ Error en registrar_inicio_calefaccion:")
         traceback.print_exc()
         mysql.connection.rollback()
-        
-        # Auditoría Error Crítico
         try:
             registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Crítico (Inicio)", str(e), "CRITICAL")
             mysql.connection.commit()
         except: pass
-
         return jsonify({"success": False, "message": "Error al registrar los datos."})
     
 # ======================
@@ -1185,10 +1210,19 @@ def registrar_tanqueo():
                 WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
                 ORDER BY fecha DESC, id DESC LIMIT 1
             """, (empresa, ubicacion))
-            row = cur.fetchone() or {}
-            if not row.get("lote"):
+            
+            # --- BLINDAJE ---
+            row_raw = cur.fetchone()
+            lote_id = None
+            if row_raw:
+                if isinstance(row_raw, dict):
+                    lote_id = row_raw.get("lote")
+                else:
+                    lote_id = row_raw[0]
+            # ----------------
+
+            if not lote_id:
                 return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
-            lote_id = row["lote"]
 
             fecha = datetime.now().date()
             columnas = [
@@ -1217,9 +1251,7 @@ def registrar_tanqueo():
             densidades_registradas = []
             masas_esperadas = []
             masas_facturadas = []
-            desviaciones_porcentuales = []
-
-            # --- LISTA PARA ACUMULAR ERRORES DE LÓGICA ---
+            
             errores_tanqueo = [] 
 
             for tk in tanques:
@@ -1232,7 +1264,7 @@ def registrar_tanqueo():
                 nivel_ini = float(tk.get("nivel_inicial", 0) or 0.0)
                 nivel_fin = float(tk.get("nivel_final", 0) or 0.0)
 
-                # === VALIDACIÓN: EL NIVEL DEBE SUBIR (ACUMULATIVA) ===
+                # Validación de lógica de tanqueo: DEBE SUBIR
                 if (nivel_fin - nivel_ini) < -0.1:
                      errores_tanqueo.append(
                         f"• TK-{num}: Inicio {nivel_ini}% -> Fin {nivel_fin}% (BAJÓ)."
@@ -1275,11 +1307,8 @@ def registrar_tanqueo():
                 if masa_esp_tk > 0:
                     masas_esperadas.append(masa_esp_tk)
                     masas_facturadas.append(kg_sumin)
-                    if kg_sumin > 0:
-                        desvio = ((kg_sumin - masa_esp_tk)/masa_esp_tk)*100.0
-                        desviaciones_porcentuales.append(desvio)
 
-            # === SI HUBO ERRORES EN ALGÚN TANQUE, ABORTAR ===
+            # Abortar si hubo errores
             if errores_tanqueo:
                 mensaje_final = "⛔ ERRORES EN DATOS DE TANQUEO:\n\n" + "\n".join(errores_tanqueo) + "\n\nEn un tanqueo el nivel debe SUBIR."
                 raise ValueError(mensaje_final)
@@ -1298,7 +1327,6 @@ def registrar_tanqueo():
                  WHERE id=%s
             """, (round(saldo_estimado_kg,2), round(saldo_estimado_gal,2), id_operacion))
 
-            # ⚠️ Cálculo de consumo del tramo ANTERIOR al tanqueo
             consumo_kg, kg_pollito, pollitos = _calcular_consumo_lote(
                 cur, empresa, ubicacion, lote_id, id_operacion,
                 [{"numero": t.get("numero"),
@@ -1335,19 +1363,18 @@ def registrar_tanqueo():
                 id_operacion
             ))
 
-            # ================================
-            # PRECIO DEL TANQUEO (Lógica original conservada)
-            # ================================
             precio_unitario = 0.0
             precio_total = 0.0
 
             if proveedor_principal:
                 cur.execute("SELECT precio FROM proveedores WHERE proveedor=%s LIMIT 1", (proveedor_principal,))
-                prow = cur.fetchone() or {}
-                try:
-                    precio_unitario = float(prow.get("precio") or 0.0)
-                except Exception:
-                    precio_unitario = 0.0
+                
+                # --- BLINDAJE ---
+                prow_raw = cur.fetchone()
+                if prow_raw:
+                    if isinstance(prow_raw, dict): precio_unitario = float(prow_raw.get("precio") or 0.0)
+                    else: precio_unitario = float(prow_raw[0] or 0.0)
+                # ----------------
 
             precio_total = precio_unitario * float(masa_facturada_total or 0.0)
 
@@ -1358,8 +1385,6 @@ def registrar_tanqueo():
                  WHERE id=%s
             """, (round(precio_unitario, 6), round(precio_total, 2), id_operacion))
 
-            # Alerta por desviación
-            alerta_enviada = False
             if masa_esperada_total > 0 and desvio_total > 8.0 and proveedor_principal:
                 try:
                     alerta_enviada = _enviar_alerta_desviacion_tanqueo(
@@ -1374,8 +1399,6 @@ def registrar_tanqueo():
                         dens_prom=dens_prom,
                         tanques=tanques
                     )
-                    
-                    # === AUDITORÍA: ALERTA DESVIACIÓN ===
                     if alerta_enviada:
                         registrar_auditoria(
                             empresa_id=id_empresa,
@@ -1383,25 +1406,21 @@ def registrar_tanqueo():
                             modulo="GLP",
                             usuario="Sistema",
                             accion="⚠️ Alerta Desviación",
-                            detalle=f"Desviación {round(desvio_total, 2)}% en {ubicacion}. Correo enviado.",
+                            detalle=f"Desviación {round(desvio_total, 2)}% en {ubicacion}.",
                             nivel="ALERTA"
                         )
-                    # ====================================
-
                 except Exception:
                     app.logger.error("⛔ Error al enviar alerta desviación.")
 
-            # === AUDITORÍA: EXITO TANQUEO ===
             registrar_auditoria(
                 empresa_id=id_empresa,
                 empresa_nombre=empresa,
                 modulo="GLP",
                 usuario=usuario,
                 accion="Tanqueo Registrado",
-                detalle=f"Sede: {ubicacion}. Facturado: {round(masa_facturada_total, 2)} kg. Valor: ${precio_total:,.0f}",
+                detalle=f"Sede: {ubicacion}. Facturado: {round(masa_facturada_total, 2)} kg.",
                 nivel="INFO"
             )
-            # =================================
 
             mysql.connection.commit()
 
@@ -1445,7 +1464,6 @@ def registrar_tanqueo():
 
     except ValueError as e:
         mysql.connection.rollback()
-        # Auditoría WARNING por error de usuario (nivel invertido)
         try:
              registrar_auditoria(id_empresa, empresa, "GLP", usuario, "⛔ Error Datos Tanqueo", str(e), "WARNING")
              mysql.connection.commit()
@@ -1456,7 +1474,6 @@ def registrar_tanqueo():
         print("⛔ Error en registrar_tanqueo:")
         traceback.print_exc()
         mysql.connection.rollback()
-        # Auditoría CRITICAL
         try:
             registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Crítico (Tanqueo)", str(e), "CRITICAL")
             mysql.connection.commit()
@@ -1513,8 +1530,6 @@ def registrar_consumo():
 
     codigo_pedido = None
     tanques_bajos = []
-    dr = 0
-    tr = 0.0
     ts_solicitado = 0.0
 
     try:
@@ -1525,10 +1540,18 @@ def registrar_consumo():
                 WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
                 ORDER BY fecha DESC, id DESC LIMIT 1
             """, (empresa, ubicacion))
-            row = cur.fetchone() or {}
-            if not row.get("lote"):
+            
+            # --- BLINDAJE ---
+            row_raw = cur.fetchone()
+            if row_raw:
+                if isinstance(row_raw, dict):
+                    lote_id = row_raw.get("lote")
+                else:
+                    lote_id = row_raw[0]
+            # ----------------
+
+            if not lote_id:
                 return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
-            lote_id = row["lote"]
 
             columnas = [
                 "fecha","empresa","id_empresa","ubicacion",
@@ -1554,7 +1577,6 @@ def registrar_consumo():
             saldo_estimado_kg = 0.0
             tanques_bajos = []
 
-            # Instancia de festivos (Lógica conservada)
             co_holidays = holidays.CO()
 
             for tk in tanques:
@@ -1570,33 +1592,20 @@ def registrar_consumo():
                 except: cap = 0.0
                 tst = tk.get("testigo")
 
-                # ==============================================================================
-                # LÓGICA DE SOLICITUD DE TANQUEO (Estándar + Proyección Viernes/Festivos)
-                # ==============================================================================
                 es_bajo = False
-                
-                # 1. CRITERIO ESTÁNDAR: Nivel crítico inmediato (<= 25%)
                 if val <= 25.0:
                     es_bajo = True
-                
-                # 2. CRITERIO PROYECCIÓN VIERNES: Si es Viernes y nivel > 25, proyectamos consumo
-                elif fecha.weekday() == 4: # 4 = Viernes
+                elif fecha.weekday() == 4: 
                     lunes_siguiente = fecha + timedelta(days=3)
                     es_puente = lunes_siguiente in co_holidays
-                    
                     dias_proyeccion = 3 if es_puente else 2
                     tasa_diaria = 8.0 
-                    consumo_proyectado = dias_proyeccion * tasa_diaria
-                    
-                    nivel_futuro_estimado = val - consumo_proyectado
-                    nivel_minimo_seguridad = 15.0
-                    
-                    if nivel_futuro_estimado < nivel_minimo_seguridad:
+                    nivel_futuro_estimado = val - (dias_proyeccion * tasa_diaria)
+                    if nivel_futuro_estimado < 15.0:
                         es_bajo = True
                 
                 if num and es_bajo:
                     tanques_bajos.append({"numero": num, "nivel": round(val, 2)})
-                # ==============================================================================
 
                 set_cols.append(f"`nivel tk-{num}`=%s"); set_vals.append(val)
                 set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(cap)
@@ -1630,7 +1639,6 @@ def registrar_consumo():
             proveedor_principal = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
             cur.execute("UPDATE cardex_glp SET proveedor=%s WHERE id=%s", (proveedor_principal, id_operacion))
 
-            # Algoritmo (foto) -> ts variable
             dr, tr, ts_solicitado = _calcular_ts_consumo(dias_operacion)
 
             if tanques_bajos and ts_solicitado > 0:
@@ -1643,7 +1651,6 @@ def registrar_consumo():
 
             mysql.connection.commit()
 
-        # Enviar correo al proveedor (no bloqueante)
         if codigo_pedido and tanques_bajos and ts_solicitado > 0:
             try:
                 enviado = _enviar_alerta_pedido_tanqueo_consumo(
@@ -1655,8 +1662,6 @@ def registrar_consumo():
                     codigo_pedido=codigo_pedido,
                     ts_solicitado=ts_solicitado
                 )
-
-                # === AUDITORÍA: CORREO PEDIDO CONSUMO ===
                 if enviado:
                     registrar_auditoria(
                         empresa_id=id_empresa,
@@ -1664,15 +1669,12 @@ def registrar_consumo():
                         modulo="GLP",
                         usuario="Sistema",
                         accion="📧 Pedido Gas (Consumo)",
-                        detalle=f"Sede: {ubicacion}. Código: {codigo_pedido}. Nivel crítico o proyección fin de semana.",
+                        detalle=f"Sede: {ubicacion}. Código: {codigo_pedido}.",
                         nivel="INFO"
                     )
-                # ========================================
-
             except Exception as e:
                 app.logger.error(f"Error enviando correo pedido CONSUMO: {e}")
 
-        # === AUDITORÍA: EXITO CONSUMO ===
         registrar_auditoria(
             empresa_id=id_empresa,
             empresa_nombre=empresa,
@@ -1682,7 +1684,6 @@ def registrar_consumo():
             detalle=f"Sede: {ubicacion}. Consumo: {round(consumo_kg, 2)} kg.",
             nivel="INFO"
         )
-        # ================================
 
         mensaje = "Consumo registrado correctamente."
         if consumo_kg > 0:
@@ -1713,7 +1714,6 @@ def registrar_consumo():
     
     except ValueError as e:
         mysql.connection.rollback()
-        # Auditoría WARNING (posible error lógico o nivel subiendo en consumo)
         try:
             registrar_auditoria(id_empresa, empresa, "GLP", usuario, "⛔ Error Lógico Consumo", str(e), "WARNING")
             mysql.connection.commit()
@@ -1724,7 +1724,6 @@ def registrar_consumo():
         print("⛔ Error en registrar_consumo:")
         traceback.print_exc()
         mysql.connection.rollback()
-        # Auditoría CRITICAL
         try:
             registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Crítico (Consumo)", str(e), "CRITICAL")
             mysql.connection.commit()
@@ -1738,7 +1737,6 @@ def registrar_consumo():
 @bp_glp.route('/finalizar_calefaccion_batch', methods=['POST'])
 @login_required_custom
 def finalizar_calefaccion_batch():
-    # Código original restaurado (simplificado)
     try:
         data = request.get_json(force=True) or {}
     except Exception:
@@ -1773,11 +1771,19 @@ def finalizar_calefaccion_batch():
                 WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
                 ORDER BY fecha DESC, id DESC LIMIT 1
             """, (empresa, ubicacion))
-            row = cur.fetchone() or {}
-            if not row.get("lote"):
-                return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
+            
+            # --- BLINDAJE ---
+            row_raw = cur.fetchone()
+            lote_id = None
+            if row_raw:
+                if isinstance(row_raw, dict):
+                    lote_id = row_raw.get("lote")
+                else:
+                    lote_id = row_raw[0]
+            # ----------------
 
-            lote_id = row["lote"]
+            if not lote_id:
+                return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
 
             fecha = datetime.now().date()
             columnas = [
@@ -1804,24 +1810,15 @@ def finalizar_calefaccion_batch():
             saldo_estimado_kg = 0.0
 
             for tk in tanques:
-                # AJUSTE 2: Limpieza y prefijo tk-
-                # raw_num = str(tk.get("numero", "")).lower().replace("tk-", "")
-                # num = raw_num.strip()
-                
                 num_str = str(tk.get("numero", ""))
                 match = _re.search(r'\d+', num_str)
                 num = match.group() if match else ""  
-                
                 if not num: continue
 
-                try:
-                    niv = float(tk.get("nivel", 0))
-                except Exception:
-                    niv = 0.0
-                try:
-                    cap = float(tk.get("capacidad", 0))
-                except Exception:
-                    cap = 0.0
+                try: niv = float(tk.get("nivel", 0))
+                except: niv = 0.0
+                try: cap = float(tk.get("capacidad", 0))
+                except: cap = 0.0
                 tst = tk.get("testigo")
 
                 set_cols.append(f"`nivel tk-{num}`=%s"); set_vals.append(niv)
@@ -1856,16 +1853,12 @@ def finalizar_calefaccion_batch():
             proveedor_principal = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
             cur.execute("UPDATE cardex_glp SET proveedor=%s WHERE id=%s", (proveedor_principal, id_operacion))
 
-            # cerrar lote
             cur.execute("""
                 UPDATE cardex_glp
                    SET estatus_lote='INACTIVO'
                  WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND lote=%s
             """, (empresa, ubicacion, lote_id))
 
-            # =======================================================
-            # AUDITORÍA: Fin de Calefacción
-            # =======================================================
             registrar_auditoria(
                 empresa_id=id_empresa,
                 empresa_nombre=empresa,
@@ -1875,7 +1868,6 @@ def finalizar_calefaccion_batch():
                 detalle=f"Sede: {ubicacion}. Lote cerrado: {lote_id}.",
                 nivel="INFO"
             )
-            # =======================================================
 
             mysql.connection.commit()
 
@@ -1903,13 +1895,9 @@ def finalizar_calefaccion_batch():
 
         return jsonify({"success": True, "message": mensaje, "resumen": resumen})
 
-    # === AGREGAR ESTO JUSTO ANTES DEL EXCEPT EXCEPTION ===
     except ValueError as e:
-        # Aquí atrapamos el error del nivel y abortamos todo
         mysql.connection.rollback()
-        # Devolvemos success:False para que el Frontend muestre la alerta roja
         return jsonify({"success": False, "message": str(e)})
-    # =====================================================
     
     except Exception:
         print("⛔ Error en finalizar_calefaccion_batch:")
@@ -1917,37 +1905,17 @@ def finalizar_calefaccion_batch():
         mysql.connection.rollback()
         return jsonify({"success": False, "message": "Error al finalizar calefacción."})
 
-# ==============
-# NUEVOS: MÓDULO DE VALIDACIÓN DE FACTURAS
-# ==============
-
-
-
-# =======================================================
-# AQUÍ SIGUE LO QUE YA TIENES (MÓDULO DE VALIDACIÓN...)
-# =======================================================
-
-
-# --- FUNCIÓN DE CONSULTA DE PEDIDOS (CORREGIDA) ---
+# --- FUNCIÓN DE CONSULTA DE PEDIDOS ---
 @bp_glp.route('/consultar_pedidos_pendientes', methods=['POST'])
 @login_required_custom
 def consultar_pedidos_pendientes():
-    """
-    Consulta pedidos GLP con estatus 'generado' para la empresa del usuario.
-    Incluye proveedor, ubicación, y lote.
-    """
-    
     empresa_nombre = session.get('empresa')
-    
     if not empresa_nombre:
         return jsonify({"success": False, "message": "Falta el nombre de la empresa en la sesión."}), 400
 
     try:
         cur = mysql.connection.cursor()
-        
-        # === CORRECCIÓN AQUÍ ===
-        # Cambiamos fecha_generacion por fecha_registro
-        query = """
+        cur.execute("""
             SELECT 
                 p.id, 
                 p.codigo_pedido, 
@@ -1958,19 +1926,14 @@ def consultar_pedidos_pendientes():
             FROM pedidos_gas_glp p
             WHERE p.cliente = %s AND p.estatus = 'generado'
             ORDER BY p.fecha_registro DESC
-        """
-        cur.execute(query, (empresa_nombre,))
+        """, (empresa_nombre,))
         
-        # Recuperar nombres de columnas si usas tuplas, o confiar en el orden
         pedidos = cur.fetchall()
         cur.close()
         
-        # Si 'pedidos' son tuplas, el orden es: 
-        # 0:id, 1:codigo, 2:fecha, 3:proveedor, 4:ubicacion, 5:lote
-        
         pedidos_listos = []
         for pedido in pedidos:
-            # Detectamos si es diccionario (DictCursor) o Tupla
+            # --- BLINDAJE ---
             if isinstance(pedido, dict):
                 p_id = pedido['id']
                 p_cod = pedido['codigo_pedido']
@@ -1979,18 +1942,17 @@ def consultar_pedidos_pendientes():
                 p_ubi = pedido['ubicacion']
                 p_lot = pedido['lote']
             else:
-                # Es tupla
                 p_id = pedido[0]
                 p_cod = pedido[1]
                 p_fec = pedido[2]
                 p_prov = pedido[3]
                 p_ubi = pedido[4]
                 p_lot = pedido[5]
+            # ----------------
 
             pedidos_listos.append({
                 "id": p_id,
                 "codigo": p_cod,
-                # Formateamos la fecha para el Frontend
                 "fecha": p_fec.strftime('%Y-%m-%d %H:%M') if p_fec else 'N/A',
                 "proveedor": p_prov if p_prov else 'N/A',
                 "ubicacion": p_ubi,
@@ -2009,16 +1971,9 @@ def consultar_pedidos_pendientes():
 @login_required_custom
 @csrf.exempt 
 def validar_pedido():
-    """
-    Actualiza el estatus de un pedido a 'validado',
-    guardando el número de factura y el ID del validador (cédula).
-    """
-    
     data = request.json
     pedido_id = data.get('pedido_id')
     numero_factura = data.get('numero_factura')
-    
-    # Asumo que la cédula del validador está en la sesión
     validador_cedula = session.get('cedula') 
     
     if not all([pedido_id, numero_factura, validador_cedula]):
@@ -2026,7 +1981,6 @@ def validar_pedido():
         
     try:
         cur = mysql.connection.cursor()
-        
         update_query = """
             UPDATE pedidos_gas_glp
             SET estatus = 'validado', 
@@ -2035,7 +1989,6 @@ def validar_pedido():
                 numero_factura = %s         
             WHERE id = %s AND estatus = 'generado'
         """
-        
         cur.execute(update_query, (validador_cedula, numero_factura, pedido_id))
         
         if cur.rowcount == 0:
@@ -2045,7 +1998,6 @@ def validar_pedido():
         
         mysql.connection.commit()
         cur.close()
-        
         return jsonify({"success": True, "message": f"Pedido {pedido_id} validado correctamente. Número de factura: {numero_factura}."})
 
     except Exception:
@@ -2059,18 +2011,13 @@ def validar_pedido():
 @bp_glp.route('/facturas', methods=['GET'])
 @login_required_custom
 def ver_facturas_glp():
-    """
-    Renderiza la plantilla HTML cargando los pedidos pendientes desde el servidor.
-    """
     empresa = session.get('empresa')
     nombre = session.get('nombre')
-    # Intentamos obtener cédula, si no está, usamos el user_id o un string vacío
     cedula = session.get('cedula') or session.get('user_id') or 'N/D'
 
     try:
         cur = mysql.connection.cursor()
-        # Buscamos los pedidos 'generado'
-        query = """
+        cur.execute("""
             SELECT 
                 p.id, 
                 p.codigo_pedido, 
@@ -2080,14 +2027,13 @@ def ver_facturas_glp():
             FROM pedidos_gas_glp p
             WHERE p.cliente = %s AND p.estatus = 'generado'
             ORDER BY p.fecha_registro DESC
-        """
-        cur.execute(query, (empresa,))
+        """, (empresa,))
         rows = cur.fetchall()
         cur.close()
 
         pedidos_listos = []
         for row in rows:
-            # Manejo robusto (DictCursor o Tupla)
+            # --- BLINDAJE ---
             if isinstance(row, dict):
                 p_id = row['id']
                 p_cod = row['codigo_pedido']
@@ -2095,23 +2041,21 @@ def ver_facturas_glp():
                 p_prov = row.get('proveedor')
                 p_ubi = row['ubicacion']
             else:
-                # Orden en tupla: id, codigo, fecha, proveedor, ubicacion
                 p_id = row[0]
                 p_cod = row[1]
                 p_fec = row[2]
                 p_prov = row[3]
                 p_ubi = row[4]
+            # ----------------
 
             pedidos_listos.append({
                 "id": p_id,
                 "codigo_pedido": p_cod,
-                # Formateamos la fecha para que se vea bien en el HTML
                 "fecha_generacion": p_fec.strftime('%Y-%m-%d %H:%M') if p_fec else 'N/A',
                 "proveedor": p_prov,
                 "ubicacion": p_ubi
             })
 
-        # Renderizamos pasando las variables que el HTML necesita
         return render_template('facturas_glp.html', 
                                pedidos=pedidos_listos, 
                                empresa=empresa, 
