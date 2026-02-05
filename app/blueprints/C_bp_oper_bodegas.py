@@ -59,12 +59,14 @@ def operario_items_orden(orden):
 
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # CORRECCIÓN: Traer TODOS los items (incluidos los finalizados) para el cálculo de la barra
         cur.execute("""
             SELECT 
                 id, 
                 codigo_producto, 
                 descripcion_producto, 
                 unidades_calculadas as cantidad, 
+                cantidad_alistada,
                 estado_actividad
             FROM picking_importacion_raw 
             WHERE id_empresa=%s 
@@ -79,21 +81,24 @@ def operario_items_orden(orden):
         return jsonify([])
 
 # --- API 3: CONFIRMAR ITEM ---
-# --- API 3: CONFIRMAR ITEM CON CANTIDAD REAL ---
 @bp_oper_bodegas.route('/api/operario/confirmar_item', methods=['POST'])
-@csrf.exempt
+@csrf.exempt 
 def operario_confirmar_item():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión'}), 401
+    if 'usuario_id' not in session: 
+        return jsonify({'error': 'Sesión expirada, recarga la página'}), 401
     
     d = request.json
     id_row = d.get('id_row')
-    # Recibimos la cantidad real que contó el operario
-    cantidad_real = d.get('cantidad_alistada', 0) 
+    cantidad_real = d.get('cantidad_alistada', 0)
     
+    # Validación básica
+    if not id_row: 
+        return jsonify({'error': 'Datos incompletos'}), 400
+
     try:
         cur = mysql.connection.cursor()
         
-        # Actualizamos estado, fecha fin Y la cantidad real
+        # 1. Ejecutar actualización
         cur.execute("""
             UPDATE picking_importacion_raw 
             SET 
@@ -104,7 +109,11 @@ def operario_confirmar_item():
         """, (cantidad_real, id_row, session.get('empresa_id')))
         
         mysql.connection.commit()
+        
+        # 2. Verificar si se actualizó algo (Si rowcount es 0, puede ser que ya estaba finalizado, retornamos OK igual)
         cur.close()
-        return jsonify({'status': 'ok'})
+        return jsonify({'status': 'ok', 'message': 'Item confirmado'})
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error Confirmar: {e}") # Verás esto en el log de errores de PythonAnywhere
+        return jsonify({'error': f'Error interno: {str(e)}'}), 500

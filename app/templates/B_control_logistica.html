@@ -43,7 +43,6 @@
         .btn-alistamiento { background: #fef3c7; color: #b45309; font-weight: 600; }
         .btn-alistamiento:hover { background: #fde68a; }
         
-        /* CORRECCIÓN CSS AQUI: Sintaxis limpia para evitar error en VS Code */
         .btn-logout { 
             margin-top: auto; 
             background: var(--color-primary) !important; 
@@ -75,7 +74,6 @@
             backdrop-filter: blur(3px); z-index: 1000;
         }
         
-        /* Modal Grande para Alistamiento */
         .modal-large {
             width: 95%; max-width: 1200px; height: 90vh; 
             background: #f9fafb; border-radius: 16px; display: flex; flex-direction: column;
@@ -91,7 +89,6 @@
         .modal-body { padding: 2rem; overflow-y: auto; flex: 1; }
         .modal-footer { padding: 1.5rem; background: white; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 1rem; }
 
-        /* TABLAS DENTRO DEL MODAL */
         .section-box { background: white; border-radius: 12px; border: 1px solid var(--color-border); margin-bottom: 2rem; overflow: hidden; }
         .section-title { padding: 1rem 1.5rem; background: #f8fafc; border-bottom: 1px solid var(--color-border); font-weight: 600; margin: 0; font-size: 1.1rem; }
         
@@ -110,7 +107,6 @@
         .btn-cancel { background: white; border: 1px solid var(--color-border); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; }
         .btn-confirm { background: var(--color-primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; }
 
-        /* Drag Area */
         .drop-area { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 3rem; text-align: center; cursor: pointer; background: #f8fafc; }
         .drop-area:hover { border-color: var(--color-primary); background: #f0fdfa; }
 
@@ -242,7 +238,7 @@
                                 <th>Estado</th>
                                 <th>Orden Actual</th>
                                 <th>Progreso (Items)</th>
-                                <th>Acción</th>
+                                <th>Tiempo</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -267,7 +263,13 @@
                                     </td>
                                     
                                     <td>
-                                        <button onclick="verDetalleOrden('{{ op.orden }}')" style="border:none; background:transparent; cursor:pointer;">👁️</button>
+                                        {% if op.estado == 'FINALIZADO' %}
+                                            <span style="color:#059669; font-weight:bold;">✔ Listo</span>
+                                        {% elif op.inicio %}
+                                            <span class="cronometro" data-inicio="{{ op.inicio }}" style="font-family:monospace; font-weight:bold; color:#d97706;">Calculando...</span>
+                                        {% else %}
+                                            <span style="color:#9ca3af;">--:--</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -289,7 +291,7 @@
                 <div style="display:flex; align-items:center; gap:10px;">
                     <h3 style="margin:0; color:#1f2937; font-size:1.4rem;">🔎 Orden #<span id="lblOrdenDetalle" style="color:var(--color-primary);"></span></h3>
                 </div>
-                <button class="btn-cancel" onclick="document.getElementById('modalDetalleOrden').style.display='none'" style="border:none; padding:0; font-size:1.8rem; color:#9ca3af; cursor:pointer;">&times;</button>
+                <button class="btn-cancel" onclick="cerrarModalDetalle()" style="border:none; padding:0; font-size:1.8rem; color:#9ca3af; cursor:pointer;">&times;</button>
             </div>
 
             <div class="modal-body" style="padding: 20px; display: flex; gap: 20px; height: 100%; overflow: hidden; box-sizing: border-box;">
@@ -379,25 +381,40 @@
     </div>
 
     <script>
+        // VARIABLE GLOBAL PARA EL POLLING
+        let intervaloDetalle = null;
+
         // -- FUNCION JS: CARGAR DETALLE MEJORADO --
         function verDetalleOrden(orden) {
             document.getElementById('lblOrdenDetalle').textContent = orden;
             document.getElementById('modalDetalleOrden').style.display = 'flex';
             
+            // 1. Cargar inmediatamente al abrir
+            cargarDatosDetalle(orden);
+            
+            // 2. Configurar auto-recarga (5 minutos = 300000 ms)
+            if(intervaloDetalle) clearInterval(intervaloDetalle);
+            intervaloDetalle = setInterval(() => cargarDatosDetalle(orden), 300000);
+        }
+
+        // Función para detener el consumo cuando se cierra el modal
+        function cerrarModalDetalle() {
+            if(intervaloDetalle) clearInterval(intervaloDetalle);
+            document.getElementById('modalDetalleOrden').style.display = 'none';
+        }
+
+        // Función separada para la carga de datos
+        function cargarDatosDetalle(orden) {
             const tbPend = document.getElementById('tblPendientesBody');
             const tbList = document.getElementById('tblListosBody');
             
-            tbPend.innerHTML = '<tr><td colspan="2" style="padding:40px; text-align:center; color:#9ca3af;">⏳ Cargando...</td></tr>';
-            tbList.innerHTML = '<tr><td colspan="2" style="padding:40px; text-align:center; color:#9ca3af;">⏳ Cargando...</td></tr>';
-            
-            // NOTA: Conecto a items_orden que es lo que tiene el backend ahora
             fetch(`/bodegas/api/items_orden/${orden}`)
                 .then(r => r.json())
                 .then(items => {
+                    // Limpiamos contenido
                     tbPend.innerHTML = '';
                     tbList.innerHTML = '';
 
-                    // Filtramos en JS porque el backend manda todo junto
                     const pendientes = items.filter(i => i.estado_actividad !== 'FINALIZADO');
                     const alistados = items.filter(i => i.estado_actividad === 'FINALIZADO');
 
@@ -405,7 +422,7 @@
                     document.getElementById('countListos').textContent = alistados.length;
 
                     const crearFila = (item, color, esPar) => `
-                        <tr style="background-color: ${esPar ? '#f9fafb' : '#ffffff'}; border-bottom: 1px solid #f3f4f6;">
+                        <tr style="background-color: ${esPar ? '#f9fafb' : '#ffffff'}; border-bottom: 1px solid #f3f4f6; animation: fadeIn 0.3s;">
                             <td style="padding: 10px 12px; color: #374151;">
                                 <div style="font-weight:600;">${item.descripcion_producto}</div>
                                 <div style="font-size:0.75rem; color:#6b7280;">${item.codigo_producto}</div>
@@ -422,10 +439,7 @@
                     if (alistados.length === 0) tbList.innerHTML = '<tr><td colspan="2" style="padding:20px; text-align:center;">⏳ Nada listo</td></tr>';
                     else alistados.forEach((i, x) => tbList.innerHTML += crearFila(i, '#10b981', x % 2 === 0));
                 })
-                .catch(err => {
-                    console.error(err);
-                    tbPend.innerHTML = '<tr><td colspan="2" style="padding:20px; color:red;">❌ Error</td></tr>';
-                });
+                .catch(err => console.error("Error polling:", err));
         }
 
         // -- ALISTAMIENTO --
@@ -462,6 +476,35 @@
                 body: JSON.stringify({numero_orden:curOrden, id_operario:s.value, nombre_operario:s.options[s.selectedIndex].getAttribute('data-n')})
             }).then(r=>r.json()).then(d=>{ alert(d.message||d.error); location.reload(); });
         }
+
+        // -- CRONOMETRO EN VIVO --
+        function actualizarCronometros() {
+            const cronometros = document.querySelectorAll('.cronometro');
+            const ahora = new Date();
+
+            cronometros.forEach(el => {
+                const inicioStr = el.getAttribute('data-inicio');
+                if(!inicioStr) return;
+                
+                const fechaInicio = new Date(inicioStr.replace(' ', 'T'));
+                if(isNaN(fechaInicio.getTime())) return;
+
+                const diff = ahora - fechaInicio;
+                if (diff > 0) {
+                    const horas = Math.floor(diff / (1000 * 60 * 60));
+                    const minutos = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const segundos = Math.floor((diff % (1000 * 60)) / 1000);
+
+                    el.textContent = 
+                        (horas < 10 ? "0" + horas : horas) + ":" + 
+                        (minutos < 10 ? "0" + minutos : minutos) + ":" + 
+                        (segundos < 10 ? "0" + segundos : segundos);
+                }
+            });
+        }
+        
+        setInterval(actualizarCronometros, 1000);
+        actualizarCronometros();
     </script>
 </body>
 </html>

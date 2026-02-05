@@ -40,7 +40,6 @@ def control_logistica():
             kpis['items_finalizados'] = int(row['listos'] or 0)
 
         # 2. Obtener Órdenes SIN ASIGNAR (Para el Modal de Alistamiento)
-        # Agrupamos por Orden para no repetir filas
         cur.execute("""
             SELECT 
                 numero_orden_origen as orden,
@@ -62,7 +61,8 @@ def control_logistica():
                 MAX(zona) as zona,
                 COUNT(*) as total_items,
                 SUM(CASE WHEN estado_actividad='FINALIZADO' THEN 1 ELSE 0 END) as items_listos,
-                MAX(estado_actividad) as estado
+                MAX(estado_actividad) as estado,
+                MIN(fecha_inicio_alistamiento) as inicio
             FROM picking_importacion_raw
             WHERE id_empresa = %s AND estado_actividad IN ('ASIGNADO', 'EN_PROCESO', 'FINALIZADO')
             GROUP BY numero_orden_origen
@@ -81,7 +81,7 @@ def control_logistica():
                            ordenes_pendientes=ordenes_sin_asignar, # Para el modal
                            ordenes_asignadas=ordenes_asignadas)    # Para la tabla
 
-# --- 2. API: DETALLE DE ITEMS DE UNA ORDEN (LO QUE FALTABA) ---
+# --- 2. API: DETALLE DE ITEMS DE UNA ORDEN ---
 @bp_bodegas.route('/bodegas/api/items_orden/<orden>')
 def get_items_orden(orden):
     if 'usuario_id' not in session: return jsonify([])
@@ -132,7 +132,7 @@ def asignar_orden():
         return jsonify({'message': 'Orden asignada.'})
     except Exception as e: return jsonify({'error': str(e)}), 500
 
-# --- 5. FUNCIONES AUXILIARES Y CARGA EXCEL (TU CÓDIGO ACTUAL) ---
+# --- 5. FUNCIONES AUXILIARES Y CARGA EXCEL ---
 def normalizar_codigo(valor):
     if pd.isna(valor) or str(valor).strip() == '': return ''
     val_str = str(valor).strip()

@@ -85,7 +85,10 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .item-row.active { border-left-color: var(--secondary); }
-        .item-row.done { opacity: 0.6; background: #f8fafc; border: 1px solid #f1f5f9; }
+        
+        /* CORRECCIÓN 1: AGREGADO display: none !important PARA QUE DESAPAREZCAN */
+        .item-row.done { opacity: 0.6; background: #f8fafc; border: 1px solid #f1f5f9; display: none !important; }
+        
         .qty-indicator {
             min-width: 50px; height: 50px; background: var(--bg-light); color: var(--primary-dark);
             border-radius: 10px; display: flex; align-items: center; justify-content: center;
@@ -329,7 +332,7 @@
             const c = document.getElementById('items-container');
             c.innerHTML = '<p style="text-align:center; padding:20px;">Cargando inventario...</p>';
             fetch(`/api/operario/items_orden/${ordenActual}`).then(r=>r.json()).then(d=>{
-                listaItems = d.map(i => ({...i, alistado: 0})); 
+                listaItems = d.map(i => ({...i, alistado: i.cantidad_alistada || 0})); 
                 renderizarItems();
             });
         }
@@ -402,11 +405,16 @@
             if(!itemActivo) return;
             document.getElementById('cam-overlay-btn').style.display = 'none'; // Ocultar botón
             
+            // CORRECCIÓN 2: AUMENTADO FPS A 25 PARA MAYOR FLUIDEZ
             scanner = new Html5Qrcode("embedded-reader");
-            scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 200 }, 
+            scanner.start({ facingMode: "environment" }, { fps: 25, qrbox: 200 }, 
                 (decodedText) => {
                     // Validar Código
-                    if(itemActivo.codigo_producto && decodedText === itemActivo.codigo_producto){
+                    // Normalización simple para comparar
+                    const scanned = decodedText.trim().toUpperCase();
+                    const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
+
+                    if(target && scanned === target){
                         document.getElementById('snd-beep').play();
                         itemActivo.alistado++;
                         document.getElementById('pk-count').textContent = itemActivo.alistado;
@@ -445,6 +453,7 @@
             document.getElementById('modal-verify').style.display = 'none';
         }
 
+        // CORRECCIÓN 3: MANEJO DE ERROR DE RED Y ACTUALIZACIÓN VISUAL
         function confirmarVerificacion(){
             const btn = document.querySelector('.btn-v-confirm');
             btn.textContent = '...';
@@ -462,14 +471,39 @@
                     cancelarVerificacion();
                     cerrarModalPicking();
                     itemActivo.estado_actividad = 'FINALIZADO';
-                    renderizarItems();
+                    renderizarItems(); // Aquí se ocultará gracias a la clase .done
                 } else {
                     alert("Error: " + d.error);
                 }
                 btn.textContent = 'CONFIRMAR';
-            }).catch(e=>{ alert("Error red"); btn.textContent = 'CONFIRMAR'; });
+            }).catch(e=>{ alert("Error de Red. Verifique su conexión."); btn.textContent = 'CONFIRMAR'; });
         }
 
+    </script>
+
+    <script>
+        (function() {
+            // 2 Horas = 2 * 60 * 60 * 1000 = 7,200,000 ms
+            const TIEMPO_LIMITE = 7200000; 
+            let temporizadorInactividad;
+
+            function reiniciarTemporizador() {
+                clearTimeout(temporizadorInactividad);
+                temporizadorInactividad = setTimeout(() => {
+                    alert("⚠️ Tu sesión se cerró por inactividad (2 horas).");
+                    window.location.href = '/logout'; 
+                }, TIEMPO_LIMITE);
+            }
+
+            // Detectar cualquier actividad
+            window.onmousemove = reiniciarTemporizador;
+            window.onkeypress = reiniciarTemporizador;
+            window.ontouchstart = reiniciarTemporizador; // Clave para móviles
+            window.onclick = reiniciarTemporizador;
+
+            // Iniciar conteo al cargar
+            reiniciarTemporizador();
+        })();
     </script>
 </body>
 </html>
