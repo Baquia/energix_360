@@ -1,171 +1,285 @@
-from flask import Blueprint, render_template, session, redirect, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, session, redirect
 from app import mysql, csrf
 import pandas as pd
+import re
+from datetime import datetime
 import MySQLdb.cursors
-from werkzeug.utils import secure_filename
 
 bp_bodegas = Blueprint('bodegas', __name__)
 
-# --- RUTAS DE NAVEGACIÓN ---
-@bp_bodegas.route('/bodegas') 
-def home():
-    nit = str(session.get('empresa_id', ''))
-    nombre = session.get('nombre', '')
-    empresa = session.get('empresa', '')
-    return render_template('B_bodegas.html', nit=nit, nombre=nombre, empresa=empresa)
+# --- 1. VISTA PRINCIPAL (DASHBOARD JEFE) ---
+@bp_bodegas.route('/control_logistica')
+def control_logistica():
+    if 'usuario_id' not in session: return redirect('/')
+    
+    empresa_id = session.get('empresa_id')
+    
+    # A. KPI: Pedidos Totales y Pendientes
+    kpis = {'pedidos_totales': 0, 'items_pendientes': 0, 'items_finalizados': 0}
+    
+    # B. Listas para la Vista
+    ordenes_sin_asignar = [] # Para el Modal de Arriba
+    ordenes_asignadas = []   # Para la Tabla de Abajo
 
-@bp_bodegas.route('/bodegas/control')
-def dashboard_control():
-    nit = str(session.get('empresa_id', ''))
-    nombre = session.get('nombre', '')
-    empresa = session.get('empresa', '')
-    kpis = { "pedidos_totales": 0, "pedidos_pendientes": 0, "operarios_activos": 0, "eficiencia_global": "0%" }
-    operarios = []
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # 1. KPIs
-        query_kpi = "SELECT COUNT(DISTINCT numero_orden_origen) as total_ordenes, COUNT(CASE WHEN estado_actividad = 'PENDIENTE' THEN 1 END) as items_pendientes, COUNT(DISTINCT id_auxiliar_asignado) as total_operarios FROM picking_importacion_raw WHERE id_empresa = %s"
-        cur.execute(query_kpi, (nit,))
-        data_kpi = cur.fetchone()
-        if data_kpi:
-            kpis["pedidos_totales"] = data_kpi['total_ordenes']
-            kpis["pedidos_pendientes"] = data_kpi['items_pendientes'] 
-            kpis["operarios_activos"] = data_kpi['total_operarios']
-            total_items = cur.execute("SELECT COUNT(*) FROM picking_importacion_raw WHERE id_empresa = %s", (nit,))
-            if total_items > 0:
-                picked = total_items - kpis["pedidos_pendientes"]
-                eficiencia = (picked / total_items) * 100
-                kpis["eficiencia_global"] = f"{int(eficiencia)}%"
-        # 2. TABLA
-        query_ops = "SELECT nombre_auxiliar_asignado as nombre, MAX(estado_actividad) as estado, COUNT(DISTINCT numero_orden_origen) as ordenes_asignadas, SUM(unidades_calculadas) as total_unidades, MAX(numero_orden_origen) as orden_actual FROM picking_importacion_raw WHERE id_empresa = %s AND nombre_auxiliar_asignado IS NOT NULL GROUP BY nombre_auxiliar_asignado"
-        cur.execute(query_ops, (nit,))
-        raw_operarios = cur.fetchall()
-        for op in raw_operarios:
-            operarios.append({ "nombre": op['nombre'], "estado": op['estado'] if op['estado'] else "Asignado", "orden": op['orden_actual'], "items_hora": int(op['total_unidades'] / 8), "avance": 0 })
+        
+        # 1. Obtener KPIs
+        cur.execute("""
+            SELECT 
+                COUNT(DISTINCT numero_orden_origen) as total,
+                SUM(CASE WHEN estado_actividad != 'FINALIZADO' THEN 1 ELSE 0 END) as pendientes,
+                SUM(CASE WHEN estado_actividad = 'FINALIZADO' THEN 1 ELSE 0 END) as listos
+            FROM picking_importacion_raw 
+            WHERE id_empresa = %s
+        """, (empresa_id,))
+        row = cur.fetchone()
+        if row:
+            kpis['pedidos_totales'] = row['total']
+            kpis['items_pendientes'] = int(row['pendientes'] or 0)
+            kpis['items_finalizados'] = int(row['listos'] or 0)
+
+        # 2. Obtener Órdenes SIN ASIGNAR (Para el Modal de Alistamiento)
+        # Agrupamos por Orden para no repetir filas
+        cur.execute("""
+            SELECT 
+                numero_orden_origen as orden,
+                MAX(zona) as zona,
+                COUNT(*) as items,
+                MAX(fecha_carga) as fecha
+            FROM picking_importacion_raw
+            WHERE id_empresa = %s AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
+            GROUP BY numero_orden_origen
+            ORDER BY MAX(fecha_carga) DESC
+        """, (empresa_id,))
+        ordenes_sin_asignar = cur.fetchall()
+
+        # 3. Obtener Órdenes YA ASIGNADAS O EN PROCESO (Para la Tabla Principal)
+        cur.execute("""
+            SELECT 
+                numero_orden_origen as orden,
+                MAX(nombre_auxiliar_asignado) as operario,
+                MAX(zona) as zona,
+                COUNT(*) as total_items,
+                SUM(CASE WHEN estado_actividad='FINALIZADO' THEN 1 ELSE 0 END) as items_listos,
+                MAX(estado_actividad) as estado
+            FROM picking_importacion_raw
+            WHERE id_empresa = %s AND estado_actividad IN ('ASIGNADO', 'EN_PROCESO', 'FINALIZADO')
+            GROUP BY numero_orden_origen
+            ORDER BY MAX(fecha_inicio_alistamiento) DESC
+        """, (empresa_id,))
+        ordenes_asignadas = cur.fetchall()
+        
         cur.close()
-    except Exception as e: print(f"Error Dashboard: {e}")
-    return render_template('B_control_logistica.html', nit=nit, nombre=nombre, empresa=empresa, kpis=kpis, operarios=operarios)
 
+    except Exception as e:
+        print(f"Error cargando dashboard: {e}")
 
-# --- LÓGICA DE CARGA CALIBRADA ---
+    # Pasamos AMBAS listas a la plantilla
+    return render_template('B_control_logistica.html', 
+                           kpis=kpis, 
+                           ordenes_pendientes=ordenes_sin_asignar, # Para el modal
+                           ordenes_asignadas=ordenes_asignadas)    # Para la tabla
+
+# --- 2. API: DETALLE DE ITEMS DE UNA ORDEN (LO QUE FALTABA) ---
+@bp_bodegas.route('/bodegas/api/items_orden/<orden>')
+def get_items_orden(orden):
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT 
+                id, codigo_producto, descripcion_producto, marca, 
+                unidades_calculadas as cantidad, cantidad_alistada, estado_actividad
+            FROM picking_importacion_raw 
+            WHERE numero_orden_origen = %s AND id_empresa = %s
+        """, (orden, session.get('empresa_id')))
+        items = cur.fetchall()
+        cur.close()
+        return jsonify(items)
+    except Exception as e:
+        return jsonify([])
+
+# --- 3. API: OBTENER LISTA DE OPERARIOS ---
+@bp_bodegas.route('/bodegas/api/get_empleados')
+def get_empleados():
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT id, nombre 
+            FROM usuarios 
+            WHERE empresa_id = %s AND perfil = 'operador_logistica'
+        """, (session.get('empresa_id'),))
+        return jsonify(cur.fetchall())
+    except: return jsonify([])
+
+# --- 4. API: ASIGNAR ORDEN ---
+@bp_bodegas.route('/bodegas/asignar_orden', methods=['POST'])
+@csrf.exempt
+def asignar_orden():
+    if 'usuario_id' not in session: return jsonify({'error': 'Sesión'}), 401
+    d = request.json
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            UPDATE picking_importacion_raw 
+            SET id_auxiliar_asignado=%s, nombre_auxiliar_asignado=%s, estado_actividad='ASIGNADO', fecha_inicio_alistamiento=NOW()
+            WHERE numero_orden_origen=%s AND id_empresa=%s
+        """, (d['id_operario'], d['nombre_operario'], d['numero_orden'], session.get('empresa_id')))
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'message': 'Orden asignada.'})
+    except Exception as e: return jsonify({'error': str(e)}), 500
+
+# --- 5. FUNCIONES AUXILIARES Y CARGA EXCEL (TU CÓDIGO ACTUAL) ---
+def normalizar_codigo(valor):
+    if pd.isna(valor) or str(valor).strip() == '': return ''
+    val_str = str(valor).strip()
+    if 'E' in val_str.upper():
+        try: return str(int(float(valor)))
+        except: pass
+    if val_str.endswith('.0'): return val_str[:-2]
+    return val_str
+
 @bp_bodegas.route('/bodegas/upload_excel', methods=['POST'])
 @csrf.exempt 
 def upload_excel():
     if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
+    empresa_id = str(session.get('empresa_id'))
     file = request.files.get('file')
     if not file: return jsonify({'error': 'No se recibió archivo'}), 400
-    filename = secure_filename(file.filename)
-    
+
     try:
-        # 1. LEER EXCEL
+        # 1. MAESTRA
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT sku, ean, producto, fabricante FROM productos WHERE id_empresa = %s", (empresa_id,))
+        db_products = cur.fetchall()
+        cur.close()
+        maestra_productos = {}
+        for row in db_products:
+            if row[0]: maestra_productos[normalizar_codigo(row[0])] = {'desc': row[2], 'marca': row[3]}
+            if row[1]: maestra_productos[normalizar_codigo(row[1])] = {'desc': row[2], 'marca': row[3]}
+
+        # 2. EXCEL
+        filename = file.filename
         df_raw = pd.read_excel(file, header=None)
         
-        # Variables Metadata
-        meta_orden = "SIN_ORDEN"
-        meta_zona = None
-        meta_creacion = None
-        meta_entrega = None
-
-        # --- MOTOR DE BÚSQUEDA ---
-        for r_idx, row in df_raw.head(20).iterrows():
-            for c_idx, cell_value in enumerate(row):
-                txt = str(cell_value).upper().strip() 
-                
-                # CASO 1: PLANILLA (Abajo 1)
-                if "PLANILA" in txt or "PLANILLA" in txt:
-                    try:
-                        val = str(df_raw.iloc[r_idx + 1, c_idx]).strip()
-                        if val.lower() not in ['nan', 'nat', 'none', '']: meta_orden = val
-                    except: pass
-                
-                # CASO 2: ZONA (Derecha +3) -> ¡AJUSTE CRÍTICO AQUÍ!
-                if "OBSERVACI" in txt:
-                    try:
-                        # Cambiado de +2 a +3 porque hay columnas vacías intermedias
-                        val = str(df_raw.iloc[r_idx, c_idx + 3]).strip()
-                        if val.lower() not in ['nan', 'nat', 'none', '']: meta_zona = val
-                    except: pass
-
-                # CASO 3: CREACION (Derecha +4)
-                if "CREACI" in txt or "GENERADO" in txt:
-                    try:
-                        val = str(df_raw.iloc[r_idx, c_idx + 4]).strip()
-                        if val.lower() not in ['nan', 'nat', 'none', '']: meta_creacion = val
-                    except: pass
-
-                # CASO 4: ENTREGA (Derecha +4)
-                if "ENTREGA" in txt or "DESPACHO" in txt:
-                    try:
-                        val = str(df_raw.iloc[r_idx, c_idx + 4]).strip()
-                        if val.lower() not in ['nan', 'nat', 'none', '']: meta_entrega = val
-                    except: pass
-
-        # --- BÚSQUEDA DE ENCABEZADO ---
-        header_row_index = -1
-        for i, row in df_raw.head(25).iterrows():
-            row_text = [str(v).lower() for v in row.values]
-            has_prod = any('código' in x or 'codigo' in x for x in row_text)
-            has_desc = any('descripción' in x or 'descripcion' in x for x in row_text)
-            if has_prod and has_desc:
-                header_row_index = i
-                break
+        # FASE 1: METADATOS
+        meta_planilla = filename.split('.')[0].replace('_', ' ').strip()
+        found_orden = False
+        keywords_orden = ['PLANILA', 'PLANILLA', 'REMISION', 'ENTREGA', 'PEDIDO', 'ORDEN', 'DOC']
+        max_r = min(20, len(df_raw)); max_c = min(30, len(df_raw.columns))
         
-        if header_row_index == -1: return jsonify({'error': 'No encontré fila de títulos (Código/Descripción).'}), 400
+        for r in range(max_r):
+            for c in range(max_c):
+                val_celda = str(df_raw.iloc[r, c]).upper().strip()
+                if any(k in val_celda for k in keywords_orden):
+                    candidatos = []
+                    for offset in range(1, 8): 
+                        if c + offset < len(df_raw.columns):
+                            cand = str(df_raw.iloc[r, c + offset]).strip()
+                            if cand and cand.upper() != 'NAN': candidatos.append(cand)
+                    if r + 1 < len(df_raw):
+                        for offset in range(0, 5): 
+                            if c + offset < len(df_raw.columns):
+                                cand = str(df_raw.iloc[r + 1, c + offset]).strip()
+                                if cand and cand.upper() != 'NAN': candidatos.append(cand)
+                    for cand in candidatos:
+                        cand_clean = cand.replace(' ', '').upper()
+                        if cand.upper() in ['NAT', 'NAN', 'NONE', 'NULL']: continue
+                        if '-' in cand and any(x.isdigit() for x in cand): continue
+                        if empresa_id in cand_clean: continue
+                        if len(cand) > 20: continue 
+                        if any(k in cand.upper() for k in keywords_orden): continue
+                        meta_planilla = cand; found_orden = True; break
+                if found_orden: break
+            if found_orden: break
 
-        # --- PROCESAR TABLA ---
-        df = df_raw.iloc[header_row_index + 1:].copy()
-        df.columns = df_raw.iloc[header_row_index]
-        df.columns = [str(c).strip().lower() for c in df.columns]
+        # Zona y Fecha
+        raw_head = [str(x).strip().upper() for x in df_raw.head(20).values.flatten() if pd.notna(x)]
+        text_dump = " ".join(raw_head)
+        meta_zona = 'GENERAL'
+        match_zona = re.search(r'(ZONA|RUTA|UBICACION|DESTINO)\s*[:#]?\s*(\w+)', text_dump)
+        if match_zona: meta_zona = match_zona.group(2)
+        meta_fecha = datetime.now().strftime('%Y-%m-%d')
+        match_fecha = re.search(r'(\d{2,4}[-/]\d{2}[-/]\d{2,4})', text_dump)
+        if match_fecha: meta_fecha = match_fecha.group(1)
 
-        col_map = {
-            'codigo_producto': ['código', 'codigo', 'item'],
-            'descripcion_producto': ['descripción', 'descripcion', 'nombre'],
-            'unidades_calculadas': ['unids', 'unidades', 'cant']
+        # FASE 2: TABLA
+        start_row = 0; header_map = {}; found_table = False
+        keywords_cols = {
+            'CODIGO': ['CODIGO', 'EAN', 'ITEM', 'SKU', 'REF', 'MATERIAL', 'ARTICULO'],
+            'DESCRIPCION': ['DESCRIPCION', 'PRODUCTO', 'NOMBRE', 'DETALLE', 'TEXTO', 'MATERIAL'],
+            'CANTIDAD': ['CANTIDAD', 'CANT', 'UND', 'UNIDADES', 'SEPARAR', 'QTY', 'PEDIDO', 'SOLICITADO']
         }
+        for i, row in df_raw.iterrows():
+            row_str = [str(val).upper() for val in row.values]
+            matches = 0; temp_map = {}
+            for col_idx, cell_val in enumerate(row_str):
+                for key, words in keywords_cols.items():
+                    if any(w in cell_val for w in words):
+                        if key not in temp_map: temp_map[key] = col_idx; matches += 1
+            if 'CANTIDAD' in temp_map and matches >= 2:
+                start_row = i + 1; header_map = temp_map; found_table = True; break
+        if not found_table: return jsonify({'error': 'No se detectaron columnas.'}), 400
 
-        df_final = pd.DataFrame()
-        for campo_bd, posibles_nombres in col_map.items():
-            found = False
-            for nombre in posibles_nombres:
-                matches = [c for c in df.columns if nombre in str(c)]
-                if matches:
-                    df_final[campo_bd] = df[matches[0]]
-                    found = True; break
-            if not found: df_final[campo_bd] = None
+        # FASE 3: PROCESAMIENTO
+        data_to_insert = []
+        marca_visual_actual = 'GENERICO'
+        fecha_creacion = datetime.now()
 
-        empresa_id = session.get('empresa_id')
+        for i in range(start_row, len(df_raw)):
+            row = df_raw.iloc[i]
+            try:
+                idx_cant = header_map.get('CANTIDAD')
+                val_cant = row[idx_cant]
+                cantidad = float(val_cant) if (pd.notna(val_cant) and str(val_cant).strip()!='') else 0
+            except: cantidad = 0
+
+            idx_desc = header_map.get('DESCRIPCION'); idx_code = header_map.get('CODIGO')
+            raw_desc = str(row[idx_desc]).strip() if idx_desc is not None and pd.notna(row[idx_desc]) else ""
+            raw_code = row[idx_code] if idx_code is not None else ""
+            val_desc = raw_desc if raw_desc.upper() != 'NAN' else ""
+            val_code = normalizar_codigo(raw_code)
+
+            if cantidad <= 0 and len(val_desc) > 2:
+                if "TOTAL" not in val_desc.upper() and "PÁGINA" not in val_desc.upper():
+                    marca_visual_actual = val_desc.replace(':', '').strip()
+                continue
+
+            if cantidad > 0:
+                final_code = val_code if val_code else 'SIN_CODIGO'
+                final_desc = val_desc
+                final_marca = marca_visual_actual
+                if final_code in maestra_productos:
+                    prod_db = maestra_productos[final_code]
+                    final_desc = prod_db['desc']
+                    if prod_db['marca']: final_marca = prod_db['marca']
+                if not final_desc: final_desc = f"ITEM SIN NOMBRE ({final_code})"
+                data_to_insert.append((empresa_id, meta_planilla, meta_zona, final_code, final_desc, final_marca, cantidad, 0, 'PENDIENTE', fecha_creacion, meta_fecha))
+
+        if not data_to_insert: return jsonify({'error': 'Archivo sin items válidos.'}), 400
+
+        # FASE 4: INSERTAR
         cur = mysql.connection.cursor()
-        filas_insertadas = 0
-        
-        for index, row in df_final.iterrows():
-            if pd.isna(row.get('codigo_producto')): continue
-            val_codigo = str(row['codigo_producto']).strip()
-            if val_codigo.lower() in ['código', 'codigo', 'cambios', 'nan', 'nat']: continue
-            try: val_unidades = int(row['unidades_calculadas'])
-            except: val_unidades = 0
-            if val_unidades == 0: continue 
-
-            query = """
-                INSERT INTO picking_importacion_raw 
-                (id_empresa, nombre_archivo, numero_orden_origen, codigo_producto, 
-                 descripcion_producto, unidades_calculadas, nombre_auxiliar_asignado, 
-                 bodega_detectada, zona, fecha_creacion_orden, fecha_entrega_orden, 
-                 placa_vehiculo, nombre_conductor, estado_actividad)
-                VALUES (%s, %s, %s, %s, %s, %s, NULL, 'General', %s, %s, %s, NULL, NULL, 'PENDIENTE')
-            """
-            cur.execute(query, (
-                empresa_id, filename, meta_orden, val_codigo,
-                str(row['descripcion_producto']) if pd.notna(row['descripcion_producto']) else '',
-                val_unidades, meta_zona, meta_creacion, meta_entrega
-            ))
-            filas_insertadas += 1
-
+        query = """INSERT INTO picking_importacion_raw (id_empresa, numero_orden_origen, zona, codigo_producto, descripcion_producto, marca, unidades_calculadas, cantidad_alistada, estado_actividad, fecha_creacion_orden, fecha_entrega_orden) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+        cur.executemany(query, data_to_insert)
         mysql.connection.commit()
         cur.close()
-        
-        msg = f"Carga Exitosa. Orden: {meta_orden} | Zona: {meta_zona} | Creación: {meta_creacion} | Entrega: {meta_entrega}"
-        return jsonify({'message': msg, 'rows': filas_insertadas})
+        return jsonify({'message': f'✅ Carga Exitosa: {meta_planilla}', 'detalles': f'Items: {len(data_to_insert)}'})
 
     except Exception as e:
-        print(f"Error Excel: {e}")
-        return jsonify({'error': f'Error interno: {str(e)}'}), 500
+        print(f"Error Upload: {e}")
+        return jsonify({'error': f'Error procesando: {str(e)}'}), 500
+
+# API STATS
+@bp_bodegas.route('/api/bodegas/stats')
+def bodegas_stats():
+    if 'usuario_id' not in session: return jsonify({})
+    empresa_id = session.get('empresa_id')
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT COUNT(DISTINCT numero_orden_origen), SUM(CASE WHEN estado_actividad='PENDIENTE' THEN 1 ELSE 0 END), SUM(CASE WHEN estado_actividad='FINALIZADO' THEN 1 ELSE 0 END) FROM picking_importacion_raw WHERE id_empresa = %s", (empresa_id,))
+    row = cur.fetchone()
+    cur.close()
+    return jsonify({'ordenes_activas': row[0] or 0, 'items_pendientes': int(row[1] or 0), 'items_finalizados': int(row[2] or 0)})

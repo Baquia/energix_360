@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WMS Operaciones</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <style>
+        /* --- RESET Y BASE --- */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0; padding: 0; color: #1f2937;
+            display: flex; justify-content: center; min-height: 100vh;
+        }
+
+        .app-container {
+            width: 100%; max-width: 500px; background: #ffffff;
+            min-height: 100vh; position: relative; display: flex; flex-direction: column;
+        }
+
+        /* --- COLORES --- */
+        :root {
+            --primary: #004e92; --primary-dark: #003366;
+            --secondary: #ff6b00; --success: #2ecc71;
+            --bg-light: #f8f9fa; --text-gray: #64748b; --border: #e2e8f0;
+        }
+
+        /* --- HEADER --- */
+        .app-header {
+            background: #ffffff; padding: 15px 25px; position: sticky; top: 0; z-index: 50;
+            border-bottom: 2px solid var(--border); display: flex; justify-content: space-between;
+            align-items: center; height: 70px; box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        }
+        .brand-area { display: flex; align-items: center; gap: 15px; width: 100%; }
+        .logo-img { height: 38px; width: auto; object-fit: contain; }
+        .logo-divider { width: 1px; height: 28px; background-color: #cbd5e1; }
+
+        /* --- CONTENIDO --- */
+        .content-area { flex: 1; padding: 25px; padding-bottom: 100px; overflow-y: auto; background: #f8fafc; }
+
+        /* --- MENU --- */
+        .menu-welcome { margin-bottom: 35px; margin-top: 10px; border-left: 4px solid var(--primary); padding-left: 15px; }
+        .menu-welcome h2 { font-size: 1.8rem; margin: 0; color: var(--primary-dark); font-weight: 800; }
+        .menu-grid { display: grid; gap: 20px; }
+        .menu-card {
+            background: white; border: 1px solid var(--border); border-radius: 12px; padding: 30px 20px;
+            text-align: center; cursor: pointer; position: relative; overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        }
+        .menu-card:active { transform: scale(0.98); background: #f1f5f9; }
+        .menu-card.opt-picking { border-left: 5px solid var(--primary); }
+        .menu-card.opt-alistamiento { border-left: 5px solid var(--secondary); }
+        .menu-icon { font-size: 2.8rem; display: block; margin-bottom: 10px; }
+        .menu-title { font-size: 1.1rem; font-weight: 900; color: var(--primary-dark); text-transform: uppercase; }
+
+        .btn-logout-menu {
+            margin-top: 40px; width: 100%; padding: 16px; background: white;
+            border: 1px solid #fee2e2; color: #ef4444; font-weight: 600; border-radius: 12px;
+            cursor: pointer; display: flex; justify-content: center; gap: 8px;
+        }
+
+        /* --- LISTAS --- */
+        .nav-back {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 25px; cursor: pointer;
+            font-weight: 600; color: var(--text-gray); background: none; border: none; font-size: 1rem;
+        }
+        .order-card {
+            background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04); border-left: 5px solid var(--primary);
+        }
+        .oc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .oc-number { font-size: 1.3rem; font-weight: 800; color: #1e293b; }
+        .oc-badge { background: #e0f2fe; color: var(--primary-dark); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+        .p-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+        .p-fill { height: 100%; background: linear-gradient(90deg, var(--success), #27ae60); transition: width 0.4s ease; }
+
+        .item-row {
+            display: flex; align-items: center; background: white; padding: 16px;
+            border-radius: 12px; margin-bottom: 12px; gap: 15px; border-left: 3px solid transparent;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .item-row.active { border-left-color: var(--secondary); }
+        .item-row.done { opacity: 0.6; background: #f8fafc; border: 1px solid #f1f5f9; }
+        .qty-indicator {
+            min-width: 50px; height: 50px; background: var(--bg-light); color: var(--primary-dark);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; font-weight: 800; border: 1px solid var(--border);
+        }
+        .item-row.done .qty-indicator { color: var(--success); font-size: 1.5rem; border: none; background: transparent; }
+        .item-details { flex: 1; overflow: hidden; }
+        .id-name { font-size: 0.95rem; font-weight: 600; color: #334155; word-break: break-word; }
+        .id-code { font-size: 0.7rem; color: var(--text-gray); font-weight: 600; margin-bottom: 3px; }
+
+        /* --- MODAL TRABAJO (PICKING) --- */
+        .modal-wrap {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.95); z-index: 100; display: none;
+            justify-content: center; align-items: center; backdrop-filter: blur(5px);
+        }
+        
+        .picking-sheet {
+            width: 95%; max-width: 400px; height: 90vh; max-height: 800px;
+            background: white; border-radius: 20px; padding: 20px;
+            display: flex; flex-direction: column; position: relative;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+
+        .btn-close-modal {
+            position: absolute; top: 15px; right: 15px; background: #f1f5f9;
+            width: 32px; height: 32px; border-radius: 50%; border: none;
+            font-weight: bold; color: #64748b; font-size: 1.2rem; cursor: pointer; z-index: 10;
+        }
+
+        /* Info Superior */
+        .pick-header { margin-bottom: 15px; padding-right: 30px; }
+        .pick-prod { font-size: 1.1rem; font-weight: 800; color: var(--primary-dark); line-height: 1.3; margin-bottom: 5px; }
+        .pick-code-pill { background: #f1f5f9; padding: 3px 8px; border-radius: 4px; font-family: monospace; color: var(--text-gray); font-size: 0.85rem; }
+
+        .pick-stats { display: flex; gap: 10px; margin-bottom: 15px; }
+        .stat-box { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 8px; text-align: center; }
+        .stat-lbl { font-size: 0.7rem; color: var(--text-gray); font-weight: 700; text-transform: uppercase; }
+        .stat-val { font-size: 1.1rem; font-weight: 800; color: #1e293b; }
+        .stat-val.loc { color: var(--secondary); }
+
+        /* Área de Cámara (Embedded) */
+        .camera-container {
+            flex: 1; background: #000; border-radius: 12px; overflow: hidden;
+            position: relative; display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
+            min-height: 200px;
+        }
+        #embedded-reader { width: 100%; height: 100%; object-fit: cover; }
+        
+        .btn-start-cam {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.2); border: 2px solid white; color: white;
+            padding: 15px 25px; border-radius: 30px; font-weight: 700;
+            display: flex; align-items: center; gap: 10px; cursor: pointer;
+            backdrop-filter: blur(4px); z-index: 5;
+        }
+        .btn-start-cam:active { background: rgba(255,255,255,0.4); }
+
+        /* Área Contador y Acción */
+        .action-area {
+            background: #fff7ed; border-radius: 16px; padding: 15px;
+            border: 1px solid #ffedd5; text-align: center;
+        }
+        .counter-big { font-size: 3.5rem; font-weight: 900; color: var(--secondary); line-height: 1; display: block; margin-bottom: 5px; }
+        .counter-lbl { font-size: 0.8rem; color: #c2410c; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+        .btn-finish {
+            width: 100%; background: var(--success); color: white; padding: 18px;
+            border-radius: 12px; font-weight: 800; font-size: 1.1rem; border: none;
+            margin-top: 15px; cursor: pointer; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+        }
+        .btn-finish:active { transform: scale(0.98); }
+
+        /* Modal Verificación */
+        .verify-sheet { background: white; width: 85%; max-width: 350px; border-radius: 20px; padding: 30px 20px; text-align: center; }
+        .verify-btns { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-v-cancel { flex: 1; padding: 12px; border: 1px solid var(--border); background: white; border-radius: 10px; font-weight: 700; color: #64748b; }
+        .btn-v-confirm { flex: 1; padding: 12px; border: none; background: var(--success); border-radius: 10px; font-weight: 700; color: white; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <audio id="snd-beep" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
+
+    <div class="app-container">
+        <header class="app-header">
+            <div class="brand-area">
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix360" class="logo-img">
+                <div class="logo-divider"></div>
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" alt="Cliente" class="logo-img" onerror="this.style.display='none'">
+            </div>
+        </header>
+
+        <div id="content-area" class="content-area">
+            
+            <div id="view-menu">
+                <div class="menu-welcome">
+                    <h2>Hola: {{ usuario }}</h2>
+                    <p>Bienvenido a tu turno</p>
+                </div>
+                <div class="menu-grid">
+                    <div class="menu-card opt-picking" onclick="iniciarApp('picking')">
+                        <span class="menu-icon">📦</span>
+                        <span class="menu-title">Picking</span>
+                    </div>
+                    <div class="menu-card opt-alistamiento" onclick="iniciarApp('alistamiento')">
+                        <span class="menu-icon">📋</span>
+                        <span class="menu-title">Inventario</span>
+                    </div>
+                </div>
+                <button class="btn-logout-menu" onclick="location.href='/logout'">Cerrar Sesión</button>
+            </div>
+
+            <div id="view-orders" class="hidden">
+                <button class="nav-back" onclick="volverAlMenu()">⬅ Volver al Menú</button>
+                <h2 style="margin: 5px 0 20px 0; color: var(--primary-dark);">Mis Tareas</h2>
+                <div id="orders-container"></div>
+            </div>
+
+            <div id="view-items" class="hidden">
+                <button class="nav-back" onclick="cargarOrdenes()">⬅ Volver a Órdenes</button>
+                
+                <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px;">
+                    <div style="font-size: 0.75rem; opacity: 0.8;">ORDEN DE PEDIDO</div>
+                    <div style="font-size: 2rem; font-weight: 800;" id="lblOrdenTitle">#0000</div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 600;">
+                        <span>Progreso</span><span id="lblProgress">0/0</span>
+                    </div>
+                    <div class="p-bar"><div id="header-progress-bar" class="p-fill" style="width: 0%; background: white;"></div></div>
+                </div>
+
+                <input type="text" id="searchBox" class="search-bar" placeholder="🔍 Buscar producto..." onkeyup="filtrarLista()" style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px;">
+                <div id="items-container"></div>
+            </div>
+
+            <div id="view-alistamiento" class="hidden">
+                <button class="nav-back" onclick="volverAlMenu()">⬅ Volver</button>
+                <div style="text-align: center; padding-top: 60px; opacity: 0.6;">
+                    <div style="font-size: 4rem;">🏗️</div>
+                    <h2>Inventario</h2>
+                    <p>En construcción</p>
+                </div>
+            </div>
+        </div> 
+    </div> 
+
+    <div id="modal-picking" class="modal-wrap">
+        <div class="picking-sheet">
+            <button class="btn-close-modal" onclick="cerrarModalPicking()">✕</button>
+            
+            <div class="pick-header">
+                <div id="pk-name" class="pick-prod">Nombre del Producto</div>
+                <span id="pk-code" class="pick-code-pill">CODE123</span>
+            </div>
+
+            <div class="pick-stats">
+                <div class="stat-box">
+                    <div class="stat-lbl">Ubicación</div>
+                    <div id="pk-loc" class="stat-val loc">A-01</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-lbl">Solicitado</div>
+                    <div id="pk-req" class="stat-val">0</div>
+                </div>
+            </div>
+
+            <div class="camera-container">
+                <div id="embedded-reader"></div>
+                <div id="cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraIncrustada()">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    ACTIVAR CÁMARA
+                </div>
+            </div>
+
+            <div class="action-area">
+                <span class="counter-lbl">UNIDADES ESCANEADAS</span>
+                <span id="pk-count" class="counter-big">0</span>
+            </div>
+
+            <button class="btn-finish" onclick="intentarTerminarItem()">TERMINAR ITEM</button>
+        </div>
+    </div>
+
+    <div id="modal-verify" class="modal-wrap">
+        <div class="verify-sheet">
+            <div style="font-size: 3rem; margin-bottom: 15px;">🤔</div>
+            <h3 style="margin:0; color:#1e293b;">¿Confirmar Item?</h3>
+            <p style="color:#64748b; line-height:1.5;">
+                Alistaste <b id="vf-count" style="color:var(--secondary); font-size:1.2rem;">0</b> de <b id="vf-req">0</b> solicitadas.
+            </p>
+            <div class="verify-btns">
+                <button class="btn-v-cancel" onclick="cancelarVerificacion()">Revisar</button>
+                <button class="btn-v-confirm" onclick="confirmarVerificacion()">CONFIRMAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ordenActual=null, listaItems=[], itemActivo=null, scanner=null;
+        
+        window.onload = mostrarMenu;
+
+        function mostrarMenu() { toggleView('view-menu'); }
+        function iniciarApp(op) { op==='picking' ? cargarOrdenes() : toggleView('view-alistamiento'); }
+        function volverAlMenu() { mostrarMenu(); }
+        function toggleView(id) {
+            ['view-menu','view-orders','view-items','view-alistamiento'].forEach(v => document.getElementById(v).classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        // --- DATA ---
+        function cargarOrdenes(){
+            toggleView('view-orders');
+            const c = document.getElementById('orders-container');
+            c.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">Cargando...</p>';
+            fetch('/api/operario/mis_ordenes').then(r=>r.json()).then(d=>{
+                c.innerHTML='';
+                if(d.length===0) { c.innerHTML='<p style="text-align:center;">No hay órdenes.</p>'; return; }
+                d.forEach(o=>{
+                    const p = Math.round((o.items_listos / o.total_items) * 100);
+                    c.innerHTML += `
+                        <div class="order-card" onclick="abrirOrden('${o.orden}')">
+                            <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona||'General'}</span></div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;"><span>Avance</span><span>${o.items_listos}/${o.total_items}</span></div>
+                            <div class="p-bar"><div class="p-fill" style="width:${p}%"></div></div>
+                        </div>`;
+                });
+            });
+        }
+
+        function abrirOrden(ord){
+            ordenActual = ord;
+            document.getElementById('lblOrdenTitle').textContent = '#'+ord;
+            toggleView('view-items');
+            cargarItems();
+        }
+
+        function cargarItems(){
+            const c = document.getElementById('items-container');
+            c.innerHTML = '<p style="text-align:center; padding:20px;">Cargando inventario...</p>';
+            fetch(`/api/operario/items_orden/${ordenActual}`).then(r=>r.json()).then(d=>{
+                listaItems = d.map(i => ({...i, alistado: 0})); 
+                renderizarItems();
+            });
+        }
+
+        function renderizarItems(){
+            const c = document.getElementById('items-container');
+            c.innerHTML = '';
+            const txt = document.getElementById('searchBox').value.toLowerCase();
+            const visible = listaItems.filter(i => (i.descripcion_producto||'').toLowerCase().includes(txt) || (i.codigo_producto||'').toLowerCase().includes(txt));
+            
+            let hechos = 0;
+            listaItems.forEach(i => { if(i.estado_actividad === 'FINALIZADO') hechos++; });
+            const pct = listaItems.length > 0 ? (hechos/listaItems.length)*100 : 0;
+            document.getElementById('lblProgress').textContent = `${hechos}/${listaItems.length}`;
+            document.getElementById('header-progress-bar').style.width = `${pct}%`;
+
+            if(visible.length === 0) { c.innerHTML = '<p style="text-align:center;">Sin resultados</p>'; return; }
+
+            visible.forEach(i => {
+                const listo = i.estado_actividad === 'FINALIZADO';
+                const clase = listo ? 'done' : 'active';
+                const icon = listo ? '✔' : i.cantidad;
+                // Limpieza de nombre
+                const nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
+
+                c.innerHTML += `
+                    <div class="item-row ${clase}" onclick="abrirModalPickingId(${i.id})">
+                        <div class="qty-indicator">${icon}</div>
+                        <div class="item-details">
+                            <div class="id-code">${i.codigo_producto || 'S/C'}</div>
+                            <div class="id-name">${i.descripcion_producto.replace(/\.+$/, '')}</div>
+                        </div>
+                    </div>`;
+            });
+
+            if(hechos === listaItems.length && listaItems.length > 0){
+                setTimeout(() => { alert("🚀 ¡Orden Terminada!"); cargarOrdenes(); }, 500);
+            }
+        }
+        function filtrarLista(){ renderizarItems(); }
+
+        // --- TARJETA DE TRABAJO (MODAL) ---
+        function abrirModalPickingId(id){
+            const item = listaItems.find(i => i.id === id);
+            if(!item || item.estado_actividad === 'FINALIZADO') return;
+
+            itemActivo = item;
+            
+            // Llenar datos
+            const nombre = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
+            document.getElementById('pk-name').textContent = nombre;
+            document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
+            document.getElementById('pk-loc').textContent = "A-01"; 
+            document.getElementById('pk-req').textContent = item.cantidad;
+            document.getElementById('pk-count').textContent = item.alistado;
+
+            // Resetear estado cámara
+            document.getElementById('cam-overlay-btn').style.display = 'flex'; // Mostrar botón activar
+            document.getElementById('modal-picking').style.display = 'flex';
+        }
+
+        function cerrarModalPicking(){
+            detenerCamara();
+            document.getElementById('modal-picking').style.display = 'none';
+            itemActivo = null;
+        }
+
+        // --- CÁMARA INCRUSTADA ---
+        function iniciarCamaraIncrustada(){
+            if(!itemActivo) return;
+            document.getElementById('cam-overlay-btn').style.display = 'none'; // Ocultar botón
+            
+            scanner = new Html5Qrcode("embedded-reader");
+            scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 200 }, 
+                (decodedText) => {
+                    // Validar Código
+                    if(itemActivo.codigo_producto && decodedText === itemActivo.codigo_producto){
+                        document.getElementById('snd-beep').play();
+                        itemActivo.alistado++;
+                        document.getElementById('pk-count').textContent = itemActivo.alistado;
+                        
+                        // Pausa breve para no contar mil veces el mismo frame
+                        scanner.pause(true);
+                        setTimeout(() => scanner.resume(), 1200);
+                    }
+                }, 
+                (err) => {}
+            ).catch(err => {
+                alert("No se pudo iniciar la cámara");
+                document.getElementById('cam-overlay-btn').style.display = 'flex';
+            });
+        }
+
+        function detenerCamara(){
+            if(scanner){
+                scanner.stop().then(() => { scanner.clear(); }).catch(e=>console.log(e));
+                scanner = null;
+            }
+        }
+
+        // --- TERMINAR ---
+        function intentarTerminarItem(){
+            if(!itemActivo) return;
+            // Pasamos datos al modal de verificación
+            document.getElementById('vf-count').textContent = itemActivo.alistado;
+            document.getElementById('vf-req').textContent = itemActivo.cantidad;
+            
+            // Ocultamos cámara visualmente (opcional) o superponemos modal
+            document.getElementById('modal-verify').style.display = 'flex';
+        }
+
+        function cancelarVerificacion(){
+            document.getElementById('modal-verify').style.display = 'none';
+        }
+
+        function confirmarVerificacion(){
+            const btn = document.querySelector('.btn-v-confirm');
+            btn.textContent = '...';
+            
+            fetch('/api/operario/confirmar_item', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    id_row: itemActivo.id,
+                    cantidad_alistada: itemActivo.alistado
+                })
+            }).then(r=>r.json()).then(d=>{
+                if(d.status === 'ok'){
+                    document.getElementById('snd-beep').play();
+                    // Cerrar todo
+                    cancelarVerificacion();
+                    cerrarModalPicking();
+                    itemActivo.estado_actividad = 'FINALIZADO';
+                    renderizarItems();
+                } else {
+                    alert("Error: " + d.error);
+                }
+                btn.textContent = 'CONFIRMAR';
+            }).catch(e=>{ alert("Error red"); btn.textContent = 'CONFIRMAR'; });
+        }
+
+    </script>
+</body>
+</html>
