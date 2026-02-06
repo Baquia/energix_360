@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, session, redirec
 from app import mysql, csrf
 import pandas as pd
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import MySQLdb.cursors
 
 bp_bodegas = Blueprint('bodegas', __name__)
@@ -19,7 +19,7 @@ def control_logistica():
     
     # B. Listas para la Vista
     ordenes_sin_asignar = [] # Para el Modal de Arriba
-    ordenes_asignadas = []   # Para la Tabla de Abajo
+    ordenes_procesadas = []  # Lista final ordenada y filtrada para la tabla
 
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -53,7 +53,8 @@ def control_logistica():
         """, (empresa_id,))
         ordenes_sin_asignar = cur.fetchall()
 
-        # 3. Obtener Órdenes YA ASIGNADAS O EN PROCESO (Para la Tabla Principal)
+        # 3. LOGICA MEJORADA: Obtener Órdenes ASIGNADAS con Filtro 24h y Ordenamiento
+        # Traemos MIN(inicio) para el arranque y MAX(fin) para el cierre
         cur.execute("""
             SELECT 
                 numero_orden_origen as orden,
@@ -61,25 +62,62 @@ def control_logistica():
                 MAX(zona) as zona,
                 COUNT(*) as total_items,
                 SUM(CASE WHEN estado_actividad='FINALIZADO' THEN 1 ELSE 0 END) as items_listos,
-                MAX(estado_actividad) as estado,
-                MIN(fecha_inicio_alistamiento) as inicio
+                MIN(fecha_inicio_alistamiento) as inicio,
+                MAX(fecha_fin_alistamiento) as fin
             FROM picking_importacion_raw
             WHERE id_empresa = %s AND estado_actividad IN ('ASIGNADO', 'EN_PROCESO', 'FINALIZADO')
             GROUP BY numero_orden_origen
-            ORDER BY MAX(fecha_inicio_alistamiento) DESC
         """, (empresa_id,))
-        ordenes_asignadas = cur.fetchall()
+        raw_ordenes = cur.fetchall()
+        
+        activos = []
+        finalizados = []
+        ahora = datetime.now()
+
+        for o in raw_ordenes:
+            # Determinar si la orden está completamente finalizada (100% items listos)
+            es_finalizado = (o['items_listos'] == o['total_items']) and (o['total_items'] > 0)
+            
+            # Calcular duración total estática si está finalizado
+            o['duracion_str'] = "--:--"
+            if es_finalizado and o['inicio'] and o['fin']:
+                diff = o['fin'] - o['inicio']
+                total_seconds = int(diff.total_seconds())
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60
+                o['duracion_str'] = f"{hours:02}:{minutes:02}:{seconds:02}"
+
+            if es_finalizado:
+                o['estado_visual'] = 'FINALIZADO'
+                # REGLA DE 24 HORAS:
+                # Si la fecha de fin fue hace menos de 24 horas, se muestra. Si no, se descarta.
+                fecha_cierre = o['fin'] or ahora
+                if (ahora - fecha_cierre) < timedelta(hours=24):
+                    finalizados.append(o)
+            else:
+                o['estado_visual'] = 'EN_PROCESO'
+                activos.append(o)
+
+        # ORDENAMIENTO:
+        # 1. Activos: Los más recientes (por fecha inicio) arriba
+        activos.sort(key=lambda x: x['inicio'] or datetime.min, reverse=True)
+        # 2. Finalizados: Los que terminaron más recientemente arriba
+        finalizados.sort(key=lambda x: x['fin'] or datetime.min, reverse=True)
+
+        # Concatenar: Primero los ACTIVOS, luego los FINALIZADOS
+        ordenes_procesadas = activos + finalizados
         
         cur.close()
 
     except Exception as e:
         print(f"Error cargando dashboard: {e}")
 
-    # Pasamos AMBAS listas a la plantilla
+    # Pasamos las listas a la plantilla
     return render_template('B_control_logistica.html', 
                            kpis=kpis, 
                            ordenes_pendientes=ordenes_sin_asignar, # Para el modal
-                           ordenes_asignadas=ordenes_asignadas)    # Para la tabla
+                           ordenes_asignadas=ordenes_procesadas)   # Para la tabla principal
 
 # --- 2. API: DETALLE DE ITEMS DE UNA ORDEN ---
 @bp_bodegas.route('/bodegas/api/items_orden/<orden>')
