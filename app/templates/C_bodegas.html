@@ -104,7 +104,7 @@
         }
         
         .picking-sheet {
-            width: 95%; max-width: 400px; height: 90vh; max-height: 800px;
+            width: 95%; max-width: 400px; height: 95vh; max-height: 850px; /* Un poco más alto para que quepa la cámara grande */
             background: white; border-radius: 20px; padding: 20px;
             display: flex; flex-direction: column; position: relative;
             box-shadow: 0 25px 50px rgba(0,0,0,0.5);
@@ -129,9 +129,10 @@
         .camera-container {
             flex: 1; background: #000; border-radius: 12px; overflow: hidden;
             position: relative; display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
-            min-height: 200px;
+            min-height: 350px; /* AUMENTADO PARA ALOJAR EL CUADRO DE 300PX */
         }
-        #embedded-reader { width: 100%; height: 100%; object-fit: cover; }
+        
+        #embedded-reader { width: 100%; height: 100%; }
         
         .btn-start-cam {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -172,7 +173,7 @@
 </head>
 <body>
 
-    <audio id="snd-beep" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
+    <audio id="snd-beep" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
     <div class="app-container">
         <header class="app-header">
@@ -291,6 +292,20 @@
     <script>
         let ordenActual=null, listaItems=[], itemActivo=null, scanner=null;
         
+        // Helper seguro para sonido
+        function playBeep() {
+            try {
+                const s = document.getElementById('snd-beep');
+                if(s) {
+                    s.currentTime = 0;
+                    const p = s.play();
+                    if (p !== undefined) {
+                        p.catch(error => { console.log("Audio play blocked (normal on mobile)", error); });
+                    }
+                }
+            } catch(e) { console.log("Audio error", e); }
+        }
+
         window.onload = mostrarMenu;
 
         function mostrarMenu() { toggleView('view-menu'); }
@@ -357,7 +372,6 @@
                 const icon = listo ? '✔' : i.cantidad;
                 const nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
 
-                // Usamos ID para poder borrar el elemento del DOM luego
                 c.innerHTML += `
                     <div id="card_${i.id}" class="item-row ${clase}" onclick="abrirModalPickingId(${i.id})">
                         <div class="qty-indicator">${icon}</div>
@@ -402,43 +416,43 @@
             if(itemActivo){
                 itemActivo.alistado = 0;
                 document.getElementById('pk-count').textContent = "0";
-                scanner.resume(); // Por si estaba pausado
+                if(scanner) scanner.resume();
             }
         }
 
-        // --- CÁMARA INCRUSTADA (CORRECCIÓN: FRENO DE MANO) ---
+        // --- CÁMARA MEJORADA ---
         function iniciarCamaraIncrustada(){
             if(!itemActivo) return;
             document.getElementById('cam-overlay-btn').style.display = 'none'; 
             
+            // CONFIGURACION MEJORADA: Cuadro de 300px
             scanner = new Html5Qrcode("embedded-reader");
-            scanner.start({ facingMode: "environment" }, { fps: 25, qrbox: 200 }, 
+            scanner.start(
+                { facingMode: "environment" }, 
+                { fps: 15, qrbox: { width: 300, height: 300 } }, // <--- TAMAÑO AJUSTADO A 300px
                 (decodedText) => {
                     const scanned = decodedText.trim().toUpperCase();
                     const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
 
                     if(target && scanned === target){
-                        // 1. VALIDAR LIMITE
                         if(itemActivo.alistado >= itemActivo.cantidad) {
-                            document.getElementById('snd-beep').play();
-                            scanner.pause(true); // Pausar escaneo
+                            playBeep(); // Usamos la funcion segura
+                            scanner.pause(true); 
                             alert("✅ Cantidad completada. Termine el item.");
-                            return; // No sumar mas
+                            return; 
                         }
 
-                        // 2. SUMAR
-                        document.getElementById('snd-beep').play();
+                        playBeep(); // Usamos la funcion segura
                         itemActivo.alistado++;
                         document.getElementById('pk-count').textContent = itemActivo.alistado;
                         
-                        // 3. PAUSA BREVE
                         scanner.pause(true);
-                        setTimeout(() => scanner.resume(), 1000);
+                        setTimeout(() => scanner.resume(), 1200); // Pausa un poco mas larga para que no lea doble
                     }
                 }, 
                 (err) => {}
             ).catch(err => {
-                alert("No se pudo iniciar la cámara");
+                alert("No se pudo iniciar la cámara. Verifica permisos.");
                 document.getElementById('cam-overlay-btn').style.display = 'flex';
             });
         }
@@ -462,7 +476,6 @@
             document.getElementById('modal-verify').style.display = 'none';
         }
 
-        // --- CORRECCIÓN: FLUJO MAGICO ---
         function confirmarVerificacion(){
             const btn = document.querySelector('.btn-v-confirm');
             btn.textContent = 'Guardando...';
@@ -475,32 +488,33 @@
                 })
             }).then(r=>r.json()).then(d=>{
                 if(d.status === 'ok'){
-                    document.getElementById('snd-beep').play();
-                    
-                    // 1. CERRAR MODALES (Limpieza)
+                    // PASO 1: Actualizar visualmente PRIMERO
                     cancelarVerificacion();
                     cerrarModalPicking();
                     
-                    // 2. ACTUALIZAR ESTADO LOCAL
                     itemActivo.estado_actividad = 'FINALIZADO';
-                    
-                    // 3. BORRAR VISUALMENTE (Efecto Inmediato)
                     const card = document.getElementById('card_' + itemActivo.id);
                     if(card) card.remove(); 
                     
-                    // 4. ACTUALIZAR BARRA PROGRESO
                     renderizarItems();
 
-                    // 5. ALERT FINAL (Usuario ve la lista limpia al fondo)
+                    // PASO 2: Intentar reproducir sonido (sin romper el flujo si falla)
+                    playBeep();
+
+                    // PASO 3: Alert final
                     setTimeout(() => {
                         alert("✅ Item alistado correctamente.");
-                    }, 200); // Pequeño delay para que se vea el cambio de fondo
+                    }, 200);
 
                 } else {
-                    alert("Error: " + d.error);
+                    alert("Error: " + (d.error || 'Desconocido'));
                 }
                 btn.textContent = 'CONFIRMAR';
-            }).catch(e=>{ alert("Error de Red. Intente de nuevo."); btn.textContent = 'CONFIRMAR'; });
+            }).catch(e=>{ 
+                console.error(e);
+                alert("Error de conexión. Pero verifica si se guardó."); 
+                btn.textContent = 'CONFIRMAR'; 
+            });
         }
 
     </script>
