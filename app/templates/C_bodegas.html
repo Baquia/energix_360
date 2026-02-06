@@ -1,176 +1,519 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>WMS Operaciones</title>
-    
+
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
         /* --- RESET Y BASE --- */
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
             font-family: 'Roboto', sans-serif;
             background-color: #f3f4f6;
-            margin: 0; padding: 0; color: #1f2937;
-            display: flex; justify-content: center; min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            color: #1f2937;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
         }
 
         .app-container {
-            width: 100%; max-width: 500px; background: #ffffff;
-            min-height: 100vh; position: relative; display: flex; flex-direction: column;
+            width: 100%;
+            max-width: 500px;
+            background: #ffffff;
+            min-height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
         }
 
         /* --- COLORES --- */
         :root {
-            --primary: #004e92; --primary-dark: #003366;
-            --secondary: #ff6b00; --success: #2ecc71;
-            --bg-light: #f8f9fa; --text-gray: #64748b; --border: #e2e8f0;
+            --primary: #004e92;
+            --primary-dark: #003366;
+            --secondary: #ff6b00;
+            --success: #2ecc71;
+            --bg-light: #f8f9fa;
+            --text-gray: #64748b;
+            --border: #e2e8f0;
         }
 
         /* --- HEADER --- */
         .app-header {
-            background: #ffffff; padding: 15px 25px; position: sticky; top: 0; z-index: 50;
-            border-bottom: 2px solid var(--border); display: flex; justify-content: space-between;
-            align-items: center; height: 70px; box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            background: #ffffff;
+            padding: 15px 25px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
         }
-        .brand-area { display: flex; align-items: center; gap: 15px; width: 100%; }
-        .logo-img { height: 38px; width: auto; object-fit: contain; }
-        .logo-divider { width: 1px; height: 28px; background-color: #cbd5e1; }
+
+        .brand-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .logo-img {
+            height: 38px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .logo-divider {
+            width: 1px;
+            height: 28px;
+            background-color: #cbd5e1;
+        }
 
         /* --- CONTENIDO --- */
-        .content-area { flex: 1; padding: 25px; padding-bottom: 100px; overflow-y: auto; background: #f8fafc; }
+        .content-area {
+            flex: 1;
+            padding: 25px;
+            padding-bottom: 100px;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
 
         /* --- MENU --- */
-        .menu-welcome { margin-bottom: 35px; margin-top: 10px; border-left: 4px solid var(--primary); padding-left: 15px; }
-        .menu-welcome h2 { font-size: 1.8rem; margin: 0; color: var(--primary-dark); font-weight: 800; }
-        .menu-grid { display: grid; gap: 20px; }
-        .menu-card {
-            background: white; border: 1px solid var(--border); border-radius: 12px; padding: 30px 20px;
-            text-align: center; cursor: pointer; position: relative; overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        .menu-welcome {
+            margin-bottom: 35px;
+            margin-top: 10px;
+            border-left: 4px solid var(--primary);
+            padding-left: 15px;
         }
-        .menu-card:active { transform: scale(0.98); background: #f1f5f9; }
-        .menu-card.opt-picking { border-left: 5px solid var(--primary); }
-        .menu-card.opt-alistamiento { border-left: 5px solid var(--secondary); }
-        .menu-icon { font-size: 2.8rem; display: block; margin-bottom: 10px; }
-        .menu-title { font-size: 1.1rem; font-weight: 900; color: var(--primary-dark); text-transform: uppercase; }
+
+        .menu-welcome h2 {
+            font-size: 1.8rem;
+            margin: 0;
+            color: var(--primary-dark);
+            font-weight: 800;
+        }
+
+        .menu-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .menu-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+        }
+
+        .menu-card:active {
+            transform: scale(0.98);
+            background: #f1f5f9;
+        }
+
+        .menu-card.opt-picking {
+            border-left: 5px solid var(--primary);
+        }
+
+        .menu-card.opt-alistamiento {
+            border-left: 5px solid var(--secondary);
+        }
+
+        .menu-icon {
+            font-size: 2.8rem;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .menu-title {
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: var(--primary-dark);
+            text-transform: uppercase;
+        }
 
         .btn-logout-menu {
-            margin-top: 40px; width: 100%; padding: 16px; background: white;
-            border: 1px solid #fee2e2; color: #ef4444; font-weight: 600; border-radius: 12px;
-            cursor: pointer; display: flex; justify-content: center; gap: 8px;
+            margin-top: 40px;
+            width: 100%;
+            padding: 16px;
+            background: white;
+            border: 1px solid #fee2e2;
+            color: #ef4444;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
         }
 
         /* --- LISTAS --- */
         .nav-back {
-            display: flex; align-items: center; gap: 8px; margin-bottom: 25px; cursor: pointer;
-            font-weight: 600; color: var(--text-gray); background: none; border: none; font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-gray);
+            background: none;
+            border: none;
+            font-size: 1rem;
         }
+
         .order-card {
-            background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04); border-left: 5px solid var(--primary);
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border-left: 5px solid var(--primary);
         }
-        .oc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .oc-number { font-size: 1.3rem; font-weight: 800; color: #1e293b; }
-        .oc-badge { background: #e0f2fe; color: var(--primary-dark); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
-        .p-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 5px; }
-        .p-fill { height: 100%; background: linear-gradient(90deg, var(--success), #27ae60); transition: width 0.4s ease; }
+
+        .oc-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .oc-number {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .oc-badge {
+            background: #e0f2fe;
+            color: var(--primary-dark);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+
+        .p-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .p-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), #27ae60);
+            transition: width 0.4s ease;
+        }
 
         .item-row {
-            display: flex; align-items: center; background: white; padding: 16px;
-            border-radius: 12px; margin-bottom: 12px; gap: 15px; border-left: 3px solid transparent;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            gap: 15px;
+            border-left: 3px solid transparent;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         }
-        .item-row.active { border-left-color: var(--secondary); }
-        .item-row.done { display: none !important; } 
-        
+
+        .item-row.active {
+            border-left-color: var(--secondary);
+        }
+
+        .item-row.done {
+            display: none !important;
+        }
+
         .qty-indicator {
-            min-width: 50px; height: 50px; background: var(--bg-light); color: var(--primary-dark);
-            border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; font-weight: 800; border: 1px solid var(--border);
+            min-width: 50px;
+            height: 50px;
+            background: var(--bg-light);
+            color: var(--primary-dark);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 800;
+            border: 1px solid var(--border);
         }
-        .item-details { flex: 1; overflow: hidden; }
-        .id-name { font-size: 0.95rem; font-weight: 600; color: #334155; word-break: break-word; }
-        .id-code { font-size: 0.7rem; color: var(--text-gray); font-weight: 600; margin-bottom: 3px; }
+
+        .item-details {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .id-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #334155;
+            word-break: break-word;
+        }
+
+        .id-code {
+            font-size: 0.7rem;
+            color: var(--text-gray);
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
 
         /* --- MODAL TRABAJO (PICKING) --- */
         .modal-wrap {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.95); z-index: 100; display: none;
-            justify-content: center; align-items: center; backdrop-filter: blur(5px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
         }
-        
+
         .picking-sheet {
-            width: 95%; max-width: 400px; height: 95vh; max-height: 850px; /* Un poco más alto para que quepa la cámara grande */
-            background: white; border-radius: 20px; padding: 20px;
-            display: flex; flex-direction: column; position: relative;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            width: 95%;
+            max-width: 400px;
+            height: 95vh;
+            max-height: 850px;
+            /* Un poco más alto para que quepa la cámara grande */
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
         }
 
         .btn-close-modal {
-            position: absolute; top: 15px; right: 15px; background: #f1f5f9;
-            width: 32px; height: 32px; border-radius: 50%; border: none;
-            font-weight: bold; color: #64748b; font-size: 1.2rem; cursor: pointer; z-index: 10;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #f1f5f9;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            font-weight: bold;
+            color: #64748b;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 10;
         }
 
-        .pick-header { margin-bottom: 15px; padding-right: 30px; }
-        .pick-prod { font-size: 1.1rem; font-weight: 800; color: var(--primary-dark); line-height: 1.3; margin-bottom: 5px; }
-        .pick-code-pill { background: #f1f5f9; padding: 3px 8px; border-radius: 4px; font-family: monospace; color: var(--text-gray); font-size: 0.85rem; }
+        .pick-header {
+            margin-bottom: 15px;
+            padding-right: 30px;
+        }
 
-        .pick-stats { display: flex; gap: 10px; margin-bottom: 15px; }
-        .stat-box { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 8px; text-align: center; }
-        .stat-lbl { font-size: 0.7rem; color: var(--text-gray); font-weight: 700; text-transform: uppercase; }
-        .stat-val { font-size: 1.1rem; font-weight: 800; color: #1e293b; }
-        .stat-val.loc { color: var(--secondary); }
+        .pick-prod {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--primary-dark);
+            line-height: 1.3;
+            margin-bottom: 5px;
+        }
+
+        .pick-code-pill {
+            background: #f1f5f9;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: var(--text-gray);
+            font-size: 0.85rem;
+        }
+
+        .pick-stats {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .stat-lbl {
+            font-size: 0.7rem;
+            color: var(--text-gray);
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .stat-val {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .stat-val.loc {
+            color: var(--secondary);
+        }
 
         .camera-container {
-            flex: 1; background: #000; border-radius: 12px; overflow: hidden;
-            position: relative; display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
-            min-height: 350px; /* AUMENTADO PARA ALOJAR EL CUADRO DE 300PX */
+            flex: 1;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-bottom: 15px;
+            min-height: 350px;
+            /* AUMENTADO PARA ALOJAR EL CUADRO DE 300PX */
         }
-        
-        #embedded-reader { width: 100%; height: 100%; }
-        
+
+        #embedded-reader {
+            width: 100%;
+            height: 100%;
+        }
+
         .btn-start-cam {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(255,255,255,0.2); border: 2px solid white; color: white;
-            padding: 15px 25px; border-radius: 30px; font-weight: 700;
-            display: flex; align-items: center; gap: 10px; cursor: pointer;
-            backdrop-filter: blur(4px); z-index: 5;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 30px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            z-index: 5;
         }
-        .btn-start-cam:active { background: rgba(255,255,255,0.4); }
+
+        .btn-start-cam:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
 
         .action-area {
-            background: #fff7ed; border-radius: 16px; padding: 15px;
-            border: 1px solid #ffedd5; text-align: center;
+            background: #fff7ed;
+            border-radius: 16px;
+            padding: 15px;
+            border: 1px solid #ffedd5;
+            text-align: center;
         }
-        .counter-big { font-size: 3.5rem; font-weight: 900; color: var(--secondary); line-height: 1; display: block; margin-bottom: 5px; }
-        .counter-lbl { font-size: 0.8rem; color: #c2410c; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+        .counter-big {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: var(--secondary);
+            line-height: 1;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .counter-lbl {
+            font-size: 0.8rem;
+            color: #c2410c;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
 
         .btn-finish {
-            width: 100%; background: var(--success); color: white; padding: 18px;
-            border-radius: 12px; font-weight: 800; font-size: 1.1rem; border: none;
-            margin-top: 15px; cursor: pointer; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+            width: 100%;
+            background: var(--success);
+            color: white;
+            padding: 18px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            border: none;
+            margin-top: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
         }
-        .btn-finish:active { transform: scale(0.98); }
+
+        .btn-finish:active {
+            transform: scale(0.98);
+        }
 
         .btn-reset {
-            margin-top: 10px; background: transparent; border: 1px solid #ccc; 
-            padding: 8px; border-radius: 8px; color: #666; font-size: 0.8rem; cursor: pointer; width: 100%;
+            margin-top: 10px;
+            background: transparent;
+            border: 1px solid #ccc;
+            padding: 8px;
+            border-radius: 8px;
+            color: #666;
+            font-size: 0.8rem;
+            cursor: pointer;
+            width: 100%;
         }
 
         /* Modal Verificación */
-        .verify-sheet { background: white; width: 85%; max-width: 350px; border-radius: 20px; padding: 30px 20px; text-align: center; }
-        .verify-btns { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-v-cancel { flex: 1; padding: 12px; border: 1px solid var(--border); background: white; border-radius: 10px; font-weight: 700; color: #64748b; }
-        .btn-v-confirm { flex: 1; padding: 12px; border: none; background: var(--success); border-radius: 10px; font-weight: 700; color: white; }
+        .verify-sheet {
+            background: white;
+            width: 85%;
+            max-width: 350px;
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+        }
 
-        .hidden { display: none !important; }
+        .verify-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-v-cancel {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 10px;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .btn-v-confirm {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: var(--success);
+            border-radius: 10px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
+
 <body>
 
     <audio id="snd-beep" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
@@ -180,12 +523,13 @@
             <div class="brand-area">
                 <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix360" class="logo-img">
                 <div class="logo-divider"></div>
-                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" alt="Cliente" class="logo-img" onerror="this.style.display='none'">
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" alt="Cliente" class="logo-img"
+                    onerror="this.style.display='none'">
             </div>
         </header>
 
         <div id="content-area" class="content-area">
-            
+
             <div id="view-menu">
                 <div class="menu-welcome">
                     <h2>Hola: {{ usuario }}</h2>
@@ -212,17 +556,22 @@
 
             <div id="view-items" class="hidden">
                 <button class="nav-back" onclick="cargarOrdenes()">⬅ Volver a Órdenes</button>
-                
-                <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px;">
+
+                <div
+                    style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px;">
                     <div style="font-size: 0.75rem; opacity: 0.8;">ORDEN DE PEDIDO</div>
                     <div style="font-size: 2rem; font-weight: 800;" id="lblOrdenTitle">#0000</div>
                     <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 600;">
                         <span>Progreso</span><span id="lblProgress">0/0</span>
                     </div>
-                    <div class="p-bar"><div id="header-progress-bar" class="p-fill" style="width: 0%; background: white;"></div></div>
+                    <div class="p-bar">
+                        <div id="header-progress-bar" class="p-fill" style="width: 0%; background: white;"></div>
+                    </div>
                 </div>
 
-                <input type="text" id="searchBox" class="search-bar" placeholder="🔍 Buscar producto..." onkeyup="filtrarLista()" style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px;">
+                <input type="text" id="searchBox" class="search-bar" placeholder="🔍 Buscar producto..."
+                    onkeyup="filtrarLista()"
+                    style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px;">
                 <div id="items-container"></div>
             </div>
 
@@ -234,13 +583,13 @@
                     <p>En construcción</p>
                 </div>
             </div>
-        </div> 
-    </div> 
+        </div>
+    </div>
 
     <div id="modal-picking" class="modal-wrap">
         <div class="picking-sheet">
             <button class="btn-close-modal" onclick="cerrarModalPicking()">✕</button>
-            
+
             <div class="pick-header">
                 <div id="pk-name" class="pick-prod">Nombre del Producto</div>
                 <span id="pk-code" class="pick-code-pill">CODE123</span>
@@ -260,7 +609,10 @@
             <div class="camera-container">
                 <div id="embedded-reader"></div>
                 <div id="cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraIncrustada()">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                    </svg>
                     ACTIVAR CÁMARA
                 </div>
             </div>
@@ -280,7 +632,8 @@
             <div style="font-size: 3rem; margin-bottom: 15px;">🤔</div>
             <h3 style="margin:0; color:#1e293b;">¿Confirmar Item?</h3>
             <p style="color:#64748b; line-height:1.5;">
-                Alistaste <b id="vf-count" style="color:var(--secondary); font-size:1.2rem;">0</b> de <b id="vf-req">0</b> solicitadas.
+                Alistaste <b id="vf-count" style="color:var(--secondary); font-size:1.2rem;">0</b> de <b
+                    id="vf-req">0</b> solicitadas.
             </p>
             <div class="verify-btns">
                 <button class="btn-v-cancel" onclick="cancelarVerificacion()">Revisar</button>
@@ -290,45 +643,45 @@
     </div>
 
     <script>
-        let ordenActual=null, listaItems=[], itemActivo=null, scanner=null;
-        
+        let ordenActual = null, listaItems = [], itemActivo = null, scanner = null;
+
         // Helper seguro para sonido
         function playBeep() {
             try {
                 const s = document.getElementById('snd-beep');
-                if(s) {
+                if (s) {
                     s.currentTime = 0;
                     const p = s.play();
                     if (p !== undefined) {
                         p.catch(error => { console.log("Audio play blocked (normal on mobile)", error); });
                     }
                 }
-            } catch(e) { console.log("Audio error", e); }
+            } catch (e) { console.log("Audio error", e); }
         }
 
         window.onload = mostrarMenu;
 
         function mostrarMenu() { toggleView('view-menu'); }
-        function iniciarApp(op) { op==='picking' ? cargarOrdenes() : toggleView('view-alistamiento'); }
+        function iniciarApp(op) { op === 'picking' ? cargarOrdenes() : toggleView('view-alistamiento'); }
         function volverAlMenu() { mostrarMenu(); }
         function toggleView(id) {
-            ['view-menu','view-orders','view-items','view-alistamiento'].forEach(v => document.getElementById(v).classList.add('hidden'));
+            ['view-menu', 'view-orders', 'view-items', 'view-alistamiento'].forEach(v => document.getElementById(v).classList.add('hidden'));
             document.getElementById(id).classList.remove('hidden');
         }
 
         // --- DATA ---
-        function cargarOrdenes(){
+        function cargarOrdenes() {
             toggleView('view-orders');
             const c = document.getElementById('orders-container');
             c.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">Cargando...</p>';
-            fetch('/api/operario/mis_ordenes').then(r=>r.json()).then(d=>{
-                c.innerHTML='';
-                if(d.length===0) { c.innerHTML='<p style="text-align:center;">No hay órdenes.</p>'; return; }
-                d.forEach(o=>{
+            fetch('/api/operario/mis_ordenes').then(r => r.json()).then(d => {
+                c.innerHTML = '';
+                if (d.length === 0) { c.innerHTML = '<p style="text-align:center;">No hay órdenes.</p>'; return; }
+                d.forEach(o => {
                     const p = Math.round((o.items_listos / o.total_items) * 100);
                     c.innerHTML += `
                         <div class="order-card" onclick="abrirOrden('${o.orden}')">
-                            <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona||'General'}</span></div>
+                            <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona || 'General'}</span></div>
                             <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;"><span>Avance</span><span>${o.items_listos}/${o.total_items}</span></div>
                             <div class="p-bar"><div class="p-fill" style="width:${p}%"></div></div>
                         </div>`;
@@ -336,199 +689,255 @@
             });
         }
 
-        function abrirOrden(ord){
+        function abrirOrden(ord) {
             ordenActual = ord;
-            document.getElementById('lblOrdenTitle').textContent = '#'+ord;
+            document.getElementById('lblOrdenTitle').textContent = '#' + ord;
             toggleView('view-items');
             cargarItems();
         }
 
-        function cargarItems(){
+        function cargarItems() {
             const c = document.getElementById('items-container');
             c.innerHTML = '<p style="text-align:center; padding:20px;">Cargando inventario...</p>';
-            fetch(`/api/operario/items_orden/${ordenActual}`).then(r=>r.json()).then(d=>{
-                listaItems = d.map(i => ({...i, alistado: i.cantidad_alistada || 0})); 
+            fetch(`/api/operario/items_orden/${ordenActual}`).then(r => r.json()).then(d => {
+                listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
                 renderizarItems();
             });
         }
 
-        function renderizarItems(){
+        function renderizarItems() {
             const c = document.getElementById('items-container');
-            c.innerHTML = '';
+            c.innerHTML = ''; // Limpieza total
+
             const txt = document.getElementById('searchBox').value.toLowerCase();
-            const visible = listaItems.filter(i => (i.descripcion_producto||'').toLowerCase().includes(txt) || (i.codigo_producto||'').toLowerCase().includes(txt));
-            
-            let hechos = 0;
-            listaItems.forEach(i => { if(i.estado_actividad === 'FINALIZADO') hechos++; });
-            const pct = listaItems.length > 0 ? (hechos/listaItems.length)*100 : 0;
-            document.getElementById('lblProgress').textContent = `${hechos}/${listaItems.length}`;
-            document.getElementById('header-progress-bar').style.width = `${pct}%`;
 
-            if(visible.length === 0) { c.innerHTML = '<p style="text-align:center;">Sin resultados</p>'; return; }
+            // Progreso basado en el tamaño actual vs original (opcional, simplificado aquí para pendientes)
+            // Si quieres mantener el total original, necesitarías una variable global `totalItemsOriginales`
+            document.getElementById('lblProgress').textContent = `Pendientes: ${listaItems.length}`;
 
-            visible.forEach(i => {
-                const listo = i.estado_actividad === 'FINALIZADO';
-                const clase = listo ? 'done' : 'active';
-                const icon = listo ? '✔' : i.cantidad;
-                const nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
-
-                c.innerHTML += `
-                    <div id="card_${i.id}" class="item-row ${clase}" onclick="abrirModalPickingId(${i.id})">
-                        <div class="qty-indicator">${icon}</div>
-                        <div class="item-details">
-                            <div class="id-code">${i.codigo_producto || 'S/C'}</div>
-                            <div class="id-name">${nombre}</div>
-                        </div>
-                    </div>`;
-            });
-
-            if(hechos === listaItems.length && listaItems.length > 0){
-                setTimeout(() => { alert("🚀 ¡Orden Terminada!"); cargarOrdenes(); }, 500);
+            // Si la lista está vacía, mostrar mensaje de éxito final
+            if (listaItems.length === 0) {
+                c.innerHTML = `
+            <div style="text-align:center; padding:50px 20px;">
+                <div style="font-size:4rem;">🎉</div>
+                <h3 style="color:#10b981;">¡Orden Completada!</h3>
+                <p>No quedan ítems pendientes.</p>
+                <button onclick="cargarOrdenes()" style="padding:15px; background:#004e92; color:white; border:none; border-radius:10px; margin-top:20px;">Volver a Mis Órdenes</button>
+            </div>`;
+                document.getElementById('header-progress-bar').style.width = '100%';
+                return;
             }
+
+            // Filtrar por búsqueda
+            const visibles = listaItems.filter(i =>
+                (i.descripcion_producto || '').toLowerCase().includes(txt) ||
+                (i.codigo_producto || '').toLowerCase().includes(txt)
+            );
+
+            if (visibles.length === 0) {
+                c.innerHTML = '<p style="text-align:center; padding:20px; color:gray;">No se encontraron productos con ese nombre.</p>';
+                return;
+            }
+
+            // Dibujar
+            visibles.forEach(i => {
+                const nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
+                c.innerHTML += `
+            <div id="card_${i.id}" class="item-row active" onclick="abrirModalPickingId(${i.id})">
+                <div class="qty-indicator">${i.cantidad}</div>
+                <div class="item-details">
+                    <div class="id-code">${i.codigo_producto || 'S/C'}</div>
+                    <div class="id-name">${nombre}</div>
+                </div>
+            </div>`;
+            });
         }
-        function filtrarLista(){ renderizarItems(); }
+
+        function filtrarLista() { renderizarItems(); }
 
         // --- TARJETA DE TRABAJO (MODAL) ---
-        function abrirModalPickingId(id){
+        function abrirModalPickingId(id) {
             const item = listaItems.find(i => i.id === id);
-            if(!item || item.estado_actividad === 'FINALIZADO') return;
+            if (!item || item.estado_actividad === 'FINALIZADO') return;
 
             itemActivo = item;
-            
+
             const nombre = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
             document.getElementById('pk-name').textContent = nombre;
             document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
-            document.getElementById('pk-loc').textContent = "A-01"; 
+            document.getElementById('pk-loc').textContent = "A-01";
             document.getElementById('pk-req').textContent = item.cantidad;
             document.getElementById('pk-count').textContent = item.alistado;
 
-            document.getElementById('cam-overlay-btn').style.display = 'flex'; 
+            document.getElementById('cam-overlay-btn').style.display = 'flex';
             document.getElementById('modal-picking').style.display = 'flex';
         }
 
-        function cerrarModalPicking(){
+        function cerrarModalPicking() {
             detenerCamara();
             document.getElementById('modal-picking').style.display = 'none';
             itemActivo = null;
         }
 
-        function resetearConteo(){
-            if(itemActivo){
+        function resetearConteo() {
+            if (itemActivo) {
                 itemActivo.alistado = 0;
                 document.getElementById('pk-count').textContent = "0";
-                if(scanner) scanner.resume();
+                if (scanner) scanner.resume();
             }
         }
 
         // --- CÁMARA MEJORADA ---
-        function iniciarCamaraIncrustada(){
-            if(!itemActivo) return;
-            document.getElementById('cam-overlay-btn').style.display = 'none'; 
-            
-            // CONFIGURACION MEJORADA: Cuadro de 300px
+
+        function iniciarCamaraIncrustada() {
+            if (!itemActivo) return;
+            document.getElementById('cam-overlay-btn').style.display = 'none';
+
+            // Si entramos y ya está lleno, no dejar arrancar
+            if (itemActivo.alistado >= itemActivo.cantidad) {
+                alert("⚠️ Este ítem ya está completo. Termínalo.");
+                return;
+            }
+
             scanner = new Html5Qrcode("embedded-reader");
             scanner.start(
-                { facingMode: "environment" }, 
-                { fps: 15, qrbox: { width: 300, height: 300 } }, // <--- TAMAÑO AJUSTADO A 300px
+                { facingMode: "environment" },
+                { fps: 15, qrbox: { width: 300, height: 300 } },
                 (decodedText) => {
                     const scanned = decodedText.trim().toUpperCase();
                     const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
 
-                    if(target && scanned === target){
-                        if(itemActivo.alistado >= itemActivo.cantidad) {
-                            playBeep(); // Usamos la funcion segura
-                            scanner.pause(true); 
-                            alert("✅ Cantidad completada. Termine el item.");
-                            return; 
+                    if (target && scanned === target) {
+                        // 1. VALIDACIÓN PREVIA (Evita sobre-escaneo)
+                        if (itemActivo.alistado >= itemActivo.cantidad) {
+                            playBeep();
+                            scanner.pause(true); // PAUSA FÍSICA INMEDIATA
+                            alert("🛑 CANTIDAD COMPLETADA\nNo puedes escanear más.");
+                            return;
                         }
 
-                        playBeep(); // Usamos la funcion segura
+                        playBeep();
                         itemActivo.alistado++;
                         document.getElementById('pk-count').textContent = itemActivo.alistado;
-                        
-                        scanner.pause(true);
-                        setTimeout(() => scanner.resume(), 1200); // Pausa un poco mas larga para que no lea doble
+
+                        // 2. CHECK POST-ESCANEO
+                        if (itemActivo.alistado >= itemActivo.cantidad) {
+                            scanner.pause(true); // Congelar cámara
+                            setTimeout(() => {
+                                alert("✅ Meta alcanzada. Presiona 'TERMINAR ITEM'.");
+                            }, 200);
+                        } else {
+                            // Pausa breve técnica (debounce) para no leer el mismo código 10 veces en 1 seg
+                            scanner.pause(true);
+                            setTimeout(() => scanner.resume(), 1000);
+                        }
                     }
-                }, 
-                (err) => {}
+                },
+                (err) => { }
             ).catch(err => {
-                alert("No se pudo iniciar la cámara. Verifica permisos.");
+                console.error(err);
+                alert("Error cámara: Verifica permisos HTTPS.");
                 document.getElementById('cam-overlay-btn').style.display = 'flex';
             });
         }
 
-        function detenerCamara(){
-            if(scanner){
-                scanner.stop().then(() => { scanner.clear(); }).catch(e=>console.log(e));
+        function detenerCamara() {
+            if (scanner) {
+                scanner.stop().then(() => { scanner.clear(); }).catch(e => console.log(e));
                 scanner = null;
             }
         }
 
         // --- TERMINAR ---
-        function intentarTerminarItem(){
-            if(!itemActivo) return;
+        function intentarTerminarItem() {
+            if (!itemActivo) return;
             document.getElementById('vf-count').textContent = itemActivo.alistado;
             document.getElementById('vf-req').textContent = itemActivo.cantidad;
             document.getElementById('modal-verify').style.display = 'flex';
         }
 
-        function cancelarVerificacion(){
+        function cancelarVerificacion() {
             document.getElementById('modal-verify').style.display = 'none';
         }
 
-        function confirmarVerificacion(){
+        function confirmarVerificacion() {
             const btn = document.querySelector('.btn-v-confirm');
+            const textoOriginal = btn.textContent;
             btn.textContent = 'Guardando...';
-            
+            btn.disabled = true;
+
+            // Guardamos el ID antes de limpiar variables
+            const idParaBorrar = itemActivo.id;
+
             fetch('/api/operario/confirmar_item', {
-                method:'POST', headers:{'Content-Type':'application/json'},
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    id_row: itemActivo.id,
+                    id_row: idParaBorrar,
                     cantidad_alistada: itemActivo.alistado
                 })
-            }).then(r=>r.json()).then(d=>{
-                if(d.status === 'ok'){
-                    // PASO 1: Actualizar visualmente PRIMERO
-                    cancelarVerificacion();
-                    cerrarModalPicking();
-                    
-                    itemActivo.estado_actividad = 'FINALIZADO';
-                    const card = document.getElementById('card_' + itemActivo.id);
-                    if(card) card.remove(); 
-                    
-                    renderizarItems();
+            })
+                .then(r => {
+                    // Si el servidor da error (ej. 500), lanzamos error manual para ir al catch
+                    if (!r.ok) throw new Error("Error HTTP " + r.status);
+                    return r.json();
+                })
+                .then(d => {
+                    if (d.status === 'ok') {
+                        // --- FASE CRÍTICA: GESTIÓN DE UI ---
+                        try {
+                            // 1. Cerrar modales
+                            cancelarVerificacion();
+                            cerrarModalPicking();
 
-                    // PASO 2: Intentar reproducir sonido (sin romper el flujo si falla)
-                    playBeep();
+                            // 2. BORRADO DE MEMORIA (La clave para que no aparezca el fantasma)
+                            // Filtramos la lista para que ese ID deje de existir en el array
+                            listaItems = listaItems.filter(i => i.id !== idParaBorrar);
+                            itemActivo = null;
 
-                    // PASO 3: Alert final
-                    setTimeout(() => {
-                        alert("✅ Item alistado correctamente.");
-                    }, 200);
+                            // 3. ACTUALIZAR PANTALLA
+                            renderizarItems(); // Como el item ya no está en listaItems, no se dibujará
 
-                } else {
-                    alert("Error: " + (d.error || 'Desconocido'));
-                }
-                btn.textContent = 'CONFIRMAR';
-            }).catch(e=>{ 
-                console.error(e);
-                alert("Error de conexión. Pero verifica si se guardó."); 
-                btn.textContent = 'CONFIRMAR'; 
-            });
+                            // 4. FEEDBACK AL USUARIO
+                            playBeep();
+
+                            // Usamos setTimeout para que el navegador tenga 100ms para "pintar" 
+                            // la pantalla vacía ANTES de que el alert bloquee todo.
+                            setTimeout(() => {
+                                alert("✅ Ítem alistado y guardado correctamente.");
+                            }, 100);
+
+                        } catch (errorVisual) {
+                            // Si falla la animación, no asustamos al usuario con error de red
+                            console.error("Error visual:", errorVisual);
+                            alert("✅ Guardado correctamente.");
+                        }
+                    } else {
+                        alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
+                    }
+                })
+                .catch(e => {
+                    console.error("Error REAL de conexión:", e);
+                    alert("❌ Error de Conexión. Verifica tu internet.");
+                })
+                .finally(() => {
+                    btn.textContent = textoOriginal;
+                    btn.disabled = false;
+                });
         }
 
     </script>
 
     <script>
-        (function() {
-            const TIEMPO_LIMITE = 7200000; 
+        (function () {
+            const TIEMPO_LIMITE = 7200000;
             let temporizadorInactividad;
 
             function reiniciarTemporizador() {
                 clearTimeout(temporizadorInactividad);
                 temporizadorInactividad = setTimeout(() => {
                     alert("⚠️ Tu sesión se cerró por inactividad (2 horas).");
-                    window.location.href = '/logout'; 
+                    window.location.href = '/logout';
                 }, TIEMPO_LIMITE);
             }
 
@@ -540,4 +949,5 @@
         })();
     </script>
 </body>
+
 </html>
