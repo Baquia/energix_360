@@ -96,8 +96,7 @@
         .data-table th { text-align: left; padding: 1rem 1.5rem; background: #f8fafc; color: var(--color-muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid var(--color-border); }
         .data-table td { padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-border); }
         
-        /* --- CORRECCION DEL ERROR CSS --- */
-        /* Definimos clases para el color de fondo en lugar de usar style inline con Jinja */
+        /* CLASES PARA EVITAR ERRORES EN EDITOR */
         .fila-finalizada { background-color: #f0fdf4 !important; }
         .fila-normal { background-color: #ffffff; }
 
@@ -146,7 +145,7 @@
         </button>
 
         <a href="/logout" class="menu-item btn-logout">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2 2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
             Cerrar Sesión
         </a>
     </aside>
@@ -169,7 +168,7 @@
                 <div style="display: flex; justify-content: space-between; text-align: center;">
                     <div>
                         <span style="font-size: 1.4rem; font-weight: 800; color: #1f2937; display: block;">
-                            {{ kpis.pedidos_totales }}
+                            {{ kpis.pedidos_pendientes_reales }}
                         </span>
                         <small style="font-size: 0.7rem; color: #6b7280; font-weight: 700;">ORDENES</small>
                     </div>
@@ -278,7 +277,7 @@
                                             </span>
                                         {% elif op.inicio %}
                                             <span class="cronometro" data-inicio="{{ op.inicio }}" style="font-family:monospace; font-weight:bold; color:#ea580c; background:#fff7ed; padding:2px 6px; border-radius:4px; border:1px solid #ffedd5;">
-                                                Calculando...
+                                                00:00:00
                                             </span>
                                         {% else %}
                                             <span style="color:#9ca3af;">--:--</span>
@@ -397,7 +396,7 @@
         // VARIABLE GLOBAL PARA EL POLLING
         let intervaloDetalle = null;
 
-        // -- FUNCION JS: CARGAR DETALLE MEJORADO (Dinámico Faltantes -> Listos) --
+        // -- 1. ABRIR MODAL Y ACTIVAR POLLING --
         function verDetalleOrden(orden) {
             document.getElementById('lblOrdenDetalle').textContent = orden;
             document.getElementById('modalDetalleOrden').style.display = 'flex';
@@ -405,7 +404,7 @@
             // Cargar datos inmediatamente
             cargarDatosDetalle(orden);
             
-            // Polling cada 3 segundos para ver movimiento en "tiempo real"
+            // Iniciar polling cada 3 segundos para movimiento dinámico
             if(intervaloDetalle) clearInterval(intervaloDetalle);
             intervaloDetalle = setInterval(() => cargarDatosDetalle(orden), 3000); 
         }
@@ -415,26 +414,37 @@
             document.getElementById('modalDetalleOrden').style.display = 'none';
         }
 
+        // -- 2. LOGICA DINÁMICA MEJORADA (Manejo de estados robusto) --
         function cargarDatosDetalle(orden) {
             const tbPend = document.getElementById('tblPendientesBody');
             const tbList = document.getElementById('tblListosBody');
             
-            fetch(`/bodegas/api/items_orden/${orden}`)
+            // Agregamos '?t=' + Date.now() para evitar caché del navegador
+            fetch(`/bodegas/api/items_orden/${orden}?t=${Date.now()}`)
                 .then(r => r.json())
                 .then(items => {
-                    // Limpiamos contenido
+                    // Limpiar tablas
                     tbPend.innerHTML = '';
                     tbList.innerHTML = '';
 
-                    // Separación Dinámica basada en el estado actual de la BD
-                    const pendientes = items.filter(i => i.estado_actividad !== 'FINALIZADO');
-                    const alistados = items.filter(i => i.estado_actividad === 'FINALIZADO');
+                    // FUNCION AUXILIAR PARA DETERMINAR SI UN ITEM ESTÁ LISTO
+                    const isItemReady = (i) => {
+                        const estado = (i.estado_actividad || '').toUpperCase();
+                        const cantPedida = parseFloat(i.cantidad || 0);
+                        const cantAlistada = parseFloat(i.cantidad_alistada || 0);
+                        
+                        // Listo si: Estado finalizado OR cantidad completada
+                        return estado === 'FINALIZADO' || (cantPedida > 0 && cantAlistada >= cantPedida);
+                    };
 
-                    // Contadores
+                    const pendientes = items.filter(i => !isItemReady(i));
+                    const alistados = items.filter(i => isItemReady(i));
+
+                    // Actualizar contadores
                     document.getElementById('countPendientes').textContent = pendientes.length;
                     document.getElementById('countListos').textContent = alistados.length;
                     
-                    // Función auxiliar para filas
+                    // Renderizar filas
                     const crearFila = (item, color, esPar) => `
                         <tr style="background-color: ${esPar ? '#f9fafb' : '#ffffff'}; border-bottom: 1px solid #f3f4f6; animation: fadeIn 0.5s;">
                             <td style="padding: 10px 12px; color: #374151;">
@@ -456,11 +466,11 @@
                 .catch(err => console.error("Error polling:", err));
         }
 
-        // -- ALISTAMIENTO --
+        // -- 3. ALISTAMIENTO (MODALES) --
         function openAlistamientoModal() { document.getElementById('modalAlistamiento').style.display = 'flex'; }
         function closeAlistamientoModal() { document.getElementById('modalAlistamiento').style.display = 'none'; }
 
-        // -- UPLOAD --
+        // -- 4. UPLOAD --
         function openUploadModal() { document.getElementById('modalUpload').style.display = 'flex'; }
         function closeUpload() { document.getElementById('modalUpload').style.display = 'none'; }
         function doUpload() {
@@ -469,7 +479,7 @@
             .then(r=>r.json()).then(d=>{ alert(d.message||d.error); if(!d.error) location.reload(); });
         }
 
-        // -- ASIGNAR --
+        // -- 5. ASIGNAR --
         let curOrden = null;
         function abrirAsignar(orden) {
             curOrden = orden;
@@ -491,31 +501,40 @@
             }).then(r=>r.json()).then(d=>{ alert(d.message||d.error); location.reload(); });
         }
 
-        // -- CRONOMETRO EN VIVO --
+        // -- 6. CRONOMETRO EN VIVO --
         function actualizarCronometros() {
             const cronometros = document.querySelectorAll('.cronometro');
             const ahora = new Date();
 
             cronometros.forEach(el => {
-                const inicioStr = el.getAttribute('data-inicio');
+                let inicioStr = el.getAttribute('data-inicio');
                 if(!inicioStr) return;
                 
-                // Asegurar compatibilidad de fecha
-                const fechaInicio = new Date(inicioStr.replace(/-/g, "/")); 
-                if(isNaN(fechaInicio.getTime())) return;
-
-                const diff = ahora - fechaInicio;
-                if (diff > 0) {
-                    const totalSeconds = Math.floor(diff / 1000);
-                    const horas = Math.floor(totalSeconds / 3600);
-                    const minutos = Math.floor((totalSeconds % 3600) / 60);
-                    const segundos = totalSeconds % 60;
-
-                    el.textContent = 
-                        (horas < 10 ? "0" + horas : horas) + ":" + 
-                        (minutos < 10 ? "0" + minutos : minutos) + ":" + 
-                        (segundos < 10 ? "0" + segundos : segundos);
+                // Normalización de fecha para evitar errores
+                let fechaFormato = inicioStr.replace(/-/g, "/"); 
+                let fechaInicio = new Date(fechaFormato);
+                
+                if (isNaN(fechaInicio.getTime())) {
+                    fechaInicio = new Date(inicioStr);
                 }
+
+                if (isNaN(fechaInicio.getTime())) {
+                    el.textContent = "Error";
+                    return;
+                }
+
+                let diff = ahora - fechaInicio;
+                if (diff < 0) diff = 0;
+
+                const totalSeconds = Math.floor(diff / 1000);
+                const horas = Math.floor(totalSeconds / 3600);
+                const minutos = Math.floor((totalSeconds % 3600) / 60);
+                const segundos = totalSeconds % 60;
+
+                el.textContent = 
+                    (horas < 10 ? "0" + horas : horas) + ":" + 
+                    (minutos < 10 ? "0" + minutos : minutos) + ":" + 
+                    (segundos < 10 ? "0" + segundos : segundos);
             });
         }
         

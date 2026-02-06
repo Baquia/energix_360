@@ -14,17 +14,22 @@ def control_logistica():
     
     empresa_id = session.get('empresa_id')
     
-    # A. KPI: Pedidos Totales y Pendientes
-    kpis = {'pedidos_totales': 0, 'items_pendientes': 0, 'items_finalizados': 0}
+    # A. KPI: Estructura inicial
+    kpis = {
+        'pedidos_totales': 0, 
+        'items_pendientes': 0, 
+        'items_finalizados': 0, 
+        'pedidos_pendientes_reales': 0 # Nuevo campo calculado
+    }
     
     # B. Listas para la Vista
-    ordenes_sin_asignar = [] # Para el Modal de Arriba
-    ordenes_procesadas = []  # Lista final ordenada y filtrada para la tabla
+    ordenes_sin_asignar = [] 
+    ordenes_procesadas = []
 
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # 1. Obtener KPIs
+        # 1. Obtener KPIs Generales (Totales históricos)
         cur.execute("""
             SELECT 
                 COUNT(DISTINCT numero_orden_origen) as total,
@@ -39,7 +44,7 @@ def control_logistica():
             kpis['items_pendientes'] = int(row['pendientes'] or 0)
             kpis['items_finalizados'] = int(row['listos'] or 0)
 
-        # 2. Obtener Órdenes SIN ASIGNAR (Para el Modal de Alistamiento)
+        # 2. Obtener Órdenes SIN ASIGNAR (Para el Modal)
         cur.execute("""
             SELECT 
                 numero_orden_origen as orden,
@@ -53,8 +58,8 @@ def control_logistica():
         """, (empresa_id,))
         ordenes_sin_asignar = cur.fetchall()
 
-        # 3. LOGICA MEJORADA: Obtener Órdenes ASIGNADAS con Filtro 24h y Ordenamiento
-        # Traemos MIN(inicio) para el arranque y MAX(fin) para el cierre
+        # 3. Obtener Órdenes ASIGNADAS / EN PROCESO / FINALIZADAS
+        # Traemos fechas de inicio y fin para cálculos de tiempo
         cur.execute("""
             SELECT 
                 numero_orden_origen as orden,
@@ -75,10 +80,10 @@ def control_logistica():
         ahora = datetime.now()
 
         for o in raw_ordenes:
-            # Determinar si la orden está completamente finalizada (100% items listos)
+            # Determinar si la orden está 100% finalizada
             es_finalizado = (o['items_listos'] == o['total_items']) and (o['total_items'] > 0)
             
-            # Calcular duración total estática si está finalizado
+            # Calcular duración estática (solo para visualización de finalizados)
             o['duracion_str'] = "--:--"
             if es_finalizado and o['inicio'] and o['fin']:
                 diff = o['fin'] - o['inicio']
@@ -90,8 +95,7 @@ def control_logistica():
 
             if es_finalizado:
                 o['estado_visual'] = 'FINALIZADO'
-                # REGLA DE 24 HORAS:
-                # Si la fecha de fin fue hace menos de 24 horas, se muestra. Si no, se descarta.
+                # REGLA DE 24 HORAS: Solo mostrar si finalizó hace menos de 1 día
                 fecha_cierre = o['fin'] or ahora
                 if (ahora - fecha_cierre) < timedelta(hours=24):
                     finalizados.append(o)
@@ -99,13 +103,17 @@ def control_logistica():
                 o['estado_visual'] = 'EN_PROCESO'
                 activos.append(o)
 
-        # ORDENAMIENTO:
-        # 1. Activos: Los más recientes (por fecha inicio) arriba
+        # --- CORRECCIÓN QUIRÚRGICA DEL KPI ---
+        # La carga pendiente real es: (Lo que nadie ha tomado) + (Lo que se está haciendo)
+        kpis['pedidos_pendientes_reales'] = len(ordenes_sin_asignar) + len(activos)
+
+        # ORDENAMIENTO DE LA TABLA
+        # Activos: Más recientes primero
         activos.sort(key=lambda x: x['inicio'] or datetime.min, reverse=True)
-        # 2. Finalizados: Los que terminaron más recientemente arriba
+        # Finalizados: Recién terminados primero
         finalizados.sort(key=lambda x: x['fin'] or datetime.min, reverse=True)
 
-        # Concatenar: Primero los ACTIVOS, luego los FINALIZADOS
+        # Unimos las listas
         ordenes_procesadas = activos + finalizados
         
         cur.close()
@@ -113,18 +121,18 @@ def control_logistica():
     except Exception as e:
         print(f"Error cargando dashboard: {e}")
 
-    # Pasamos las listas a la plantilla
     return render_template('B_control_logistica.html', 
                            kpis=kpis, 
-                           ordenes_pendientes=ordenes_sin_asignar, # Para el modal
-                           ordenes_asignadas=ordenes_procesadas)   # Para la tabla principal
+                           ordenes_pendientes=ordenes_sin_asignar, 
+                           ordenes_asignadas=ordenes_procesadas)
 
-# --- 2. API: DETALLE DE ITEMS DE UNA ORDEN ---
+# --- 2. API: ITEMS DE ORDEN ---
 @bp_bodegas.route('/bodegas/api/items_orden/<orden>')
 def get_items_orden(orden):
     if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # Traemos también 'cantidad_alistada' para la lógica dinámica del frontend
         cur.execute("""
             SELECT 
                 id, codigo_producto, descripcion_producto, marca, 
@@ -138,7 +146,7 @@ def get_items_orden(orden):
     except Exception as e:
         return jsonify([])
 
-# --- 3. API: OBTENER LISTA DE OPERARIOS ---
+# --- 3. API: EMPLEADOS ---
 @bp_bodegas.route('/bodegas/api/get_empleados')
 def get_empleados():
     if 'usuario_id' not in session: return jsonify([])
@@ -152,7 +160,7 @@ def get_empleados():
         return jsonify(cur.fetchall())
     except: return jsonify([])
 
-# --- 4. API: ASIGNAR ORDEN ---
+# --- 4. API: ASIGNAR ---
 @bp_bodegas.route('/bodegas/asignar_orden', methods=['POST'])
 @csrf.exempt
 def asignar_orden():
@@ -170,7 +178,7 @@ def asignar_orden():
         return jsonify({'message': 'Orden asignada.'})
     except Exception as e: return jsonify({'error': str(e)}), 500
 
-# --- 5. FUNCIONES AUXILIARES Y CARGA EXCEL ---
+# --- 5. CARGA EXCEL ---
 def normalizar_codigo(valor):
     if pd.isna(valor) or str(valor).strip() == '': return ''
     val_str = str(valor).strip()
@@ -189,7 +197,6 @@ def upload_excel():
     if not file: return jsonify({'error': 'No se recibió archivo'}), 400
 
     try:
-        # 1. MAESTRA
         cur = mysql.connection.cursor()
         cur.execute("SELECT sku, ean, producto, fabricante FROM productos WHERE id_empresa = %s", (empresa_id,))
         db_products = cur.fetchall()
@@ -199,11 +206,9 @@ def upload_excel():
             if row[0]: maestra_productos[normalizar_codigo(row[0])] = {'desc': row[2], 'marca': row[3]}
             if row[1]: maestra_productos[normalizar_codigo(row[1])] = {'desc': row[2], 'marca': row[3]}
 
-        # 2. EXCEL
         filename = file.filename
         df_raw = pd.read_excel(file, header=None)
         
-        # FASE 1: METADATOS
         meta_planilla = filename.split('.')[0].replace('_', ' ').strip()
         found_orden = False
         keywords_orden = ['PLANILA', 'PLANILLA', 'REMISION', 'ENTREGA', 'PEDIDO', 'ORDEN', 'DOC']
@@ -234,7 +239,6 @@ def upload_excel():
                 if found_orden: break
             if found_orden: break
 
-        # Zona y Fecha
         raw_head = [str(x).strip().upper() for x in df_raw.head(20).values.flatten() if pd.notna(x)]
         text_dump = " ".join(raw_head)
         meta_zona = 'GENERAL'
@@ -244,7 +248,6 @@ def upload_excel():
         match_fecha = re.search(r'(\d{2,4}[-/]\d{2}[-/]\d{2,4})', text_dump)
         if match_fecha: meta_fecha = match_fecha.group(1)
 
-        # FASE 2: TABLA
         start_row = 0; header_map = {}; found_table = False
         keywords_cols = {
             'CODIGO': ['CODIGO', 'EAN', 'ITEM', 'SKU', 'REF', 'MATERIAL', 'ARTICULO'],
@@ -262,7 +265,6 @@ def upload_excel():
                 start_row = i + 1; header_map = temp_map; found_table = True; break
         if not found_table: return jsonify({'error': 'No se detectaron columnas.'}), 400
 
-        # FASE 3: PROCESAMIENTO
         data_to_insert = []
         marca_visual_actual = 'GENERICO'
         fecha_creacion = datetime.now()
@@ -299,7 +301,6 @@ def upload_excel():
 
         if not data_to_insert: return jsonify({'error': 'Archivo sin items válidos.'}), 400
 
-        # FASE 4: INSERTAR
         cur = mysql.connection.cursor()
         query = """INSERT INTO picking_importacion_raw (id_empresa, numero_orden_origen, zona, codigo_producto, descripcion_producto, marca, unidades_calculadas, cantidad_alistada, estado_actividad, fecha_creacion_orden, fecha_entrega_orden) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
         cur.executemany(query, data_to_insert)
@@ -311,7 +312,6 @@ def upload_excel():
         print(f"Error Upload: {e}")
         return jsonify({'error': f'Error procesando: {str(e)}'}), 500
 
-# API STATS
 @bp_bodegas.route('/api/bodegas/stats')
 def bodegas_stats():
     if 'usuario_id' not in session: return jsonify({})
