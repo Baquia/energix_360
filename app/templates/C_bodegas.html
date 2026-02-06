@@ -85,16 +85,13 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .item-row.active { border-left-color: var(--secondary); }
-        
-        /* CORRECCIÓN 1: AGREGADO display: none !important PARA QUE DESAPAREZCAN */
-        .item-row.done { opacity: 0.6; background: #f8fafc; border: 1px solid #f1f5f9; display: none !important; }
+        .item-row.done { display: none !important; } 
         
         .qty-indicator {
             min-width: 50px; height: 50px; background: var(--bg-light); color: var(--primary-dark);
             border-radius: 10px; display: flex; align-items: center; justify-content: center;
             font-size: 1.2rem; font-weight: 800; border: 1px solid var(--border);
         }
-        .item-row.done .qty-indicator { color: var(--success); font-size: 1.5rem; border: none; background: transparent; }
         .item-details { flex: 1; overflow: hidden; }
         .id-name { font-size: 0.95rem; font-weight: 600; color: #334155; word-break: break-word; }
         .id-code { font-size: 0.7rem; color: var(--text-gray); font-weight: 600; margin-bottom: 3px; }
@@ -119,7 +116,6 @@
             font-weight: bold; color: #64748b; font-size: 1.2rem; cursor: pointer; z-index: 10;
         }
 
-        /* Info Superior */
         .pick-header { margin-bottom: 15px; padding-right: 30px; }
         .pick-prod { font-size: 1.1rem; font-weight: 800; color: var(--primary-dark); line-height: 1.3; margin-bottom: 5px; }
         .pick-code-pill { background: #f1f5f9; padding: 3px 8px; border-radius: 4px; font-family: monospace; color: var(--text-gray); font-size: 0.85rem; }
@@ -130,7 +126,6 @@
         .stat-val { font-size: 1.1rem; font-weight: 800; color: #1e293b; }
         .stat-val.loc { color: var(--secondary); }
 
-        /* Área de Cámara (Embedded) */
         .camera-container {
             flex: 1; background: #000; border-radius: 12px; overflow: hidden;
             position: relative; display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
@@ -147,7 +142,6 @@
         }
         .btn-start-cam:active { background: rgba(255,255,255,0.4); }
 
-        /* Área Contador y Acción */
         .action-area {
             background: #fff7ed; border-radius: 16px; padding: 15px;
             border: 1px solid #ffedd5; text-align: center;
@@ -161,6 +155,11 @@
             margin-top: 15px; cursor: pointer; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
         }
         .btn-finish:active { transform: scale(0.98); }
+
+        .btn-reset {
+            margin-top: 10px; background: transparent; border: 1px solid #ccc; 
+            padding: 8px; border-radius: 8px; color: #666; font-size: 0.8rem; cursor: pointer; width: 100%;
+        }
 
         /* Modal Verificación */
         .verify-sheet { background: white; width: 85%; max-width: 350px; border-radius: 20px; padding: 30px 20px; text-align: center; }
@@ -271,6 +270,7 @@
             </div>
 
             <button class="btn-finish" onclick="intentarTerminarItem()">TERMINAR ITEM</button>
+            <button class="btn-reset" onclick="resetearConteo()">🔄 Reiniciar Conteo</button>
         </div>
     </div>
 
@@ -355,15 +355,15 @@
                 const listo = i.estado_actividad === 'FINALIZADO';
                 const clase = listo ? 'done' : 'active';
                 const icon = listo ? '✔' : i.cantidad;
-                // Limpieza de nombre
                 const nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
 
+                // Usamos ID para poder borrar el elemento del DOM luego
                 c.innerHTML += `
-                    <div class="item-row ${clase}" onclick="abrirModalPickingId(${i.id})">
+                    <div id="card_${i.id}" class="item-row ${clase}" onclick="abrirModalPickingId(${i.id})">
                         <div class="qty-indicator">${icon}</div>
                         <div class="item-details">
                             <div class="id-code">${i.codigo_producto || 'S/C'}</div>
-                            <div class="id-name">${i.descripcion_producto.replace(/\.+$/, '')}</div>
+                            <div class="id-name">${nombre}</div>
                         </div>
                     </div>`;
             });
@@ -381,7 +381,6 @@
 
             itemActivo = item;
             
-            // Llenar datos
             const nombre = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
             document.getElementById('pk-name').textContent = nombre;
             document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
@@ -389,8 +388,7 @@
             document.getElementById('pk-req').textContent = item.cantidad;
             document.getElementById('pk-count').textContent = item.alistado;
 
-            // Resetear estado cámara
-            document.getElementById('cam-overlay-btn').style.display = 'flex'; // Mostrar botón activar
+            document.getElementById('cam-overlay-btn').style.display = 'flex'; 
             document.getElementById('modal-picking').style.display = 'flex';
         }
 
@@ -400,28 +398,42 @@
             itemActivo = null;
         }
 
-        // --- CÁMARA INCRUSTADA ---
+        function resetearConteo(){
+            if(itemActivo){
+                itemActivo.alistado = 0;
+                document.getElementById('pk-count').textContent = "0";
+                scanner.resume(); // Por si estaba pausado
+            }
+        }
+
+        // --- CÁMARA INCRUSTADA (CORRECCIÓN: FRENO DE MANO) ---
         function iniciarCamaraIncrustada(){
             if(!itemActivo) return;
-            document.getElementById('cam-overlay-btn').style.display = 'none'; // Ocultar botón
+            document.getElementById('cam-overlay-btn').style.display = 'none'; 
             
-            // CORRECCIÓN 2: AUMENTADO FPS A 25 PARA MAYOR FLUIDEZ
             scanner = new Html5Qrcode("embedded-reader");
             scanner.start({ facingMode: "environment" }, { fps: 25, qrbox: 200 }, 
                 (decodedText) => {
-                    // Validar Código
-                    // Normalización simple para comparar
                     const scanned = decodedText.trim().toUpperCase();
                     const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
 
                     if(target && scanned === target){
+                        // 1. VALIDAR LIMITE
+                        if(itemActivo.alistado >= itemActivo.cantidad) {
+                            document.getElementById('snd-beep').play();
+                            scanner.pause(true); // Pausar escaneo
+                            alert("✅ Cantidad completada. Termine el item.");
+                            return; // No sumar mas
+                        }
+
+                        // 2. SUMAR
                         document.getElementById('snd-beep').play();
                         itemActivo.alistado++;
                         document.getElementById('pk-count').textContent = itemActivo.alistado;
                         
-                        // Pausa breve para no contar mil veces el mismo frame
+                        // 3. PAUSA BREVE
                         scanner.pause(true);
-                        setTimeout(() => scanner.resume(), 1200);
+                        setTimeout(() => scanner.resume(), 1000);
                     }
                 }, 
                 (err) => {}
@@ -441,11 +453,8 @@
         // --- TERMINAR ---
         function intentarTerminarItem(){
             if(!itemActivo) return;
-            // Pasamos datos al modal de verificación
             document.getElementById('vf-count').textContent = itemActivo.alistado;
             document.getElementById('vf-req').textContent = itemActivo.cantidad;
-            
-            // Ocultamos cámara visualmente (opcional) o superponemos modal
             document.getElementById('modal-verify').style.display = 'flex';
         }
 
@@ -453,10 +462,10 @@
             document.getElementById('modal-verify').style.display = 'none';
         }
 
-        // CORRECCIÓN 3: MANEJO DE ERROR DE RED Y ACTUALIZACIÓN VISUAL
+        // --- CORRECCIÓN: FLUJO MAGICO ---
         function confirmarVerificacion(){
             const btn = document.querySelector('.btn-v-confirm');
-            btn.textContent = '...';
+            btn.textContent = 'Guardando...';
             
             fetch('/api/operario/confirmar_item', {
                 method:'POST', headers:{'Content-Type':'application/json'},
@@ -467,23 +476,37 @@
             }).then(r=>r.json()).then(d=>{
                 if(d.status === 'ok'){
                     document.getElementById('snd-beep').play();
-                    // Cerrar todo
+                    
+                    // 1. CERRAR MODALES (Limpieza)
                     cancelarVerificacion();
                     cerrarModalPicking();
+                    
+                    // 2. ACTUALIZAR ESTADO LOCAL
                     itemActivo.estado_actividad = 'FINALIZADO';
-                    renderizarItems(); // Aquí se ocultará gracias a la clase .done
+                    
+                    // 3. BORRAR VISUALMENTE (Efecto Inmediato)
+                    const card = document.getElementById('card_' + itemActivo.id);
+                    if(card) card.remove(); 
+                    
+                    // 4. ACTUALIZAR BARRA PROGRESO
+                    renderizarItems();
+
+                    // 5. ALERT FINAL (Usuario ve la lista limpia al fondo)
+                    setTimeout(() => {
+                        alert("✅ Item alistado correctamente.");
+                    }, 200); // Pequeño delay para que se vea el cambio de fondo
+
                 } else {
                     alert("Error: " + d.error);
                 }
                 btn.textContent = 'CONFIRMAR';
-            }).catch(e=>{ alert("Error de Red. Verifique su conexión."); btn.textContent = 'CONFIRMAR'; });
+            }).catch(e=>{ alert("Error de Red. Intente de nuevo."); btn.textContent = 'CONFIRMAR'; });
         }
 
     </script>
 
     <script>
         (function() {
-            // 2 Horas = 2 * 60 * 60 * 1000 = 7,200,000 ms
             const TIEMPO_LIMITE = 7200000; 
             let temporizadorInactividad;
 
@@ -495,13 +518,10 @@
                 }, TIEMPO_LIMITE);
             }
 
-            // Detectar cualquier actividad
             window.onmousemove = reiniciarTemporizador;
             window.onkeypress = reiniciarTemporizador;
-            window.ontouchstart = reiniciarTemporizador; // Clave para móviles
+            window.ontouchstart = reiniciarTemporizador;
             window.onclick = reiniciarTemporizador;
-
-            // Iniciar conteo al cargar
             reiniciarTemporizador();
         })();
     </script>
