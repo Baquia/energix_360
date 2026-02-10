@@ -313,6 +313,63 @@
         flex: 1 1 100%;
       }
     }
+
+    /* MODAL NEGOCIACION */
+    .modal-negociacion {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .neg-card {
+      background: white;
+      padding: 25px;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .neg-input {
+      font-size: 2.2em;
+      width: 120px;
+      text-align: center;
+      border: 2px solid #015249;
+      border-radius: 10px;
+      color: #015249;
+      font-weight: 800;
+    }
+
+    .counter-btn {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      border: 1px solid #ccc;
+      background: #f0f0f0;
+      font-size: 1.4em;
+      cursor: pointer;
+    }
+
+    .btn-solicitar {
+      background: #015249;
+      color: white;
+      width: 100%;
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 1.1em;
+      font-weight: bold;
+      border: none;
+      margin-top: 20px;
+      cursor: pointer;
+    }
   </style>
 
 </head>
@@ -846,17 +903,17 @@
             sincronizadosCount++;
             lastSuccessResponse = j;
           } else {
-            // SI EL SERVIDOR DICE "NO" (ERROR LÓGICO)
+            // SI EL SERVIDOR DICE "NO" (ERROR LÓGICO: Ej. Lote activo)
             // 1. Mostrar la alerta
             alert("⚠️ El servidor rechazó una operación pendiente:\n\n" + (j.message || "Operación rechazada"));
 
             // 2. Limpiamos la pantalla y volvemos al menú
             if (typeof mostrarMenu === 'function') mostrarMenu();
 
-            // Nota: Al NO hacer 'remaining.push(it)', la operación se descarta de la cola.
+            // Nota: Al NO hacer 'remaining.push(it)', la operación se descarta de la cola para no atascar.
           }
         } catch (e) {
-          // Error de red real -> Se queda en la cola
+          // Error de red real -> Se queda en la cola para intentar luego
           remaining.push(it);
         }
       }
@@ -865,20 +922,35 @@
 
       // === ACCIONES AL FINALIZAR ===
 
-      // CORRECCIÓN CLAVE: Ocultar el aviso SIEMPRE que la cola quede vacía
-      // (Independientemente de si hubo "éxito" o "rechazo")
+      // Ocultar el aviso SIEMPRE que la cola quede vacía
       if (remaining.length === 0) {
         const warningDiv = document.getElementById("syncWarning");
         if (warningDiv) warningDiv.style.display = 'none';
       }
 
-      // 1. Si hubo éxitos reales (para mostrar resumen)
+      // 1. GESTIÓN DE RESPUESTA EXITOSA (AQUÍ ESTÁ EL CAMBIO DEL COPILOTO)
       if (sincronizadosCount > 0) {
+        // Solo mostramos la UI si ya no quedan pendientes
         if (remaining.length === 0) {
-          if (lastSuccessResponse && typeof mostrarResumenOperacion === 'function') {
-            alert(`✅ Se han sincronizado ${sincronizadosCount} operaciones.`);
-            mostrarResumenOperacion(lastSuccessResponse);
+
+          if (lastSuccessResponse) {
+            // Notificar que los datos YA están seguros en BD
+            alert(`✅ Sincronización completada. Datos guardados en el servidor.`);
+
+            // --- LÓGICA INTELIGENTE: ¿Qué pantalla mostrar? ---
+
+            // OPCIÓN A: Si la respuesta trae datos del Copiloto (requiere_gas), activamos la negociación
+            if (lastSuccessResponse.resumen && (lastSuccessResponse.resumen.requiere_gas !== undefined)) {
+              console.log("🧠 Copiloto detectado en respuesta offline. Activando vista inteligente.");
+              manejarRespuestaOperacion(lastSuccessResponse);
+            }
+            // OPCIÓN B: Si es una operación vieja o de otro módulo, usamos la vista estándar
+            else if (typeof mostrarResumenOperacion === 'function') {
+              mostrarResumenOperacion(lastSuccessResponse);
+            }
+
           } else {
+            // Fallback por seguridad
             alert(`✅ ¡Éxito! Se sincronizaron ${sincronizadosCount} operaciones.`);
             window.location.reload();
           }
@@ -887,14 +959,11 @@
 
       // 2. Si la sesión venció
       if (needLoginForSync) {
-        // === NUEVA PROTECCIÓN: NO MOLESTAR SI EL USUARIO ESTÁ TRABAJANDO ===
-        // Si el usuario está en medio de una operación (QR, formulario, etc.),
-        // ignoramos el logout forzado por ahora para dejarle terminar offline.
+        // PROTECCIÓN: NO MOLESTAR SI EL USUARIO ESTÁ TRABAJANDO EN OTRA COSA
         if (typeof GLP_OPERACION_EN_CURSO !== 'undefined' && GLP_OPERACION_EN_CURSO) {
           console.warn("⛔ Sesión vencida detectada en background, pero el usuario está operando. Se pospone el logout.");
           return;
         }
-        // ===================================================================
 
         alert("⚠️ TU SESIÓN HA VENCIDO\n\nDale Aceptar para iniciar sesión nuevamente.");
         window.location.href = "/logout";
@@ -1418,17 +1487,149 @@
     /**
     * Función genérica que usan TODAS las operaciones al recibir la respuesta.
     */
+
+    let currentOpId = null;
+    let currentDiasExtra = 0;
+
     function manejarRespuestaOperacion(resp) {
-      if (!resp) {
-        alert("Respuesta inválida del servidor.");
-        mostrarMenu();
+      // ... (código existente para ocultar menu y conversacion) ...
+      // Asegurate de mostrar el panel:
+      const panel = document.getElementById("panelResumen");
+      panel.style.display = "block";
+
+      if (!resp.resumen) {
+        // Manejo de error existente
+        panel.innerHTML = `<p>${resp.message}</p><button onclick="location.reload()" class="btn-cerrar">Volver</button>`;
         return;
       }
-      if (resp.resumen) {
-        mostrarResumenOperacion(resp);
+
+      const r = resp.resumen;
+      currentOpId = r.op_id; // Guardamos el ID para la negociación
+
+      // HEADER COMÚN
+      let html = `
+            <h3>Resumen - ${r.operacion}</h3>
+            <p><strong>Sede:</strong> ${r.sede}</p>
+            <p><strong>Lote:</strong> ${r.lote}</p>
+            <p><strong>Saldo:</strong> ${r.saldo_estimado_kg} kg</p>
+        `;
+
+      // LÓGICA COPILOTO
+      if (r.requiere_gas) {
+        // ALERTA ROJA + BOTÓN SOLICITAR
+        html += `
+                <div style="background:#fff5f5; border:1px solid #ef9a9a; padding:15px; border-radius:10px; margin-top:15px;">
+                    <h4 style="color:#c62828; margin:0 0 5px 0;">🚨 ATENCIÓN: ${r.razon_alerta}</h4>
+                    <p style="margin:5px 0; font-size:0.9em;">Necesitas solicitar gas.</p>
+                    <button onclick="abrirNegociacion(${r.sugerencia_carga}, ${r.dias_actuales})" 
+                            style="width:100%; background:#c62828; color:white; border:none; padding:14px; font-weight:bold; border-radius:8px; font-size:1.1em; margin-top:10px; cursor:pointer;">
+                        SOLICITAR GAS
+                    </button>
+                </div>`;
       } else {
-        alert(resp.message || (resp.success ? "Operación realizada" : "No se pudo completar la operación"));
-        mostrarMenu();
+        // MENSAJE VERDE DE TRANQUILIDAD
+        html += `
+                <div style="background:#e8f5e9; padding:15px; border-radius:10px; margin-top:15px; text-align:center; border:1px solid #a5d6a7;">
+                    <div style="font-size:2em;">✅</div>
+                    <strong style="color:#2e7d32; display:block; margin:5px 0;">Todo en orden</strong>
+                    <p style="font-size:0.9em; color:#1b5e20; margin:0;">Por ahora no necesitas gas. Vuelve a revisar en 24h.</p>
+                </div>
+                <button class="menu-btn" onclick="location.reload()" style="margin-top:20px;">Volver al Menú</button>`;
+      }
+      panel.innerHTML = html;
+    }
+
+    // ==========================================
+    // FUNCIONES DE NEGOCIACIÓN (FALTANTES)
+    // ==========================================
+
+    // 1. Abrir el Modal con la sugerencia del Copiloto
+    function abrirNegociacion(sugerencia, diasAct) {
+      const modal = document.getElementById("modalNegociacion");
+      const inputNivel = document.getElementById("neg_nivel");
+      const spanDiasAct = document.getElementById("neg_dias_act");
+      const spanDiasExtra = document.getElementById("neg_dias_extra");
+
+      // Pre-llenar datos
+      inputNivel.value = sugerencia;
+      spanDiasAct.innerText = diasAct;
+
+      // Resetear contador de negociación
+      currentDiasExtra = 0;
+      spanDiasExtra.innerText = "0";
+
+      // Mostrar
+      modal.style.display = "flex";
+    }
+
+    // 2. Control del contador de Días Extra (+/-)
+    function adjustDias(delta) {
+      currentDiasExtra += delta;
+      // Evitar números negativos
+      if (currentDiasExtra < 0) currentDiasExtra = 0;
+
+      // Actualizar vista
+      document.getElementById("neg_dias_extra").innerText = currentDiasExtra;
+    }
+
+    // 3. Cerrar / Cancelar
+    function cerrarNegociacion() {
+      const modal = document.getElementById("modalNegociacion");
+      modal.style.display = "none";
+
+      // Feedback al usuario
+      alert("Has decidido NO solicitar gas por ahora.\nEl sistema guardó el consumo, pero no se generó pedido.");
+
+      // Volver al estado limpio (recargar página)
+      location.reload();
+    }
+
+    // 4. Enviar la Solicitud Negociada al Servidor
+
+    async function confirmarSolicitud() {
+      const nivelSolicitado = document.getElementById("neg_nivel").value;
+      const btn = document.querySelector(".btn-solicitar");
+
+      // Feedback visual
+      btn.innerText = "⏳ Enviando solicitud...";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/glp/solicitar_pedido_manual', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': "{{ csrf_token() }}"  // <--- ¡ESTO ES LA LLAVE MAESTRA!
+          },
+          body: JSON.stringify({
+            op_id: currentOpId,
+            nivel_solicitado: nivelSolicitado,
+            dias_extra: currentDiasExtra
+          })
+        });
+
+        // Verificamos si la respuesta es válida antes de convertir a JSON
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        if (!ct.includes("application/json")) {
+          throw new Error("El servidor devolvió un error HTML (posible CSRF o 500)");
+        }
+
+        const data = await res.json();
+
+        if (data.success) {
+          alert("✅ ¡Solicitud Enviada!\n\nEl Webmaster revisará tu pedido y recibirás confirmación cuando sea aprobado.");
+          location.reload();
+        } else {
+          alert("⚠️ Error del servidor: " + data.message);
+          btn.disabled = false;
+          btn.innerText = "✅ Confirmar y Solicitar";
+        }
+
+      } catch (error) {
+        console.error(error);
+        alert("⛔ Error técnico: " + error.message);
+        btn.disabled = false;
+        btn.innerText = "Reintentar";
       }
     }
 
@@ -2160,7 +2361,9 @@
     }
 
     // 6) Densidad suministrada
+    // 6) Densidad suministrada (CON LÍMITE 1.8 - 2.5)
     function pedirDensidadSuministrada() {
+      // ... (código de setup igual) ...
       const texto = document.getElementById("preguntaTexto");
       const input = document.getElementById("respuestaInput");
       const foto = document.getElementById("inputFoto");
@@ -2169,7 +2372,7 @@
 
       show(input);
       hide(foto);
-      hide(divSiNo); // Asegurar que los botones de confirmación estén ocultos
+      hide(divSiNo);
 
       input.type = "number";
       input.step = "0.01";
@@ -2180,39 +2383,40 @@
 
       btn.onclick = () => {
         const d = Number(input.value || 0);
-        if (isNaN(d) || d <= 0) {
-          alert("Ingresa una densidad válida (>0).");
-          return;
+
+        // --- CAMBIO AQUÍ: RANGO 1.8 a 2.5 ---
+        if (isNaN(d) || d < 1.8 || d > 2.5) {
+          alert("⛔ DATO INVÁLIDO\n\nLa densidad debe estar obligatoriamente entre 1.8 y 2.5 kg/gal.\n\nRevisa el baucher nuevamente.");
+          input.value = ""; // Borrar dato incorrecto
+          input.focus();
+          return; // DETIENE EL PROCESO
         }
+        // ------------------------------------
 
-        // --- INICIO CONFIRMACIÓN ---
+        // ... (resto de la confirmación Si/No igual) ...
         hide(input);
-        hide(btn); // Ocultar input y botón enviar
+        hide(btn);
         texto.textContent = `¿Estás seguro que la densidad es ${d} kg/gal?`;
-
+        
         const bSi = document.getElementById("btnSi");
         const bNo = document.getElementById("btnNo");
-        show(divSiNo); // Mostrar los botones de Sí/No
+        show(divSiNo);
 
-        // Opción NO: Regresar a editar
         bNo.onclick = () => {
           hide(divSiNo);
           texto.textContent = `Ingresa la DENSIDAD SUMINISTRADA (kg/gal) para el tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
           show(input);
           show(btn);
-          input.focus(); // Poner foco para corrección rápida
+          input.focus();
         };
 
-        // Opción SÍ: Guardar y pasar a la siguiente etapa
         bSi.onclick = () => {
           hide(divSiNo);
           tanqueActualDatos.densidad_suministrada = d;
           pedirKgSuministrados();
         };
-        // --- FIN CONFIRMACIÓN ---
       };
     }
-
     // 7) Kg suministrados
     function pedirKgSuministrados() {
       const texto = document.getElementById("preguntaTexto");
@@ -2503,6 +2707,32 @@
     window.addEventListener("offline", actualizarBloqueoLogout);
 
   </script>
+
+  <div id="modalNegociacion" class="modal-negociacion">
+    <div class="neg-card">
+      <h3 style="color:#d9534f; margin-top:0;">⚠️ Nivel Bajo Detectado</h3>
+      <p style="color:#555;">El sistema sugiere pedir gas para asegurar el lote.</p>
+      <div style="background:#e8f5e9; padding:15px; border-radius:12px; margin:15px 0;">
+        <label style="font-weight:bold; color:#015249;">Cantidad a Solicitar (%)</label><br>
+        <input type="number" id="neg_nivel" class="neg-input" value="60">
+        <div style="font-size:0.75em; color:#666; margin-top:5px;">(Toca el número para editar)</div>
+      </div>
+      <div style="margin:20px 0;">
+        <label style="font-weight:bold;">⏳ Extensión de Lote</label>
+        <p style="font-size:0.85em; margin:5px 0; color:#666;">Llevas <span id="neg_dias_act"></span> días. ¿Necesitas
+          días extra?</p>
+        <div style="display:flex; justify-content:center; gap:15px; align-items:center;">
+          <button class="counter-btn" onclick="adjustDias(-1)">-</button>
+          <span id="neg_dias_extra" style="font-size:1.8em; font-weight:bold; min-width:40px;">0</span>
+          <button class="counter-btn" onclick="adjustDias(1)">+</button>
+        </div>
+      </div>
+      <button class="btn-solicitar" onclick="confirmarSolicitud()">✅ Confirmar y Solicitar</button>
+      <button onclick="cerrarNegociacion()"
+        style="background:transparent; border:none; color:#777; margin-top:15px; text-decoration:underline; font-size:0.9em;">No
+        pedir ahora (Asumo el riesgo)</button>
+    </div>
+  </div>
 
 </body>
 

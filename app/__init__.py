@@ -55,7 +55,7 @@ def create_app():
     login_manager.login_message = "Por favor inicie sesión."
 
     # =========================================================
-    #  REGISTRO DE BLUEPRINTS (Arquitectura A/B)
+    #  REGISTRO DE BLUEPRINTS (Arquitectura A/B/C)
     # =========================================================
 
     # ---------------------------------------------------------
@@ -64,7 +64,7 @@ def create_app():
     # ---------------------------------------------------------
     from app.blueprints.bp_890707006 import bp_890707006    # Pollos GAR
     from app.blueprints.bp_901811727 import bp_901811727    # Webmaster / Admin
-    from app.blueprints.A_bp_logistica import logistica_bp  # Logística y Distribución (NUEVO)
+    from app.blueprints.A_bp_logistica import logistica_bp  # Logística y Distribución
 
     app.register_blueprint(bp_890707006)
     app.register_blueprint(bp_901811727)
@@ -80,13 +80,20 @@ def create_app():
     from app.blueprints.bp_gestion_mermas import bp_gestion_mermas #modulo de gestion Mermas
     
     # --SUBMODULOS PARA VENTAS Y DISTRIBICION --#
-    from app.blueprints.B_bp_bodegas import bp_bodegas#modulo de gestion Mermas
-    from app.blueprints.B_bp_flotacarga import bp_flotacarga #modulo de gestion Mermas
+    from app.blueprints.B_bp_bodegas import bp_bodegas #modulo de Bodegas (Dashboard/Carga)
+    from app.blueprints.B_bp_flotacarga import bp_flotacarga #modulo de Flota
    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
     app.register_blueprint(bp_bodegas)
     app.register_blueprint(bp_flotacarga)
+
+    # ---------------------------------------------------------
+    #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
+    #  (Interfaces ligeras para operarios: Picking, Entregas...)
+    # ---------------------------------------------------------
+    from app.blueprints.C_bp_oper_bodegas import bp_oper_bodegas
+    app.register_blueprint(bp_oper_bodegas)
 
     return app
 

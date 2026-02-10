@@ -196,8 +196,6 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
     # ==========================================================================
     # PASO 0: DETECTAR POBLACIÓN (POLLITOS) DENTRO DEL RANGO SELECCIONADO
     # ==========================================================================
-    # Escaneamos los datos para encontrar el número de pollitos de cada lote.
-    # Priorizamos si la operación es 'inicio_calefaccion'.
     mapa_pollitos_lote = {}
     
     for row in resultados:
@@ -206,19 +204,18 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         operacion = str(row.get('operacion') or '').lower()
         
         if lote:
-            # Si aún no tenemos dato para este lote, o encontramos un dato mejor:
             dato_actual = mapa_pollitos_lote.get(lote, 0)
             
-            # CASO A: Encontramos la operación "inicio" (Prioridad Máxima)
+            # Prioridad A: Operación inicio
             if 'inicio' in operacion and pollitos > 0:
                 mapa_pollitos_lote[lote] = pollitos
             
-            # CASO B: Encontramos un número mayor al que teníamos (y no habíamos encontrado un inicio)
+            # Prioridad B: Mayor número encontrado
             elif pollitos > dato_actual:
                  mapa_pollitos_lote[lote] = pollitos
 
     # ==========================================================================
-    # INICIO DEL PROCESAMIENTO NORMAL (SUMAS Y PROMEDIOS)
+    # INICIO DEL PROCESAMIENTO (SUMAS, PROMEDIOS Y SERIES)
     # ==========================================================================
 
     math_saldo_inicial_kg_global = 0.0
@@ -229,10 +226,19 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
     total_pollitos_global = 0
     lotes_procesados_global = set()
 
-    series = { 'fechas': [], 'kg_pollito': [], 'saldo_inicial': [], 'saldo_final': [], 'ingresos': [] }
+    # --- CAMBIO 1: AGREGAMOS LA SERIE 'velocidad_consumo' ---
+    series = { 
+        'fechas': [], 
+        'kg_pollito': [], 
+        'velocidad_consumo': [],  # <--- NUEVA SERIE PARA GRÁFICAS
+        'saldo_inicial': [], 
+        'saldo_final': [], 
+        'ingresos': [] 
+    }
+    
     granjas_data = {}
 
-    # Ordenamos por fecha para que el gráfico salga bien
+    # Ordenamos por fecha
     resultados.sort(key=lambda x: str(x.get('fecha')))
 
     for row in resultados:
@@ -247,7 +253,10 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         val_precio = safe_float(row.get('precio_total')) 
         kg_pollo  = safe_float(row.get('kg_pollito'))
         
-        # AQUÍ USAMOS EL DATO CORREGIDO DEL PASO 0
+        # --- CAMBIO 2: EXTRAEMOS EL DATO DE VELOCIDAD ---
+        vel_consumo = safe_float(row.get('velocidad_consumo'))
+        
+        # Usamos el dato de pollitos corregido
         pollitos_reales = mapa_pollitos_lote.get(lote_id, 0)
 
         # 1. CÁLCULO DIRECTO (SUMAS)
@@ -260,14 +269,15 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         if clase == 'ingreso':
             math_ingresos_kg += masa_fact
 
-        # 2. SERIES PARA GRÁFICOS
+        # 2. SERIES PARA GRÁFICOS (ACTUALIZADO)
         series['fechas'].append(fecha_str)
         series['kg_pollito'].append(kg_pollo)
+        series['velocidad_consumo'].append(vel_consumo) # <--- AGREGAMOS EL DATO A LA LISTA
         series['saldo_inicial'].append(val_kg_saldo if clase == 'saldo inicial' else None)
         series['saldo_final'].append(val_kg_saldo if clase == 'saldo final' else None)
         series['ingresos'].append(masa_fact if clase == 'ingreso' else None)
 
-        # 3. CONTEO DE POLLITOS (Usando el valor real encontrado en el rango)
+        # 3. CONTEO DE POLLITOS GLOBAL
         if lote_id and lote_id not in lotes_procesados_global:
             total_pollitos_global += pollitos_reales
             lotes_procesados_global.add(lote_id)
@@ -286,7 +296,6 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         elif clase == 'ingreso': d['ingresos'] += masa_fact
         
         if lote_id and lote_id not in d['lotes']:
-            # Si este lote tiene pollitos registrados en el rango, los sumamos
             if pollitos_reales > 0:
                 d['pollitos'] += pollitos_reales
             d['lotes'].add(lote_id)
@@ -311,7 +320,7 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         "card6_value": math_dinero_total
     }
 
-    # --- TABLA RESUMEN ---
+    # --- TABLA RESUMEN Y FILTRADO ESTADÍSTICO ---
     tabla_resumen = []
     lista_rendimientos = []
 
@@ -319,11 +328,15 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         consumo_granja = datos['consumo_real']
         rend_granja = 0.0
         
-        # Cálculo seguro de eficiencia por granja
         if datos['pollitos'] > 0:
             rend_granja = consumo_granja / datos['pollitos']
-            lista_rendimientos.append(rend_granja)
+            
+            # --- CAMBIO 3: FILTRO ESTADÍSTICO ---
+            # Solo consideramos para la media/desviación las granjas con consumo real > 0
+            if rend_granja > 0.000001:
+                lista_rendimientos.append(rend_granja)
 
+        # A la tabla visual agregamos TODAS (incluso las de 0)
         tabla_resumen.append({
             'granja': nombre_granja,
             'total_kg': consumo_granja,
@@ -331,22 +344,33 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
             'kg_pollito': rend_granja
         })
 
-    # --- ESTADÍSTICAS ---
+    # --- CÁLCULO DE ESTADÍSTICAS (KPIs de Variabilidad) ---
     media = 0.0
     desviacion = 0.0
-    n = len(lista_rendimientos)
+    
+    n = len(lista_rendimientos) # n ahora excluye los ceros
+    
     if n > 0:
         media = sum(lista_rendimientos) / n
+        
         if n > 1:
             varianza = sum((x - media) ** 2 for x in lista_rendimientos) / (n - 1)
             desviacion = math.sqrt(varianza)
+
+    # --- CAMBIO 4: NOTA METODOLÓGICA ---
+    nota_informativa = "Nota: Las estadísticas (media y desviación) se calculan únicamente sobre las granjas que reportaron consumo en este periodo, excluyendo aquellas con valor cero."
 
     return {
         "kpis": kpis,
         "series": series,
         "tabla_resumen": tabla_resumen,
-        "estadisticas": { "media": media, "desviacion": desviacion },
-        "periodo_tipo": periodo
+        "estadisticas": { 
+            "media": media, 
+            "desviacion": desviacion,
+            "n_muestras": n
+        },
+        "periodo_tipo": periodo,
+        "nota_metodologica": nota_informativa
     }
     
 @csrf.exempt
@@ -399,7 +423,7 @@ def generar_informe():
         sql = """
             SELECT c.fecha, c.ubicacion, c.lote, c.estatus_lote, c.operacion, c.clase, 
                    c.saldo_estimado_kg, c.saldo_estimado_galones,
-                   c.pollitos, c.kg_pollito, c.masa_kg_facturada, c.neto_gastado,
+                   c.pollitos, c.kg_pollito,c.velocidad_consumo, c.masa_kg_facturada, c.neto_gastado,
                    c.precio_total 
             FROM cardex_glp c
         """
@@ -980,3 +1004,203 @@ def _borrar_lista_archivos(base_dir, lista_rutas):
         except Exception as ex:
             print(f"Error borrando archivo {ruta}: {ex}")
     return borrados
+
+
+# ==============================================================================
+# REPORTE DE PENDIENTES DE TANQUEO (SOLICITADOS VS REALES)
+# ==============================================================================
+@csrf.exempt
+@bp_901811727.route('/obtener_pendientes_tanqueo_reporte', methods=['POST'])
+@login_required_custom
+def obtener_pendientes_tanqueo_reporte():
+    empresa_id = request.get_json().get('empresa_id')
+    if not empresa_id:
+        return jsonify({"success": False, "message": "ID Empresa requerido"})
+
+    try:
+        cur = mysql.connection.cursor()
+        
+        # 1. Obtener Nombre Comercial (la tabla pedidos usa nombres, no IDs)
+        cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
+        row_emp = cur.fetchone()
+        if not row_emp:
+            return jsonify({"success": False, "message": "Empresa no encontrada"})
+            
+        nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
+
+        # 2. Consulta Cruzada (Pedidos Aprobados vs Cardex)
+        # Busca pedidos aprobados cuyo 'codigo_pedido' NO exista en cardex_glp
+        sql = """
+            SELECT 
+                p.id,
+                p.fecha_registro,
+                p.ubicacion,
+                p.proveedor,
+                p.nivel_solicitado,
+                p.codigo_pedido,
+                DATEDIFF(NOW(), p.fecha_registro) as dias_retraso
+            FROM pedidos_gas_glp p
+            LEFT JOIN cardex_glp c ON p.codigo_pedido = c.codigo_pedido
+            WHERE p.cliente = %s
+              AND p.estatus_flujo = 'aprobado_webmaster'
+              AND c.id IS NULL
+            ORDER BY dias_retraso DESC
+        """
+        cur.execute(sql, (nombre_empresa,))
+        rows = cur.fetchall()
+        
+        # Procesar resultados
+        pendientes = []
+        col_names = [d[0] for d in cur.description] if cur.description else []
+        
+        for r in rows:
+            rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
+            pendientes.append({
+                "fecha": str(rd.get('fecha_registro')),
+                "ubicacion": rd.get('ubicacion'),
+                "proveedor": rd.get('proveedor'),
+                "solicitado": float(rd.get('nivel_solicitado') or 0),
+                "codigo": rd.get('codigo_pedido'),
+                "dias": int(rd.get('dias_retraso') or 0)
+            })
+
+        cur.close()
+        return jsonify({"success": True, "items": pendientes})
+
+    except Exception as e:
+        print("Error reporte pendientes:", str(e))
+        return jsonify({"success": False, "message": str(e)})
+    
+# ==============================================================================
+# NUEVA RUTA: INFORME DE SALDOS AL CIERRE (Último Lote Inactivo)
+# ==============================================================================
+@csrf.exempt
+@bp_901811727.route('/generar_informe_saldos', methods=['POST'])
+@login_required_custom
+def generar_informe_saldos():
+    # Intentamos obtener empresa_id del JSON o de la sesión
+    data = request.get_json() or {}
+    empresa_id = data.get('empresa_id') or session.get('empresa_id')
+    
+    if not empresa_id:
+        return jsonify({'error': 'ID Empresa no identificado'}), 400
+
+    cur = mysql.connection.cursor()
+    
+    try:
+        # 1. Encontrar el último lote 'INACTIVO' para cada ubicación de esa empresa
+        sql_lotes = """
+            SELECT ubicacion, MAX(lote) as ultimo_lote_inactivo
+            FROM cardex_glp
+            WHERE id_empresa = %s AND estatus_lote = 'INACTIVO'
+            GROUP BY ubicacion
+        """
+        cur.execute(sql_lotes, (empresa_id,))
+        lotes_inactivos = cur.fetchall()
+        
+        # Convertir a lista de dicts si es necesario
+        col_names = [d[0] for d in cur.description]
+        lista_lotes = []
+        for row in lotes_inactivos:
+            if isinstance(row, dict): lista_lotes.append(row)
+            else: lista_lotes.append(dict(zip(col_names, row)))
+
+        reporte_data = []
+
+        # 2. Iterar por cada granja para buscar el saldo final
+        for item in lista_lotes:
+            ubicacion = item['ubicacion']
+            lote = item['ultimo_lote_inactivo']
+            
+            tanques_estado = {} 
+
+            # Traemos todo el historial de ese lote (del más reciente al más antiguo)
+            sql_detalle = """
+                SELECT fecha, 
+                       `nivel tk-1`, `capacidad tk-1`,
+                       `nivel tk-2`, `capacidad tk-2`,
+                       `nivel tk-3`, `capacidad tk-3`,
+                       `nivel tk-4`, `capacidad tk-4`,
+                       `nivel tk-5`, `capacidad tk-5`,
+                       `nivel tk-6`, `capacidad tk-6`
+                FROM cardex_glp
+                WHERE id_empresa = %s AND ubicacion = %s AND lote = %s
+                ORDER BY fecha DESC, id DESC
+            """
+            cur.execute(sql_detalle, (empresa_id, ubicacion, lote))
+            filas_lote = cur.fetchall()
+
+            fecha_cierre = None
+            
+            # Procesar filas
+            filas_dict = []
+            if filas_lote:
+                cols_det = [d[0] for d in cur.description]
+                for f in filas_lote:
+                    filas_dict.append(f if isinstance(f, dict) else dict(zip(cols_det, f)))
+                
+                fecha_cierre = filas_dict[0].get('fecha')
+
+            # Buscar último nivel registrado de cada tanque
+            for row in filas_dict:
+                for i in range(1, 7):
+                    tk_key = f'tk-{i}'
+                    nivel_col = f'nivel tk-{i}'
+                    cap_col = f'capacidad tk-{i}'
+                    
+                    if tk_key in tanques_estado: continue # Ya encontramos el último valor
+                        
+                    nivel_val = row.get(nivel_col)
+                    cap_val = row.get(cap_col)
+
+                    if nivel_val is not None:
+                        try:
+                            nivel_pct = float(nivel_val)
+                            capacidad = float(cap_val or 250)
+                            # Cálculo: (Nivel% / 100) * Capacidad * Densidad(2.0)
+                            saldo_kg = (nivel_pct / 100.0) * capacidad * 2.0
+                            
+                            tanques_estado[tk_key] = {
+                                'nivel_pct': nivel_pct,
+                                'capacidad': capacidad,
+                                'saldo_kg': saldo_kg
+                            }
+                        except: pass
+
+            # Armar resultado por granja
+            if tanques_estado:
+                lista_tanques_final = []
+                total_kg_granja = 0
+                
+                for i in range(1, 7):
+                    tk_key = f'tk-{i}'
+                    if tk_key in tanques_estado:
+                        d = tanques_estado[tk_key]
+                        lista_tanques_final.append({
+                            'tanque': f'Tanque {i}',
+                            'nivel': d['nivel_pct'],
+                            'capacidad_gl': d['capacidad'],
+                            'saldo_kg': d['saldo_kg']
+                        })
+                        total_kg_granja += d['saldo_kg']
+                
+                if lista_tanques_final:
+                    reporte_data.append({
+                        'ubicacion': ubicacion,
+                        'lote_cerrado': lote,
+                        'fecha_cierre': str(fecha_cierre),
+                        'tanques': lista_tanques_final,
+                        'total_kg_granja': total_kg_granja
+                    })
+
+        return jsonify({
+            'success': True,
+            'data': reporte_data,
+            'fecha_generacion': str(datetime.now().strftime("%Y-%m-%d %H:%M"))
+        })
+
+    except Exception as e:
+        print(f"Error informe saldos: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        cur.close()

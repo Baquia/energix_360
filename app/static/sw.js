@@ -6,8 +6,8 @@
 */
 
 // 1. CAMBIO DE VERSIÓN PARA FORZAR ACTUALIZACIÓN Y LIMPIAR FANTASMAS
-const CACHE_STATIC = "bqa-one-shell-v12.1";
-const CACHE_DYNAMIC = "bqa-one-dyn-v12.1";
+const CACHE_STATIC = "bqa-one-shell-v13.1";
+const CACHE_DYNAMIC = "bqa-one-dyn-v13.1";
 
 // ===== MODO OFFLINE GARANTIZADO =====
 let FORCE_OFFLINE = false;
