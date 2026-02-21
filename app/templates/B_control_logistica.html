@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BQA ONE-CONTROL LOGISTICA | {{ empresa }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <style>
         :root {
             --color-primary: #015249;
@@ -17,105 +18,342 @@
             --color-muted: #6b7280;
         }
 
-        body { font-family: 'Inter', sans-serif; background: var(--color-bg); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--color-bg);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
 
         /* SIDEBAR */
-        .sidebar { width: 280px; background: var(--color-surface); border-right: 1px solid var(--color-border); padding: 1.5rem; display: flex; flex-direction: column; }
-        .brand-container { display: flex; align-items: center; gap: 15px; margin-bottom: 2rem; border-bottom: 1px solid var(--color-border); padding-bottom: 1rem; }
-        .logo-app { height: 40px; } 
-        .logo-cliente { height: 35px; max-width: 100px; object-fit: contain; }
-        
-        .menu-label { font-size: 0.75rem; color: var(--color-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 0.75rem; }
-        
-        .menu-item {
-            width: 100%; display: flex; align-items: center; padding: 0.75rem 1rem;
-            border: none; background: transparent; color: var(--color-text);
-            font-weight: 500; cursor: pointer; border-radius: 8px; text-align: left;
-            margin-bottom: 0.5rem; transition: 0.2s; font-size: 0.95rem; text-decoration: none;
+        .sidebar {
+            width: 280px;
+            background: var(--color-surface);
+            border-right: 1px solid var(--color-border);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
         }
-        .menu-item:hover, .menu-item.active { background: #f0fdfa; color: var(--color-primary); }
-        .menu-item svg { width: 20px; height: 20px; margin-right: 12px; }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--color-border);
+            padding-bottom: 1rem;
+        }
+
+        .logo-app {
+            height: 40px;
+        }
+
+        .logo-cliente {
+            height: 35px;
+            max-width: 100px;
+            object-fit: contain;
+        }
+
+        .menu-label {
+            font-size: 0.75rem;
+            color: var(--color-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+
+        .menu-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border: none;
+            background: transparent;
+            color: var(--color-text);
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            text-align: left;
+            margin-bottom: 0.5rem;
+            transition: 0.2s;
+            font-size: 0.95rem;
+            text-decoration: none;
+        }
+
+        .menu-item:hover,
+        .menu-item.active {
+            background: #f0fdfa;
+            color: var(--color-primary);
+        }
+
+        .menu-item svg {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+        }
 
         /* BOTONES ESPECIALES */
-        .btn-upload { background: #e0f2fe; color: #0284c7; font-weight: 600; }
-        .btn-upload:hover { background: #bae6fd; }
-        
-        .btn-alistamiento { background: #fef3c7; color: #b45309; font-weight: 600; }
-        .btn-alistamiento:hover { background: #fde68a; }
-        
-        .btn-logout { 
-            margin-top: auto; 
-            background: var(--color-primary) !important; 
-            color: white !important; 
+        .btn-upload {
+            background: #e0f2fe;
+            color: #0284c7;
+            font-weight: 600;
+        }
+
+        .btn-upload:hover {
+            background: #bae6fd;
+        }
+
+        .btn-alistamiento {
+            background: #fef3c7;
+            color: #b45309;
+            font-weight: 600;
+        }
+
+        .btn-alistamiento:hover {
+            background: #fde68a;
+        }
+
+        .btn-logout {
+            margin-top: auto;
+            background: var(--color-primary) !important;
+            color: white !important;
             display: flex;
             justify-content: center;
             padding: 0.5rem !important;
             font-size: 0.85rem !important;
-            width: 90%; 
-            align-self: center; 
+            width: 90%;
+            align-self: center;
             border-radius: 20px;
         }
 
         /* MAIN */
-        .main-content { flex: 1; padding: 2rem; overflow-y: auto; }
-        .header h1 { font-size: 1.75rem; color: var(--color-primary); margin: 0; }
-        .header p { color: var(--color-muted); margin: 5px 0 0; }
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .header h1 {
+            font-size: 1.75rem;
+            color: var(--color-primary);
+            margin: 0;
+        }
+
+        .header p {
+            color: var(--color-muted);
+            margin: 5px 0 0;
+        }
 
         /* KPIS */
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
-        .kpi-card { background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--color-border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .kpi-val { font-size: 2rem; font-weight: 700; display: block; margin-top: 5px; }
-        .kpi-lbl { font-size: 0.85rem; color: var(--color-muted); font-weight: 600; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .kpi-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .kpi-val {
+            font-size: 2rem;
+            font-weight: 700;
+            display: block;
+            margin-top: 5px;
+        }
+
+        .kpi-lbl {
+            font-size: 0.85rem;
+            color: var(--color-muted);
+            font-weight: 600;
+        }
 
         /* MODALES */
         .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center;
-            backdrop-filter: blur(3px); z-index: 1000;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(3px);
+            z-index: 1000;
         }
-        
+
         .modal-large {
-            width: 95%; max-width: 1200px; height: 90vh; 
-            background: #f9fafb; border-radius: 16px; display: flex; flex-direction: column;
-            overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            width: 95%;
+            max-width: 1200px;
+            height: 90vh;
+            background: #f9fafb;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
         }
 
         .modal-card {
-            background: white; border-radius: 16px; width: 90%; max-width: 450px;
-            padding: 0; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 450px;
+            padding: 0;
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
 
-        .modal-header { padding: 1.5rem; background: white; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
-        .modal-body { padding: 2rem; overflow-y: auto; flex: 1; }
-        .modal-footer { padding: 1.5rem; background: white; border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: 1rem; }
+        .modal-header {
+            padding: 1.5rem;
+            background: white;
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-        .section-box { background: white; border-radius: 12px; border: 1px solid var(--color-border); margin-bottom: 2rem; overflow: hidden; }
-        .section-title { padding: 1rem 1.5rem; background: #f8fafc; border-bottom: 1px solid var(--color-border); font-weight: 600; margin: 0; font-size: 1.1rem; }
-        
-        .data-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-        .data-table th { text-align: left; padding: 1rem 1.5rem; background: #f8fafc; color: var(--color-muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid var(--color-border); }
-        .data-table td { padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-border); }
-        
+        .modal-body {
+            padding: 2rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-footer {
+            padding: 1.5rem;
+            background: white;
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+
+        .section-box {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .section-title {
+            padding: 1rem 1.5rem;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--color-border);
+            font-weight: 600;
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 1rem 1.5rem;
+            background: #f8fafc;
+            color: var(--color-muted);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .data-table td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--color-border);
+        }
+
         /* CLASES PARA EVITAR ERRORES EN EDITOR */
-        .fila-finalizada { background-color: #f0fdf4 !important; }
-        .fila-normal { background-color: #ffffff; }
+        .fila-finalizada {
+            background-color: #f0fdf4 !important;
+        }
 
-        .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
-        .badge-blue { background: #eff6ff; color: #1d4ed8; }
-        .badge-green { background: #f0fdf4; color: #15803d; }
-        .badge-yellow { background: #fef3c7; color: #b45309; }
+        .fila-normal {
+            background-color: #ffffff;
+        }
 
-        .btn-assign { background: white; border: 1px solid var(--color-border); padding: 5px 10px; border-radius: 6px; cursor: pointer; color: var(--color-primary); font-weight: 600; }
-        .btn-assign:hover { background: var(--color-primary); color: white; }
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
 
-        .btn-cancel { background: white; border: 1px solid var(--color-border); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; }
-        .btn-confirm { background: var(--color-primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; }
+        .badge-blue {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
 
-        .drop-area { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 3rem; text-align: center; cursor: pointer; background: #f8fafc; }
-        .drop-area:hover { border-color: var(--color-primary); background: #f0fdfa; }
+        .badge-green {
+            background: #f0fdf4;
+            color: #15803d;
+        }
 
+        .badge-yellow {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .btn-assign {
+            background: white;
+            border: 1px solid var(--color-border);
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--color-primary);
+            font-weight: 600;
+        }
+
+        .btn-assign:hover {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: white;
+            border: 1px solid var(--color-border);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .btn-confirm {
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .drop-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            background: #f8fafc;
+        }
+
+        .drop-area:hover {
+            border-color: var(--color-primary);
+            background: #f0fdfa;
+        }
     </style>
 </head>
+
 <body>
 
     <aside class="sidebar">
@@ -123,29 +361,46 @@
             <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo-app" alt="App">
             <div style="width:1px; height:30px; background:#e5e7eb; margin:0 15px;"></div>
             {% if nit %}
-            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" onerror="this.style.display='none'">
+            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente"
+                onerror="this.style.display='none'">
             {% endif %}
         </div>
 
         <div class="menu-label">Gestión Logística</div>
-        
+
         <button class="menu-item active">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
             Dashboard
         </button>
 
         <button onclick="openAlistamientoModal()" class="menu-item btn-alistamiento">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
             Alistamiento
         </button>
 
         <button onclick="openUploadModal()" class="menu-item btn-upload">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
             Cargar Picking (Excel)
         </button>
 
         <a href="/logout" class="menu-item btn-logout">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2 2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2 2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
             Cerrar Sesión
         </a>
     </aside>
@@ -161,10 +416,13 @@
                 <span class="kpi-lbl">Total Pedidos</span>
                 <span class="kpi-val">{{ kpis.pedidos_totales }}</span>
             </div>
-            
-            <div class="kpi-card" style="border-left: 5px solid #ea580c; display: flex; flex-direction: column; justify-content: center;">
-                <span class="kpi-lbl" style="margin-bottom: 10px; border-bottom: 1px solid #f3f4f6; padding-bottom: 5px;">Carga Pendiente</span>
-                
+
+            <div class="kpi-card"
+                style="border-left: 5px solid #ea580c; display: flex; flex-direction: column; justify-content: center;">
+                <span class="kpi-lbl"
+                    style="margin-bottom: 10px; border-bottom: 1px solid #f3f4f6; padding-bottom: 5px;">Carga
+                    Pendiente</span>
+
                 <div style="display: flex; justify-content: space-between; text-align: center;">
                     <div>
                         <span style="font-size: 1.4rem; font-weight: 800; color: #1f2937; display: block;">
@@ -187,9 +445,10 @@
                 <span class="kpi-val" style="color: #059669;">{{ kpis.items_finalizados }}</span>
             </div>
         </div>
-        
+
         <div style="margin-top: 3rem; text-align: center; color: var(--color-muted);">
-            <p>ℹ️ Para gestionar pedidos y ver la actividad en vivo, haga clic en <b>"Alistamiento"</b> en el menú lateral.</p>
+            <p>ℹ️ Para gestionar pedidos y ver la actividad en vivo, haga clic en <b>"Alistamiento"</b> en el menú
+                lateral.</p>
         </div>
     </main>
 
@@ -197,10 +456,11 @@
         <div class="modal-large">
             <div class="modal-header">
                 <h3>📋 Gestión de Alistamiento & Monitoreo</h3>
-                <button class="btn-cancel" onclick="closeAlistamientoModal()" style="border:none; padding:0; font-size:1.5rem;">&times;</button>
+                <button class="btn-cancel" onclick="closeAlistamientoModal()"
+                    style="border:none; padding:0; font-size:1.5rem;">&times;</button>
             </div>
             <div class="modal-body" style="background: #f3f4f6;">
-                
+
                 <div class="section-box">
                     <h4 class="section-title">📦 Pedidos Pendientes por Asignar</h4>
                     <table class="data-table">
@@ -215,28 +475,70 @@
                         </thead>
                         <tbody>
                             {% if ordenes_pendientes %}
-                                {% for orden in ordenes_pendientes %}
-                                <tr>
-                                    <td><b>{{ orden.orden }}</b></td>
-                                    <td><span class="badge badge-blue">{{ orden.zona }}</span></td>
-                                    <td>{{ orden.items }}</td>
-                                    <td>{{ orden.fecha }}</td>
-                                    <td>
-                                        <button onclick="abrirAsignar('{{ orden.orden }}')" class="btn-assign">Asignar 👤</button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
+                            {% for orden in ordenes_pendientes %}
+                            <tr>
+                                <td><b>{{ orden.orden }}</b></td>
+                                <td><span class="badge badge-blue">{{ orden.zona }}</span></td>
+                                <td>{{ orden.items }}</td>
+                                <td>{{ orden.fecha }}</td>
+                                <td>
+                                    <button onclick="abrirAsignar('{{ orden.orden }}', this)" class="btn-assign">Asignar 👤</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
                             {% else %}
-                                <tr><td colspan="5" style="text-align:center; padding:1.5rem; color:#6b7280;">✅ No hay pedidos pendientes.</td></tr>
+                            <tr>
+                                <td colspan="5" style="text-align:center; padding:1.5rem; color:#6b7280;">✅ No hay
+                                    pedidos pendientes.</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="section-box" style="border-left: 4px solid var(--color-primary);">
+                    <h4 class="section-title">🏷️ Lotes Pendientes por Marca (Batch Picking)</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Marca / Fabricante</th>
+                                <th>Órdenes Incluidas</th>
+                                <th>Total Items</th>
+                                <th>Creación</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if marcas_pendientes %}
+                            {% for m in marcas_pendientes %}
+                            <tr>
+                                <td><b style="color:var(--color-primary-dark);">{{ m.marca }}</b></td>
+                                <td><span class="badge badge-yellow">{{ m.ordenes }} órdenes</span></td>
+                                <td>{{ m.items }}</td>
+                                <td>{{ m.fecha }}</td>
+                                <td>
+                                    <button onclick="abrirAsignarMarca('{{ m.marca }}', this)"
+                                        class="btn-assign">Asignar 👤</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="5" style="text-align:center; padding:1.5rem; color:#6b7280;">✅ No hay lotes
+                                    por marca pendientes.</td>
+                            </tr>
                             {% endif %}
                         </tbody>
                     </table>
                 </div>
 
                 <div class="section-box">
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding: 1rem 1.5rem; background: #f8fafc; border-bottom: 1px solid var(--color-border);">
-                        <h4 class="section-title" style="border:none; padding:0; background:transparent;">📡 Operarios en Tiempo Real</h4>
-                        <small style="color: #6b7280; font-style: italic;">Nota: Los pedidos finalizados desaparecerán 24 horas después de su culminación.</small>
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; padding: 1rem 1.5rem; background: #f8fafc; border-bottom: 1px solid var(--color-border);">
+                        <h4 class="section-title" style="border:none; padding:0; background:transparent;">📡 Operarios
+                            en Tiempo Real</h4>
+                        <small style="color: #6b7280; font-style: italic;">Nota: Los pedidos finalizados desaparecerán
+                            24 horas después de su culminación.</small>
                     </div>
 
                     <table class="data-table">
@@ -251,42 +553,46 @@
                         </thead>
                         <tbody>
                             {% if ordenes_asignadas %}
-                                {% for op in ordenes_asignadas %}
-                                <tr class="{% if op.estado_visual == 'FINALIZADO' %}fila-finalizada{% else %}fila-normal{% endif %}">
-                                    <td><b>{{ op.operario }}</b></td>
-                                    <td>
-                                        {% if op.estado_visual == 'FINALIZADO' %}
-                                            <span class="badge badge-green">COMPLETADO</span>
-                                        {% else %}
-                                            <span class="badge badge-yellow">ALISTANDO...</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ op.orden }}</td>
-                                    
-                                    <td 
-                                        onclick="verDetalleOrden('{{ op.orden }}')"
-                                        style="cursor: pointer; color: #0284c7; text-decoration: underline; font-weight: bold;"
-                                        title="Clic para ver detalle completo">
-                                        {{ op.items_listos }} / {{ op.total_items }}
-                                    </td>
-                                    
-                                    <td>
-                                        {% if op.estado_visual == 'FINALIZADO' %}
-                                            <span style="color:#059669; font-weight:bold; font-family:monospace;">
-                                                🏁 {{ op.duracion_str }}
-                                            </span>
-                                        {% elif op.inicio %}
-                                            <span class="cronometro" data-inicio="{{ op.inicio }}" style="font-family:monospace; font-weight:bold; color:#ea580c; background:#fff7ed; padding:2px 6px; border-radius:4px; border:1px solid #ffedd5;">
-                                                00:00:00
-                                            </span>
-                                        {% else %}
-                                            <span style="color:#9ca3af;">--:--</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
+                            {% for op in ordenes_asignadas %}
+                            <tr
+                                class="{% if op.estado_visual == 'FINALIZADO' %}fila-finalizada{% else %}fila-normal{% endif %}">
+                                <td><b>{{ op.operario }}</b></td>
+                                <td>
+                                    {% if op.estado_visual == 'FINALIZADO' %}
+                                    <span class="badge badge-green">COMPLETADO</span>
+                                    {% else %}
+                                    <span class="badge badge-yellow">ALISTANDO...</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ op.orden }}</td>
+
+                                <td onclick="verDetalleOrden('{{ op.orden }}')"
+                                    style="cursor: pointer; color: #0284c7; text-decoration: underline; font-weight: bold;"
+                                    title="Clic para ver detalle completo">
+                                    {{ op.items_listos }} / {{ op.total_items }}
+                                </td>
+
+                                <td>
+                                    {% if op.estado_visual == 'FINALIZADO' %}
+                                    <span style="color:#059669; font-weight:bold; font-family:monospace;">
+                                        🏁 {{ op.duracion_str }}
+                                    </span>
+                                    {% elif op.inicio %}
+                                    <span class="cronometro" data-inicio="{{ op.inicio }}"
+                                        style="font-family:monospace; font-weight:bold; color:#ea580c; background:#fff7ed; padding:2px 6px; border-radius:4px; border:1px solid #ffedd5;">
+                                        00:00:00
+                                    </span>
+                                    {% else %}
+                                    <span style="color:#9ca3af;">--:--</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
                             {% else %}
-                                <tr><td colspan="5" style="text-align:center; padding:1.5rem; color:#6b7280;">😴 No hay operarios activos.</td></tr>
+                            <tr>
+                                <td colspan="5" style="text-align:center; padding:1.5rem; color:#6b7280;">😴 No hay
+                                    operarios activos.</td>
+                            </tr>
                             {% endif %}
                         </tbody>
                     </table>
@@ -298,21 +604,27 @@
 
     <div id="modalDetalleOrden" class="modal-overlay" style="z-index: 1100;">
         <div class="modal-large" style="width: 95%; max-width: 1400px; height: 90vh; background: #f3f4f6;">
-            
+
             <div class="modal-header" style="background: #fff; padding: 15px 25px; border-bottom: 1px solid #e5e7eb;">
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <h3 style="margin:0; color:#1f2937; font-size:1.4rem;">🔎 Orden #<span id="lblOrdenDetalle" style="color:var(--color-primary);"></span></h3>
+                    <h3 style="margin:0; color:#1f2937; font-size:1.4rem;">🔎 Orden #<span id="lblOrdenDetalle"
+                            style="color:var(--color-primary);"></span></h3>
                 </div>
-                <button class="btn-cancel" onclick="cerrarModalDetalle()" style="border:none; padding:0; font-size:1.8rem; color:#9ca3af; cursor:pointer;">&times;</button>
+                <button class="btn-cancel" onclick="cerrarModalDetalle()"
+                    style="border:none; padding:0; font-size:1.8rem; color:#9ca3af; cursor:pointer;">&times;</button>
             </div>
 
-            <div class="modal-body" style="padding: 20px; display: flex; gap: 20px; height: 100%; overflow: hidden; box-sizing: border-box;">
-                
-                <div style="flex: 1; display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #ea580c; overflow: hidden;">
+            <div class="modal-body"
+                style="padding: 20px; display: flex; gap: 20px; height: 100%; overflow: hidden; box-sizing: border-box;">
+
+                <div
+                    style="flex: 1; display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #ea580c; overflow: hidden;">
                     <div style="padding: 15px; border-bottom: 1px solid #f3f4f6; background: #fff7ed;">
-                        <h4 style="margin:0; color: #c2410c; display:flex; justify-content:space-between; align-items:center;">
+                        <h4
+                            style="margin:0; color: #c2410c; display:flex; justify-content:space-between; align-items:center;">
                             ⚠️ Faltantes / En Proceso
-                            <span id="countPendientes" style="background: #ea580c; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">0</span>
+                            <span id="countPendientes"
+                                style="background: #ea580c; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">0</span>
                         </h4>
                     </div>
                     <div style="flex: 1; overflow-y: auto;">
@@ -320,7 +632,8 @@
                             <thead style="position: sticky; top: 0; background: white; z-index: 10;">
                                 <tr>
                                     <th style="text-align:left; padding:12px; background:#f9fafb;">PRODUCTO</th>
-                                    <th style="text-align:center; width:60px; padding:12px; background:#f9fafb;">CANT</th>
+                                    <th style="text-align:center; width:60px; padding:12px; background:#f9fafb;">CANT
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody id="tblPendientesBody"></tbody>
@@ -328,11 +641,14 @@
                     </div>
                 </div>
 
-                <div style="flex: 1; display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #10b981; overflow: hidden;">
+                <div
+                    style="flex: 1; display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #10b981; overflow: hidden;">
                     <div style="padding: 15px; border-bottom: 1px solid #f3f4f6; background: #ecfdf5;">
-                        <h4 style="margin:0; color: #047857; display:flex; justify-content:space-between; align-items:center;">
+                        <h4
+                            style="margin:0; color: #047857; display:flex; justify-content:space-between; align-items:center;">
                             ✅ Listos / Finalizados
-                            <span id="countListos" style="background: #10b981; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">0</span>
+                            <span id="countListos"
+                                style="background: #10b981; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">0</span>
                         </h4>
                     </div>
                     <div style="flex: 1; overflow-y: auto;">
@@ -340,7 +656,8 @@
                             <thead style="position: sticky; top: 0; background: white; z-index: 10;">
                                 <tr>
                                     <th style="text-align:left; padding:12px; background:#f9fafb;">PRODUCTO</th>
-                                    <th style="text-align:center; width:60px; padding:12px; background:#f9fafb;">CANT</th>
+                                    <th style="text-align:center; width:60px; padding:12px; background:#f9fafb;">CANT
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody id="tblListosBody"></tbody>
@@ -356,7 +673,8 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3>Asignar Orden <span id="targetOrden" style="color:var(--color-primary);"></span></h3>
-                <button class="btn-cancel" onclick="cerrarAsignar()" style="border:none; padding:0; font-size:1.5rem;">&times;</button>
+                <button class="btn-cancel" onclick="cerrarAsignar()"
+                    style="border:none; padding:0; font-size:1.5rem;">&times;</button>
             </div>
             <div class="modal-body">
                 <p>Seleccione operario disponible:</p>
@@ -375,11 +693,13 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3>Cargar Picking</h3>
-                <button class="btn-cancel" onclick="closeUpload()" style="border:none; padding:0; font-size:1.5rem;">&times;</button>
+                <button class="btn-cancel" onclick="closeUpload()"
+                    style="border:none; padding:0; font-size:1.5rem;">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="frmUpload">
-                    <input type="file" name="file" id="fi" accept=".xlsx" style="display:none" onchange="document.getElementById('fn').textContent=this.files[0].name">
+                    <input type="file" name="file" id="fi" accept=".xlsx" style="display:none"
+                        onchange="document.getElementById('fn').textContent=this.files[0].name">
                     <div class="drop-area" onclick="document.getElementById('fi').click()">
                         <p id="fn" style="margin:0">Clic para seleccionar Excel</p>
                     </div>
@@ -392,25 +712,43 @@
         </div>
     </div>
 
+    <div id="modalConfirmacion" class="modal-overlay" style="z-index: 1200;">
+        <div class="modal-card" style="text-align: center; padding: 2rem;">
+            <div style="font-size: 3.5rem; margin-bottom: 10px;">🤔</div>
+            <h3 style="margin:0; color:#1f2937; font-size: 1.5rem;">Confirmar Asignación</h3>
+            <p id="txtConfirmacion" style="color:#64748b; font-size: 1.1rem; margin: 20px 0; line-height: 1.5;">
+                ¿Vas a asignar el lote?
+            </p>
+            <div style="display: flex; gap: 15px; margin-top: 30px;">
+                <button onclick="cancelarConfirmacion()"
+                    style="flex: 1; padding: 15px; border: 1px solid var(--color-border); background: white; border-radius: 12px; font-weight: 700; color: #64748b; cursor: pointer;">NO,
+                    Cancelar</button>
+                <button id="btnEjecutarAsignacion" onclick="ejecutarAsignacion()"
+                    style="flex: 1; padding: 15px; border: none; background: var(--color-primary); border-radius: 12px; font-weight: 700; color: white; cursor: pointer; box-shadow: 0 4px 10px rgba(1, 82, 73, 0.2);">SÍ,
+                    Asignar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // VARIABLE GLOBAL PARA EL POLLING
+        // VARIABLE GLOBAL PARA EL POLLING DE DETALLES
         let intervaloDetalle = null;
 
         // -- 1. ABRIR MODAL Y ACTIVAR POLLING --
         function verDetalleOrden(orden) {
             document.getElementById('lblOrdenDetalle').textContent = orden;
             document.getElementById('modalDetalleOrden').style.display = 'flex';
-            
+
             // Cargar datos inmediatamente
             cargarDatosDetalle(orden);
-            
+
             // Iniciar polling cada 3 segundos para movimiento dinámico
-            if(intervaloDetalle) clearInterval(intervaloDetalle);
-            intervaloDetalle = setInterval(() => cargarDatosDetalle(orden), 3000); 
+            if (intervaloDetalle) clearInterval(intervaloDetalle);
+            intervaloDetalle = setInterval(() => cargarDatosDetalle(orden), 3000);
         }
 
         function cerrarModalDetalle() {
-            if(intervaloDetalle) clearInterval(intervaloDetalle);
+            if (intervaloDetalle) clearInterval(intervaloDetalle);
             document.getElementById('modalDetalleOrden').style.display = 'none';
         }
 
@@ -418,7 +756,7 @@
         function cargarDatosDetalle(orden) {
             const tbPend = document.getElementById('tblPendientesBody');
             const tbList = document.getElementById('tblListosBody');
-            
+
             // Agregamos '?t=' + Date.now() para evitar caché del navegador
             fetch(`/bodegas/api/items_orden/${orden}?t=${Date.now()}`)
                 .then(r => r.json())
@@ -432,7 +770,7 @@
                         const estado = (i.estado_actividad || '').toUpperCase();
                         const cantPedida = parseFloat(i.cantidad || 0);
                         const cantAlistada = parseFloat(i.cantidad_alistada || 0);
-                        
+
                         // Listo si: Estado finalizado OR cantidad completada
                         return estado === 'FINALIZADO' || (cantPedida > 0 && cantAlistada >= cantPedida);
                     };
@@ -443,19 +781,36 @@
                     // Actualizar contadores
                     document.getElementById('countPendientes').textContent = pendientes.length;
                     document.getElementById('countListos').textContent = alistados.length;
-                    
+
                     // Renderizar filas
-                    const crearFila = (item, color, esPar) => `
+                    const crearFila = (item, color, esPar) => {
+                        let desc = item.descripcion_producto || '';
+                        let badge = '';
+
+                        // DETECTAR SI ES PROMOCIÓN
+                        const matchPromo = desc.match(/\(Kit:\s*(.*?)\)/i);
+                        if (matchPromo) {
+                            const promoName = matchPromo[1];
+                            desc = desc.replace(/\(Kit:\s*.*?\)/i, '').trim();
+                            badge = `<span style="background:#fef08a; color:#92400e; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:8px; border:1px solid #fde68a; white-space: nowrap;">
+                                        🎁 KIT: ${promoName}
+                                     </span>`;
+                        }
+
+                        return `
                         <tr style="background-color: ${esPar ? '#f9fafb' : '#ffffff'}; border-bottom: 1px solid #f3f4f6; animation: fadeIn 0.5s;">
                             <td style="padding: 10px 12px; color: #374151;">
-                                <div style="font-weight:600;">${item.descripcion_producto}</div>
-                                <div style="font-size:0.75rem; color:#6b7280;">${item.codigo_producto}</div>
+                                <div style="font-weight:600; display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+                                    ${desc} ${badge}
+                                </div>
+                                <div style="font-size:0.75rem; color:#6b7280; margin-top:2px;">${item.codigo_producto}</div>
                             </td>
-                            <td style="padding: 10px; text-align: center; font-weight: 700; color: ${color};">
+                            <td style="padding: 10px; text-align: center; font-weight: 700; color: ${color}; font-size:1.1rem;">
                                 ${item.cantidad}
                             </td>
                         </tr>
-                    `;
+                        `;
+                    };
 
                     if (pendientes.length === 0) tbPend.innerHTML = '<tr><td colspan="2" style="padding:20px; text-align:center; color:#9ca3af;">🎉 Todo alistado</td></tr>';
                     else pendientes.forEach((i, x) => tbPend.innerHTML += crearFila(i, '#ea580c', x % 2 === 0));
@@ -475,31 +830,128 @@
         function closeUpload() { document.getElementById('modalUpload').style.display = 'none'; }
         function doUpload() {
             const fd = new FormData(document.getElementById('frmUpload'));
-            fetch('/bodegas/upload_excel', {method:'POST', body:fd})
-            .then(r=>r.json()).then(d=>{ alert(d.message||d.error); if(!d.error) location.reload(); });
+            fetch('/bodegas/upload_excel', { method: 'POST', body: fd })
+                .then(r => r.json()).then(d => { alert(d.message || d.error); if (!d.error) location.reload(); });
         }
 
-        // -- 5. ASIGNAR --
+        // -- 5. ASIGNAR (UX AVANZADA CON AUTO-REAPERTURA Y CONFIRMACIÓN) --
         let curOrden = null;
-        function abrirAsignar(orden) {
-            curOrden = orden;
-            document.getElementById('targetOrden').textContent = orden;
+        let curMarca = null;
+        let modoAsignacion = 'orden';
+        let opSeleccionadoId = null;
+        let opSeleccionadoNombre = null;
+        let curFilaDOM = null; // Guardará la fila HTML para borrarla luego
+
+        function abrirAsignar(orden, btn) {
+            curOrden = orden; 
+            modoAsignacion = 'orden';
+            curFilaDOM = btn.closest('tr');
+            document.getElementById('targetOrden').textContent = "Orden #" + orden;
             document.getElementById('modalAsignar').style.display = 'flex';
-            fetch('/bodegas/api/get_empleados').then(r=>r.json()).then(u=>{
-                const s = document.getElementById('selOperario');
-                s.innerHTML='<option value="">Seleccione...</option>';
-                u.forEach(e=>s.innerHTML+=`<option value="${e.id}" data-n="${e.nombre}">${e.nombre}</option>`);
-            });
+            cargarListaOperarios();
         }
-        function cerrarAsignar() { document.getElementById('modalAsignar').style.display = 'none'; }
+
+        function abrirAsignarMarca(marca, btn) {
+            curMarca = marca; 
+            modoAsignacion = 'marca';
+            curFilaDOM = btn.closest('tr');
+            document.getElementById('targetOrden').textContent = "Lote: " + marca;
+            document.getElementById('modalAsignar').style.display = 'flex';
+            cargarListaOperarios();
+        }
+
+        function cargarListaOperarios() {
+            fetch('/bodegas/api/get_empleados')
+                .then(r => r.json())
+                .then(u => {
+                    const s = document.getElementById('selOperario');
+                    s.innerHTML = '<option value="">Seleccione...</option>';
+                    u.forEach(e => s.innerHTML += `<option value="${e.id}" data-n="${e.nombre}">${e.nombre}</option>`);
+                });
+        }
+
+        function cerrarAsignar() { 
+            document.getElementById('modalAsignar').style.display = 'none'; 
+        }
+
         function confirmarAsignar() {
             const s = document.getElementById('selOperario');
-            if(!s.value) return alert('Seleccione operario');
-            fetch('/bodegas/asignar_orden', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({numero_orden:curOrden, id_operario:s.value, nombre_operario:s.options[s.selectedIndex].getAttribute('data-n')})
-            }).then(r=>r.json()).then(d=>{ alert(d.message||d.error); location.reload(); });
+            if (!s.value) return alert('⚠️ Seleccione un operario.');
+            
+            opSeleccionadoId = s.value;
+            opSeleccionadoNombre = s.options[s.selectedIndex].getAttribute('data-n');
+            
+            const itemNombre = modoAsignacion === 'orden' ? `la orden <b>#${curOrden}</b>` : `el lote de la marca <b>${curMarca}</b>`;
+            document.getElementById('txtConfirmacion').innerHTML = `¿Asignar ${itemNombre} a <b style="color:var(--color-primary);">${opSeleccionadoNombre}</b>?`;
+            
+            document.getElementById('modalAsignar').style.display = 'none';
+            document.getElementById('modalConfirmacion').style.display = 'flex';
         }
+
+        function cancelarConfirmacion() {
+            document.getElementById('modalConfirmacion').style.display = 'none';
+            document.getElementById('modalAsignar').style.display = 'flex';
+        }
+
+        function ejecutarAsignacion() {
+            const payload = { id_operario: opSeleccionadoId, nombre_operario: opSeleccionadoNombre };
+            let url = '';
+            
+            if (modoAsignacion === 'orden') {
+                payload.numero_orden = curOrden;
+                url = '/bodegas/asignar_orden';
+            } else {
+                payload.marca = curMarca;
+                url = '/bodegas/asignar_marca';
+            }
+
+            const btnEjecutar = document.getElementById('btnEjecutarAsignacion');
+            btnEjecutar.textContent = 'Procesando...';
+            btnEjecutar.disabled = true;
+
+            fetch(url, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json()).then(d => { 
+                
+                document.getElementById('modalConfirmacion').style.display = 'none';
+
+                // Desvanece y borra la fila de la vista
+                if(curFilaDOM) {
+                    curFilaDOM.style.transition = "opacity 0.4s ease";
+                    curFilaDOM.style.opacity = "0";
+                    setTimeout(() => curFilaDOM.remove(), 400);
+                }
+
+                // Guardamos la instrucción en el navegador para reabrir el modal grande automáticamente
+                sessionStorage.setItem('reabrirAlistamiento', 'true');
+                
+                setTimeout(() => {
+                    alert(`✅ ¡Asignado con éxito a ${opSeleccionadoNombre}!`);
+                    location.reload(); 
+                }, 450);
+
+            }).catch(e => {
+                alert("❌ Error de conexión al asignar.");
+                location.reload();
+            }).finally(() => {
+                btnEjecutar.textContent = 'SÍ, Asignar';
+                btnEjecutar.disabled = false;
+            });
+        }
+
+        // =========================================================
+        // MAGIA UX: REABRIR MODAL AUTOMÁTICAMENTE AL RECARGAR
+        // =========================================================
+        document.addEventListener("DOMContentLoaded", function() {
+            if (sessionStorage.getItem('reabrirAlistamiento') === 'true') {
+                if (typeof openAlistamientoModal === "function") {
+                    openAlistamientoModal(); 
+                }
+                sessionStorage.removeItem('reabrirAlistamiento'); 
+            }
+        });
 
         // -- 6. CRONOMETRO EN VIVO --
         function actualizarCronometros() {
@@ -508,12 +960,12 @@
 
             cronometros.forEach(el => {
                 let inicioStr = el.getAttribute('data-inicio');
-                if(!inicioStr) return;
-                
+                if (!inicioStr) return;
+
                 // Normalización de fecha para evitar errores
-                let fechaFormato = inicioStr.replace(/-/g, "/"); 
+                let fechaFormato = inicioStr.replace(/-/g, "/");
                 let fechaInicio = new Date(fechaFormato);
-                
+
                 if (isNaN(fechaInicio.getTime())) {
                     fechaInicio = new Date(inicioStr);
                 }
@@ -531,15 +983,16 @@
                 const minutos = Math.floor((totalSeconds % 3600) / 60);
                 const segundos = totalSeconds % 60;
 
-                el.textContent = 
-                    (horas < 10 ? "0" + horas : horas) + ":" + 
-                    (minutos < 10 ? "0" + minutos : minutos) + ":" + 
+                el.textContent =
+                    (horas < 10 ? "0" + horas : horas) + ":" +
+                    (minutos < 10 ? "0" + minutos : minutos) + ":" +
                     (segundos < 10 ? "0" + segundos : segundos);
             });
         }
-        
+
         setInterval(actualizarCronometros, 1000);
         actualizarCronometros();
     </script>
 </body>
+
 </html>

@@ -550,7 +550,13 @@
 
             <div id="view-orders" class="hidden">
                 <button class="nav-back" onclick="volverAlMenu()">⬅ Volver al Menú</button>
-                <h2 style="margin: 5px 0 20px 0; color: var(--primary-dark);">Mis Tareas</h2>
+                <h2 style="margin: 5px 0 10px 0; color: var(--primary-dark);">Mis Tareas</h2>
+
+                <h4 style="color:#64748b; border-bottom:1px solid #e2e8f0; padding-bottom:5px;">🏷️ Lotes Agrupados</h4>
+                <div id="marcas-container" style="margin-bottom:25px;"></div>
+
+                <h4 style="color:#64748b; border-bottom:1px solid #e2e8f0; padding-bottom:5px;">📦 Órdenes de Pedido
+                </h4>
                 <div id="orders-container"></div>
             </div>
 
@@ -617,9 +623,23 @@
                 </div>
             </div>
 
-            <div class="action-area">
-                <span class="counter-lbl">UNIDADES ESCANEADAS</span>
-                <span id="pk-count" class="counter-big">0</span>
+            <div class="action-area" id="area-conteo-cajas">
+                <span class="counter-lbl" style="color:#0369a1;">📦 CAJAS COMPLETAS</span>
+                <span id="pk-count-cajas" class="counter-big" style="color:#0284c7;">0</span>
+            </div>
+
+            <div class="action-area hidden" id="area-teclado-fracciones"
+                style="background: #fdf2f8; border-color: #fbcfe8;">
+                <span class="counter-lbl" style="color:#be185d;">🍬 UNIDADES SUELTAS (FRACCIONES)</span>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 15px;">
+                    <button onclick="cambiarFraccion(-1)"
+                        style="width: 50px; height: 50px; border-radius: 50%; font-size: 2rem; border: none; background: #f9a8d4; color: #831843; font-weight: bold; cursor: pointer;">-</button>
+                    <span id="pk-count-unidades" class="counter-big"
+                        style="color:#be185d; margin: 0; min-width: 60px;">0</span>
+                    <button onclick="cambiarFraccion(1)"
+                        style="width: 50px; height: 50px; border-radius: 50%; font-size: 2rem; border: none; background: #f472b6; color: white; font-weight: bold; cursor: pointer;">+</button>
+                </div>
+                <small style="color:#9d174d; display:block; margin-top:10px;">Validado con llave EAN 🔑</small>
             </div>
 
             <button class="btn-finish" onclick="intentarTerminarItem()">TERMINAR ITEM</button>
@@ -644,6 +664,20 @@
 
     <script>
         let ordenActual = null, listaItems = [], itemActivo = null, scanner = null;
+
+        function abrirMarca(marca) {
+            ordenActual = null; // No es una orden, es una marca
+            document.getElementById('lblOrdenTitle').textContent = 'Lote: ' + marca;
+            toggleView('view-items');
+
+            const c = document.getElementById('items-container');
+            c.innerHTML = '<p style="text-align:center; padding:20px;">Cargando lote...</p>';
+
+            fetch(`/api/operario/items_lote/${marca}?v=` + new Date().getTime()).then(r => r.json()).then(d => {
+                listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
+                renderizarItems();
+            });
+        }
 
         // Helper seguro para sonido
         function playBeep() {
@@ -673,37 +707,46 @@
 
         function cargarOrdenes() {
             toggleView('view-orders');
-            const c = document.getElementById('orders-container');
-            c.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">Cargando...</p>';
+            const cOrd = document.getElementById('orders-container');
+            const cMar = document.getElementById('marcas-container');
+            cOrd.innerHTML = 'Cargando...'; cMar.innerHTML = 'Cargando...';
 
-            // SOLUCIÓN: Agregamos ?v=TIMESTAMP para evitar que el navegador use la memoria caché
-            const urlSinCache = '/api/operario/mis_ordenes?v=' + new Date().getTime();
+            const t = new Date().getTime();
 
-            fetch(urlSinCache).then(r => r.json()).then(d => {
-                c.innerHTML = '';
-                if (d.length === 0) {
-                    c.innerHTML = `
-                <div style="text-align:center; padding:40px; opacity:0.7;">
-                    <div style="font-size:3rem;">✅</div>
-                    <h3>¡Todo al día!</h3>
-                    <p>No tienes órdenes pendientes.</p>
-                </div>`;
-                    return;
-                }
+            // Cargar Lotes por Marca
+            fetch('/api/operario/mis_marcas?v=' + t).then(r => r.json()).then(d => {
+                cMar.innerHTML = '';
+                if (d.length === 0) cMar.innerHTML = '<p style="color:#94a3b8; font-size:0.9rem;">Sin lotes asignados</p>';
+                d.forEach(m => {
+                    const p = Math.round((m.items_listos / m.total_items) * 100);
+                    cMar.innerHTML += `
+                    <div class="order-card" style="border-left-color: var(--secondary);" onclick="abrirMarca('${m.marca}')">
+                        <div class="oc-top">
+                            <span class="oc-number" style="font-size:1.1rem;">LOTE: ${m.marca}</span>
+                            <span class="oc-badge" style="background:#fef3c7; color:#b45309;">${m.total_ordenes} Pedidos</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;">
+                            <span>Avance</span><span>${m.items_listos}/${m.total_items}</span>
+                        </div>
+                        <div class="p-bar"><div class="p-fill" style="width:${p}%; background: var(--secondary);"></div></div>
+                    </div>`;
+                });
+            });
+
+            // Cargar Órdenes
+            fetch('/api/operario/mis_ordenes?v=' + t).then(r => r.json()).then(d => {
+                cOrd.innerHTML = '';
+                if (d.length === 0) cOrd.innerHTML = '<p style="color:#94a3b8; font-size:0.9rem;">Sin órdenes asignadas</p>';
                 d.forEach(o => {
                     const p = Math.round((o.items_listos / o.total_items) * 100);
-                    c.innerHTML += `
-                <div class="order-card" onclick="abrirOrden('${o.orden}')">
-                    <div class="oc-top">
-                        <span class="oc-number">#${o.orden}</span>
-                        <span class="oc-badge">${o.zona || 'General'}</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;">
-                        <span>Avance</span>
-                        <span>${o.items_listos}/${o.total_items}</span>
-                    </div>
-                    <div class="p-bar"><div class="p-fill" style="width:${p}%"></div></div>
-                </div>`;
+                    cOrd.innerHTML += `
+                    <div class="order-card" onclick="abrirOrden('${o.orden}')">
+                        <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona || 'General'}</span></div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;">
+                            <span>Avance</span><span>${o.items_listos}/${o.total_items}</span>
+                        </div>
+                        <div class="p-bar"><div class="p-fill" style="width:${p}%"></div></div>
+                    </div>`;
                 });
             });
         }
@@ -760,13 +803,40 @@
 
             // Dibujar
             visibles.forEach(i => {
-                const nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
+                let nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
+                let badgeHtml = '';
+
+                // DETECTAR SI ES PROMOCIÓN (Busca el texto "(Kit: ...)")
+                const matchPromo = nombre.match(/\(Kit:\s*(.*?)\)/i);
+                if (matchPromo) {
+                    const nombrePromo = matchPromo[1]; // Extrae el nombre de la promo
+                    nombre = nombre.replace(/\(Kit:\s*.*?\)/i, '').trim(); // Quita el texto del nombre principal
+
+                    // Crea la etiqueta visual
+                    badgeHtml = `<div style="display:inline-block; background-color:#fef08a; color:#92400e; font-size:0.65rem; padding:3px 8px; border-radius:6px; font-weight:800; margin-bottom:5px; border:1px solid #fde68a; letter-spacing:0.5px;">
+                                    🎁 KIT: ${nombrePromo}
+                                 </div><br>`;
+                }
+
+                // INYECCIÓN DE BADGES DE RUTA Y ORDEN
+                let extraBadges = '';
+                if (i.numero_orden_origen) {
+                    extraBadges += `<span style="display:inline-block; background:#e0f2fe; color:#0369a1; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-right:5px; margin-top:5px;">📦 Ord: #${i.numero_orden_origen}</span>`;
+                }
+                if (i.zona) {
+                    extraBadges += `<span style="display:inline-block; background:#fce7f3; color:#be185d; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-top:5px;">🚚 Ruta: ${i.zona}</span>`;
+                }
+
                 c.innerHTML += `
             <div id="card_${i.id}" class="item-row active" onclick="abrirModalPickingId(${i.id})">
-                <div class="qty-indicator">${i.cantidad}</div>
+                <div class="qty-indicator" style="font-size: 0.85rem; flex-direction: column; gap: 4px;">
+                    <div>📦 ${i.req_cajas}</div>
+                    <div style="color: var(--secondary);">🍬 ${i.req_unidades}</div>
+                </div>
                 <div class="item-details">
                     <div class="id-code">${i.codigo_producto || 'S/C'}</div>
-                    <div class="id-name">${nombre}</div>
+                    <div class="id-name">${badgeHtml}${nombre}</div>
+                    <div>${extraBadges}</div>
                 </div>
             </div>`;
             });
@@ -774,7 +844,9 @@
 
         function filtrarLista() { renderizarItems(); }
 
-        // --- TARJETA DE TRABAJO (MODAL) ---
+        // --- TARJETA DE TRABAJO (MODAL Y MÁQUINA DE ESTADOS) ---
+        let faseAlistamiento = ''; // Puede ser: 'CAJAS', 'LLAVE' o 'MANUAL'
+
         function abrirModalPickingId(id) {
             const item = listaItems.find(i => i.id === id);
             if (!item || item.estado_actividad === 'FINALIZADO') return;
@@ -784,11 +856,39 @@
             const nombre = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
             document.getElementById('pk-name').textContent = nombre;
             document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
-            document.getElementById('pk-loc').textContent = "A-01";
-            document.getElementById('pk-req').textContent = item.cantidad;
-            document.getElementById('pk-count').textContent = item.alistado;
+            document.getElementById('pk-loc').textContent = item.zona || "A-01";
 
+            // Requeridos vs Actuales (Aseguramos que sean números enteros)
+            itemActivo.req_cajas = parseInt(item.req_cajas) || 0;
+            itemActivo.req_unidades = parseInt(item.req_unidades) || 0;
+            itemActivo.act_cajas = parseInt(item.act_cajas) || 0;
+            itemActivo.act_unidades = parseInt(item.act_unidades) || 0;
+
+            document.getElementById('pk-req').innerHTML = `📦 ${itemActivo.req_cajas} <br> 🍬 ${itemActivo.req_unidades}`;
+            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+
+            // RESETEAR INTERFAZ VISUAL DEL MODAL
             document.getElementById('cam-overlay-btn').style.display = 'flex';
+            document.getElementById('area-conteo-cajas').classList.add('hidden');
+            document.getElementById('area-teclado-fracciones').classList.add('hidden');
+
+            // MÁQUINA DE ESTADOS: Determinar en qué fase iniciamos al abrir
+            if (itemActivo.req_cajas > itemActivo.act_cajas) {
+                // Faltan cajas: Modo Estricto (Cámara como contador)
+                faseAlistamiento = 'CAJAS';
+                document.getElementById('area-conteo-cajas').classList.remove('hidden');
+            } else if (itemActivo.req_unidades > 0 && itemActivo.act_unidades < itemActivo.req_unidades) {
+                // Cajas listas (o cero requeridas). Vamos por las fracciones
+                // Iniciamos la cámara en "Modo Llave" (requiere 1 escaneo para desbloquear el teclado)
+                faseAlistamiento = 'LLAVE';
+                alert("🔑 Escanea la caja principal una vez para desbloquear las fracciones.");
+            } else {
+                // Ya todo estaba listo (caso raro al reabrir, pero se maneja por seguridad)
+                faseAlistamiento = 'MANUAL';
+                document.getElementById('area-teclado-fracciones').classList.remove('hidden');
+            }
+
             document.getElementById('modal-picking').style.display = 'flex';
         }
 
@@ -796,25 +896,45 @@
             detenerCamara();
             document.getElementById('modal-picking').style.display = 'none';
             itemActivo = null;
+            faseAlistamiento = '';
         }
 
         function resetearConteo() {
             if (itemActivo) {
-                itemActivo.alistado = 0;
-                document.getElementById('pk-count').textContent = "0";
+                itemActivo.act_cajas = 0;
+                itemActivo.act_unidades = 0;
+                document.getElementById('pk-count-cajas').textContent = "0";
+                document.getElementById('pk-count-unidades').textContent = "0";
+
+                // Reiniciar la máquina de estados simulando que lo volvemos a abrir
+                abrirModalPickingId(itemActivo.id);
+
                 if (scanner) scanner.resume();
             }
         }
 
-        // --- CÁMARA MEJORADA ---
+        function cambiarFraccion(valor) {
+            if (!itemActivo) return;
+            let actual = itemActivo.act_unidades;
+            let nuevo = actual + valor;
+
+            // Limitar el contador para que no baje de 0 ni supere lo requerido en el Excel
+            if (nuevo >= 0 && nuevo <= itemActivo.req_unidades) {
+                itemActivo.act_unidades = nuevo;
+                document.getElementById('pk-count-unidades').textContent = nuevo;
+                playBeep();
+            }
+        }
+
+        // --- CÁMARA MEJORADA (CON FASES E INTELIGENCIA) ---
 
         function iniciarCamaraIncrustada() {
             if (!itemActivo) return;
             document.getElementById('cam-overlay-btn').style.display = 'none';
 
-            // Si entramos y ya está lleno, no dejar arrancar
-            if (itemActivo.alistado >= itemActivo.cantidad) {
-                alert("⚠️ Este ítem ya está completo. Termínalo.");
+            // Si entramos y ya está todo lleno, no dejar arrancar la cámara
+            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
+                alert("⚠️ Este ítem ya está completo. Presiona 'Terminar Ítem'.");
                 return;
             }
 
@@ -827,28 +947,40 @@
                     const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
 
                     if (target && scanned === target) {
-                        // 1. VALIDACIÓN PREVIA (Evita sobre-escaneo)
-                        if (itemActivo.alistado >= itemActivo.cantidad) {
+
+                        // FLUJO 1: Llenando Cajas (Modo Estricto, 1 escaneo = 1 caja)
+                        if (faseAlistamiento === 'CAJAS') {
+                            if (itemActivo.act_cajas >= itemActivo.req_cajas) return; // Seguro anti-rebote
+
                             playBeep();
-                            scanner.pause(true); // PAUSA FÍSICA INMEDIATA
-                            alert("🛑 CANTIDAD COMPLETADA\nNo puedes escanear más.");
-                            return;
+                            itemActivo.act_cajas++;
+                            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+
+                            if (itemActivo.act_cajas >= itemActivo.req_cajas) {
+                                // Cajas completas. ¿Hay fracciones pendientes en el pedido?
+                                if (itemActivo.req_unidades > 0) {
+                                    scanner.pause(true);
+                                    faseAlistamiento = 'MANUAL'; // Pasamos a la fase 2 automáticamente
+                                    document.getElementById('area-conteo-cajas').classList.add('hidden');
+                                    document.getElementById('area-teclado-fracciones').classList.remove('hidden');
+                                    setTimeout(() => alert("✅ Cajas completas.\nAhora digita las unidades sueltas abajo."), 200);
+                                } else {
+                                    scanner.pause(true);
+                                    setTimeout(() => alert("✅ Meta alcanzada. Presiona 'TERMINAR ITEM'."), 200);
+                                }
+                            } else {
+                                // Faltan más cajas, pausar 1 segundo para no escanear la misma caja 10 veces rápido
+                                scanner.pause(true);
+                                setTimeout(() => scanner.resume(), 1000);
+                            }
                         }
-
-                        playBeep();
-                        itemActivo.alistado++;
-                        document.getElementById('pk-count').textContent = itemActivo.alistado;
-
-                        // 2. CHECK POST-ESCANEO
-                        if (itemActivo.alistado >= itemActivo.cantidad) {
-                            scanner.pause(true); // Congelar cámara
-                            setTimeout(() => {
-                                alert("✅ Meta alcanzada. Presiona 'TERMINAR ITEM'.");
-                            }, 200);
-                        } else {
-                            // Pausa breve técnica (debounce) para no leer el mismo código 10 veces en 1 seg
-                            scanner.pause(true);
-                            setTimeout(() => scanner.resume(), 1000);
+                        // FLUJO 2: Validación Llave (El pedido era solo fracciones / Break-pack)
+                        else if (faseAlistamiento === 'LLAVE') {
+                            playBeep();
+                            scanner.pause(true); // Bloqueamos la cámara porque ya cumplió su función
+                            faseAlistamiento = 'MANUAL';
+                            document.getElementById('area-teclado-fracciones').classList.remove('hidden');
+                            setTimeout(() => alert("🔓 Producto validado.\nYa puedes digitar las unidades sueltas con los botones."), 200);
                         }
                     }
                 },
@@ -867,11 +999,14 @@
             }
         }
 
-        // --- TERMINAR ---
+        // --- TERMINAR E INFORMAR AL BACKEND ---
         function intentarTerminarItem() {
             if (!itemActivo) return;
-            document.getElementById('vf-count').textContent = itemActivo.alistado;
-            document.getElementById('vf-req').textContent = itemActivo.cantidad;
+
+            // Actualizamos la vista del modal de verificación para que muestre ambas cosas
+            document.getElementById('vf-count').innerHTML = `📦 ${itemActivo.act_cajas} | 🍬 ${itemActivo.act_unidades}`;
+            document.getElementById('vf-req').innerHTML = `📦 ${itemActivo.req_cajas} | 🍬 ${itemActivo.req_unidades}`;
+
             document.getElementById('modal-verify').style.display = 'flex';
         }
 
@@ -885,49 +1020,39 @@
             btn.textContent = 'Guardando...';
             btn.disabled = true;
 
-            // Guardamos el ID antes de limpiar variables
             const idParaBorrar = itemActivo.id;
 
+            // Enviamos las cajas y las unidades por separado a la base de datos
             fetch('/api/operario/confirmar_item', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id_row: idParaBorrar,
-                    cantidad_alistada: itemActivo.alistado
+                    cajas_alistadas: itemActivo.act_cajas,
+                    unidades_alistadas: itemActivo.act_unidades
                 })
             })
                 .then(r => {
-                    // Si el servidor da error (ej. 500), lanzamos error manual para ir al catch
                     if (!r.ok) throw new Error("Error HTTP " + r.status);
                     return r.json();
                 })
                 .then(d => {
                     if (d.status === 'ok') {
-                        // --- FASE CRÍTICA: GESTIÓN DE UI ---
                         try {
-                            // 1. Cerrar modales
                             cancelarVerificacion();
                             cerrarModalPicking();
 
-                            // 2. BORRADO DE MEMORIA (La clave para que no aparezca el fantasma)
-                            // Filtramos la lista para que ese ID deje de existir en el array
                             listaItems = listaItems.filter(i => i.id !== idParaBorrar);
                             itemActivo = null;
 
-                            // 3. ACTUALIZAR PANTALLA
-                            renderizarItems(); // Como el item ya no está en listaItems, no se dibujará
-
-                            // 4. FEEDBACK AL USUARIO
+                            renderizarItems();
                             playBeep();
 
-                            // Usamos setTimeout para que el navegador tenga 100ms para "pintar" 
-                            // la pantalla vacía ANTES de que el alert bloquee todo.
                             setTimeout(() => {
                                 alert("✅ Ítem alistado y guardado correctamente.");
                             }, 100);
 
                         } catch (errorVisual) {
-                            // Si falla la animación, no asustamos al usuario con error de red
                             console.error("Error visual:", errorVisual);
                             alert("✅ Guardado correctamente.");
                         }
@@ -944,7 +1069,6 @@
                     btn.disabled = false;
                 });
         }
-
     </script>
 
     <script>
