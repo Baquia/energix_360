@@ -62,11 +62,11 @@ def create_app():
     #  GRUPO A: CONTROLADORES PRINCIPALES / EMPRESAS
     #  (Gestionan la lógica de negocio de alto nivel)
     # ---------------------------------------------------------
-    from app.blueprints.bp_890707006 import bp_890707006    # Pollos GAR
-    from app.blueprints.bp_901811727 import bp_901811727    # Webmaster / Admin
-    from app.blueprints.A_bp_logistica import logistica_bp  # Logística y Distribución
+    from app.blueprints.A_bp_gestionavicola import gestionavicola_bp  # Gestión Avícola Genérica (Reemplaza a 890707006)
+    from app.blueprints.bp_901811727 import bp_901811727              # Webmaster / Admin
+    from app.blueprints.A_bp_logistica import logistica_bp            # Logística y Distribución
 
-    app.register_blueprint(bp_890707006)
+    app.register_blueprint(gestionavicola_bp)
     app.register_blueprint(bp_901811727)
     app.register_blueprint(logistica_bp)
 
@@ -76,15 +76,17 @@ def create_app():
     # ---------------------------------------------------------
     
     # --SUBMODULOS PARA EMPRESAS AVICOLAS --#
-    from app.blueprints.bp_glp import bp_glp #modulo de control GLP
-    from app.blueprints.bp_gestion_mermas import bp_gestion_mermas #modulo de gestion Mermas
+    from app.blueprints.bp_glp import bp_glp                               # Modulo de control GLP
+    from app.blueprints.bp_gestion_mermas import bp_gestion_mermas         # Modulo de gestion Mermas
+    from app.blueprints.B_bp_supervisorgas import bp_supervisorgas         # Modulo Supervisor Gas (NUEVO)
     
     # --SUBMODULOS PARA VENTAS Y DISTRIBICION --#
-    from app.blueprints.B_bp_bodegas import bp_bodegas #modulo de Bodegas (Dashboard/Carga)
-    from app.blueprints.B_bp_flotacarga import bp_flotacarga #modulo de Flota
+    from app.blueprints.B_bp_bodegas import bp_bodegas                     # Modulo de Bodegas (Dashboard/Carga)
+    from app.blueprints.B_bp_flotacarga import bp_flotacarga               # Modulo de Flota
    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
+    app.register_blueprint(bp_supervisorgas)                               # Registro del NUEVO blueprint
     app.register_blueprint(bp_bodegas)
     app.register_blueprint(bp_flotacarga)
 
@@ -117,9 +119,6 @@ def load_user(user_id):
 
     if user_data:
         from app.models import User
-        # Ajustamos para instanciar User correctamente según tu modelo
-        # (id, nombre, cedula, tipo, clase, rol, empresa_id)
-        # Nota: Asegúrate de que tu clase User acepte estos argumentos en este orden
         user_obj = User(
             user_data[0],  # id
             user_data[1],  # nombre

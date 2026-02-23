@@ -6,17 +6,13 @@ from functools import wraps
 import os
 
 # 1. DETERMINAR LA RUTA REAL DE LA CARPETA APP
-# Según tu aclaración, el logo está en la carpeta 'static' que está DENTRO de 'app'
 base_dir = os.path.abspath(os.path.dirname(__file__))
-# Forzamos la ruta a energix_360/app/static
 static_path = os.path.join(base_dir, "app", "static")
 
 # 2. INICIALIZAR LA APP
-# Usamos create_app() para cargar toda tu configuración
 app = create_app()
 
-# 3. ASIGNAR LA CARPETA STATIC CORRECTA (DENTRO DE APP)
-# Esto recuperará el logo y las imágenes de la carpeta app/static
+# 3. ASIGNAR LA CARPETA STATIC CORRECTA
 app.static_folder = static_path
 app.static_url_path = "/static"
 
@@ -40,59 +36,45 @@ def login_required_custom(f):
     return decorated_function
 
 # --- RUTAS PRINCIPALES ---
-
 @app.route("/login_energix360_offline.html")
 def login_energix360_offline():
     return render_template("login_energix360_offline.html")
 
 @app.route("/sw.js")
 def sw():
-    return send_from_directory(app.static_folder, "sw.js",
-                           mimetype="application/javascript")
-
-# EN energix_360.py
+    return send_from_directory(app.static_folder, "sw.js", mimetype="application/javascript")
 
 @app.route('/')
 def index():
     # 1. Si ya tiene sesión, redirigir a su panel correspondiente
     if 'usuario_id' in session:
-        # Recuperamos el tipo guardado en sesión
         tipo_str = str(session.get('tipo_empresa', '')).strip().lower()
         
-        # Lógica de redirección (reutilizando tu lógica de login)
+        # --- NUEVA REDIRECCIÓN ---
         if 'ventas_distribucion' in tipo_str:
              return redirect('/control_logistica.html')
+        elif 'cria_beneficio_aves_corral' in tipo_str:
+             return redirect('/gestion_avicola.html')
         elif 'webmaster' in tipo_str:
              return redirect('/901811727.html')
         
-        # Redirección por defecto
         return redirect(f"/{session.get('empresa_id')}.html")
 
     form = LoginForm()
 
-    # --- CORRECCIÓN CLAVE AQUÍ ---
     import MySQLdb.cursors 
-    
-    # 2. Usamos DictCursor para que la BD devuelva nombres de columnas
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("SELECT nit, nombre_comercial FROM empresas")
         empresas = cur.fetchall()
         cur.close()
 
-        # 3. Llenamos el SelectField
-        # Ahora sí funcionará e['nit'] porque estamos usando DictCursor
         form.empresa.choices = [(e['nit'], e['nombre_comercial']) for e in empresas]
-    
     except Exception as err:
         print(f"Error cargando empresas: {err}")
         form.empresa.choices = []
 
     return render_template('login_energix360.html', form=form) 
-    # NOTA: Si tu archivo HTML de login se llama 'login.html', cambia 'index.html' por 'login.html'
-
-from flask import jsonify, request, session
-import MySQLdb.cursors # Importante para que funcionen los diccionarios
 
 @app.route('/login', methods=['POST'])
 @csrf.exempt
@@ -107,7 +89,6 @@ def login():
         return jsonify(success=False, message="Datos incompletos")
 
     import MySQLdb.cursors
-    # Usamos DictCursor para acceder por nombre de columna
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
     cur.execute("SELECT nit, tipo_empresa FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
@@ -122,32 +103,47 @@ def login():
 
     cur.execute("SELECT * FROM usuarios WHERE cedula = %s", (cedula,))
     usuario = cur.fetchone()
-    cur.close()
 
     if not usuario:
+        cur.close()
         return jsonify(success=False, message="USUARIO NO EXISTE")
 
     if not bcrypt.check_password_hash(usuario['password'], password):
+        cur.close()
         return jsonify(success=False, message="CONTRASEÑA INCORRECTA")
 
     if str(usuario['empresa_id']) != nit_empresa:
+        cur.close()
         return jsonify(success=False, message="USUARIO NO PERTENECE A ESTA EMPRESA")
 
+    # --- LECTURA DE MÓDULOS PERMITIDOS (SOLO PARA AVÍCOLAS) ---
+    tipo_str = tipo_empresa.lower()
+    if 'cria_beneficio_aves_corral' in tipo_str:
+        # Consulta a la nueva tabla
+        cur.execute("SELECT modulo FROM modulos_empresas_avicolas WHERE id_empresa = %s AND estatus = 'activo'", (nit_empresa,))
+        modulos_bd = cur.fetchall()
+        session['modulos_activos'] = [m['modulo'] for m in modulos_bd]
+    else:
+        session['modulos_activos'] = []
+
+    cur.close()
+
+    # Iniciar Sesión Normal
     session['usuario_id'] = usuario['id']          
     session['cedula'] = usuario['cedula']          
     session['nombre'] = usuario['nombre']
     session['usuario_nombre'] = usuario['nombre']  
     session['empresa'] = usuario['empresa']
     session['empresa_id'] = usuario['empresa_id']
+    session['tipo_empresa'] = tipo_empresa
 
     offline_salt = f"{usuario['cedula']}|{usuario['empresa_id']}"
 
-    # --- LÓGICA DE REDIRECCIÓN ACTUALIZADA ---
-    tipo_str = tipo_empresa.lower()
-
-    # Ahora buscamos el término exacto que pusiste en la BD
+    # --- DETERMINAR A DÓNDE ENVIARLO ---
     if 'ventas_distribucion' in tipo_str:
         ruta_html = "control_logistica.html"
+    elif 'cria_beneficio_aves_corral' in tipo_str:
+        ruta_html = "gestion_avicola.html"
     else:
         ruta_html = f"{nit_empresa}.html"
 
@@ -172,14 +168,10 @@ def logout():
     return redirect(url_for('index'))
 
 
-# --- BLOQUE DE ARRANQUE ---
 if __name__ == '__main__':
     print("\n--- REVISIÓN DE CARPETA ESTÁTICA ---")
     print(f"Buscando logo y fotos en: {app.static_folder}")
-    
-    if os.path.exists(app.static_folder):
-        print("✅ LA CARPETA EXISTE FÍSICAMENTE.")
-    else:
-        print("❌ ERROR: LA CARPETA NO EXISTE EN ESA RUTA.")
+    if os.path.exists(app.static_folder): print("✅ LA CARPETA EXISTE FÍSICAMENTE.")
+    else: print("❌ ERROR: LA CARPETA NO EXISTE EN ESA RUTA.")
 
     app.run(debug=True, port=5002)

@@ -14,7 +14,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-
   <style>
     /* ========================================= */
     /* 1. VARIABLES Y DISEÑO HÍBRIDO (PC/MÓVIL)  */
@@ -32,7 +31,6 @@
       background: var(--bg-light);
       color: #1f2937;
       padding-top: var(--header-height);
-      /* Espacio para el header fijo */
       overflow-x: hidden;
     }
 
@@ -54,7 +52,6 @@
 
     .btn-hamburguesa {
       display: none;
-      /* Oculto en PC */
       background: none;
       border: none;
       font-size: 1.6rem;
@@ -159,8 +156,6 @@
     /* 2. MEDIA QUERIES (MÓVIL)                  */
     /* ========================================= */
     @media (max-width: 992px) {
-
-      /* Header */
       .btn-hamburguesa {
         display: block;
       }
@@ -169,13 +164,11 @@
         font-size: 1.1rem;
       }
 
-      /* Layout */
       .layout {
         display: block;
         padding: 10px;
       }
 
-      /* Sidebar Offcanvas */
       .sidebar-left {
         position: fixed;
         top: 0;
@@ -184,7 +177,6 @@
         width: 280px;
         border-radius: 0;
         transform: translateX(-105%);
-        /* Oculto */
         z-index: 2000;
       }
 
@@ -192,7 +184,6 @@
         transform: translateX(0);
       }
 
-      /* Overlay Oscuro */
       .sidebar-overlay {
         position: fixed;
         top: 0;
@@ -209,7 +200,6 @@
         display: block;
       }
 
-      /* Ajustes generales móvil */
       .form-section {
         padding: 15px;
       }
@@ -219,7 +209,6 @@
         font-size: 1rem;
       }
 
-      /* Botones más grandes */
       .table-responsive {
         font-size: 0.85rem;
       }
@@ -228,8 +217,6 @@
     /* ========================================= */
     /* 3. ESTILOS ESPECÍFICOS (KPIs, Audit, PDF) */
     /* ========================================= */
-
-    /* KPI CARDS */
     .kpi-card-box {
       background: #fff;
       border-radius: 12px;
@@ -249,7 +236,6 @@
       color: #111;
     }
 
-    /* Colores KPI */
     .border-kpi-1 {
       border-color: #3b82f6;
     }
@@ -294,7 +280,6 @@
       color: #ec4899;
     }
 
-    /* AUDIT LOG */
     .audit-modal-body {
       background: #f8f9fa;
       max-height: 70vh;
@@ -369,7 +354,6 @@
       }
     }
 
-    /* ESTILOS PDF FANTASMA */
     #contenedorFantasma {
       position: absolute;
       left: -9999px;
@@ -474,7 +458,6 @@
       margin: 0 auto;
     }
 
-    /* UTILIDADES */
     .form-section {
       display: none;
       background: white;
@@ -499,7 +482,6 @@
       color: white;
     }
 
-    /* OVERLAY PREGUNTAS */
     .pregunta-overlay {
       position: fixed;
       inset: 0;
@@ -520,7 +502,6 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     }
 
-    /* TARJETA VALIDACIÓN (NUEVO ESTILO RESPONSIVE) */
     .validacion-grid {
       display: flex;
       flex-direction: column;
@@ -553,7 +534,6 @@
       cursor: zoom-in;
     }
 
-    /* SCROLLBAR */
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -565,6 +545,7 @@
     }
   </style>
 
+
 </head>
 <script>
   if ("serviceWorker" in navigator) {
@@ -572,6 +553,9 @@
       navigator.serviceWorker.register("/sw.js").catch(err => console.error("Error SW:", err));
     });
   }
+
+  // Guardamos las empresas en una variable global para construir selects dinámicos
+  const empresasData = {{ empresas | tojson | safe }};
 </script>
 
 <body>
@@ -603,31 +587,29 @@
       <div class="sidebar-section-title" data-bs-toggle="collapse" data-bs-target="#seccionAdmin">
         <span>ADMINISTRACIÓN</span> <span>▾</span>
       </div>
+
       <div class="collapse show" id="seccionAdmin">
         <button class="nav-item" onclick="abrirAuditLog()">
           <span class="icon-spacer">👁️</span> Audit Log
         </button>
-        <button class="nav-item" onclick="activarMenu(this, 'crearEmpresa')">
-          <span class="icon-spacer">🏢</span> Crear Empresa
+        <button class="nav-item" onclick="activarMenuDinamico(this, 'gestionEmpresas'); cargarTablaEmpresas()">
+          <span class="icon-spacer">🏢</span> Empresas
         </button>
-
-        <button class="nav-item" type="button" data-bs-toggle="collapse" data-bs-target="#menuPerfiles">
-          <span class="icon-spacer">👥</span> Gestión Perfiles
+        <button class="nav-item" onclick="activarMenuDinamico(this, 'gestionTiposEmpresa'); cargarTablaTiposEmpresa()">
+          <span class="icon-spacer">🏷️</span> Tipos Empresa
         </button>
-        <div class="collapse" id="menuPerfiles">
-          <button class="nav-item submenu-operacion" onclick="activarMenu(this, 'crearPerfil')">Crear Nuevo</button>
-          <button class="nav-item submenu-operacion" onclick="activarMenu(this, 'editarPerfil')">Editar
-            Existente</button>
-        </div>
-
-        <button class="nav-item" type="button" data-bs-toggle="collapse" data-bs-target="#menuUsuarios">
-          <span class="icon-spacer">👤</span> Gestión Usuarios
+        <button class="nav-item" onclick="activarMenuDinamico(this, 'gestionUsuarios'); cargarTablaUsuarios()">
+          <span class="icon-spacer">👤</span> Usuarios
         </button>
-        <div class="collapse" id="menuUsuarios">
-          <button class="nav-item submenu-operacion" onclick="activarMenu(this, 'crearUsuario')">Crear Usuario</button>
-          <button class="nav-item submenu-operacion" onclick="activarMenu(this, 'editarUsuario')">Editar
-            Usuario</button>
-        </div>
+        <button class="nav-item" onclick="activarMenuDinamico(this, 'gestionPerfiles'); cargarTablaPerfiles()">
+          <span class="icon-spacer">👥</span> Perfiles
+        </button>
+        <button class="nav-item" onclick="activarMenuDinamico(this, 'gestionProveedores'); cargarTablaProveedores()">
+          <span class="icon-spacer">🚚</span> Proveedores
+        </button>
+        <button class="nav-item" onclick="activarMenuDinamico(this, 'gestionContactos'); cargarTablaContactos()">
+          <span class="icon-spacer">📧</span> Contactos
+        </button>
       </div>
 
       <div class="sidebar-section-title mt-2" data-bs-toggle="collapse" data-bs-target="#seccionInformes">
@@ -671,8 +653,275 @@
 
 
     <div class="main-content">
+
+      <div id="pantallaBienvenida" class="form-section text-center py-5" style="display:block;">
+        <h2 class="text-primary fw-bold">Bienvenido, {{ nombre }}</h2>
+        <p class="text-muted">Seleccione una opción del menú lateral para gestionar el sistema.</p>
+      </div>
+
+      <div id="gestionEmpresas" class="form-section" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="text-primary fw-bold mb-0">Gestión de Empresas</h4>
+          <div><button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Empresa')">+ Nueva
+              Empresa</button><button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌
+              Cerrar</button></div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>NIT</th>
+                <th>Nombre Comercial</th>
+                <th>Tipo Empresa</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyEmpresas"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="gestionTiposEmpresa" class="form-section" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="text-primary fw-bold mb-0">Tipos de Empresa</h4>
+          <div><button class="btn btn-success btn-sm me-2" onclick="nuevoItem('TipoEmpresa')">+ Nuevo
+              Tipo</button><button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>Nombre del Tipo</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyTiposEmpresa"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="gestionUsuarios" class="form-section" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="text-primary fw-bold mb-0">Gestión de Usuarios</h4>
+          <div><button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Usuario')">+ Nuevo
+              Usuario</button><button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌
+              Cerrar</button></div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>Cédula</th>
+                <th>Nombre</th>
+                <th>Perfil</th>
+                <th>Empresa</th>
+                <th>Teléfono</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyUsuarios"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="gestionPerfiles" class="form-section" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="text-primary fw-bold mb-0">Gestión de Perfiles</h4>
+          <div><button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Perfil')">+ Nuevo Perfil</button><button
+              class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button></div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>NIT</th>
+                <th>Empresa</th>
+                <th>Operación</th>
+                <th>Perfil</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyPerfiles"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="gestionProveedores" class="form-section" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="text-primary fw-bold mb-0">Gestión de Proveedores</h4>
+          <div><button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Proveedor')">+ Nuevo
+              Proveedor</button><button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌
+              Cerrar</button></div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>NIT/ID</th>
+                <th>Proveedor</th>
+                <th>Precio Kg</th>
+                <th>Emails</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyProveedores"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="gestionContactos" class="form-section" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="text-primary fw-bold mb-0">Contactos de Alertas</h4>
+          <div><button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Contacto')">+ Nuevo
+              Contacto</button><button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌
+              Cerrar</button></div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>Empresa</th>
+                <th>Área</th>
+                <th>Email Destino</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyContactos"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal fade" id="modalMaestro" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+              <h5 class="modal-title fw-bold" id="modalTituloMaestro">Formulario</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="contenedorCamposMaestro"></div>
+            <div class="modal-footer bg-light">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="button" class="btn btn-success fw-bold px-4" onclick="guardarMaestro()">✅ Guardar
+                Cambios</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="gestionEmpresas" class="form-section">
+        <div class="d-flex justify-content-between mb-3">
+          <h4>Gestión de Empresas</h4>
+          <button class="btn btn-primary btn-sm" onclick="nuevoItem('Empresa')">+ Nueva Empresa</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>NIT</th>
+                <th>Nombre Comercial</th>
+                <th>Tipo Empresa</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyEmpresas">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="gestionUsuarios" class="form-section">
+        <div class="d-flex justify-content-between mb-3">
+          <h4>Gestión de Usuarios</h4>
+          <button class="btn btn-primary btn-sm" onclick="nuevoItem('Usuario')">+ Nuevo Usuario</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>Cédula</th>
+                <th>Nombre</th>
+                <th>Perfil</th>
+                <th>Empresa</th>
+                <th>Teléfono</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyUsuarios"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="gestionPerfiles" class="form-section">
+        <div class="d-flex justify-content-between mb-3">
+          <h4>Gestión de Perfiles</h4>
+          <button class="btn btn-primary btn-sm" onclick="nuevoItem('Perfil')">+ Nuevo Perfil</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>NIT</th>
+                <th>Empresa</th>
+                <th>Operación</th>
+                <th>Perfil</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyPerfiles"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="gestionProveedores" class="form-section">
+        <div class="d-flex justify-content-between mb-3">
+          <h4>Gestión de Proveedores</h4>
+          <button class="btn btn-primary btn-sm" onclick="nuevoItem('Proveedor')">+ Nuevo Proveedor</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>NIT/ID</th>
+                <th>Proveedor</th>
+                <th>Precio Kg</th>
+                <th>Emails</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyProveedores"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="gestionContactos" class="form-section">
+        <div class="d-flex justify-content-between mb-3">
+          <h4>Contactos de Alertas</h4>
+          <button class="btn btn-primary btn-sm" onclick="nuevoItem('Contacto')">+ Nuevo Contacto</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>Empresa</th>
+                <th>Área</th>
+                <th>Email Destino</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="bodyContactos"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div id="seccionAprobacionesGLP" class="form-section">
-        <h4 class="mb-3 text-primary">Aprobación de Solicitudes GLP</h4>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="text-primary m-0">Aprobación de Solicitudes GLP</h4>
+
+          <button class="btn btn-outline-secondary btn-sm" onclick="window.location.reload()">
+            ❌ Cerrar
+          </button>
+        </div>
         <p class="text-muted small">Analice las solicitudes de consumo y apruebe para que el cliente pueda enviarlas.
         </p>
 
@@ -695,78 +944,6 @@
         <div id="msgSinAprobaciones" class="alert alert-info text-center" style="display:none;">
           No hay solicitudes pendientes.
         </div>
-      </div>
-
-      <div id="crearEmpresa" class="form-section">
-        <h4 class="mb-3">Crear Empresa</h4>
-        <form id="formCrearEmpresa" data-url="/registrar_empresa" data-confirmar="¿Desea registrar esta empresa?">
-          <div class="mb-2"><label>Nombre Comercial</label><input type="text" name="nombre_comercial"
-              class="form-control"></div>
-          <div class="mb-2"><label>NIT</label><input type="text" name="nit" class="form-control"></div>
-          <div class="mt-3"><button type="button" class="btn btn-custom"
-              onclick="confirmarEnvioGenerico('formCrearEmpresa')">Registrar</button></div>
-        </form>
-      </div>
-
-      <div id="crearPerfil" class="form-section">
-        <h5 class="mb-3">Crear Perfil</h5>
-        <form id="form_crearPerfil" data-url="/registrar_perfil" data-confirmar="¿Desea registrar este perfil?">
-          <div class="mb-3">
-            <label class="form-label">Empresa</label>
-            <select name="empresa_select" class="form-select" onchange="actualizarNit()">
-              <option value="">Seleccione una empresa</option>
-              {% for empresa in empresas %}
-              <option data-nit="{{ empresa.nit }}" value="{{ empresa.nombre_comercial }}">{{ empresa.nombre_comercial }}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="mb-3"><label class="form-label">NIT</label><input type="text" id="nit" name="nit"
-              class="form-control"></div>
-          <div class="mb-3">
-            <label class="form-label">Operación</label>
-            <select name="operacion" class="form-select">
-              <option value="Electricidad">Gestion Electricidad</option>
-              <option value="Gas">Gestion Gas Avicola</option>
-              <option value="Carbon">Gestion Carbón</option>
-            </select>
-          </div>
-          <div class="mb-3"><label class="form-label">Nombre del Perfil</label><input type="text" name="perfil"
-              class="form-control"></div>
-          <div class="mt-3"><button type="button" class="btn btn-custom"
-              onclick="confirmarEnvioGenerico('form_crearPerfil')">Registrar</button></div>
-        </form>
-      </div>
-
-      <div id="crearUsuario" class="form-section">
-        <h4 class="mb-3">Crear Usuario</h4>
-        <form id="form_crearUsuario" data-url="/registrar_usuario" data-confirmar="¿Desea registrar este usuario?">
-          <div class="mb-2"><label>Cédula</label><input type="text" name="cedula" class="form-control"></div>
-          <div class="mb-2"><label>Nombre</label><input type="text" name="nombre" class="form-control"></div>
-          <div class="mb-2"><label>Contraseña</label><input type="password" name="password" class="form-control"></div>
-          <div class="mb-2"><label>Empresa</label>
-            <select id="empresa_select_usuario" name="empresa_select" class="form-select"
-              onchange="actualizarEmpresaUsuario()">
-              <option value="">Seleccione...</option>
-              {% for empresa in empresas %}
-              <option data-id="{{ empresa.nit }}" value="{{ empresa.nombre_comercial }}">{{ empresa.nombre_comercial }}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <input type="hidden" id="empresa_id" name="empresa_id">
-          <div class="mb-2">
-            <label>Operación</label>
-            <select id="operacion_usuario" name="operacion" class="form-select"
-              onchange="actualizarPerfilesPorEmpresaYOperacion()">
-              <option value="Gas">Gas</option>
-            </select>
-          </div>
-          <div class="mb-2"><label>Perfil</label><select id="perfil_usuario" name="perfil" class="form-select"></select>
-          </div>
-          <div class="mt-3"><button type="button" class="btn btn-custom"
-              onclick="confirmarEnvioGenerico('form_crearUsuario')">Registrar</button></div>
-        </form>
       </div>
 
       <div id="seccionInforme" class="form-section">
@@ -868,6 +1045,27 @@
       </div>
 
     </div>
+
+    <div class="modal fade" id="modalMaestro" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title" id="modalTituloMaestro">Formulario</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div id="contenedorCamposMaestro"></div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-success fw-bold px-4" onclick="guardarMaestro()">✅ Guardar
+              Cambios</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
     <div class="modal fade" id="modalDecisionTanqueo" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -919,9 +1117,9 @@
         <div class="p-3 bg-white border-bottom">
           <select id="selectEmpresaAudit" class="form-select" onchange="cargarLogAudit()">
             <option value="">-- Seleccione Empresa --</option>
-            {% for empresa in empresas %}
-            <option value="{{ empresa.nit }}">{{ empresa.nombre_comercial }}</option>
-            {% endfor %}
+            <script>
+              document.write(empresasData.map(e => `<option value="${e.nit}">${e.nombre_comercial}</option>`).join(''));
+            </script>
           </select>
         </div>
         <div class="audit-modal-body">
@@ -1009,8 +1207,274 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
   <script>
-    // 1. CONTROL DE MENÚ MÓVIL (NUEVO)
+    // =========================================================
+    // LÓGICA DE GESTIÓN ADMINISTRATIVA (CRUD INTEGRAL)
+    // =========================================================
+    currentMode = "";
+    currentAction = "crear";
+    currentUrl = "";
+
+    function cargarTablaEmpresas() {
+      const b = document.getElementById('bodyEmpresas');
+      b.innerHTML = '';
+      empresasData.forEach(e => {
+        const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(e))));
+        b.innerHTML += `<tr>
+                <td>${e.nit}</td>
+                <td class="fw-bold">${e.nombre_comercial}</td>
+                <td><span class="badge bg-secondary">${e.tipo_empresa || 'general'}</span></td>
+                <td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Empresa', '${dataStr}')">✏️ Editar</button></td>
+            </tr>`;
+      });
+    }
+
+    function cargarTablaUsuarios() {
+      fetch('/obtener_todos_usuarios').then(r => r.json()).then(d => {
+        const b = document.getElementById('bodyUsuarios'); b.innerHTML = '';
+        d.users.forEach(u => {
+          const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(u))));
+          b.innerHTML += `<tr>
+                    <td>${u.cedula}</td>
+                    <td class="fw-bold">${u.nombre}</td>
+                    <td><span class="badge bg-primary">${u.perfil}</span></td>
+                    <td><small>${u.empresa}</small></td>
+                    <td>${u.telefono || '-'}</td>
+                    <td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Usuario', '${dataStr}')">✏️ Editar</button></td>
+                </tr>`;
+        });
+      });
+    }
+
+    function cargarTablaPerfiles() {
+      fetch('/obtener_todos_perfiles').then(r => r.json()).then(d => {
+        const b = document.getElementById('bodyPerfiles'); b.innerHTML = '';
+        d.profiles.forEach(p => {
+          const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(p))));
+          b.innerHTML += `<tr>
+                    <td>${p.nit}</td>
+                    <td class="fw-bold">${p.empresa}</td>
+                    <td>${p.operacion}</td>
+                    <td><span class="badge bg-success">${p.perfil}</span></td>
+                    <td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Perfil', '${dataStr}')">✏️ Editar</button></td>
+                </tr>`;
+        });
+      });
+    }
+
+    function cargarTablaProveedores() {
+      fetch('/obtener_todos_proveedores').then(r => r.json()).then(d => {
+        const b = document.getElementById('bodyProveedores'); b.innerHTML = '';
+        d.providers.forEach(p => {
+          const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(p))));
+          b.innerHTML += `<tr>
+                    <td>${p.id_proveedor}</td>
+                    <td class="fw-bold">${p.proveedor}</td>
+                    <td class="text-success fw-bold">$${p.precio}</td>
+                    <td><small>${p.email1}</small></td>
+                    <td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Proveedor', '${dataStr}')">✏️ Editar</button></td>
+                </tr>`;
+        });
+      });
+    }
+
+    function cargarTablaContactos() {
+      fetch('/obtener_todos_contactos').then(r => r.json()).then(d => {
+        const b = document.getElementById('bodyContactos'); b.innerHTML = '';
+        d.contacts.forEach(c => {
+          const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(c))));
+          b.innerHTML += `<tr>
+                    <td class="fw-bold">${c.empresa}</td>
+                    <td><span class="badge bg-warning text-dark">${c.area_contacto}</span></td>
+                    <td class="text-danger fw-bold">${c.email}</td>
+                    <td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Contacto', '${dataStr}')">✏️ Editar</button></td>
+                </tr>`;
+        });
+      });
+    }
+
+    function nuevoItem(tipo) {
+      currentMode = tipo;
+      currentAction = "crear";
+      document.getElementById('modalTituloMaestro').innerText = "Crear " + tipo;
+      renderizarFormMaestro(tipo, {});
+      new bootstrap.Modal(document.getElementById('modalMaestro')).show();
+    }
+
+    // Función para abrir modal en modo edición
+    function editarRegistro(tipo, datosBase64) {
+      currentMode = tipo;
+      currentAction = "editar";
+      document.getElementById('modalTituloMaestro').innerText = "Editar " + tipo;
+
+      // Decodificamos los datos que vienen del botón
+      const data = JSON.parse(decodeURIComponent(escape(atob(datosBase64))));
+
+      renderizarFormMaestro(tipo, data);
+      new bootstrap.Modal(document.getElementById('modalMaestro')).show();
+    }
+
+    function renderizarFormMaestro(tipo, data) {
+      let html = `<input type="hidden" id="form_accion_maestro" value="${currentAction}">`;
+
+      // Crear opciones de empresas para los selects
+      let optsEmpresas = '<option value="">Seleccione Empresa...</option>';
+      empresasData.forEach(e => {
+        let sel = (data.empresa === e.nombre_comercial || data.empresa_select === e.nombre_comercial || data.nit === e.nit) ? 'selected' : '';
+        optsEmpresas += `<option value="${e.nombre_comercial}" data-nit="${e.nit}" ${sel}>${e.nombre_comercial}</option>`;
+      });
+
+      if (tipo === 'Empresa') {
+        currentUrl = "/gestionar_empresa";
+        html += `
+          <label class="fw-bold small mt-2">NIT</label>
+          <input type="text" id="f_nit" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+          <label class="fw-bold small mt-2">Nombre Comercial</label>
+          <input type="text" id="f_nom" class="form-control" value="${data.nombre_comercial || ''}">
+          <label class="fw-bold small mt-2">Tipo de Empresa</label>
+          <select id="f_tipo" class="form-select">
+            <option value="general" ${data.tipo_empresa === 'general' ? 'selected' : ''}>General</option>
+            <option value="webmaster" ${data.tipo_empresa === 'webmaster' ? 'selected' : ''}>Webmaster</option>
+            <option value="cria_beneficio_aves_corral" ${data.tipo_empresa === 'cria_beneficio_aves_corral' ? 'selected' : ''}>Avícola</option>
+          </select>`;
+
+      } else if (tipo === 'Proveedor') {
+        currentUrl = "/gestionar_proveedor";
+        html += `
+          <label class="fw-bold small mt-2">NIT/ID Proveedor</label>
+          <input type="text" id="f_idp" class="form-control" value="${data.id_proveedor || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+          <label class="fw-bold small mt-2">Nombre Proveedor</label>
+          <input type="text" id="f_prov" class="form-control" value="${data.proveedor || ''}">
+          <label class="fw-bold small text-success mt-2">Precio por Kg ($)</label>
+          <input type="number" id="f_prec" class="form-control border-success fw-bold" value="${data.precio || 0}">
+          <label class="fw-bold small mt-2">Email Principal</label>
+          <input type="email" id="f_e1" class="form-control" value="${data.email1 || ''}">
+          <label class="fw-bold small mt-2">Email Secundario</label>
+          <input type="email" id="f_e2" class="form-control" value="${data.email2 || ''}">`;
+
+      } else if (tipo === 'Usuario') {
+        currentUrl = "/gestionar_usuario";
+        html += `
+          <label class="fw-bold small mt-2">Cédula</label>
+          <input type="text" id="f_ced" class="form-control" value="${data.cedula || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+          <label class="fw-bold small mt-2">Nombre Completo</label>
+          <input type="text" id="f_unom" class="form-control" value="${data.nombre || ''}">
+          
+          <label class="fw-bold small mt-2">Asignar a Empresa</label>
+          <select id="f_enom" class="form-select" onchange="document.getElementById('f_eid').value = this.options[this.selectedIndex].getAttribute('data-nit');">
+            ${optsEmpresas}
+          </select>
+          <input type="hidden" id="f_eid" value="${data.empresa_id || ''}">
+          
+          <label class="fw-bold small mt-2">Perfil del Sistema</label>
+          <input type="text" id="f_perf" class="form-control" value="${data.perfil || ''}">
+          
+          <div class="row mt-2">
+            <div class="col-6"><label class="fw-bold small text-primary">Telegram ID</label><input type="text" id="f_tlg" class="form-control border-primary" value="${data.telegram_id || ''}"></div>
+            <div class="col-6"><label class="fw-bold small">Teléfono</label><input type="text" id="f_tel" class="form-control" value="${data.telefono || ''}"></div>
+          </div>
+          
+          <label class="fw-bold small text-danger mt-2">Contraseña ${currentAction === 'editar' ? '(Dejar vacío para NO cambiar)' : '*'}</label>
+          <input type="password" id="f_pass" class="form-control border-danger">
+          <input type="hidden" id="f_tuser" value="cliente"><input type="hidden" id="f_clase" value="op">`;
+
+      } else if (tipo === 'Perfil') {
+        currentUrl = "/gestionar_perfil";
+        html += `
+          <input type="hidden" id="f_pid" value="${data.id || ''}">
+          <label class="fw-bold small mt-2">Asignar a Empresa</label>
+          <select id="f_enom_p" class="form-select" onchange="document.getElementById('f_nit_p').value = this.options[this.selectedIndex].getAttribute('data-nit');">
+            ${optsEmpresas}
+          </select>
+          <input type="hidden" id="f_nit_p" value="${data.nit || ''}">
+          
+          <label class="fw-bold small mt-2">Módulo/Operación</label>
+          <input type="text" id="f_op" class="form-control" value="${data.operacion || ''}" placeholder="Ej: Gas, Mermas">
+          <label class="fw-bold small text-success mt-2">Nombre del Perfil</label>
+          <input type="text" id="f_perf_p" class="form-control border-success" value="${data.perfil || ''}">`;
+
+      } else if (tipo === 'Contacto') {
+        currentUrl = "/gestionar_contacto";
+        html += `
+          <input type="hidden" id="f_cid" value="${data.id || ''}">
+          <label class="fw-bold small mt-2">Empresa</label>
+          <select id="f_enom_c" class="form-select" onchange="document.getElementById('f_eid_c').value = this.options[this.selectedIndex].getAttribute('data-nit');">
+            ${optsEmpresas}
+          </select>
+          <input type="hidden" id="f_eid_c" value="${data.id_empresa || ''}">
+          
+          <label class="fw-bold small text-warning mt-2">Área del Contacto</label>
+          <input type="text" id="f_area" class="form-control border-warning" value="${data.area_contacto || ''}" placeholder="Ej: gerenciagranjas">
+          <label class="fw-bold small text-danger mt-2">Email para Alertas</label>
+          <input type="email" id="f_email" class="form-control border-danger" value="${data.email || ''}">`;
+      }
+
+      document.getElementById('contenedorCamposMaestro').innerHTML = html;
+    }
+
+    function guardarMaestro() {
+      const fd = new FormData();
+      fd.append('accion', document.getElementById('form_accion_maestro').value);
+
+      if (currentMode === 'Empresa') {
+        fd.append('nit', document.getElementById('f_nit').value);
+        fd.append('nombre_comercial', document.getElementById('f_nom').value);
+        fd.append('tipo_empresa', document.getElementById('f_tipo').value);
+      }
+      else if (currentMode === 'Proveedor') {
+        fd.append('id_proveedor', document.getElementById('f_idp').value);
+        fd.append('proveedor', document.getElementById('f_prov').value);
+        fd.append('precio', document.getElementById('f_prec').value);
+        fd.append('email1', document.getElementById('f_e1').value);
+        fd.append('email2', document.getElementById('f_e2').value);
+      }
+      else if (currentMode === 'Usuario') {
+        fd.append('cedula', document.getElementById('f_ced').value);
+        fd.append('nombre', document.getElementById('f_unom').value);
+        fd.append('perfil', document.getElementById('f_perf').value);
+        fd.append('telegram_id', document.getElementById('f_tlg').value);
+        fd.append('telefono', document.getElementById('f_tel').value);
+        fd.append('password', document.getElementById('f_pass').value);
+        fd.append('empresa_id', document.getElementById('f_eid').value);
+        fd.append('empresa_select', document.getElementById('f_enom').value);
+        fd.append('tipo_usuario', document.getElementById('f_tuser').value);
+        fd.append('clase', document.getElementById('f_clase').value);
+      }
+      else if (currentMode === 'Perfil') {
+        fd.append('id', document.getElementById('f_pid').value);
+        fd.append('empresa_select', document.getElementById('f_enom_p').value);
+        fd.append('nit', document.getElementById('f_nit_p').value);
+        fd.append('operacion', document.getElementById('f_op').value);
+        fd.append('perfil', document.getElementById('f_perf_p').value);
+      }
+      else if (currentMode === 'Contacto') {
+        fd.append('id', document.getElementById('f_cid').value);
+        fd.append('empresa_nombre', document.getElementById('f_enom_c').value);
+        fd.append('id_empresa', document.getElementById('f_eid_c').value);
+        fd.append('area_contacto', document.getElementById('f_area').value);
+        fd.append('email', document.getElementById('f_email').value);
+      }
+
+      fetch(currentUrl, { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+          alert(d.message);
+          if (d.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
+            if (currentMode === 'Empresa') location.reload();
+            else if (currentMode === 'Usuario') cargarTablaUsuarios();
+            else if (currentMode === 'Proveedor') cargarTablaProveedores();
+            else if (currentMode === 'Perfil') cargarTablaPerfiles();
+            else if (currentMode === 'Contacto') cargarTablaContactos();
+          }
+        });
+    }
+
+    // -------------------------------------------------------------
+    // 1. NAVEGACIÓN Y MENÚ MÓVIL
+    // -------------------------------------------------------------
     function toggleMenu() {
       const sidebar = document.getElementById('sidebarMenu');
       const overlay = document.getElementById('mobileOverlay');
@@ -1687,353 +2151,6 @@
         });
     }
 
-    function actualizarEmpresaUsuario() {
-      const s = document.getElementById('empresa_select_usuario');
-      document.getElementById('empresa_id').value = s.options[s.selectedIndex].getAttribute('data-id') || '';
-      actualizarPerfilesPorEmpresaYOperacion();
-    }
-    function actualizarPerfilesPorEmpresaYOperacion() {
-      const eid = document.getElementById('empresa_id').value;
-      const op = document.getElementById('operacion_usuario').value;
-      if (!eid || !op) return;
-      fetch(`/obtener_perfiles?empresa_id=${eid}&operacion=${op}`).then(r => r.json()).then(d => {
-        const s = document.getElementById('perfil_usuario'); s.innerHTML = '';
-        d.perfiles.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; s.appendChild(o); });
-      });
-    }
-    function actualizarNit() {
-      const s = document.querySelector('[name="empresa_select"]');
-      const nit = s.options[s.selectedIndex].getAttribute('data-nit');
-      document.getElementById('nit').value = nit || '';
-    }
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // Llamada silenciosa al backend para limpiar fotos viejas
-      fetch('/ejecutar_limpieza_automatica')
-        .then(response => response.json())
-        .then(data => {
-          // CONDICIÓN: Si fue exitoso Y el mensaje NO dice "limpio" (es decir, sí borró algo)
-          if (data.success && !data.message.includes('limpio')) {
-            // Muestra la alerta visual que pediste
-            alert("🧹 MANTENIMIENTO: " + data.message);
-          } else {
-            // Si no borró nada, solo lo registra en consola (F12) para no molestar
-            console.log("Sistema limpio o sin cambios: ", data.message);
-          }
-        })
-        .catch(err => console.log("Error en limpieza automática:", err));
-    });
-    function mostrarSeccionAprobacionesGLP() {
-      // Ocultar otras secciones y mostrar esta
-      document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none');
-      document.getElementById('seccionAprobacionesGLP').style.display = 'block';
-
-      cargarAprobacionesGLP();
-    }
-
-    function cargarAprobacionesGLP() {
-      const tbody = document.getElementById('tablaAprobacionesGLP');
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando...</td></tr>';
-
-      fetch('/glp/admin/obtener_solicitudes_pendientes')
-        .then(r => r.json())
-        .then(data => {
-          tbody.innerHTML = '';
-
-          // Validación de datos vacíos
-          if (!data.success || data.items.length === 0) {
-            document.getElementById('msgSinAprobaciones').style.display = 'block';
-            return;
-          }
-          document.getElementById('msgSinAprobaciones').style.display = 'none';
-
-          data.items.forEach(item => {
-            // 1. Renderizar la columna de Tanques (con fotos y alertas de nivel)
-            let htmlTanques = '<div class="d-flex gap-2">';
-            item.tanques.forEach(t => {
-              let fotoHtml = t.foto ?
-                `<br><a href="${t.foto}" target="_blank" style="font-size:0.7rem;">Ver Foto</a>` : '';
-
-              // Alerta visual en rojo si el nivel es crítico (<= 25%)
-              let color = t.nivel <= 25 ? 'text-danger fw-bold' : '';
-
-              htmlTanques += `
-                        <div class="border p-1 rounded text-center" style="min-width:60px;">
-                            <div class="small fw-bold">${t.numero}</div>
-                            <div class="${color}">${t.nivel}%</div>
-                            ${fotoHtml}
-                        </div>
-                    `;
-            });
-            htmlTanques += '</div>';
-
-            // 2. Construir la fila completa
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                    <td>${item.fecha.substring(0, 16)}</td>
-                    <td>
-                        <div class="fw-bold">${item.cliente}</div>
-                        <div class="small text-muted">${item.ubicacion}</div>
-                    </td>
-                    <td>
-                        <div>${item.lote}</div>
-                        <div class="badge bg-info text-dark">Día ${item.dias_operacion}</div>
-                    </td>
-                    <td>${htmlTanques}</td>
-                    <td class="text-center">
-                        <div class="fs-5 fw-bold text-success">${item.nivel_solicitado}%</div>
-                        <div class="small text-muted">Llenar hasta</div>
-                    </td>
-                    <td class="text-center">
-                        <div class="d-flex justify-content-center gap-2">
-                            <button class="btn btn-success btn-sm" onclick="aprobarSolicitudGLP(${item.id}, this)">
-                                👍
-                            </button>
-                            <button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${item.id})">
-                                📈 Analizar
-                            </button>
-                        </div>
-                    </td>
-                `;
-            tbody.appendChild(tr);
-          });
-        })
-        .catch(error => {
-          console.error('Error cargando aprobaciones:', error);
-          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error al cargar datos.</td></tr>';
-        });
-    }
-
-
-
-    function aprobarSolicitudGLP(id, btn) {
-      if (!confirm("¿Aprobar esta solicitud para que el cliente pueda enviarla?")) return;
-
-      btn.disabled = true;
-      btn.textContent = "Procesando...";
-
-      fetch('/glp/admin/aprobar_solicitud', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, // <--- CORRECCIÓN CRÍTICA (Error 415)
-        body: JSON.stringify({ id: id })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            alert("Aprobada correctamente.");
-            cargarAprobacionesGLP(); // Recargar tabla
-          } else {
-            alert("Error: " + data.message);
-            btn.disabled = false;
-            btn.textContent = "👍"; // Restaurar icono si falló
-          }
-        })
-        .catch(error => {
-          console.error("Error de red:", error);
-          alert("Error de conexión al aprobar.");
-          btn.disabled = false;
-          btn.textContent = "👍";
-        });
-    }
-
-    function abrirModalPendientesTanqueo(empresaId) {
-      const modal = new bootstrap.Modal(document.getElementById('modalPendientesTanqueo'));
-      const tbody = document.getElementById('tablaPendientesTanqueoBody');
-      const msg = document.getElementById('msgSinPendientesTanqueo');
-
-      tbody.innerHTML = '<tr><td colspan="5">Cargando datos...</td></tr>';
-      msg.style.display = 'none';
-      modal.show();
-
-      fetch('/obtener_pendientes_tanqueo_reporte', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ empresa_id: empresaId })
-      })
-        .then(r => r.json())
-        .then(data => {
-          tbody.innerHTML = '';
-
-          if (!data.success || data.items.length === 0) {
-            msg.style.display = 'block';
-            return;
-          }
-
-          data.items.forEach(item => {
-            // Lógica de Semáforo
-            let badgeColor = 'bg-success';
-            let badgeText = 'Normal';
-
-            if (item.dias >= 1 && item.dias <= 2) {
-              badgeColor = 'bg-warning text-dark';
-              badgeText = 'Alerta Leve';
-            } else if (item.dias >= 3) {
-              badgeColor = 'bg-danger';
-              badgeText = 'Crítico';
-            }
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-            <td>
-                <div>${item.fecha}</div>
-                <small class="text-muted text-uppercase" style="font-size:0.7em">${item.codigo}</small>
-            </td>
-            <td class="fw-bold text-primary">${item.ubicacion}</td>
-            <td>${item.proveedor || 'N/D'}</td>
-            <td>
-                <span class="fw-bold">${item.solicitado}%</span>
-                <span class="text-muted small">aprox</span>
-            </td>
-            <td>
-                <div class="badge ${badgeColor}" style="font-size:0.9em;">
-                    ${item.dias} Días
-                </div>
-            </td>
-          `;
-            tbody.appendChild(tr);
-          });
-        })
-        .catch(err => {
-          console.error(err);
-          tbody.innerHTML = '<tr><td colspan="5" class="text-danger">Error cargando datos</td></tr>';
-        });
-    }
-
-    let chartSimulador = null;
-    let datosSimulacion = null;
-    let idPedidoEnAnalisis = null;
-
-    function abrirSimuladorProyeccion(idPedido) {
-      idPedidoEnAnalisis = idPedido;
-      const modal = new bootstrap.Modal(document.getElementById('modalProyeccion'));
-      modal.show();
-
-      // Feedback visual inicial
-      document.getElementById('sim_nivel_actual').innerText = "...";
-      document.getElementById('sim_tasa').innerText = "...";
-      document.getElementById('sim_detalle_kg').innerText = "";
-      document.getElementById('sim_input_solicita').value = "";
-
-      fetch('/glp/admin/analizar_proyeccion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, // <--- CORRECCIÓN CRÍTICA (Error 415)
-        body: JSON.stringify({ id: idPedido })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (!data.success) {
-            alert(data.message);
-            modal.hide();
-            return;
-          }
-
-          datosSimulacion = data;
-
-          document.getElementById('sim_nivel_actual').innerText = data.nivel_actual + "%";
-          document.getElementById('sim_tasa').innerText = "-" + data.tasa_descenso_diaria + "%";
-          document.getElementById('sim_detalle_kg').innerText = "(" + data.kg_ave_calculado + " kg/ave)";
-          document.getElementById('sim_input_solicita').value = data.solicitado_original;
-
-          renderizarGraficaProyeccion();
-        })
-        .catch(error => {
-          console.error("Error analizando:", error);
-          alert("Error al cargar la proyección.");
-          modal.hide();
-        });
-    }
-
-    function actualizarGraficaSimulacion() {
-      if (chartSimulador) renderizarGraficaProyeccion();
-    }
-
-    function renderizarGraficaProyeccion() {
-      const ctx = document.getElementById('chartProyeccion').getContext('2d');
-      let solicita = parseFloat(document.getElementById('sim_input_solicita').value) || 0;
-
-      const labels = [];
-      const dataProyeccion = [];
-      const dataSeguridad = [];
-
-      let nivelSimulado = datosSimulacion.nivel_actual + solicita;
-      if (nivelSimulado > 100) nivelSimulado = 100;
-
-      let diaInicio = datosSimulacion.dia_actual;
-      // Proyectamos hasta el día 16 para ver cómo amanece después del cierre
-      let diaFin = 16;
-      if (diaInicio >= 15) diaFin = diaInicio + 3; // Si ya pasó, mostramos 3 días más
-
-      for (let d = diaInicio; d <= diaFin; d++) {
-        labels.push("Día " + d);
-        dataProyeccion.push(nivelSimulado.toFixed(1));
-        dataSeguridad.push(20); // Línea roja fija
-
-        nivelSimulado -= datosSimulacion.tasa_descenso_diaria;
-        if (nivelSimulado < 0) nivelSimulado = 0;
-      }
-
-      if (chartSimulador) chartSimulador.destroy();
-
-      chartSimulador = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Proyección Nivel (%)',
-              data: dataProyeccion,
-              borderColor: '#015249',
-              backgroundColor: 'rgba(1, 82, 73, 0.1)',
-              borderDash: [5, 5],
-              pointRadius: 4,
-              fill: true,
-              tension: 0.1
-            },
-            {
-              label: 'Mínimo Seguro (20%)',
-              data: dataSeguridad,
-              borderColor: '#dc3545',
-              borderWidth: 2,
-              pointRadius: 0,
-              fill: false
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: { beginAtZero: true, max: 100, title: { display: true, text: 'Nivel %' } }
-          }
-        }
-      });
-    }
-
-    function confirmarAprobacionSimulada() {
-      const valorFinal = document.getElementById('sim_input_solicita').value;
-      if (!confirm(`¿Aprobar solicitud con ${valorFinal}%?`)) return;
-
-      fetch('/glp/admin/aprobar_solicitud', {
-        method: 'POST',
-        body: JSON.stringify({
-          id: idPedidoEnAnalisis,
-          nivel_aprobado: valorFinal
-        })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            alert("✅ Aprobado y ajustado.");
-            bootstrap.Modal.getInstance(document.getElementById('modalProyeccion')).hide();
-            cargarAprobacionesGLP();
-          } else {
-            alert("Error: " + data.message);
-          }
-        });
-    }
-
     function generarInformeSaldos(empresaId) {
       // 1. Preparar la vista (Ocultar gráficos y KPIs que no aplican a saldos)
       document.getElementById('seccionInforme').style.display = 'block';
@@ -2137,89 +2254,279 @@
         });
     }
 
+    function mostrarSeccionAprobacionesGLP() { document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none'); document.getElementById('seccionAprobacionesGLP').style.display = 'block'; cargarAprobacionesGLP(); }
+    function cargarAprobacionesGLP() { const tbody = document.getElementById('tablaAprobacionesGLP'); tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando...</td></tr>'; fetch('/glp/admin/obtener_solicitudes_pendientes').then(r => r.json()).then(data => { tbody.innerHTML = ''; if (!data.success || data.items.length === 0) { document.getElementById('msgSinAprobaciones').style.display = 'block'; return; } document.getElementById('msgSinAprobaciones').style.display = 'none'; data.items.forEach(item => { let htmlTanques = '<div class="d-flex gap-2">'; item.tanques.forEach(t => { let color = t.nivel <= 25 ? 'text-danger fw-bold' : ''; htmlTanques += `<div class="border p-1 rounded text-center" style="min-width:60px;"><div class="small fw-bold">${t.numero}</div><div class="${color}">${t.nivel}%</div></div>`; }); htmlTanques += '</div>'; const tr = document.createElement('tr'); tr.innerHTML = `<td>${item.fecha.substring(0, 16)}</td><td><div class="fw-bold">${item.cliente}</div><div class="small text-muted">${item.ubicacion}</div></td><td><div>${item.lote}</div><div class="badge bg-info text-dark">Día ${item.dias_operacion}</div></td><td>${htmlTanques}</td><td class="text-center"><div class="fs-5 fw-bold text-success">${item.nivel_solicitado}%</div><div class="small text-muted">Llenar hasta</div></td><td class="text-center"><div class="d-flex justify-content-center gap-2"><button class="btn btn-success btn-sm" onclick="aprobarSolicitudGLP(${item.id}, this)">👍</button><button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${item.id})">📈 Analizar</button></div></td>`; tbody.appendChild(tr); }); }); }
+    function aprobarSolicitudGLP(id, btn) { if (!confirm("¿Aprobar esta solicitud para que el cliente pueda enviarla?")) return; btn.disabled = true; btn.textContent = "Procesando..."; fetch('/glp/admin/aprobar_solicitud', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) }).then(r => r.json()).then(data => { if (data.success) { alert("Aprobada correctamente."); cargarAprobacionesGLP(); } else { alert("Error: " + data.message); btn.disabled = false; btn.textContent = "👍"; } }); }
+
+    let chartSimulador = null, datosSimulacion = null, idPedidoEnAnalisis = null;
+    function abrirSimuladorProyeccion(idPedido) { idPedidoEnAnalisis = idPedido; const modal = new bootstrap.Modal(document.getElementById('modalProyeccion')); modal.show(); fetch('/glp/admin/analizar_proyeccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idPedido }) }).then(r => r.json()).then(data => { if (!data.success) return; datosSimulacion = data; document.getElementById('sim_nivel_actual').innerText = data.nivel_actual + "%"; document.getElementById('sim_tasa').innerText = "-" + data.tasa_descenso_diaria + "%"; document.getElementById('sim_input_solicita').value = data.solicitado_original; renderizarGraficaProyeccion(); }); }
+    function actualizarGraficaSimulacion() { if (chartSimulador) renderizarGraficaProyeccion(); }
+    function renderizarGraficaProyeccion() { const ctx = document.getElementById('chartProyeccion').getContext('2d'); let solicita = parseFloat(document.getElementById('sim_input_solicita').value) || 0; const labels = [], dataProyeccion = [], dataSeguridad = []; let nivelSimulado = datosSimulacion.nivel_actual + solicita; if (nivelSimulado > 100) nivelSimulado = 100; let diaInicio = datosSimulacion.dia_actual; let diaFin = 16; if (diaInicio >= 15) diaFin = diaInicio + 3; for (let d = diaInicio; d <= diaFin; d++) { labels.push("Día " + d); dataProyeccion.push(nivelSimulado.toFixed(1)); dataSeguridad.push(20); nivelSimulado -= datosSimulacion.tasa_descenso_diaria; if (nivelSimulado < 0) nivelSimulado = 0; } if (chartSimulador) chartSimulador.destroy(); chartSimulador = new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [{ label: 'Proyección Nivel (%)', data: dataProyeccion, borderColor: '#015249', backgroundColor: 'rgba(1, 82, 73, 0.1)', borderDash: [5, 5], pointRadius: 4, fill: true, tension: 0.1 }, { label: 'Mínimo Seguro (20%)', data: dataSeguridad, borderColor: '#dc3545', borderWidth: 2, pointRadius: 0, fill: false }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } } } }); }
+    function confirmarAprobacionSimulada() { const valorFinal = document.getElementById('sim_input_solicita').value; if (!confirm(`¿Aprobar solicitud con ${valorFinal}%?`)) return; fetch('/glp/admin/aprobar_solicitud', { method: 'POST', body: JSON.stringify({ id: idPedidoEnAnalisis, nivel_aprobado: valorFinal }) }).then(r => r.json()).then(data => { if (data.success) { alert("✅ Aprobado."); bootstrap.Modal.getInstance(document.getElementById('modalProyeccion')).hide(); cargarAprobacionesGLP(); } }); }
+    function abrirModalPendientesTanqueo(empresaId) { const modal = new bootstrap.Modal(document.getElementById('modalPendientesTanqueo')); const tbody = document.getElementById('tablaPendientesTanqueoBody'); const msg = document.getElementById('msgSinPendientesTanqueo'); tbody.innerHTML = '<tr><td colspan="5">Cargando datos...</td></tr>'; msg.style.display = 'none'; modal.show(); fetch('/obtener_pendientes_tanqueo_reporte', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: empresaId }) }).then(r => r.json()).then(data => { tbody.innerHTML = ''; if (!data.success || data.items.length === 0) { msg.style.display = 'block'; return; } data.items.forEach(item => { let badgeColor = 'bg-success'; if (item.dias >= 1 && item.dias <= 2) badgeColor = 'bg-warning text-dark'; else if (item.dias >= 3) badgeColor = 'bg-danger'; const tr = document.createElement('tr'); tr.innerHTML = `<td><div>${item.fecha}</div><small class="text-muted text-uppercase" style="font-size:0.7em">${item.codigo}</small></td><td class="fw-bold text-primary">${item.ubicacion}</td><td>${item.proveedor || 'N/D'}</td><td><span class="fw-bold">${item.solicitado}%</span></td><td><div class="badge ${badgeColor}" style="font-size:0.9em;">${item.dias} Días</div></td>`; tbody.appendChild(tr); }); }); }
   </script>
-  <div class="modal fade" id="modalProyeccion" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header bg-dark text-white">
-          <h5 class="modal-title">🔮 Proyección de Cierre de Lote</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
 
-          <div class="row mb-3 align-items-center">
-            <div class="col-md-4 text-center">
-              <label class="small fw-bold text-muted">Nivel Actual</label>
-              <h3 class="text-secondary" id="sim_nivel_actual">0%</h3>
+  <script id="empresas-data" type="application/json">
+  {{ empresas | tojson | safe }}
+</script>
+  <script id="tipos-empresa-data" type="application/json">
+  {{ tipos_empresa | default([]) | tojson | safe }}
+</script>
+
+  <script>
+    // 1. LECTURA SEGURA
+    const empDataTxt = document.getElementById('empresas-data').textContent;
+    const tipoDataTxt = document.getElementById('tipos-empresa-data').textContent;
+    const tiposEmpresaData = tipoDataTxt.trim() ? JSON.parse(tipoDataTxt) : [];
+
+    //let currentMode = "";
+    //let currentAction = "crear";
+    //let currentUrl = "";
+
+    // 2. FUNCIÓN DE NAVEGACIÓN Y CIERRE
+    function cerrarVistasAdmin() {
+      document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none');
+      document.getElementById('pantallaBienvenida').style.display = 'block';
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    }
+
+    function activarMenuDinamico(btn, divId) {
+      document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      document.getElementById(divId).style.display = 'block';
+    }
+
+    // 3. CARGA DE TABLAS
+    function cargarTablaEmpresas() {
+      const b = document.getElementById('bodyEmpresas'); b.innerHTML = '';
+      empresasData.forEach(e => {
+        const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(e))));
+        b.innerHTML += `<tr><td>${e.nit}</td><td class="fw-bold">${e.nombre_comercial}</td><td><span class="badge bg-secondary">${e.tipo_empresa || 'general'}</span></td><td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Empresa', '${dataStr}')">✏️ Editar</button></td></tr>`;
+      });
+    }
+
+    function cargarTablaTiposEmpresa() {
+      fetch('/obtener_todos_tipos_empresa').then(r => r.json()).then(d => {
+        const b = document.getElementById('bodyTiposEmpresa'); b.innerHTML = '';
+        d.tipos.forEach(t => {
+          const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(t))));
+          b.innerHTML += `<tr><td class="fw-bold">${t.tipo}</td><td><button class="btn btn-sm btn-warning" onclick="editarRegistro('TipoEmpresa', '${dataStr}')">✏️ Editar</button></td></tr>`;
+        });
+      });
+    }
+
+    function cargarTablaUsuarios() {
+      fetch('/obtener_todos_usuarios').then(r => r.json()).then(d => {
+        const b = document.getElementById('bodyUsuarios'); b.innerHTML = '';
+        d.users.forEach(u => {
+          const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(u))));
+          b.innerHTML += `<tr><td>${u.cedula}</td><td class="fw-bold">${u.nombre}</td><td><span class="badge bg-primary">${u.perfil}</span></td><td><small>${u.empresa}</small></td><td>${u.telefono || '-'}</td><td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Usuario', '${dataStr}')">✏️ Editar</button></td></tr>`;
+        });
+      });
+    }
+
+    function cargarTablaPerfiles() {
+      fetch('/obtener_todos_perfiles').then(r => r.json()).then(d => {
+        const b = document.getElementById('bodyPerfiles'); b.innerHTML = '';
+        d.profiles.forEach(p => {
+          const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(p))));
+          b.innerHTML += `<tr><td>${p.nit}</td><td class="fw-bold">${p.empresa}</td><td>${p.operacion}</td><td><span class="badge bg-success">${p.perfil}</span></td><td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Perfil', '${dataStr}')">✏️ Editar</button></td></tr>`;
+        });
+      });
+    }
+
+    function cargarTablaProveedores() {
+      fetch('/obtener_todos_proveedores').then(r => r.json()).then(d => {
+        const b = document.getElementById('bodyProveedores'); b.innerHTML = '';
+        d.providers.forEach(p => {
+          const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(p))));
+          b.innerHTML += `<tr><td>${p.id_proveedor}</td><td class="fw-bold">${p.proveedor}</td><td class="text-success fw-bold">$${p.precio}</td><td><small>${p.email1}</small></td><td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Proveedor', '${dataStr}')">✏️ Editar</button></td></tr>`;
+        });
+      });
+    }
+
+    function cargarTablaContactos() {
+      fetch('/obtener_todos_contactos').then(r => r.json()).then(d => {
+        const b = document.getElementById('bodyContactos'); b.innerHTML = '';
+        d.contacts.forEach(c => {
+          const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(c))));
+          b.innerHTML += `<tr><td class="fw-bold">${c.empresa}</td><td><span class="badge bg-warning text-dark">${c.area_contacto}</span></td><td class="text-danger fw-bold">${c.email}</td><td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Contacto', '${dataStr}')">✏️ Editar</button></td></tr>`;
+        });
+      });
+    }
+
+    // 4. LÓGICA DEL MODAL MAESTRO
+    function nuevoItem(tipo) {
+      currentMode = tipo; currentAction = "crear";
+      document.getElementById('modalTituloMaestro').innerText = "Crear Nuevo: " + tipo;
+      renderizarFormMaestro(tipo, {});
+      new bootstrap.Modal(document.getElementById('modalMaestro')).show();
+    }
+
+    function editarRegistro(tipo, datosBase64) {
+      currentMode = tipo; currentAction = "editar";
+      document.getElementById('modalTituloMaestro').innerText = "Editar Registro: " + tipo;
+      const data = JSON.parse(decodeURIComponent(escape(atob(datosBase64))));
+      renderizarFormMaestro(tipo, data);
+      new bootstrap.Modal(document.getElementById('modalMaestro')).show();
+    }
+
+    function renderizarFormMaestro(tipo, data) {
+      let html = `<input type="hidden" id="form_accion_maestro" value="${currentAction}">`;
+
+      let optsEmpresas = '<option value="">Seleccione Empresa...</option>';
+      empresasData.forEach(e => {
+        let sel = (data.empresa === e.nombre_comercial || data.empresa_select === e.nombre_comercial || data.nit === e.nit) ? 'selected' : '';
+        optsEmpresas += `<option value="${e.nombre_comercial}" data-nit="${e.nit}" ${sel}>${e.nombre_comercial}</option>`;
+      });
+
+      if (tipo === 'Empresa') {
+        currentUrl = "/gestionar_empresa";
+        let optsTipos = '<option value="">Seleccione...</option>';
+        tiposEmpresaData.forEach(t => {
+          let sel = (data.tipo_empresa === t) ? 'selected' : '';
+          optsTipos += `<option value="${t}" ${sel}>${t}</option>`;
+        });
+
+        html += `
+          <label class="fw-bold small mt-2 text-primary">NIT</label>
+          <input type="text" id="f_nit" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+          
+          <label class="fw-bold small mt-2">Nombre Comercial</label>
+          <input type="text" id="f_nom" class="form-control" value="${data.nombre_comercial || ''}">
+          
+          <label class="fw-bold small mt-2">Tipo de Empresa</label>
+          <select id="f_tipo" class="form-select">${optsTipos}</select>`;
+
+      } else if (tipo === 'TipoEmpresa') {
+        currentUrl = "/gestionar_tipo_empresa";
+
+        html += `
+          <input type="hidden" id="f_tid" value="${data.id || ''}">
+          <label class="fw-bold small mt-2">Nombre del Tipo</label>
+          <input type="text" id="f_tnom" class="form-control" value="${data.tipo || ''}">`;
+
+      } else if (tipo === 'Proveedor') {
+        currentUrl = "/gestionar_proveedor";
+
+        html += `
+          <label class="fw-bold small mt-2 text-primary">NIT/ID Proveedor</label>
+          <input type="text" id="f_idp" class="form-control" value="${data.id_proveedor || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+          
+          <label class="fw-bold small mt-2">Nombre Proveedor</label>
+          <input type="text" id="f_prov" class="form-control" value="${data.proveedor || ''}">
+          
+          <label class="fw-bold small text-success mt-2">Precio por Kg ($)</label>
+          <input type="number" id="f_prec" class="form-control border-success fw-bold" value="${data.precio || 0}">
+          
+          <label class="fw-bold small mt-2">Email Principal</label>
+          <input type="email" id="f_e1" class="form-control" value="${data.email1 || ''}">
+          
+          <label class="fw-bold small mt-2">Email Secundario</label>
+          <input type="email" id="f_e2" class="form-control" value="${data.email2 || ''}">`;
+
+      } else if (tipo === 'Usuario') {
+        currentUrl = "/gestionar_usuario";
+
+        html += `
+          <label class="fw-bold small mt-2 text-primary">Cédula</label>
+          <input type="text" id="f_ced" class="form-control" value="${data.cedula || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+          
+          <label class="fw-bold small mt-2">Nombre Completo</label>
+          <input type="text" id="f_unom" class="form-control" value="${data.nombre || ''}">
+          
+          <label class="fw-bold small mt-2">Asignar a Empresa</label>
+          <select id="f_enom" class="form-select" onchange="document.getElementById('f_eid').value = this.options[this.selectedIndex].getAttribute('data-nit');">
+            ${optsEmpresas}
+          </select>
+          <input type="hidden" id="f_eid" value="${data.empresa_id || ''}">
+          
+          <label class="fw-bold small mt-2">Perfil del Sistema</label>
+          <input type="text" id="f_perf" class="form-control" value="${data.perfil || ''}">
+          
+          <div class="row mt-2">
+            <div class="col-6">
+              <label class="fw-bold small text-primary">Telegram ID (Solo lectura)</label>
+              <input type="text" id="f_tlg" class="form-control border-primary bg-light" value="${data.telegram_id || ''}" readonly placeholder="Vinculado por el Bot">
             </div>
-            <div class="col-md-4 text-center">
-              <label class="small fw-bold text-muted">Consumo Diario</label>
-              <h3 class="text-danger" id="sim_tasa">0% / día</h3>
-              <small class="text-muted" id="sim_detalle_kg">Calc. basado en historia</small>
-            </div>
-            <div class="col-md-4">
-              <label class="small fw-bold text-primary">A SOLICITAR (Editable)</label>
-              <div class="input-group">
-                <input type="number" id="sim_input_solicita" class="form-control fw-bold text-primary fs-4"
-                  onchange="actualizarGraficaSimulacion()" onkeyup="actualizarGraficaSimulacion()">
-                <span class="input-group-text">%</span>
-              </div>
+            <div class="col-6">
+              <label class="fw-bold small">Teléfono</label>
+              <input type="text" id="f_tel" class="form-control" value="${data.telefono || ''}" oninput="if(this.value !== '${data.telefono || ''}') { document.getElementById('f_tlg').value = ''; }">
             </div>
           </div>
+          
+          <label class="fw-bold small text-danger mt-2">Contraseña ${currentAction === 'editar' ? '(Dejar vacío para NO cambiar)' : '*'}</label>
+          <input type="password" id="f_pass" class="form-control border-danger">
+          
+          <input type="hidden" id="f_tuser" value="cliente">
+          <input type="hidden" id="f_clase" value="op">`;
 
-          <div style="height: 300px; width: 100%;">
-            <canvas id="chartProyeccion"></canvas>
-          </div>
+      } else if (tipo === 'Perfil') {
+        currentUrl = "/gestionar_perfil";
 
-          <div class="alert alert-light border mt-3 py-2 small text-center">
-            La línea punteada proyecta el consumo futuro hasta el <b>Día 15</b>.<br>
-            Ajusta el valor "A Solicitar" para evitar caer en la zona roja (20%).
-          </div>
+        html += `
+          <input type="hidden" id="f_pid" value="${data.id || ''}">
+          
+          <label class="fw-bold small mt-2">Asignar a Empresa</label>
+          <select id="f_enom_p" class="form-select" onchange="document.getElementById('f_nit_p').value = this.options[this.selectedIndex].getAttribute('data-nit');">
+            ${optsEmpresas}
+          </select>
+          <input type="hidden" id="f_nit_p" value="${data.nit || ''}">
+          
+          <label class="fw-bold small mt-2">Módulo/Operación</label>
+          <input type="text" id="f_op" class="form-control" value="${data.operacion || ''}" placeholder="Ej: Gas, Mermas">
+          
+          <label class="fw-bold small text-success mt-2">Nombre del Perfil</label>
+          <input type="text" id="f_perf_p" class="form-control border-success" value="${data.perfil || ''}">`;
 
-        </div>
-        <div class="modal-footer bg-light">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="button" class="btn btn-success fw-bold px-4" onclick="confirmarAprobacionSimulada()">
-            ✅ Confirmar y Aprobar
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+      } else if (tipo === 'Contacto') {
+        currentUrl = "/gestionar_contacto";
 
-  <div class="modal fade" id="modalPendientesTanqueo" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header bg-warning text-dark">
-          <h5 class="modal-title fw-bold">⏳ Solicitudes sin Tanqueo Registrado</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body p-0">
-          <div class="table-responsive">
-            <table class="table table-striped table-hover mb-0 text-center align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Fecha Solicitud</th>
-                  <th>Sede</th>
-                  <th>Proveedor Asignado</th>
-                  <th>Cant. Solicitada</th>
-                  <th>Tiempo de Espera</th>
-                </tr>
-              </thead>
-              <tbody id="tablaPendientesTanqueoBody">
-              </tbody>
-            </table>
-          </div>
-          <div id="msgSinPendientesTanqueo" class="text-center p-4 text-muted" style="display:none;">
-            ✅ Todo al día. No hay solicitudes pendientes de tanqueo.
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-        </div>
-      </div>
-    </div>
-  </div>
+        html += `
+          <input type="hidden" id="f_cid" value="${data.id || ''}">
+          
+          <label class="fw-bold small mt-2">Empresa</label>
+          <select id="f_enom_c" class="form-select" onchange="document.getElementById('f_eid_c').value = this.options[this.selectedIndex].getAttribute('data-nit');">
+            ${optsEmpresas}
+          </select>
+          <input type="hidden" id="f_eid_c" value="${data.id_empresa || ''}">
+          
+          <label class="fw-bold small text-warning mt-2">Área del Contacto</label>
+          <input type="text" id="f_area" class="form-control border-warning" value="${data.area_contacto || ''}" placeholder="Ej: gerenciagranjas">
+          
+          <label class="fw-bold small text-danger mt-2">Email para Alertas</label>
+          <input type="email" id="f_email" class="form-control border-danger" value="${data.email || ''}">`;
+      }
+
+      document.getElementById('contenedorCamposMaestro').innerHTML = html;
+    }
+
+    function guardarMaestro() {
+      const fd = new FormData(); fd.append('accion', document.getElementById('form_accion_maestro').value);
+      if (currentMode === 'Empresa') { fd.append('nit', document.getElementById('f_nit').value); fd.append('nombre_comercial', document.getElementById('f_nom').value); fd.append('tipo_empresa', document.getElementById('f_tipo').value); }
+      else if (currentMode === 'TipoEmpresa') { fd.append('id', document.getElementById('f_tid').value); fd.append('tipo', document.getElementById('f_tnom').value); }
+      else if (currentMode === 'Proveedor') { fd.append('id_proveedor', document.getElementById('f_idp').value); fd.append('proveedor', document.getElementById('f_prov').value); fd.append('precio', document.getElementById('f_prec').value); fd.append('email1', document.getElementById('f_e1').value); fd.append('email2', document.getElementById('f_e2').value); }
+      else if (currentMode === 'Usuario') { fd.append('cedula', document.getElementById('f_ced').value); fd.append('nombre', document.getElementById('f_unom').value); fd.append('perfil', document.getElementById('f_perf').value); fd.append('telegram_id', document.getElementById('f_tlg').value); fd.append('telefono', document.getElementById('f_tel').value); fd.append('password', document.getElementById('f_pass').value); fd.append('empresa_id', document.getElementById('f_eid').value); fd.append('empresa_select', document.getElementById('f_enom').value); fd.append('tipo_usuario', document.getElementById('f_tuser').value); fd.append('clase', document.getElementById('f_clase').value); }
+      else if (currentMode === 'Perfil') { fd.append('id', document.getElementById('f_pid').value); fd.append('empresa_select', document.getElementById('f_enom_p').value); fd.append('nit', document.getElementById('f_nit_p').value); fd.append('operacion', document.getElementById('f_op').value); fd.append('perfil', document.getElementById('f_perf_p').value); }
+      else if (currentMode === 'Contacto') { fd.append('id', document.getElementById('f_cid').value); fd.append('empresa_nombre', document.getElementById('f_enom_c').value); fd.append('id_empresa', document.getElementById('f_eid_c').value); fd.append('area_contacto', document.getElementById('f_area').value); fd.append('email', document.getElementById('f_email').value); }
+
+      fetch(currentUrl, { method: 'POST', body: fd }).then(r => r.json()).then(d => {
+        alert(d.message);
+        if (d.success) {
+          bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
+          if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa') location.reload();
+          else if (currentMode === 'Usuario') cargarTablaUsuarios();
+          else if (currentMode === 'Proveedor') cargarTablaProveedores();
+          else if (currentMode === 'Perfil') cargarTablaPerfiles();
+          else if (currentMode === 'Contacto') cargarTablaContactos();
+        }
+      });
+    }
+  </script>
+
+
+
 
 </body>
 

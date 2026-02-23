@@ -13,13 +13,15 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+import holidays 
 
 bcrypt = Bcrypt()
 
 bp_901811727 = Blueprint('bp_901811727', __name__)
+co_holidays = holidays.CO() 
 
 # ==============================================================================
-# RUTAS DE GESTIÓN
+# RUTAS DE GESTIÓN (ADMINISTRACIÓN CRUD COMPLETA)
 # ==============================================================================
 
 @bp_901811727.route('/901811727.html')
@@ -29,31 +31,33 @@ def panel_webmaster():
     try:
         cur = mysql.connection.cursor()
         
-        # --- CORRECCIÓN AQUÍ ---
-        cur.execute("SELECT nit, nombre_comercial FROM empresas")
+        # 1. Obtener empresas incluyendo tipo_empresa
+        cur.execute("SELECT nit, nombre_comercial, tipo_empresa FROM empresas")
         data_empresas = cur.fetchall()
-        
-        # Convertimos las tuplas a diccionarios para que el HTML pueda usar .nit y .nombre_comercial
         empresas = []
         if data_empresas:
-            # Verificamos si la BD devolvió tuplas (lo normal) o diccionarios
             if isinstance(data_empresas[0], dict):
                 empresas = data_empresas
             else:
-                # Mapeo manual: columna 0 es nit, columna 1 es nombre
-                empresas = [{'nit': row[0], 'nombre_comercial': row[1]} for row in data_empresas]
-        # -----------------------
+                empresas = [{'nit': row[0], 'nombre_comercial': row[1], 'tipo_empresa': row[2] if len(row)>2 else 'general'} for row in data_empresas]
 
+        # 2. Obtener la nueva lista de tipos de empresa
+        cur.execute("SELECT tipo FROM tipos_empresa")
+        data_tipos = cur.fetchall()
+        tipos_empresa = [r['tipo'] if isinstance(r, dict) else r[0] for r in data_tipos]
+        
         cur.execute("SELECT nombre_comercial FROM empresas")
         clientes = cur.fetchall()
         
         cur.close()
         
+        # Pasamos la variable tipos_empresa al render_template
         return render_template('901811727.html', 
                                nombre=session.get('nombre'), 
                                empresa=session.get('empresa'), 
                                form=form, 
-                               empresas=empresas, # Ahora enviamos la lista limpia
+                               empresas=empresas, 
+                               tipos_empresa=tipos_empresa,
                                clientes=clientes)
     except Exception as e:
         print("Error panel:", e)
@@ -65,16 +69,26 @@ def panel_webmaster():
 def registrar_empresa():
     nombre_comercial = request.form.get('nombre_comercial', '').strip()
     nit = request.form.get('nit', '').strip()
+    tipo_empresa = request.form.get('tipo_empresa', 'general').strip()
+    accion = request.form.get('accion', 'crear').strip()
+    
     if not nombre_comercial or not nit:
         return jsonify({'success': False, 'message': 'Faltan datos obligatorios.'})
+    
     cur = mysql.connection.cursor()
     try:
-        cur.execute("SELECT * FROM empresas WHERE nit = %s", (nit,))
-        if cur.fetchone():
-            return jsonify({'success': False, 'message': 'La empresa ya existe.'})
-        cur.execute("INSERT INTO empresas (nit, nombre_comercial) VALUES (%s, %s)", (nit, nombre_comercial))
+        if accion == 'crear':
+            cur.execute("SELECT * FROM empresas WHERE nit = %s", (nit,))
+            if cur.fetchone():
+                return jsonify({'success': False, 'message': 'La empresa ya existe.'})
+            cur.execute("INSERT INTO empresas (nit, nombre_comercial, tipo_empresa) VALUES (%s, %s, %s)", (nit, nombre_comercial, tipo_empresa))
+            msg = 'Empresa creada correctamente.'
+        else:
+            cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s WHERE nit=%s", (nombre_comercial, tipo_empresa, nit))
+            msg = 'Empresa actualizada correctamente.'
+            
         mysql.connection.commit()
-        return jsonify({'success': True, 'message': 'Empresa creada correctamente.'})
+        return jsonify({'success': True, 'message': msg})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
     finally:
@@ -88,20 +102,33 @@ def registrar_perfil():
     nit = request.form.get('nit', '').strip()
     operacion = request.form.get('operacion', '').strip()
     perfil = request.form.get('perfil', '').strip()
+    accion = request.form.get('accion', 'crear').strip()
+    pid = request.form.get('id', '')
+
     if not all([empresa_nombre, nit, operacion, perfil]):
         return jsonify({'success': False, 'message': 'Faltan datos obligatorios.'})
+    
     cur = mysql.connection.cursor()
     try:
-        cur.execute("SELECT nit FROM empresas WHERE nombre_comercial = %s", (empresa_nombre,))
-        empresa = cur.fetchone()
-        if not empresa or str(empresa['nit']) != nit:
-            return jsonify({'success': False, 'message': 'Empresa no válida o NIT incorrecto.'})
-        cur.execute("SELECT * FROM perfiles WHERE nit = %s AND operacion = %s AND perfil = %s", (nit, operacion, perfil))
-        if cur.fetchone():
-            return jsonify({'success': False, 'message': 'El perfil ya existe.'})
-        cur.execute("INSERT INTO perfiles (nit, operacion, perfil) VALUES (%s, %s, %s)", (nit, operacion, perfil))
+        if accion == 'crear':
+            cur.execute("SELECT nit FROM empresas WHERE nombre_comercial = %s", (empresa_nombre,))
+            empresa = cur.fetchone()
+            nit_db = empresa['nit'] if isinstance(empresa, dict) else (empresa[0] if empresa else None)
+            if not empresa or str(nit_db) != nit:
+                return jsonify({'success': False, 'message': 'Empresa no válida o NIT incorrecto.'})
+                
+            cur.execute("SELECT * FROM perfiles WHERE nit = %s AND operacion = %s AND perfil = %s", (nit, operacion, perfil))
+            if cur.fetchone():
+                return jsonify({'success': False, 'message': 'El perfil ya existe.'})
+                
+            cur.execute("INSERT INTO perfiles (empresa, nit, operacion, perfil) VALUES (%s, %s, %s, %s)", (empresa_nombre, nit, operacion, perfil))
+            msg = 'Perfil creado correctamente.'
+        else:
+            cur.execute("UPDATE perfiles SET operacion=%s, perfil=%s WHERE id=%s", (operacion, perfil, pid))
+            msg = 'Perfil actualizado correctamente.'
+
         mysql.connection.commit()
-        return jsonify({'success': True, 'message': 'Perfil creado correctamente.'})
+        return jsonify({'success': True, 'message': msg})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
     finally:
@@ -118,7 +145,7 @@ def obtener_perfiles():
     try:
         cur = mysql.connection.cursor()
         cur.execute("SELECT DISTINCT perfil FROM perfiles WHERE nit = %s AND operacion = %s", (empresa_id, operacion))
-        perfiles = [row['perfil'] for row in cur.fetchall()]
+        perfiles = [row['perfil'] if isinstance(row, dict) else row[0] for row in cur.fetchall()]
         cur.close()
         return jsonify({'perfiles': perfiles})
     except Exception as e:
@@ -133,25 +160,98 @@ def registrar_usuario():
     cedula = data.get('cedula', '').strip()
     nombre = data.get('nombre', '').strip()
     password = data.get('password', '').strip()
-    if not all([cedula, nombre, password]):
+    accion = data.get('accion', 'crear').strip()
+    
+    if accion == 'crear' and not all([cedula, nombre, password]):
         return jsonify({'success': False, 'message': 'Faltan datos obligatorios.'})
+        
     cur = mysql.connection.cursor()
     try:
-        cur.execute("SELECT id FROM usuarios WHERE cedula = %s", (cedula,))
-        if cur.fetchone():
-            return jsonify({'success': False, 'message': 'El usuario ya existe.'})
-        password_hashed = bcrypt.generate_password_hash(password).decode('utf-8')
-        cur.execute("""
-            INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (cedula, nombre, password_hashed, data.get('tipo_usuario'), data.get('clase'), 
-              data.get('perfil'), data.get('empresa_id'), data.get('empresa_select')))
+        if accion == 'crear':
+            cur.execute("SELECT id FROM usuarios WHERE cedula = %s", (cedula,))
+            if cur.fetchone():
+                return jsonify({'success': False, 'message': 'El usuario ya existe.'})
+            password_hashed = bcrypt.generate_password_hash(password).decode('utf-8')
+            cur.execute("""
+                INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa, telegram_id, telefono)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (cedula, nombre, password_hashed, data.get('tipo_usuario'), data.get('clase'), 
+                  data.get('perfil'), data.get('empresa_id'), data.get('empresa_select'), data.get('telegram_id'), data.get('telefono')))
+            msg = 'Usuario creado.'
+        else:
+            if password:
+                password_hashed = bcrypt.generate_password_hash(password).decode('utf-8')
+                cur.execute("""
+                    UPDATE usuarios SET nombre=%s, password=%s, perfil=%s, empresa_id=%s, empresa=%s, telegram_id=%s, telefono=%s
+                    WHERE cedula=%s
+                """, (nombre, password_hashed, data.get('perfil'), data.get('empresa_id'), data.get('empresa_select'), data.get('telegram_id'), data.get('telefono'), cedula))
+            else:
+                cur.execute("""
+                    UPDATE usuarios SET nombre=%s, perfil=%s, empresa_id=%s, empresa=%s, telegram_id=%s, telefono=%s
+                    WHERE cedula=%s
+                """, (nombre, data.get('perfil'), data.get('empresa_id'), data.get('empresa_select'), data.get('telegram_id'), data.get('telefono'), cedula))
+            msg = 'Usuario actualizado.'
+
         mysql.connection.commit()
-        return jsonify({'success': True, 'message': 'Usuario creado.'})
+        return jsonify({'success': True, 'message': msg})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
     finally:
         cur.close()
+
+@csrf.exempt
+@bp_901811727.route('/registrar_proveedor', methods=['POST'])
+@login_required_custom
+def registrar_proveedor():
+    d = request.form
+    accion = d.get('accion', 'crear')
+    cur = mysql.connection.cursor()
+    try:
+        if accion == 'crear':
+            cur.execute("""
+                INSERT INTO proveedores (proveedor, id_proveedor, email1, email2, producto_servicio, precio)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (d.get('proveedor'), d.get('id_proveedor'), d.get('email1'), d.get('email2'), 'GLP', d.get('precio')))
+            msg = "Proveedor creado."
+        else:
+            cur.execute("""
+                UPDATE proveedores 
+                SET proveedor=%s, email1=%s, email2=%s, precio=%s 
+                WHERE id_proveedor=%s
+            """, (d.get('proveedor'), d.get('email1'), d.get('email2'), d.get('precio'), d.get('id_proveedor')))
+            msg = "Proveedor actualizado."
+        mysql.connection.commit()
+        return jsonify(success=True, message=msg)
+    except Exception as e: return jsonify(success=False, message=str(e))
+    finally: cur.close()
+
+@csrf.exempt
+@bp_901811727.route('/registrar_contacto', methods=['POST'])
+@login_required_custom
+def registrar_contacto():
+    d = request.form
+    accion = d.get('accion', 'crear')
+    cur = mysql.connection.cursor()
+    try:
+        if accion == 'crear':
+            cur.execute("""
+                INSERT INTO contactos (empresa, id_empresa, area_contacto, email)
+                VALUES (%s, %s, %s, %s)
+            """, (d.get('empresa_nombre'), d.get('id_empresa'), d.get('area_contacto'), d.get('email')))
+            msg = "Contacto creado."
+        else:
+            cur.execute("""
+                UPDATE contactos SET area_contacto=%s, email=%s 
+                WHERE id=%s
+            """, (d.get('area_contacto'), d.get('email'), d.get('id')))
+            msg = "Contacto actualizado."
+        mysql.connection.commit()
+        return jsonify(success=True, message=msg)
+    except Exception as e: return jsonify(success=False, message=str(e))
+    finally: cur.close()
+
+# --- RUTAS DE CONSULTA PARA LAS TABLAS FRONTEND ---
+
 
 @csrf.exempt
 @bp_901811727.route('/consultar_proveedores', methods=['POST'])
@@ -179,10 +279,10 @@ def obtener_periodo():
 
 
 # ==============================================================================
-# LÓGICA DE INFORMES Y ESTADÍSTICAS (KPIs ACTUALIZADOS)
+# LÓGICA DE INFORMES Y ESTADÍSTICAS (KPIs ACTUALIZADOS Y RESCATE POBLACIÓN)
 # ==============================================================================
 
-def _procesar_resultados_glp(resultados, tipo_informe, periodo):
+def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_rescatada):
     if not resultados:
         return None
 
@@ -193,44 +293,15 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         except (ValueError, TypeError):
             return 0.0
 
-    # ==========================================================================
-    # PASO 0: DETECTAR POBLACIÓN (POLLITOS) DENTRO DEL RANGO SELECCIONADO
-    # ==========================================================================
-    mapa_pollitos_lote = {}
-    
-    for row in resultados:
-        lote = row.get('lote')
-        pollitos = int(row.get('pollitos') or 0)
-        operacion = str(row.get('operacion') or '').lower()
-        
-        if lote:
-            dato_actual = mapa_pollitos_lote.get(lote, 0)
-            
-            # Prioridad A: Operación inicio
-            if 'inicio' in operacion and pollitos > 0:
-                mapa_pollitos_lote[lote] = pollitos
-            
-            # Prioridad B: Mayor número encontrado
-            elif pollitos > dato_actual:
-                 mapa_pollitos_lote[lote] = pollitos
-
-    # ==========================================================================
-    # INICIO DEL PROCESAMIENTO (SUMAS, PROMEDIOS Y SERIES)
-    # ==========================================================================
-
     math_saldo_inicial_kg_global = 0.0
     math_ingresos_kg = 0.0
     math_consumo_real_acumulado = 0.0
     math_dinero_total = 0.0 
-    
-    total_pollitos_global = 0
-    lotes_procesados_global = set()
 
-    # --- CAMBIO 1: AGREGAMOS LA SERIE 'velocidad_consumo' ---
     series = { 
         'fechas': [], 
         'kg_pollito': [], 
-        'velocidad_consumo': [],  # <--- NUEVA SERIE PARA GRÁFICAS
+        'velocidad_consumo': [],  
         'saldo_inicial': [], 
         'saldo_final': [], 
         'ingresos': [] 
@@ -238,28 +309,34 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
     
     granjas_data = {}
 
-    # Ordenamos por fecha
     resultados.sort(key=lambda x: str(x.get('fecha')))
 
     for row in resultados:
+        lote_id = row.get('lote')
+        
+        # 1. RESCATE DE POBLACIÓN (El puente del Lote)
+        pollitos_reales = mapa_poblacion_rescatada.get(lote_id, 0)
+
+        # CRITERIO DE EXCLUSIÓN 1: Si el lote no tiene población registrada en la historia, se ignora
+        if pollitos_reales <= 0:
+            continue
+
         fecha_str = str(row.get('fecha'))
         clase = str(row.get('clase') or '').lower().strip()
-        lote_id = row.get('lote')
         ubicacion = row.get('ubicacion') or 'Desconocida'
 
         val_kg_saldo = safe_float(row.get('saldo_estimado_kg'))
         masa_fact = safe_float(row.get('masa_kg_facturada'))
         neto_gast = safe_float(row.get('neto_gastado'))
+        
+        # CRITERIO DE EXCLUSIÓN 2: Si el registro es un egreso/consumo pero el valor es 0, es ruido
+        if clase in ['egreso', 'consumo'] and neto_gast <= 0:
+            continue
+
         val_precio = safe_float(row.get('precio_total')) 
         kg_pollo  = safe_float(row.get('kg_pollito'))
-        
-        # --- CAMBIO 2: EXTRAEMOS EL DATO DE VELOCIDAD ---
         vel_consumo = safe_float(row.get('velocidad_consumo'))
         
-        # Usamos el dato de pollitos corregido
-        pollitos_reales = mapa_pollitos_lote.get(lote_id, 0)
-
-        # 1. CÁLCULO DIRECTO (SUMAS)
         math_consumo_real_acumulado += neto_gast
         math_dinero_total += val_precio
 
@@ -269,20 +346,13 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         if clase == 'ingreso':
             math_ingresos_kg += masa_fact
 
-        # 2. SERIES PARA GRÁFICOS (ACTUALIZADO)
         series['fechas'].append(fecha_str)
         series['kg_pollito'].append(kg_pollo)
-        series['velocidad_consumo'].append(vel_consumo) # <--- AGREGAMOS EL DATO A LA LISTA
+        series['velocidad_consumo'].append(vel_consumo) 
         series['saldo_inicial'].append(val_kg_saldo if clase == 'saldo inicial' else None)
         series['saldo_final'].append(val_kg_saldo if clase == 'saldo final' else None)
         series['ingresos'].append(masa_fact if clase == 'ingreso' else None)
 
-        # 3. CONTEO DE POLLITOS GLOBAL
-        if lote_id and lote_id not in lotes_procesados_global:
-            total_pollitos_global += pollitos_reales
-            lotes_procesados_global.add(lote_id)
-
-        # 4. DATOS AGRUPADOS POR GRANJA
         if ubicacion not in granjas_data:
             granjas_data[ubicacion] = {
                 'inicial': 0.0, 'ingresos': 0.0, 'consumo_real': 0.0,
@@ -300,10 +370,38 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
                 d['pollitos'] += pollitos_reales
             d['lotes'].add(lote_id)
 
-    # --- CÁLCULOS KPI FINALES ---
+    # 2. FILTRADO FINAL Y CÁLCULO DE EFICIENCIA
+    tabla_resumen = []
+    lista_rendimientos = []
+    total_pollitos_global = 0
+    total_consumo_final = 0.0
+
+    for nombre_granja, datos in granjas_data.items():
+        consumo_granja = datos['consumo_real']
+        
+        # REGLA MAESTRA: Eliminar granjas con consumo cero del reporte
+        if consumo_granja <= 0.0001:
+            continue
+
+        rend_granja = 0.0
+        if datos['pollitos'] > 0:
+            rend_granja = consumo_granja / datos['pollitos']
+            if rend_granja > 0.000001:
+                lista_rendimientos.append(rend_granja)
+
+        total_pollitos_global += datos['pollitos']
+        total_consumo_final += consumo_granja
+
+        tabla_resumen.append({
+            'granja': nombre_granja,
+            'total_kg': consumo_granja,
+            'pollitos': datos['pollitos'],
+            'kg_pollito': rend_granja
+        })
+
     rendimiento = 0.0
     if total_pollitos_global > 0:
-        rendimiento = math_consumo_real_acumulado / total_pollitos_global
+        rendimiento = total_consumo_final / total_pollitos_global
     
     kpis = {
         "card1_label": "Saldo Inicial (kg)",
@@ -311,7 +409,7 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         "card2_label": "Pedidos Gas (kg)",
         "card2_value": math_ingresos_kg,
         "card3_label": "Consumo Real (kg)",
-        "card3_value": math_consumo_real_acumulado,
+        "card3_value": total_consumo_final,
         "card4_label": "Eficiencia (kg/ave)", 
         "card4_value": rendimiento,
         "card5_label": "Pollitos",
@@ -320,45 +418,17 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo):
         "card6_value": math_dinero_total
     }
 
-    # --- TABLA RESUMEN Y FILTRADO ESTADÍSTICO ---
-    tabla_resumen = []
-    lista_rendimientos = []
-
-    for nombre_granja, datos in granjas_data.items():
-        consumo_granja = datos['consumo_real']
-        rend_granja = 0.0
-        
-        if datos['pollitos'] > 0:
-            rend_granja = consumo_granja / datos['pollitos']
-            
-            # --- CAMBIO 3: FILTRO ESTADÍSTICO ---
-            # Solo consideramos para la media/desviación las granjas con consumo real > 0
-            if rend_granja > 0.000001:
-                lista_rendimientos.append(rend_granja)
-
-        # A la tabla visual agregamos TODAS (incluso las de 0)
-        tabla_resumen.append({
-            'granja': nombre_granja,
-            'total_kg': consumo_granja,
-            'pollitos': datos['pollitos'],
-            'kg_pollito': rend_granja
-        })
-
-    # --- CÁLCULO DE ESTADÍSTICAS (KPIs de Variabilidad) ---
     media = 0.0
     desviacion = 0.0
-    
-    n = len(lista_rendimientos) # n ahora excluye los ceros
+    n = len(lista_rendimientos) 
     
     if n > 0:
         media = sum(lista_rendimientos) / n
-        
         if n > 1:
             varianza = sum((x - media) ** 2 for x in lista_rendimientos) / (n - 1)
             desviacion = math.sqrt(varianza)
 
-    # --- CAMBIO 4: NOTA METODOLÓGICA ---
-    nota_informativa = "Nota: Las estadísticas (media y desviación) se calculan únicamente sobre las granjas que reportaron consumo en este periodo, excluyendo aquellas con valor cero."
+    nota_informativa = "Nota: Estadísticas ajustadas. Se omiten granjas sin consumo en el periodo."
 
     return {
         "kpis": kpis,
@@ -391,10 +461,11 @@ def generar_informe():
             return jsonify({"success": False, "message": "Faltan datos obligatorios."}), 400
 
         cursor = mysql.connection.cursor()
-        wheres = ["WHERE c.id_empresa = %s"]
+        
+        # Filtro Base (Fechas y Empresa)
+        wheres = ["WHERE c.id_empresa = %s AND (c.pollitos > 0 OR c.neto_gastado > 0 OR c.clase = 'ingreso' OR c.operacion = 'inicio_calefaccion')"]
         params = [empresa_id]
 
-        # Filtros por Ubicación (Zona o Granja)
         if tipo_informe == 'zona' and ubicacion:
             cursor.execute("SELECT DISTINCT ubicacion FROM tanques_sedes WHERE zona = %s AND empresa_id = %s", (ubicacion, empresa_id))
             granjas = [r['ubicacion'] if isinstance(r, dict) else r[0] for r in cursor.fetchall()]
@@ -407,19 +478,14 @@ def generar_informe():
             wheres.append("AND c.ubicacion = %s")
             params.append(ubicacion)
 
-        # --- LÓGICA DE PERIODOS AJUSTADA ---
         if periodo == 'Personalizado' and fecha_ini and fecha_fin:
-            # HISTÓRICO: Filtramos solo por fechas.
-            # Trae tanto lotes ACTIVOS como INACTIVOS que tuvieron movimiento en ese rango.
             wheres.append("AND c.fecha BETWEEN %s AND %s")
             params.append(fecha_ini)
             params.append(fecha_fin)
             
         elif periodo == 'Actual':
-            # ACTUAL: Solo lo que está vivo hoy (ACTIVO)
             wheres.append("AND c.estatus_lote = 'ACTIVO'")
 
-        # SELECT
         sql = """
             SELECT c.fecha, c.ubicacion, c.lote, c.estatus_lote, c.operacion, c.clase, 
                    c.saldo_estimado_kg, c.saldo_estimado_galones,
@@ -441,11 +507,29 @@ def generar_informe():
                 else:
                     raw_results.append(dict(zip(columns, row)))
 
+        # 3. LÓGICA DE RESCATE DE POBLACIÓN (MÁS ALLÁ DEL MURO DE FECHAS)
+        lotes_activos = list(set([r['lote'] for r in raw_results if r.get('lote')]))
+        
+        mapa_pob_rescatada = {}
+        if lotes_activos:
+            placeholders_lotes = ', '.join(['%s'] * len(lotes_activos))
+            sql_rescate = f"""
+                SELECT lote, pollitos 
+                FROM cardex_glp 
+                WHERE operacion = 'inicio_calefaccion' 
+                  AND lote IN ({placeholders_lotes})
+            """
+            cursor.execute(sql_rescate, tuple(lotes_activos))
+            for p_row in cursor.fetchall():
+                l_id = p_row['lote'] if isinstance(p_row, dict) else p_row[0]
+                p_qty = int(p_row['pollitos'] if isinstance(p_row, dict) else p_row[1])
+                mapa_pob_rescatada[l_id] = p_qty
+
         cursor.close()
 
-        datos = _procesar_resultados_glp(raw_results, tipo_informe, periodo)
-        if not datos:
-            return jsonify({"success": False, "message": "No hay datos para mostrar."})
+        datos = _procesar_resultados_glp(raw_results, tipo_informe, periodo, mapa_pob_rescatada)
+        if not datos or not datos.get('tabla_resumen'):
+            return jsonify({"success": False, "message": "No hay datos operativos válidos para mostrar."})
 
         return jsonify({"success": True, "data": datos})
 
@@ -496,11 +580,9 @@ def obtener_ubicaciones():
     
 
 # ==============================================================================
-# NUEVO MÓDULO: VALIDACIÓN DE TANQUEOS (Similar a Investigación NC)
+# VALIDACIÓN DE TANQUEOS
 # ==============================================================================
 
-
-# Configuración Email (Asegúrate de que estas variables de entorno existan o configúralas aquí)
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = 587
 EMAIL_USER = os.environ.get("EMAIL_USER", "tu_email@ejemplo.com")
@@ -508,10 +590,6 @@ EMAIL_PASS = os.environ.get("EMAIL_PASS", "tu_password")
 EMAIL_FROM = EMAIL_USER
 
 def _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos, archivos):
-    """
-    Busca contacto 'gerenciagranjas' de forma robusta (TRIM, Types) y envía correo.
-    """
-    # 1. Limpieza de datos de entrada para evitar errores de tipo
     try:
         e_id = int(empresa_id) if empresa_id else 0
     except:
@@ -519,12 +597,8 @@ def _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos, archivos):
         
     e_nombre = str(empresa_nombre).strip() if empresa_nombre else ""
 
-    print(f"🔍 DEBUG ALERTAS: Buscando 'gerenciagranjas' para ID=[{e_id}] o Nombre=[{e_nombre}]")
-
     cur = mysql.connection.cursor()
     
-    # 2. Consulta Blindada: Usa TRIM para ignorar espacios y busca por ambos campos.
-    # Intenta encontrar el contacto si coincide el ID numérico O si coincide el Nombre exacto.
     query = """
         SELECT email 
         FROM contactos 
@@ -536,7 +610,6 @@ def _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos, archivos):
     row = cur.fetchone()
     cur.close()
 
-    # 3. Verificación del resultado (Soporta si el cursor devuelve Diccionario o Tupla)
     destinatario = None
     if row:
         if isinstance(row, dict):
@@ -545,14 +618,9 @@ def _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos, archivos):
             destinatario = row[0]
 
     if not destinatario:
-        print(f"❌ ERROR: No se encontró email 'gerenciagranjas' en tabla contactos.")
-        # AQUÍ ESTABA EL ERROR ANTERIOR, YA CORREGIDO (Paréntesis cerrado correctamente):
-        print(f"   --> Verifique que exista un registro con id_empresa={e_id} OR empresa='{e_nombre}' en la tabla contactos.")
+        print(f"❌ ERROR: No se encontró email 'gerenciagranjas'.")
         return False
 
-    print(f"✅ Contacto encontrado: {destinatario}. Preparando envío...")
-
-    # 4. Construir el correo
     msg = MIMEMultipart()
     msg['From'] = EMAIL_FROM
     msg['To'] = destinatario
@@ -574,12 +642,10 @@ def _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos, archivos):
     """
     msg.attach(MIMEText(cuerpo, 'html'))
 
-    # 5. Adjuntar Fotos
     base_dir = current_app.static_folder
     if archivos:
         for ruta in archivos:
             if ruta:
-                # Limpieza de ruta para encontrar el archivo físico en el sistema
                 clean_path = ruta.replace('/static/', '').replace('\\', '/')
                 full_path = os.path.join(base_dir, clean_path)
                 
@@ -593,48 +659,29 @@ def _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos, archivos):
                         msg.attach(part)
                     except Exception as e:
                         print(f"⚠️ Error adjuntando archivo {full_path}: {e}")
-                else:
-                     print(f"⚠️ Archivo no encontrado para adjuntar: {full_path}")
 
-    # 6. Enviar vía SMTP
     try:
         server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
         server.starttls()
         server.login(EMAIL_USER, EMAIL_PASS)
         server.sendmail(EMAIL_FROM, destinatario, msg.as_string())
         server.quit()
-        print("📨 Correo enviado con éxito a Gerencia.")
         return True
     except Exception as e:
         print(f"⛔ Error crítico enviando email SMTP: {e}")
         return False        
-# ==============================================================================
-# VALIDACIÓN DE TANQUEOS (CORREGIDO)
-# ==============================================================================
 
 @csrf.exempt
 @bp_901811727.route('/obtener_tanqueos_validacion', methods=['POST'])
 @login_required_custom
 def obtener_tanqueos_validacion():
-    # --- FUNCIÓN AUXILIAR PARA CORREGIR RUTAS ---
     def formatear_ruta(ruta):
         if not ruta: return None
-        
-        # 1. Normalizar slashes (Windows usa \, web usa /)
         ruta = ruta.strip().replace('\\', '/')
-        
-        # 2. Limpieza: Quitamos barra inicial si existe
         if ruta.startswith('/'):
             ruta = ruta[1:]
-            
-        # 3. Limpieza: Quitamos el prefijo 'static/' si ya viene en la BD
-        # Esto evita errores tipo: /static/static/testigos...
         if ruta.startswith('static/'):
             ruta = ruta.replace('static/', '', 1)
-
-        # 4. Construcción Final: 
-        # Agregamos /static/ al inicio. Como limpiamos la ruta antes,
-        # el resultado será limpio, ej: "/static/testigos/Empresa/foto.jpg"
         return f"/static/{ruta}"
 
     empresa_id = request.get_json().get('empresa_id')
@@ -681,7 +728,6 @@ def obtener_tanqueos_validacion():
                 tiene_foto = bool(path_antes or path_desp or path_voucher)
                 
                 if tiene_valor or tiene_foto:
-                    # --- APLICAMOS FORMATEO AQUÍ ---
                     tanques_activos.append({
                         'numero': i,
                         'pct_antes': val_antes if val_antes is not None else '-',
@@ -713,7 +759,6 @@ def obtener_tanqueos_validacion():
 @bp_901811727.route('/procesar_validacion_tanqueo', methods=['POST'])
 @login_required_custom
 def procesar_validacion_tanqueo():
-    # 1. Obtener datos JSON
     data = request.get_json()
     if not data:
         return jsonify({'status': 'error', 'message': 'Datos no recibidos'}), 400
@@ -725,8 +770,6 @@ def procesar_validacion_tanqueo():
          return jsonify({'status': 'error', 'message': 'ID no proporcionado'})
 
     cur = mysql.connection.cursor()
-    
-    # Traemos TODO el registro
     cur.execute("SELECT * FROM cardex_glp WHERE id = %s", (id_registro,))
     row = cur.fetchone()
     
@@ -734,35 +777,24 @@ def procesar_validacion_tanqueo():
         cur.close()
         return jsonify({'status': 'error', 'message': 'Registro no encontrado'})
 
-    # --- CORRECCIÓN CRÍTICA AQUÍ ---
-    # Detectamos si 'row' ya es un diccionario o es una tupla
     if isinstance(row, dict):
         row_dict = row
     else:
-        # Si es tupla, hacemos la conversión manual
         columns = [desc[0] for desc in cur.description]
         row_dict = dict(zip(columns, row))
-    # -------------------------------
 
-    # Extraemos datos informativos con seguridad
     empresa_id = row_dict.get('id_empresa')
     empresa_nombre = row_dict.get('empresa')
     ubicacion = row_dict.get('ubicacion')
 
-    # Debug para confirmar en consola que ahora sí toma los datos reales
-    print(f"DEBUG PROCESAMIENTO: ID_Empresa={empresa_id}, Nombre={empresa_nombre}")
-
-    # --- RECOLECCIÓN DE RUTAS DE FOTOS ---
     archivos_adjuntos = []
     
     for key, value in row_dict.items():
-        # Buscamos columnas de tipo texto que contengan 'testigo' y tengan datos
         if value and isinstance(value, str) and 'testigo' in key.lower():
             archivos_adjuntos.append(value.strip())
 
     msg = ""
 
-    # --- CASO RECHAZO (NO) ---
     if decision == 'NO': 
         datos_alerta = {
             'ubicacion': ubicacion,
@@ -770,23 +802,18 @@ def procesar_validacion_tanqueo():
             'lote': str(row_dict.get('lote'))
         }
         
-        # Enviamos alerta (Ahora empresa_id llevará el número correcto, ej: 890707006)
         enviado = _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos_alerta, archivos_adjuntos)
         
         if enviado:
-            # Borramos evidencias físicas
             _borrar_evidencias_tanqueo(archivos_adjuntos)
             
-            # Borramos registro SQL
             cur.execute("DELETE FROM cardex_glp WHERE id = %s", (id_registro,))
             mysql.connection.commit()
             msg = "Registro rechazado. Se envió alerta a Gerencia y se eliminaron las evidencias."
         else:
             cur.close()
-            # Si falla el envío de correo, avisamos al frontend
             return jsonify({'success': False, 'message': 'Fallo el envío de correo. No se eliminó el registro por seguridad.'})
             
-    # --- CASO VALIDACIÓN (SI) ---
     elif decision == 'SI':
         cur.execute("""
             UPDATE cardex_glp 
@@ -800,46 +827,31 @@ def procesar_validacion_tanqueo():
 
     cur.close()
     return jsonify({'success': True, 'message': msg})        
+
 def _borrar_evidencias_tanqueo(rutas):
-    """Elimina archivos físicos del servidor"""
     base_dir = current_app.static_folder 
-    
     for rel_path in rutas:
         if rel_path:
-            # 1. Quitamos la barra inicial si existe
             clean_name = rel_path.lstrip('/')
-            
-            # 2. Si empieza con 'static/', lo quitamos SOLO UNA VEZ para no romper nombres de archivos
             if clean_name.startswith('static/'):
                 clean_name = clean_name.replace('static/', '', 1)
-            
-            # 3. Construimos la ruta absoluta
             full_path = os.path.join(base_dir, clean_name)
-            
-            # 4. Verificamos y borramos
             if os.path.exists(full_path):
                 try:
                     os.remove(full_path)
-                    print(f"🗑️ Eliminado: {full_path}")
                 except Exception as e:
                     print(f"⚠️ Error borrando {full_path}: {e}")
-            else:
-                print(f"⚠️ Archivo no encontrado para borrar: {full_path}")
                 
 @csrf.exempt
 @bp_901811727.route('/obtener_audit_log', methods=['POST'])
 @login_required_custom
 def obtener_audit_log():
-    # Recibe el ID de la empresa seleccionada
     empresa_id = request.form.get('empresa_id') 
-    
     if not empresa_id:
         return jsonify({'success': False, 'logs': []})
 
     try:
         cur = mysql.connection.cursor()
-        
-        # 1. Consulta explícita de las 6 columnas
         cur.execute("""
             SELECT fecha, modulo, usuario, accion, detalle, nivel 
             FROM audit_log 
@@ -852,17 +864,14 @@ def obtener_audit_log():
         cur.close()
         
         data = []
-        # 2. Definimos nombres para mapear si llegan tuplas (0, 1, 2...)
         nombres_cols = ['fecha', 'modulo', 'usuario', 'accion', 'detalle', 'nivel']
 
         for row in logs:
-            # TRUCO: Si es tupla, la volvemos diccionario usando zip()
             if isinstance(row, tuple):
                 r = dict(zip(nombres_cols, row))
             else:
-                r = row # Ya es diccionario
+                r = row 
             
-            # 3. Formateo seguro de fecha (Esto solía romper el código)
             fecha_val = r.get('fecha')
             if fecha_val:
                 fecha_str = fecha_val.strftime('%Y-%m-%d %H:%M:%S')
@@ -877,7 +886,6 @@ def obtener_audit_log():
                 'detalle': r.get('detalle'),
                 'nivel': r.get('nivel')
             }) 
-            
         return jsonify({'success': True, 'logs': data})
 
     except Exception as e:
@@ -888,28 +896,18 @@ def obtener_audit_log():
 @bp_901811727.route('/ejecutar_limpieza_automatica')
 @login_required_custom
 def ejecutar_limpieza_automatica():
-    """
-    Limpieza Profunda (60 días):
-    1. Borra testigos de gas (cardex_glp).
-    2. Borra evidencias de mermas (mermas_pollosgar).
-    3. Soporta fotos y videos.
-    """
     dias_limite = 60
     total_borrados = 0
     base_dir = current_app.static_folder
     
     cur = mysql.connection.cursor()
     try:
-        # ==============================================================================
-        # 1. LIMPIEZA DE TESTIGOS GLP (Tabla cardex_glp)
-        # ==============================================================================
+        # GLP
         cur.execute(f"""
             SELECT * FROM cardex_glp 
             WHERE fecha < DATE_SUB(NOW(), INTERVAL {dias_limite} DAY)
         """)
         filas_glp = cur.fetchall()
-        
-        # Obtenemos nombres de columnas para iterar
         cols_glp = [desc[0] for desc in cur.description] if filas_glp else []
 
         for fila in filas_glp:
@@ -918,24 +916,19 @@ def ejecutar_limpieza_automatica():
             cols_update_glp = []
 
             for col, val in row.items():
-                # En cardex_glp las columnas clave contienen la palabra 'testigo'
                 if val and isinstance(val, str) and 'testigo' in col.lower():
                     rutas_glp.append(val.strip())
                     cols_update_glp.append(col)
             
-            # Borrar archivos y limpiar BD
             if rutas_glp:
-                count = _borrar_lista_archivos(base_dir, rutas_glp) # Función auxiliar abajo
+                count = _borrar_lista_archivos(base_dir, rutas_glp) 
                 total_borrados += count
             
             if cols_update_glp:
                 set_clause = ", ".join([f"`{c}` = NULL" for c in cols_update_glp])
                 cur.execute(f"UPDATE cardex_glp SET {set_clause} WHERE id = %s", (row['id'],))
 
-        # ==============================================================================
-        # 2. LIMPIEZA DE MERMAS (Tabla mermas_pollosgar)
-        # ==============================================================================
-        # En mermas, las evidencias están en columnas fijas: evidencia_url, url1, url2
+        # MERMAS
         cur.execute(f"""
             SELECT id, evidencia_url, evidencia_url1, evidencia_url2 
             FROM mermas_pollosgar 
@@ -944,7 +937,6 @@ def ejecutar_limpieza_automatica():
         filas_mermas = cur.fetchall()
         
         for fila in filas_mermas:
-            # Normalizar a diccionario si viene como tupla
             if isinstance(fila, dict):
                 r_m = fila
             else:
@@ -953,14 +945,12 @@ def ejecutar_limpieza_automatica():
             rutas_mermas = []
             cols_update_mermas = []
             
-            # Revisamos las 3 columnas de evidencia posibles
             for col_name in ['evidencia_url', 'evidencia_url1', 'evidencia_url2']:
                 val = r_m.get(col_name)
-                if val and isinstance(val, str) and len(val) > 5: # Filtro básico
+                if val and isinstance(val, str) and len(val) > 5:
                     rutas_mermas.append(val.strip())
                     cols_update_mermas.append(col_name)
             
-            # Borrar archivos y limpiar BD
             if rutas_mermas:
                 count = _borrar_lista_archivos(base_dir, rutas_mermas)
                 total_borrados += count
@@ -970,8 +960,7 @@ def ejecutar_limpieza_automatica():
                 cur.execute(f"UPDATE mermas_pollosgar SET {set_clause} WHERE id = %s", (r_m['id'],))
 
         mysql.connection.commit()
-        mensaje = f"Mantenimiento completado: Se eliminaron {total_borrados} archivos (Fotos/Videos) antiguos de GLP y Mermas."
-        print(f"🧹 {mensaje}")
+        mensaje = f"Mantenimiento completado: Se eliminaron {total_borrados} archivos antiguos."
         return jsonify({'success': True, 'message': mensaje})
 
     except Exception as e:
@@ -981,33 +970,23 @@ def ejecutar_limpieza_automatica():
         cur.close()
 
 def _borrar_lista_archivos(base_dir, lista_rutas):
-    """Auxiliar para borrar archivos manejando rutas con/sin /static/"""
     borrados = 0
     for ruta in lista_rutas:
         try:
-            # Limpieza inteligente de la ruta
             clean = ruta.strip().replace('\\', '/')
-            
-            # Caso 1: Ruta viene como '/static/mermas/...' (Típico de cardex_glp)
             if clean.startswith('/static/') or clean.startswith('static/'):
                 clean = clean.lstrip('/').replace('static/', '', 1)
-            
-            # Caso 2: Ruta viene como 'mermas/pollos_gar_sas/...' (Típico de mermas_pollosgar)
-            # No hacemos nada extra, ya que join(static_folder, 'mermas/...') funciona bien.
-            
             full_path = os.path.join(base_dir, clean)
             
             if os.path.exists(full_path):
                 os.remove(full_path)
-                print(f"🗑️ Eliminado (+60d): {clean}")
                 borrados += 1
-        except Exception as ex:
-            print(f"Error borrando archivo {ruta}: {ex}")
+        except Exception: pass
     return borrados
 
 
 # ==============================================================================
-# REPORTE DE PENDIENTES DE TANQUEO (SOLICITADOS VS REALES)
+# REPORTE DE PENDIENTES DE TANQUEO
 # ==============================================================================
 @csrf.exempt
 @bp_901811727.route('/obtener_pendientes_tanqueo_reporte', methods=['POST'])
@@ -1020,7 +999,6 @@ def obtener_pendientes_tanqueo_reporte():
     try:
         cur = mysql.connection.cursor()
         
-        # 1. Obtener Nombre Comercial (la tabla pedidos usa nombres, no IDs)
         cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
         row_emp = cur.fetchone()
         if not row_emp:
@@ -1028,8 +1006,6 @@ def obtener_pendientes_tanqueo_reporte():
             
         nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
 
-        # 2. Consulta Cruzada (Pedidos Aprobados vs Cardex)
-        # Busca pedidos aprobados cuyo 'codigo_pedido' NO exista en cardex_glp
         sql = """
             SELECT 
                 p.id,
@@ -1049,7 +1025,6 @@ def obtener_pendientes_tanqueo_reporte():
         cur.execute(sql, (nombre_empresa,))
         rows = cur.fetchall()
         
-        # Procesar resultados
         pendientes = []
         col_names = [d[0] for d in cur.description] if cur.description else []
         
@@ -1072,13 +1047,12 @@ def obtener_pendientes_tanqueo_reporte():
         return jsonify({"success": False, "message": str(e)})
     
 # ==============================================================================
-# NUEVA RUTA: INFORME DE SALDOS AL CIERRE (Último Lote Inactivo)
+# INFORME DE SALDOS AL CIERRE
 # ==============================================================================
 @csrf.exempt
 @bp_901811727.route('/generar_informe_saldos', methods=['POST'])
 @login_required_custom
 def generar_informe_saldos():
-    # Intentamos obtener empresa_id del JSON o de la sesión
     data = request.get_json() or {}
     empresa_id = data.get('empresa_id') or session.get('empresa_id')
     
@@ -1088,7 +1062,6 @@ def generar_informe_saldos():
     cur = mysql.connection.cursor()
     
     try:
-        # 1. Encontrar el último lote 'INACTIVO' para cada ubicación de esa empresa
         sql_lotes = """
             SELECT ubicacion, MAX(lote) as ultimo_lote_inactivo
             FROM cardex_glp
@@ -1098,7 +1071,6 @@ def generar_informe_saldos():
         cur.execute(sql_lotes, (empresa_id,))
         lotes_inactivos = cur.fetchall()
         
-        # Convertir a lista de dicts si es necesario
         col_names = [d[0] for d in cur.description]
         lista_lotes = []
         for row in lotes_inactivos:
@@ -1107,14 +1079,12 @@ def generar_informe_saldos():
 
         reporte_data = []
 
-        # 2. Iterar por cada granja para buscar el saldo final
         for item in lista_lotes:
             ubicacion = item['ubicacion']
             lote = item['ultimo_lote_inactivo']
             
             tanques_estado = {} 
 
-            # Traemos todo el historial de ese lote (del más reciente al más antiguo)
             sql_detalle = """
                 SELECT fecha, 
                        `nivel tk-1`, `capacidad tk-1`,
@@ -1132,7 +1102,6 @@ def generar_informe_saldos():
 
             fecha_cierre = None
             
-            # Procesar filas
             filas_dict = []
             if filas_lote:
                 cols_det = [d[0] for d in cur.description]
@@ -1141,14 +1110,13 @@ def generar_informe_saldos():
                 
                 fecha_cierre = filas_dict[0].get('fecha')
 
-            # Buscar último nivel registrado de cada tanque
             for row in filas_dict:
                 for i in range(1, 7):
                     tk_key = f'tk-{i}'
                     nivel_col = f'nivel tk-{i}'
                     cap_col = f'capacidad tk-{i}'
                     
-                    if tk_key in tanques_estado: continue # Ya encontramos el último valor
+                    if tk_key in tanques_estado: continue 
                         
                     nivel_val = row.get(nivel_col)
                     cap_val = row.get(cap_col)
@@ -1157,7 +1125,6 @@ def generar_informe_saldos():
                         try:
                             nivel_pct = float(nivel_val)
                             capacidad = float(cap_val or 250)
-                            # Cálculo: (Nivel% / 100) * Capacidad * Densidad(2.0)
                             saldo_kg = (nivel_pct / 100.0) * capacidad * 2.0
                             
                             tanques_estado[tk_key] = {
@@ -1167,7 +1134,6 @@ def generar_informe_saldos():
                             }
                         except: pass
 
-            # Armar resultado por granja
             if tanques_estado:
                 lista_tanques_final = []
                 total_kg_granja = 0
@@ -1204,3 +1170,267 @@ def generar_informe_saldos():
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         cur.close()
+        
+# ==============================================================================
+# RUTA TEMPORAL: RECALCULAR HISTÓRICO DE EFICIENCIA (KG_POLLITO)
+# ==============================================================================
+@bp_901811727.route('/util/recalcular_historico')
+@login_required_custom
+def recalcular_historico_glp():
+    try:
+        cur = mysql.connection.cursor()
+        
+        # 1. Obtener todos los lotes únicos
+        cur.execute("SELECT DISTINCT lote FROM cardex_glp WHERE lote IS NOT NULL")
+        lotes_raw = cur.fetchall()
+        lotes = [row['lote'] if isinstance(row, dict) else row[0] for row in lotes_raw]
+        
+        registros_actualizados = 0
+        
+        for lote in lotes:
+            # 2. Buscar pollitos iniciales
+            cur.execute("""
+                SELECT pollitos FROM cardex_glp 
+                WHERE lote=%s AND operacion='inicio_calefaccion' LIMIT 1
+            """, (lote,))
+            row_p = cur.fetchone()
+            
+            pollitos = 0
+            if row_p:
+                pollitos = row_p.get('pollitos') if isinstance(row_p, dict) else row_p[0]
+            
+            if not pollitos or float(pollitos) <= 0:
+                continue
+                
+            # 3. Traer registros cronológicos
+            cur.execute("""
+                SELECT id, COALESCE(neto_gastado, 0) as neto 
+                FROM cardex_glp 
+                WHERE lote=%s 
+                ORDER BY id ASC
+            """, (lote,))
+            registros = cur.fetchall()
+            
+            consumo_acumulado = 0.0
+            
+            # 4. Recalcular acumulado
+            for reg in registros:
+                r_id = reg['id'] if isinstance(reg, dict) else reg[0]
+                r_neto = float(reg['neto'] if isinstance(reg, dict) else reg[1])
+                
+                consumo_acumulado += r_neto
+                nuevo_kg_pollito = consumo_acumulado / float(pollitos)
+                
+                # 5. Actualizar BD
+                cur.execute("UPDATE cardex_glp SET kg_pollito=%s WHERE id=%s", (nuevo_kg_pollito, r_id))
+                registros_actualizados += 1
+                
+        mysql.connection.commit()
+        cur.close()
+        
+        return jsonify({
+            "success": True, 
+            "message": f"¡Éxito! Se han recalculado y corregido {registros_actualizados} registros históricos."
+        })
+
+    except Exception as e:
+        mysql.connection.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)})
+    
+# ==============================================================================
+# NUEVAS RUTAS DE ADMINISTRACIÓN (CRUD INTEGRAL)
+# ==============================================================================
+
+@csrf.exempt
+@bp_901811727.route('/gestionar_tipo_empresa', methods=['POST'])
+@login_required_custom
+def gestionar_tipo_empresa():
+    d = request.form
+    cur = mysql.connection.cursor()
+    try:
+        if d.get('accion') == 'crear':
+            cur.execute("INSERT INTO tipos_empresa (tipo) VALUES (%s)", (d.get('tipo'),))
+        else:
+            cur.execute("UPDATE tipos_empresa SET tipo=%s WHERE id=%s", (d.get('tipo'), d.get('id')))
+        mysql.connection.commit()
+        return jsonify(success=True, message="Tipo de empresa gestionado exitosamente.")
+    except Exception as e: 
+        return jsonify(success=False, message=str(e))
+    finally: 
+        cur.close()
+
+@csrf.exempt
+@bp_901811727.route('/gestionar_empresa', methods=['POST'])
+@login_required_custom
+def gestionar_empresa():
+    d = request.form
+    cur = mysql.connection.cursor()
+    try:
+        if d.get('accion') == 'crear':
+            cur.execute("INSERT INTO empresas (nit, nombre_comercial, tipo_empresa) VALUES (%s, %s, %s)", 
+                       (d.get('nit'), d.get('nombre_comercial'), d.get('tipo_empresa')))
+        else:
+            cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s WHERE nit=%s", 
+                       (d.get('nombre_comercial'), d.get('tipo_empresa'), d.get('nit')))
+        mysql.connection.commit()
+        return jsonify(success=True, message="Empresa procesada correctamente.")
+    except Exception as e: 
+        return jsonify(success=False, message=str(e))
+    finally: 
+        cur.close()
+
+@csrf.exempt
+@bp_901811727.route('/gestionar_usuario', methods=['POST'])
+@login_required_custom
+def gestionar_usuario():
+    d = request.form
+    cur = mysql.connection.cursor()
+    try:
+        if d.get('accion') == 'crear':
+            pw = bcrypt.generate_password_hash(d.get('password')).decode('utf-8')
+            cur.execute("""INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa, telegram_id, telefono) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                       (d.get('cedula'), d.get('nombre'), pw, d.get('tipo_usuario'), d.get('clase'), d.get('perfil'), d.get('empresa_id'), d.get('empresa_select'), None, d.get('telefono')))
+        else:
+            cedula = d.get('cedula')
+            nuevo_telefono = d.get('telefono')
+            telegram_id_enviado = d.get('telegram_id')
+
+            # --- LÓGICA DE SEGURIDAD: VERIFICAR CAMBIO DE TELÉFONO ---
+            cur.execute("SELECT telefono FROM usuarios WHERE cedula=%s", (cedula,))
+            row = cur.fetchone()
+            telefono_actual = row['telefono'] if isinstance(row, dict) else row[0]
+
+            # Si el teléfono cambió, forzamos a borrar el ID de Telegram
+            if str(telefono_actual) != str(nuevo_telefono):
+                telegram_id_enviado = None
+            elif not telegram_id_enviado or telegram_id_enviado.strip() == "":
+                telegram_id_enviado = None
+            # ---------------------------------------------------------
+
+            query = "UPDATE usuarios SET nombre=%s, perfil=%s, telegram_id=%s, telefono=%s, empresa_id=%s, empresa=%s"
+            params = [d.get('nombre'), d.get('perfil'), telegram_id_enviado, nuevo_telefono, d.get('empresa_id'), d.get('empresa_select')]
+            
+            if d.get('password'):
+                query += ", password=%s"
+                params.append(bcrypt.generate_password_hash(d.get('password')).decode('utf-8'))
+                
+            query += " WHERE cedula=%s"
+            params.append(cedula)
+            
+            cur.execute(query, tuple(params))
+            
+        mysql.connection.commit()
+        return jsonify(success=True, message="Usuario gestionado exitosamente.")
+    except Exception as e: 
+        return jsonify(success=False, message=str(e))
+    finally: 
+        cur.close()
+
+@csrf.exempt
+@bp_901811727.route('/gestionar_proveedor', methods=['POST'])
+@login_required_custom
+def gestionar_proveedor():
+    d = request.form
+    cur = mysql.connection.cursor()
+    try:
+        if d.get('accion') == 'crear':
+            cur.execute("""INSERT INTO proveedores (proveedor, id_proveedor, email1, email2, producto_servicio, precio) 
+                           VALUES (%s, %s, %s, %s, %s, %s)""",
+                       (d.get('proveedor'), d.get('id_proveedor'), d.get('email1'), d.get('email2'), 'GLP', d.get('precio')))
+        else:
+            cur.execute("""UPDATE proveedores SET proveedor=%s, email1=%s, email2=%s, precio=%s WHERE id_proveedor=%s""",
+                       (d.get('proveedor'), d.get('email1'), d.get('email2'), d.get('precio'), d.get('id_proveedor')))
+        mysql.connection.commit()
+        return jsonify(success=True, message="Proveedor actualizado.")
+    except Exception as e: 
+        return jsonify(success=False, message=str(e))
+    finally: 
+        cur.close()
+
+@csrf.exempt
+@bp_901811727.route('/gestionar_perfil', methods=['POST'])
+@login_required_custom
+def gestionar_perfil():
+    d = request.form
+    cur = mysql.connection.cursor()
+    try:
+        if d.get('accion') == 'crear':
+            cur.execute("INSERT INTO perfiles (empresa, nit, operacion, perfil) VALUES (%s, %s, %s, %s)",
+                       (d.get('empresa_select'), d.get('nit'), d.get('operacion'), d.get('perfil')))
+        else:
+            cur.execute("UPDATE perfiles SET operacion=%s, perfil=%s WHERE id=%s", (d.get('operacion'), d.get('perfil'), d.get('id')))
+        mysql.connection.commit()
+        return jsonify(success=True, message="Perfil procesado.")
+    except Exception as e: 
+        return jsonify(success=False, message=str(e))
+    finally: 
+        cur.close()
+
+@csrf.exempt
+@bp_901811727.route('/gestionar_contacto', methods=['POST'])
+@login_required_custom
+def gestionar_contacto():
+    d = request.form
+    cur = mysql.connection.cursor()
+    try:
+        if d.get('accion') == 'crear':
+            cur.execute("INSERT INTO contactos (empresa, id_empresa, area_contacto, email) VALUES (%s, %s, %s, %s)",
+                       (d.get('empresa_nombre'), d.get('id_empresa'), d.get('area_contacto'), d.get('email')))
+        else:
+            cur.execute("UPDATE contactos SET area_contacto=%s, email=%s WHERE id=%s", (d.get('area_contacto'), d.get('email'), d.get('id')))
+        mysql.connection.commit()
+        return jsonify(success=True, message="Contacto gestionado.")
+    except Exception as e: 
+        return jsonify(success=False, message=str(e))
+    finally: 
+        cur.close()
+
+# --- RUTAS DE LECTURA PARA LLENAR TABLAS ---
+@bp_901811727.route('/obtener_todos_tipos_empresa')
+@login_required_custom
+def obtener_todos_tipos_empresa():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id, tipo FROM tipos_empresa")
+    rows = cur.fetchall()
+    res = [dict(zip(['id','tipo'], r)) if not isinstance(r, dict) else r for r in rows]
+    cur.close(); return jsonify(success=True, tipos=res)
+
+@bp_901811727.route('/obtener_todos_usuarios')
+@login_required_custom
+def obtener_todos_usuarios():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id, cedula, nombre, perfil, empresa, empresa_id, telegram_id, telefono FROM usuarios")
+    rows = cur.fetchall()
+    cols = ['id','cedula','nombre','perfil','empresa','empresa_id','telegram_id','telefono']
+    res = [dict(zip(cols, r)) if not isinstance(r, dict) else r for r in rows]
+    cur.close(); return jsonify(success=True, users=res)
+
+@bp_901811727.route('/obtener_todos_proveedores')
+@login_required_custom
+def obtener_todos_proveedores():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id_proveedor, proveedor, email1, email2, precio FROM proveedores")
+    rows = cur.fetchall()
+    res = [dict(zip(['id_proveedor','proveedor','email1','email2','precio'], r)) if not isinstance(r, dict) else r for r in rows]
+    cur.close(); return jsonify(success=True, providers=res)
+
+@bp_901811727.route('/obtener_todos_contactos')
+@login_required_custom
+def obtener_todos_contactos():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id, empresa, id_empresa, area_contacto, email FROM contactos")
+    rows = cur.fetchall()
+    res = [dict(zip(['id','empresa','id_empresa','area_contacto','email'], r)) if not isinstance(r, dict) else r for r in rows]
+    cur.close(); return jsonify(success=True, contacts=res)
+
+@bp_901811727.route('/obtener_todos_perfiles')
+@login_required_custom
+def obtener_todos_perfiles():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id, empresa, nit, operacion, perfil FROM perfiles")
+    rows = cur.fetchall()
+    res = [dict(zip(['id','empresa','nit','operacion','perfil'], r)) if not isinstance(r, dict) else r for r in rows]
+    cur.close(); return jsonify(success=True, profiles=res)
