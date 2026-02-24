@@ -4,8 +4,8 @@ import sys
 
 # --- CONFIGURACIÓN PARA TU XAMPP (LOCAL) ---
 DB_HOST = "baquiasoft.mysql.pythonanywhere-services.com"
-DB_USER = "baquiasof"      # Usuario por defecto de XAMPP
-DB_PASS = "Metanoia765/*"          # Por defecto en XAMPP es vacío
+DB_USER = "baquiasoft"      # Usuario por defecto de XAMPP
+DB_PASS = "Ataraxia123*/"          # Por defecto en XAMPP es vacío
 DB_NAME = "baquiasoft$energix_360"
 
 # TU TOKEN DE TELEGRAM
