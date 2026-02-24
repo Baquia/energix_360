@@ -186,7 +186,8 @@
     <div class="main-content">
       
       <div id="pantallaBienvenida" class="form-section active text-center py-5" style="display: block;">
-        <img src="{{ url_for('static', filename='logo_' ~ empresa_id ~ '.PNG') }}" alt="Logo Empresa" height="100" onerror="this.style.display='none'">
+
+        <img src="{{ url_for('static', filename='logo_' ~ session.get('empresa_id', '') ~ '.png') }}" alt="Logo Empresa" height="100" onerror="this.style.display='none'">
         <h2 class="mt-4 text-primary fw-bold">Bienvenido, {{ nombre }}</h2>
         <p class="text-muted">Seleccione una opción del menú lateral para gestionar la operación de gas de su empresa.</p>
       </div>
