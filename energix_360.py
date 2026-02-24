@@ -91,20 +91,26 @@ def index():
     return render_template('login_energix360.html', form=form) 
 
 # --- PROCESADOR DE AUTENTICACIÓN (LOGIN) ---
-@app.route('/login', methods=['POST'])
+# --- CONTROLADOR DE AUTENTICACIÓN (LOGIN) ---
+@app.route('/login', methods=['GET', 'POST']) # <--- AGREGAMOS 'GET' AQUÍ
 @csrf.exempt
 def login():
     """
-    Valida las credenciales del usuario y devuelve la ruta virtual 
-    de redirección al frontend mediante JSON.
+    Valida las credenciales del usuario. Si es un GET, redirige al index.
+    Si es un POST, procesa el JSON de autenticación.
     """
+    # Si alguien intenta entrar a /login escribiendo la URL o refrescando
+    if request.method == 'GET':
+        return redirect(url_for('index')) #
+
+    # Procesamiento normal del POST (JSON)
     data = request.get_json(force=True)
     cedula = data.get('cedula')
     password = data.get('password')
     nombre_empresa = data.get('empresa')
 
     if not all([cedula, password, nombre_empresa]):
-        return jsonify(success=False, message="Por favor, complete todos los campos.")
+        return jsonify(success=False, message="Por favor, complete todos los campos.") #
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
@@ -113,7 +119,7 @@ def login():
     emp_info = cur.fetchone()
     if not emp_info:
         cur.close()
-        return jsonify(success=False, message="Empresa no encontrada.")
+        return jsonify(success=False, message="Empresa no encontrada.") #
 
     nit_empresa = str(emp_info['nit'])
     tipo_empresa = str(emp_info.get('tipo_empresa') or '').lower()
@@ -124,11 +130,11 @@ def login():
 
     if not usuario or not bcrypt.check_password_hash(usuario['password'], password):
         cur.close()
-        return jsonify(success=False, message="Cédula o contraseña incorrecta.")
+        return jsonify(success=False, message="Cédula o contraseña incorrecta.") #
 
     if str(usuario['empresa_id']) != nit_empresa:
         cur.close()
-        return jsonify(success=False, message="El usuario no pertenece a la empresa seleccionada.")
+        return jsonify(success=False, message="El usuario no pertenece a la empresa seleccionada.") #
 
     # C. Carga de Módulos (Específico para empresas Avícolas)
     modulos_activos = []
@@ -148,24 +154,23 @@ def login():
         'nombre': usuario['nombre'],
         'empresa': usuario['empresa'],
         'empresa_id': usuario['empresa_id'],
-        'nit': usuario['empresa_id'], # Alias para compatibilidad
+        'nit': usuario['empresa_id'],
         'tipo_empresa': tipo_empresa,
         'perfil': str(usuario.get('perfil') or '').strip().lower(),
         'modulos_activos': modulos_activos
     })
 
-    # E. DETERMINACIÓN DE RUTA PARA EL FRONTEND (Evita errores 404 por nombres físicos)
+    # E. DETERMINACIÓN DE RUTA PARA EL FRONTEND
     perfil = session['perfil']
     
-    # Redirección dinámica según perfil y tipo de empresa
     if 'webmaster' in tipo_empresa or nit_empresa == '901811727' or 'webmaster' in perfil:
-        ruta_virtual = "901811727.html" # Endpoint para gestionar_usuario
+        ruta_virtual = "901811727.html"
     elif 'ventas_distribucion' in tipo_empresa:
         ruta_virtual = "control_logistica.html"
     elif 'cria_beneficio_aves_corral' in tipo_empresa or nit_empresa == '890707006':
-        ruta_virtual = "gestion_avicola.html" # Endpoint virtual del Blueprint
+        ruta_virtual = "gestion_avicola.html"
     else:
-        ruta_virtual = "glp.html" # Fallback seguro
+        ruta_virtual = "glp.html"
 
     return jsonify(
         success=True,
