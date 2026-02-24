@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,111 +23,409 @@
       --header-height: 60px;
       --bg-light: #f6f7f8;
     }
+
     body {
-      margin: 0; font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg-light); color: #1f2937;
-      padding-top: var(--header-height); overflow-x: hidden;
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-light);
+      color: #1f2937;
+      padding-top: var(--header-height);
+      overflow-x: hidden;
     }
+
     .header {
-      position: fixed; top: 0; left: 0; width: 100%; height: var(--header-height);
-      background: white; z-index: 1040; display: flex; align-items: center;
-      justify-content: space-between; padding: 0 15px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: var(--header-height);
+      background: white;
+      z-index: 1040;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 15px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
+
     .btn-hamburguesa {
-      display: none; background: none; border: none; font-size: 1.6rem;
-      color: var(--color-primary); cursor: pointer; padding: 5px; margin-right: 10px;
+      display: none;
+      background: none;
+      border: none;
+      font-size: 1.6rem;
+      color: var(--color-primary);
+      cursor: pointer;
+      padding: 5px;
+      margin-right: 10px;
     }
+
     .layout {
-      display: flex; max-width: 1600px; margin: 0 auto; padding: 20px; gap: 20px; position: relative;
+      display: flex;
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
+      gap: 20px;
+      position: relative;
     }
+
     .sidebar-left {
-      flex: 0 0 260px; width: 260px;
+      flex: 0 0 260px;
+      width: 260px;
       background: linear-gradient(180deg, var(--color-primary) 0%, #002521 100%);
-      color: white; border-radius: 12px; height: calc(100vh - 90px);
-      position: sticky; top: 80px; overflow-y: auto;
-      box-shadow: 4px 0 15px rgba(0,0,0,0.05); z-index: 1000; transition: transform 0.3s ease;
+      color: white;
+      border-radius: 12px;
+      height: calc(100vh - 90px);
+      position: sticky;
+      top: 80px;
+      overflow-y: auto;
+      box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05);
+      z-index: 1000;
+      transition: transform 0.3s ease;
     }
-    .main-content { flex: 1; min-width: 0; }
+
+    .main-content {
+      flex: 1;
+      min-width: 0;
+    }
+
     .sidebar-section-title {
-      padding: 20px 20px 10px 20px; font-size: 0.85rem; font-weight: 700;
-      color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding: 20px 20px 10px 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.7);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
+
     .nav-item {
-      display: flex; align-items: center; width: 100%; padding: 14px 20px;
-      color: #e2e8f0; background: transparent; border: none; text-align: left;
-      font-size: 0.95rem; border-left: 4px solid transparent; cursor: pointer;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      padding: 14px 20px;
+      color: #e2e8f0;
+      background: transparent;
+      border: none;
+      text-align: left;
+      font-size: 0.95rem;
+      border-left: 4px solid transparent;
+      cursor: pointer;
     }
-    .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
-    .nav-item.active { background: rgba(255,255,255,0.15); border-left-color: #34d399; color: white; font-weight: 600; }
-    .icon-spacer { display: inline-flex; width: 25px; justify-content: center; margin-right: 10px; }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .nav-item.active {
+      background: rgba(255, 255, 255, 0.15);
+      border-left-color: #34d399;
+      color: white;
+      font-weight: 600;
+    }
+
+    .icon-spacer {
+      display: inline-flex;
+      width: 25px;
+      justify-content: center;
+      margin-right: 10px;
+    }
 
     @media (max-width: 992px) {
-      .btn-hamburguesa { display: block; }
-      .header h4 { font-size: 1.1rem; }
-      .layout { display: block; padding: 10px; }
+      .btn-hamburguesa {
+        display: block;
+      }
+
+      .header h4 {
+        font-size: 1.1rem;
+      }
+
+      .layout {
+        display: block;
+        padding: 10px;
+      }
+
       .sidebar-left {
-        position: fixed; top: 0; left: 0; height: 100vh; width: 280px;
-        border-radius: 0; transform: translateX(-105%); z-index: 2000;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 280px;
+        border-radius: 0;
+        transform: translateX(-105%);
+        z-index: 2000;
       }
-      .sidebar-left.show { transform: translateX(0); }
+
+      .sidebar-left.show {
+        transform: translateX(0);
+      }
+
       .sidebar-overlay {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.6); z-index: 1999; display: none; backdrop-filter: blur(2px);
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 1999;
+        display: none;
+        backdrop-filter: blur(2px);
       }
-      .sidebar-overlay.show { display: block; }
-      .form-section { padding: 15px; }
+
+      .sidebar-overlay.show {
+        display: block;
+      }
+
+      .form-section {
+        padding: 15px;
+      }
     }
 
     /* KPI CARDS */
     .kpi-card-box {
-      background: #fff; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-      padding: 20px; text-align: center; border-top: 5px solid #ccc; height: 100%;
-      display: flex; flex-direction: column; justify-content: center;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      padding: 20px;
+      text-align: center;
+      border-top: 5px solid #ccc;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
-    .kpi-value { font-size: 1.5rem; font-weight: 800; color: #111; }
-    .border-kpi-1 { border-color: #3b82f6; } .text-kpi-1 { color: #3b82f6; }
-    .border-kpi-2 { border-color: #10b981; } .text-kpi-2 { color: #10b981; }
-    .border-kpi-3 { border-color: #f59e0b; } .text-kpi-3 { color: #f59e0b; }
-    .border-kpi-4 { border-color: #6366f1; } .text-kpi-4 { color: #6366f1; }
-    .border-kpi-5 { border-color: #64748b; }
-    .border-kpi-6 { border-color: #ec4899; } .text-kpi-6 { color: #ec4899; }
+
+    .kpi-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #111;
+    }
+
+    .border-kpi-1 {
+      border-color: #3b82f6;
+    }
+
+    .text-kpi-1 {
+      color: #3b82f6;
+    }
+
+    .border-kpi-2 {
+      border-color: #10b981;
+    }
+
+    .text-kpi-2 {
+      color: #10b981;
+    }
+
+    .border-kpi-3 {
+      border-color: #f59e0b;
+    }
+
+    .text-kpi-3 {
+      color: #f59e0b;
+    }
+
+    .border-kpi-4 {
+      border-color: #6366f1;
+    }
+
+    .text-kpi-4 {
+      color: #6366f1;
+    }
+
+    .border-kpi-5 {
+      border-color: #64748b;
+    }
+
+    .border-kpi-6 {
+      border-color: #ec4899;
+    }
+
+    .text-kpi-6 {
+      color: #ec4899;
+    }
 
     /* PDF FANTASMA */
-    #contenedorFantasma { position: absolute; left: -9999px; top: 0; }
-    #reporteImpresion { width: 750px; padding: 40px; background: white; font-family: Arial, sans-serif; display: none; }
-    .modo-impresion #reporteImpresion { display: block !important; }
-    .rep-header { display: flex; justify-content: space-between; border-bottom: 2px solid #015249; padding-bottom: 10px; margin-bottom: 20px; }
-    .rep-logo { height: 60px; object-fit: contain; }
-    .rep-grid-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; background: #f9f9f9; }
-    .rep-item label { font-size: 10px; font-weight: bold; color: #555; text-transform: uppercase; display: block; }
-    .rep-item span { font-size: 12px; font-weight: bold; }
-    .rep-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
-    .rep-card { border: 1px solid #000; padding: 15px; text-align: center; border-radius: 4px; }
-    .rep-card-label { font-size: 10px; font-weight: bold; color: #555; text-transform: uppercase; }
-    .rep-card-value { font-size: 18px; font-weight: bold; color: #015249; }
-    .rep-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; }
-    .rep-table th, .rep-table td { border: 1px solid #000; padding: 5px; text-align: center; }
-    #repGraficoImg { width: 100%; height: 250px; object-fit: contain; border: 1px solid #eee; display: block; margin: 0 auto; }
+    #contenedorFantasma {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+    }
 
-    .form-section { display: none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    .btn-custom { background-color: var(--color-primary); color: white; border: none; }
-    .btn-custom:hover { background-color: var(--color-primary-dark); color: white; }
+    #reporteImpresion {
+      width: 750px;
+      padding: 40px;
+      background: white;
+      font-family: Arial, sans-serif;
+      display: none;
+    }
+
+    .modo-impresion #reporteImpresion {
+      display: block !important;
+    }
+
+    .rep-header {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 2px solid #015249;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+
+    .rep-logo {
+      height: 60px;
+      object-fit: contain;
+    }
+
+    .rep-grid-info {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 30px;
+      border: 1px solid #ddd;
+      padding: 15px;
+      background: #f9f9f9;
+    }
+
+    .rep-item label {
+      font-size: 10px;
+      font-weight: bold;
+      color: #555;
+      text-transform: uppercase;
+      display: block;
+    }
+
+    .rep-item span {
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .rep-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .rep-card {
+      border: 1px solid #000;
+      padding: 15px;
+      text-align: center;
+      border-radius: 4px;
+    }
+
+    .rep-card-label {
+      font-size: 10px;
+      font-weight: bold;
+      color: #555;
+      text-transform: uppercase;
+    }
+
+    .rep-card-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #015249;
+    }
+
+    .rep-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      margin-bottom: 20px;
+    }
+
+    .rep-table th,
+    .rep-table td {
+      border: 1px solid #000;
+      padding: 5px;
+      text-align: center;
+    }
+
+    #repGraficoImg {
+      width: 100%;
+      height: 250px;
+      object-fit: contain;
+      border: 1px solid #eee;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .form-section {
+      display: none;
+      background: white;
+      border-radius: 10px;
+      padding: 25px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      margin-bottom: 20px;
+    }
+
+    .btn-custom {
+      background-color: var(--color-primary);
+      color: white;
+      border: none;
+    }
+
+    .btn-custom:hover {
+      background-color: var(--color-primary-dark);
+      color: white;
+    }
 
     /* OVERLAYS */
     .pregunta-overlay {
-      position: fixed; inset: 0; background: rgba(0,50,40,0.7); backdrop-filter: blur(3px);
-      z-index: 9999; display: flex; justify-content: center; align-items: center;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 50, 40, 0.7);
+      backdrop-filter: blur(3px);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
-    .pregunta-card { background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 
-    .tanqueo-card { background: white; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .tanqueo-header { background: var(--color-primary); color: white; padding: 10px 15px; font-weight: 600; display: flex; justify-content: space-between; }
-    .thumb-val { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; cursor: zoom-in; }
-    
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
+    .pregunta-card {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .tanqueo-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+
+    .tanqueo-header {
+      background: var(--color-primary);
+      color: white;
+      padding: 10px 15px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .thumb-val {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      cursor: zoom-in;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
   </style>
 </head>
 
@@ -184,12 +483,14 @@
     </div>
 
     <div class="main-content">
-      
+
       <div id="pantallaBienvenida" class="form-section active text-center py-5" style="display: block;">
 
-        <img src="{{ url_for('static', filename='logo_' ~ session.get('empresa_id', '') ~ '.png') }}" alt="Logo Empresa" height="100" onerror="this.style.display='none'">
+        <img src="{{ url_for('static', filename='logo_' ~ session.get('empresa_id', '') ~ '.png') }}" alt="Logo Empresa"
+          height="100" onerror="this.style.display='none'">
         <h2 class="mt-4 text-primary fw-bold">Bienvenido, {{ nombre }}</h2>
-        <p class="text-muted">Seleccione una opción del menú lateral para gestionar la operación de gas de su empresa.</p>
+        <p class="text-muted">Seleccione una opción del menú lateral para gestionar la operación de gas de su empresa.
+        </p>
       </div>
 
       <div id="seccionAprobacionesGLP" class="form-section">
@@ -201,13 +502,19 @@
           <table class="table table-bordered table-hover align-middle">
             <thead class="table-dark">
               <tr>
-                <th>Fecha</th><th>Sede</th><th>Lote</th><th>Tanques</th><th>Solicita</th><th>Acción</th>
+                <th>Fecha</th>
+                <th>Sede</th>
+                <th>Lote</th>
+                <th>Tanques</th>
+                <th>Solicita</th>
+                <th>Acción</th>
               </tr>
             </thead>
             <tbody id="tablaAprobacionesGLP"></tbody>
           </table>
         </div>
-        <div id="msgSinAprobaciones" class="alert alert-info text-center" style="display:none;">No hay solicitudes pendientes.</div>
+        <div id="msgSinAprobaciones" class="alert alert-info text-center" style="display:none;">No hay solicitudes
+          pendientes.</div>
       </div>
 
       <div id="seccionValidacionTanqueos" class="form-section">
@@ -216,7 +523,8 @@
           <button class="btn btn-secondary btn-sm" onclick="cerrarVistas()">&times; Cerrar</button>
         </div>
         <div id="loadingTanqueos" style="display:none; text-align:center; color:#666; padding: 20px;">
-          <div class="spinner-border text-primary" role="status"></div><div class="mt-2">Cargando...</div>
+          <div class="spinner-border text-primary" role="status"></div>
+          <div class="mt-2">Cargando...</div>
         </div>
         <div id="gridTanqueos" class="d-flex flex-column gap-3"></div>
         <div id="emptyTanqueos" style="display:none; text-align:center; padding:40px; color:#999;">✅ Todo al día.</div>
@@ -235,19 +543,50 @@
         </div>
 
         <div class="row g-3 mb-4" id="kpiContainer">
-          <div class="col-md-4 col-6"><div class="kpi-card-box border-kpi-1"><div class="kpi-label">Saldo Inicial</div><div class="kpi-value text-kpi-1" id="kpi1Value">0</div></div></div>
-          <div class="col-md-4 col-6"><div class="kpi-card-box border-kpi-2"><div class="kpi-label">Pedidos Gas</div><div class="kpi-value text-kpi-2" id="kpi2Value">0</div></div></div>
-          <div class="col-md-4 col-6"><div class="kpi-card-box border-kpi-3"><div class="kpi-label">Consumos</div><div class="kpi-value text-kpi-3" id="kpi3Value">0</div></div></div>
-          <div class="col-md-4 col-6"><div class="kpi-card-box border-kpi-5"><div class="kpi-label">Pollitos</div><div class="kpi-value" id="kpi5Value">0</div></div></div>
-          <div class="col-md-4 col-6"><div class="kpi-card-box border-kpi-6"><div class="kpi-label">Inversión ($)</div><div class="kpi-value text-kpi-6" id="kpi6Value">0</div></div></div>
-          <div class="col-md-4 col-6"><div class="kpi-card-box border-kpi-4"><div class="kpi-label">Eficiencia</div><div class="kpi-value text-kpi-4" id="kpi4Value">0</div></div></div>
+          <div class="col-md-4 col-6">
+            <div class="kpi-card-box border-kpi-1">
+              <div class="kpi-label">Saldo Inicial</div>
+              <div class="kpi-value text-kpi-1" id="kpi1Value">0</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-6">
+            <div class="kpi-card-box border-kpi-2">
+              <div class="kpi-label">Pedidos Gas</div>
+              <div class="kpi-value text-kpi-2" id="kpi2Value">0</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-6">
+            <div class="kpi-card-box border-kpi-3">
+              <div class="kpi-label">Consumos</div>
+              <div class="kpi-value text-kpi-3" id="kpi3Value">0</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-6">
+            <div class="kpi-card-box border-kpi-5">
+              <div class="kpi-label">Pollitos</div>
+              <div class="kpi-value" id="kpi5Value">0</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-6">
+            <div class="kpi-card-box border-kpi-6">
+              <div class="kpi-label">Inversión ($)</div>
+              <div class="kpi-value text-kpi-6" id="kpi6Value">0</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-6">
+            <div class="kpi-card-box border-kpi-4">
+              <div class="kpi-label">Eficiencia</div>
+              <div class="kpi-value text-kpi-4" id="kpi4Value">0</div>
+            </div>
+          </div>
         </div>
 
         <div class="card p-3 mb-4 shadow-sm border-0" id="cardGrafico">
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="card-title m-0 fs-6 text-primary">Análisis Gráfico</h5>
             <div class="btn-group">
-              <button class="btn btn-outline-primary btn-sm active" onclick="cambiarVistaGrafico('rendimiento')">Rendimiento</button>
+              <button class="btn btn-outline-primary btn-sm active"
+                onclick="cambiarVistaGrafico('rendimiento')">Rendimiento</button>
               <button class="btn btn-outline-primary btn-sm" onclick="cambiarVistaGrafico('saldos')">Saldos</button>
             </div>
           </div>
@@ -258,7 +597,9 @@
           <h5 class="card-title mb-3 fs-6 text-primary">Detalle</h5>
           <div class="table-responsive">
             <table id="tablaConsumo" class="table table-hover table-bordered table-sm text-center mb-0">
-              <thead class="table-light"><tr></tr></thead>
+              <thead class="table-light">
+                <tr></tr>
+              </thead>
               <tbody></tbody>
             </table>
           </div>
@@ -271,10 +612,14 @@
   <div class="modal fade" id="modalDecisionTanqueo" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header bg-primary text-white"><h5 class="modal-title">Validar Tanqueo</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title">Validar Tanqueo</h5><button type="button" class="btn-close btn-close-white"
+            data-bs-dismiss="modal"></button>
+        </div>
         <div class="modal-body text-center p-4">
           <h4 class="mb-3">¿Información correcta?</h4>
-          <p class="text-muted mb-4 small"><strong>SI:</strong> Aprueba y borra fotos.<br><strong>NO:</strong> Alerta a Gerencia y borra fotos.</p>
+          <p class="text-muted mb-4 small"><strong>SI:</strong> Aprueba y borra fotos.<br><strong>NO:</strong> Alerta a
+            Gerencia y borra fotos.</p>
           <div class="d-flex gap-3 justify-content-center">
             <button class="btn btn-danger px-4" onclick="confirmarDecisionTanqueo('NO')">NO</button>
             <button class="btn btn-success px-4" onclick="confirmarDecisionTanqueo('SI')">SI</button>
@@ -284,19 +629,57 @@
     </div>
   </div>
 
-  <div class="modal fade" id="modalProyeccion" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal fade" id="modalProyeccion" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header bg-dark text-white"><h5 class="modal-title">🔮 Proyección de Cierre</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <div class="row mb-3 align-items-center">
-            <div class="col-md-4 text-center"><label class="small fw-bold text-muted">Nivel Actual</label><h3 class="text-secondary" id="sim_nivel_actual">0%</h3></div>
-            <div class="col-md-4 text-center"><label class="small fw-bold text-muted">Consumo Diario</label><h3 class="text-danger" id="sim_tasa">0%</h3><small class="text-muted" id="sim_detalle_kg"></small></div>
-            <div class="col-md-4"><label class="small fw-bold text-primary">A SOLICITAR</label><div class="input-group"><input type="number" id="sim_input_solicita" class="form-control fw-bold text-primary fs-4" onchange="actualizarGraficaSimulacion()"><span class="input-group-text">%</span></div></div>
-          </div>
-          <div style="height: 300px; width: 100%;"><canvas id="chartProyeccion"></canvas></div>
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title">📉 Copiloto GLP: Simulación de Cierre</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-success fw-bold px-4" onclick="confirmarAprobacionSimulada()">✅ Aprobar</button></div>
+        <div class="modal-body bg-light">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="card shadow-sm h-100 border-0">
+                <div class="card-body">
+                  <h6 class="fw-bold text-primary mb-3">Estado Actual</h6>
+                  <div class="d-flex justify-content-between border-bottom py-2">
+                    <span class="text-muted">Nivel Real:</span>
+                    <span id="sim_nivel_actual" class="fw-bold text-dark">--%</span>
+                  </div>
+                  <div class="d-flex justify-content-between border-bottom py-2">
+                    <span class="text-muted">Tasa Descenso:</span>
+                    <span id="sim_tasa" class="fw-bold text-danger">--</span>
+                  </div>
+
+                  <h6 class="fw-bold text-success mt-4 mb-3">Simulación de Carga</h6>
+                  <div class="p-3 bg-success bg-opacity-10 rounded border border-success">
+                    <label class="small fw-bold">Aprobar despacho hasta (%):</label>
+                    <input type="number" id="sim_input_solicita"
+                      class="form-control form-control-lg fw-bold text-center mt-2 border-success"
+                      oninput="actualizarGraficaSimulacion()">
+                    <p class="text-muted small mt-2 mb-0">Ajuste el valor para ver la autonomía proyectada.</p>
+                  </div>
+
+                  <div class="d-grid mt-4">
+                    <button class="btn btn-success btn-lg fw-bold shadow-sm" onclick="confirmarAprobacionSimulada()">
+                      ✅ APROBAR AHORA
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <h6 class="fw-bold text-muted mb-3">Proyección Dinámica del Ciclo</h6>
+                  <div style="height: 400px; position: relative;">
+                    <canvas id="chartProyeccion"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -304,24 +687,46 @@
   <div class="modal fade" id="modalPendientesTanqueo" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header bg-warning text-dark"><h5 class="modal-title fw-bold">⏳ Pendientes de Tanqueo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header bg-warning text-dark">
+          <h5 class="modal-title fw-bold">⏳ Pendientes de Tanqueo</h5><button type="button" class="btn-close"
+            data-bs-dismiss="modal"></button>
+        </div>
         <div class="modal-body p-0">
           <div class="table-responsive">
-            <table class="table table-striped text-center align-middle m-0"><thead class="table-light"><tr><th>Fecha</th><th>Sede</th><th>Proveedor</th><th>Solicitado</th><th>Espera</th></tr></thead><tbody id="tablaPendientesTanqueoBody"></tbody></table>
+            <table class="table table-striped text-center align-middle m-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Fecha</th>
+                  <th>Sede</th>
+                  <th>Proveedor</th>
+                  <th>Solicitado</th>
+                  <th>Espera</th>
+                </tr>
+              </thead>
+              <tbody id="tablaPendientesTanqueoBody"></tbody>
+            </table>
           </div>
-          <div id="msgSinPendientesTanqueo" class="text-center p-4 text-muted" style="display:none;">✅ Todo al día.</div>
+          <div id="msgSinPendientesTanqueo" class="text-center p-4 text-muted" style="display:none;">✅ Todo al día.
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div id="lightboxSimple" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center;" onclick="this.style.display='none'"><img id="lbImg" src="" style="max-width:90%; max-height:90%; border:2px solid white; border-radius:4px;"></div>
+  <div id="lightboxSimple"
+    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:10000; justify-content:center; align-items:center;"
+    onclick="this.style.display='none'"><img id="lbImg" src=""
+      style="max-width:90%; max-height:90%; border:2px solid white; border-radius:4px;"></div>
 
   <div id="contenedorFantasma">
     <div id="reporteImpresion">
       <div class="rep-header">
-        <img id="repLogoCliente" src="{{ url_for('static', filename='logo_' ~ empresa_id ~ '.PNG') }}" class="rep-logo" onerror="this.style.display='none'">
-        <div class="rep-title text-center"><h2 id="repTituloPrincipal">Informe GLP</h2><p id="repSubtituloPrincipal">BQA-ONE</p></div>
+        <img id="repLogoCliente" src="{{ url_for('static', filename='logo_' ~ empresa_id ~ '.PNG') }}" class="rep-logo"
+          onerror="this.style.display='none'">
+        <div class="rep-title text-center">
+          <h2 id="repTituloPrincipal">Informe GLP</h2>
+          <p id="repSubtituloPrincipal">BQA-ONE</p>
+        </div>
         <img src="/static/logo_energix360.png" class="rep-logo">
       </div>
       <div class="rep-grid-info">
@@ -331,18 +736,46 @@
         <div class="rep-item"><label>Fecha Reporte</label><span id="repFecha">---</span></div>
         <div class="rep-item"><label>Responsable</label><span id="repUsuario">{{ nombre }}</span></div>
       </div>
-      <div id="repSectionKPIs"><div class="rep-section-title">KPIs</div><div class="rep-kpis">
-        <div class="rep-card"><div class="rep-card-label" id="lblKpi1"></div><div class="rep-card-value" id="valKpi1"></div></div>
-        <div class="rep-card"><div class="rep-card-label" id="lblKpi2"></div><div class="rep-card-value" id="valKpi2"></div></div>
-        <div class="rep-card"><div class="rep-card-label" id="lblKpi3"></div><div class="rep-card-value" id="valKpi3"></div></div>
-        <div class="rep-card"><div class="rep-card-label" id="lblKpi4"></div><div class="rep-card-value" id="valKpi4"></div></div>
-        <div class="rep-card"><div class="rep-card-label" id="lblKpi5"></div><div class="rep-card-value" id="valKpi5"></div></div>
-        <div class="rep-card"><div class="rep-card-label" id="lblKpi6"></div><div class="rep-card-value" id="valKpi6"></div></div>
-      </div></div>
-      <div id="repSectionGraph"><div class="rep-section-title">Gráfica</div><img id="repGraficoImg" src=""></div>
+      <div id="repSectionKPIs">
+        <div class="rep-section-title">KPIs</div>
+        <div class="rep-kpis">
+          <div class="rep-card">
+            <div class="rep-card-label" id="lblKpi1"></div>
+            <div class="rep-card-value" id="valKpi1"></div>
+          </div>
+          <div class="rep-card">
+            <div class="rep-card-label" id="lblKpi2"></div>
+            <div class="rep-card-value" id="valKpi2"></div>
+          </div>
+          <div class="rep-card">
+            <div class="rep-card-label" id="lblKpi3"></div>
+            <div class="rep-card-value" id="valKpi3"></div>
+          </div>
+          <div class="rep-card">
+            <div class="rep-card-label" id="lblKpi4"></div>
+            <div class="rep-card-value" id="valKpi4"></div>
+          </div>
+          <div class="rep-card">
+            <div class="rep-card-label" id="lblKpi5"></div>
+            <div class="rep-card-value" id="valKpi5"></div>
+          </div>
+          <div class="rep-card">
+            <div class="rep-card-label" id="lblKpi6"></div>
+            <div class="rep-card-value" id="valKpi6"></div>
+          </div>
+        </div>
+      </div>
+      <div id="repSectionGraph">
+        <div class="rep-section-title">Gráfica</div><img id="repGraficoImg" src="">
+      </div>
       <div class="rep-section-title" style="margin-top:20px;">Detalle</div>
-      <table class="rep-table" id="repTablaMain"><thead></thead><tbody id="repTablaBody"></tbody></table>
-      <div style="margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 10px; color: #888; text-align: center;">Generado automáticamente por BQA ONE.</div>
+      <table class="rep-table" id="repTablaMain">
+        <thead></thead>
+        <tbody id="repTablaBody"></tbody>
+      </table>
+      <div
+        style="margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 10px; color: #888; text-align: center;">
+        Generado automáticamente por BQA ONE.</div>
     </div>
   </div>
 
@@ -352,35 +785,35 @@
     // ==============================================
     // VARIABLES GLOBALES Y LÓGICA SINGLE-TENANT
     // ==============================================
-    const EMPRESA_ID = "{{ empresa_id }}"; 
+    const EMPRESA_ID = "{{ empresa_id }}";
     let chartInstancia = null, datosGlobales = null, chartSimulador = null, datosSimulacion = null, idPedidoEnAnalisis = null, idTanqueoSeleccionado = null;
 
     function toggleMenu() { document.getElementById('sidebarMenu').classList.toggle('show'); document.getElementById('mobileOverlay').classList.toggle('show'); }
-    
-    document.querySelectorAll('.nav-item').forEach(btn => { 
-        btn.addEventListener('click', () => { 
-            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active')); 
-            btn.classList.add('active'); 
-            if(window.innerWidth < 992) toggleMenu(); 
-        }); 
+
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (window.innerWidth < 992) toggleMenu();
+      });
     });
-    
-    function cerrarVistas() { 
-        document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none'); 
-        document.getElementById('pantallaBienvenida').style.display = 'block'; 
+
+    function cerrarVistas() {
+      document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none');
+      document.getElementById('pantallaBienvenida').style.display = 'block';
     }
 
     // ==============================================
     // 1. INFORMES (ADAPTADOS A SINGLE-TENANT)
     // ==============================================
-    function pregOpcionGranja() { 
-        fetch('/obtener_ubicaciones', { 
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ tipo: 'granja', empresa_id: EMPRESA_ID }) 
-        }).then(r => r.json()).then(d => { 
-            if(d.success && d.ubicaciones.length > 0) mostrarPregunta("Seleccione Granja", d.ubicaciones.map(u => ({value: u, text: u})), (u) => pregPeriodo('granja', u)); 
-            else alert("No hay granjas."); 
-        }); 
+    function pregOpcionGranja() {
+      fetch('/obtener_ubicaciones', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'granja', empresa_id: EMPRESA_ID })
+      }).then(r => r.json()).then(d => {
+        if (d.success && d.ubicaciones.length > 0) mostrarPregunta("Seleccione Granja", d.ubicaciones.map(u => ({ value: u, text: u })), (u) => pregPeriodo('granja', u));
+        else alert("No hay granjas.");
+      });
     }
 
     // NUEVA FUNCIÓN PARA ZONAS
@@ -389,7 +822,7 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tipo: 'zona', empresa_id: EMPRESA_ID })
       }).then(r => r.json()).then(d => {
-        if(d.success && d.ubicaciones.length > 0) {
+        if (d.success && d.ubicaciones.length > 0) {
           mostrarPregunta("Seleccione Zona", d.ubicaciones.map(u => ({ value: u, text: u })), (u) => pregPeriodo('zona', u));
         } else {
           alert("No hay zonas registradas o asignadas.");
@@ -397,11 +830,11 @@
       });
     }
 
-    function pregPeriodo(tipo, ubicacion) { 
-        mostrarPregunta("Periodo", [{value:"Actual", text:"Lote Actual"}, {value:"Personalizado", text:"Histórico"}], (p) => { 
-            if(p === "Personalizado") mostrarSelectorFechas((ini, fin) => generarInformeFinal(tipo, ubicacion, p, ini, fin)); 
-            else generarInformeFinal(tipo, ubicacion, p, null, null); 
-        }); 
+    function pregPeriodo(tipo, ubicacion) {
+      mostrarPregunta("Periodo", [{ value: "Actual", text: "Lote Actual" }, { value: "Personalizado", text: "Histórico" }], (p) => {
+        if (p === "Personalizado") mostrarSelectorFechas((ini, fin) => generarInformeFinal(tipo, ubicacion, p, ini, fin));
+        else generarInformeFinal(tipo, ubicacion, p, null, null);
+      });
     }
 
     function mostrarPregunta(txt, opts, cb) {
@@ -415,8 +848,8 @@
       const row = document.createElement("div"); row.className = "d-flex gap-2";
       row.innerHTML = `<button class="btn btn-secondary flex-fill" onclick="this.closest('.pregunta-overlay').remove()">Cancelar</button>`;
       const b2 = document.createElement("button"); b2.className = "btn btn-custom flex-fill"; b2.innerText = "Continuar";
-      b2.onclick = () => { if(sel.value){ ov.remove(); cb(sel.value); } };
-      
+      b2.onclick = () => { if (sel.value) { ov.remove(); cb(sel.value); } };
+
       row.appendChild(b2); card.appendChild(row); ov.appendChild(card);
       document.body.appendChild(ov);
     }
@@ -425,19 +858,19 @@
       const ov = document.createElement("div"); ov.className = "pregunta-overlay";
       ov.innerHTML = `<div class="pregunta-card"><h5 class="text-center mb-3 text-primary">Rango Fechas</h5><label class="small">Inicio</label><input type="date" id="tIni" class="form-control mb-2"><label class="small">Fin</label><input type="date" id="tFin" class="form-control mb-4"><div class="d-flex gap-2"><button class="btn btn-secondary flex-fill" onclick="this.closest('.pregunta-overlay').remove()">Cancelar</button><button class="btn btn-custom flex-fill" id="btnOkF">Generar</button></div></div>`;
       document.body.appendChild(ov);
-      document.getElementById('btnOkF').onclick = () => { const i = document.getElementById('tIni').value, f = document.getElementById('tFin').value; if(i && f){ ov.remove(); cb(i,f); } else alert("Faltan fechas"); };
+      document.getElementById('btnOkF').onclick = () => { const i = document.getElementById('tIni').value, f = document.getElementById('tFin').value; if (i && f) { ov.remove(); cb(i, f); } else alert("Faltan fechas"); };
     }
 
     function generarInformeFinal(tipo, ubi, per, ini, fin) {
-      let tit = "Informe General"; if(tipo === 'granja') tit = `Granja: ${ubi}`; else if(tipo === 'zona') tit = `Zona: ${ubi}`;
+      let tit = "Informe General"; if (tipo === 'granja') tit = `Granja: ${ubi}`; else if (tipo === 'zona') tit = `Zona: ${ubi}`;
       document.getElementById('tituloInforme').textContent = tit;
-      document.getElementById('subtituloPeriodo').textContent = `Periodo: ${per} ${ini ? '('+ini+' al '+fin+')' : ''}`;
+      document.getElementById('subtituloPeriodo').textContent = `Periodo: ${per} ${ini ? '(' + ini + ' al ' + fin + ')' : ''}`;
 
       fetch('/generar_informe', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tipo_informe: tipo, periodo: per, fecha_inicio: ini, fecha_fin: fin, ubicacion: ubi, empresa_id: EMPRESA_ID })
       }).then(r => r.json()).then(resp => {
-        if(resp.success) { datosGlobales = resp.data; renderizarInforme(resp.data); }
+        if (resp.success) { datosGlobales = resp.data; renderizarInforme(resp.data); }
         else alert(resp.message);
       });
     }
@@ -465,12 +898,12 @@
     }
 
     function cambiarVistaGrafico(vista) {
-      if(!datosGlobales) return;
+      if (!datosGlobales) return;
       const ctx = document.getElementById('graficoConsumo').getContext('2d');
-      if(chartInstancia) chartInstancia.destroy();
+      if (chartInstancia) chartInstancia.destroy();
       const s = datosGlobales.series;
       const d = vista === 'rendimiento' ? [{ label: 'Rendimiento', data: s.kg_pollito, borderColor: '#6366f1', fill: true, backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 }] : [{ label: 'Saldos', data: s.saldo_inicial, borderColor: '#3b82f6' }];
-      chartInstancia = new Chart(ctx, { type: 'line', data: { labels: s.fechas, datasets: d }, options: { responsive: true, maintainAspectRatio: false }});
+      chartInstancia = new Chart(ctx, { type: 'line', data: { labels: s.fechas, datasets: d }, options: { responsive: true, maintainAspectRatio: false } });
     }
 
     // ==============================================
@@ -491,11 +924,11 @@
       fetch('/generar_informe_saldos', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: EMPRESA_ID })
       }).then(r => r.json()).then(resp => {
-        if(!resp.success) { tbody.innerHTML = `<tr><td colspan="5" class="text-danger">${resp.error}</td></tr>`; return; }
-        
+        if (!resp.success) { tbody.innerHTML = `<tr><td colspan="5" class="text-danger">${resp.error}</td></tr>`; return; }
+
         datosGlobales = { tipo: 'saldos', data: resp.data || [] };
         thead.innerHTML = '<th class="bg-dark text-white">Granja / Lote</th><th class="bg-dark text-white">Fecha</th><th class="bg-dark text-white">Tanque</th><th class="bg-dark text-white">Nivel</th><th class="bg-dark text-white">Saldo (kg)</th>';
-        
+
         let html = '';
         resp.data.forEach(g => {
           html += `<tr class="table-primary"><td colspan="5" class="fw-bold text-start">🏠 ${g.ubicacion} <span class="badge bg-secondary">Lote: ${g.lote_cerrado}</span></td></tr>`;
@@ -517,46 +950,100 @@
 
       fetch('/glp/admin/obtener_solicitudes_pendientes').then(r => r.json()).then(data => {
         tbody.innerHTML = '';
-        if(!data.success || data.items.length === 0) { document.getElementById('msgSinAprobaciones').style.display = 'block'; return; }
+        if (!data.success || data.items.length === 0) { document.getElementById('msgSinAprobaciones').style.display = 'block'; return; }
         document.getElementById('msgSinAprobaciones').style.display = 'none';
         data.items.forEach(i => {
           let tks = '<div class="d-flex gap-2">';
-          i.tanques.forEach(t => { tks += `<div class="border p-1 rounded text-center"><div class="small fw-bold">${t.numero}</div><div class="${t.nivel<=25?'text-danger':''}">${t.nivel}%</div></div>`; });
+          i.tanques.forEach(t => { tks += `<div class="border p-1 rounded text-center"><div class="small fw-bold">${t.numero}</div><div class="${t.nivel <= 25 ? 'text-danger' : ''}">${t.nivel}%</div></div>`; });
           tks += '</div>';
-          tbody.innerHTML += `<tr><td>${i.fecha.substring(0,16)}</td><td><b>${i.ubicacion}</b></td><td>${i.lote} <span class="badge bg-info text-dark">Día ${i.dias_operacion}</span></td><td>${tks}</td><td><h5 class="text-success m-0">${i.nivel_solicitado}%</h5></td><td><button class="btn btn-success btn-sm me-1" onclick="aprobarSolicitudGLP(${i.id}, this)">Aprobar</button><button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${i.id})">Analizar</button></td></tr>`;
+          tbody.innerHTML += `<tr><td>${i.fecha.substring(0, 16)}</td><td><b>${i.ubicacion}</b></td><td>${i.lote} <span class="badge bg-info text-dark">Día ${i.dias_operacion}</span></td><td>${tks}</td><td><h5 class="text-success m-0">${i.nivel_solicitado}%</h5></td><td><button class="btn btn-success btn-sm me-1" onclick="aprobarSolicitudGLP(${i.id}, this)">Aprobar</button><button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${i.id})">Analizar</button></td></tr>`;
         });
       });
     }
 
     function aprobarSolicitudGLP(id, btn) {
-      if(!confirm("¿Aprobar solicitud?")) return;
+      if (!confirm("¿Aprobar solicitud?")) return;
       btn.disabled = true;
-      fetch('/glp/admin/aprobar_solicitud', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id })
-      }).then(r=>r.json()).then(d=>{ if(d.success){ alert("Aprobada"); mostrarAprobaciones(); } else { alert(d.message); btn.disabled=false; } });
+      fetch('/glp/admin/aprobar_solicitud', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id })
+      }).then(r => r.json()).then(d => { if (d.success) { alert("Aprobada"); mostrarAprobaciones(); } else { alert(d.message); btn.disabled = false; } });
     }
 
     function abrirSimuladorProyeccion(id) {
       idPedidoEnAnalisis = id; new bootstrap.Modal(document.getElementById('modalProyeccion')).show();
-      fetch('/glp/admin/analizar_proyeccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id })
-      }).then(r=>r.json()).then(d => {
-        if(!d.success){ alert(d.message); return; }
+      fetch('/glp/admin/analizar_proyeccion', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id })
+      }).then(r => r.json()).then(d => {
+        if (!d.success) { alert(d.message); return; }
         datosSimulacion = d; document.getElementById('sim_nivel_actual').innerText = d.nivel_actual + "%"; document.getElementById('sim_tasa').innerText = "-" + d.tasa_descenso_diaria + "%"; document.getElementById('sim_input_solicita').value = d.solicitado_original; renderizarGraficaProyeccion();
       });
     }
 
-    function actualizarGraficaSimulacion() { if(chartSimulador) renderizarGraficaProyeccion(); }
+    function actualizarGraficaSimulacion() { if (chartSimulador) renderizarGraficaProyeccion(); }
+
     function renderizarGraficaProyeccion() {
       const ctx = document.getElementById('chartProyeccion').getContext('2d');
-      let sol = parseFloat(document.getElementById('sim_input_solicita').value)||0;
-      let niv = datosSimulacion.nivel_actual + sol; if(niv>100) niv=100;
-      let lbs = [], dp = [], ds = [];
-      for(let d=datosSimulacion.dia_actual; d<=16; d++){ lbs.push("Día "+d); dp.push(niv.toFixed(1)); ds.push(20); niv-=datosSimulacion.tasa_descenso_diaria; if(niv<0) niv=0; }
-      if(chartSimulador) chartSimulador.destroy();
-      chartSimulador = new Chart(ctx, { type:'line', data:{ labels:lbs, datasets:[{label:'Proyección', data:dp, borderColor:'#015249'},{label:'Mínimo', data:ds, borderColor:'red'}] }});
+      let solicita = parseFloat(document.getElementById('sim_input_solicita').value) || 0;
+
+      const labels = [], dataProyeccion = [], dataSeguridad = [];
+
+      // Nivel inicial simulado (Real + Carga solicitada)
+      let nivelSimulado = datosSimulacion.nivel_actual + solicita;
+      if (nivelSimulado > 100) nivelSimulado = 100;
+
+      let diaInicio = datosSimulacion.dia_actual;
+      // Lógica dinámica: proyectar al menos 4 días más si ya estamos al final del ciclo
+      let diaFin = Math.max(16, diaInicio + 4);
+
+      for (let d = diaInicio; d <= diaFin; d++) {
+        labels.push("Día " + d);
+        dataProyeccion.push(nivelSimulado.toFixed(1));
+        dataSeguridad.push(20); // Piso de seguridad del 20%
+
+        nivelSimulado -= datosSimulacion.tasa_descenso_diaria;
+        if (nivelSimulado < 0) nivelSimulado = 0;
+      }
+
+      if (chartSimulador) chartSimulador.destroy();
+
+      chartSimulador = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Proyección de Inventario (%)',
+              data: dataProyeccion,
+              borderColor: '#015249',
+              backgroundColor: 'rgba(1, 82, 73, 0.1)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 5,
+              pointBackgroundColor: '#015249'
+            },
+            {
+              label: 'Mínimo Seguro (20%)',
+              data: dataSeguridad,
+              borderColor: '#dc3545',
+              borderDash: [5, 5],
+              pointRadius: 0,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true, max: 100 } },
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
     }
+
     function confirmarAprobacionSimulada() {
-      fetch('/glp/admin/aprobar_solicitud', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idPedidoEnAnalisis, nivel_aprobado: document.getElementById('sim_input_solicita').value })
-      }).then(r=>r.json()).then(d=>{ if(d.success){ alert("Aprobado"); bootstrap.Modal.getInstance(document.getElementById('modalProyeccion')).hide(); mostrarAprobaciones(); }});
+      fetch('/glp/admin/aprobar_solicitud', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idPedidoEnAnalisis, nivel_aprobado: document.getElementById('sim_input_solicita').value })
+      }).then(r => r.json()).then(d => { if (d.success) { alert("Aprobado"); bootstrap.Modal.getInstance(document.getElementById('modalProyeccion')).hide(); mostrarAprobaciones(); } });
     }
 
     // ==============================================
@@ -566,12 +1053,13 @@
       document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none');
       document.getElementById('seccionValidacionTanqueos').style.display = 'block';
       const grid = document.getElementById('gridTanqueos'); grid.innerHTML = '';
-      fetch('/obtener_tanqueos_validacion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: EMPRESA_ID })
-      }).then(r=>r.json()).then(d => {
-        if(d.success && d.items.length > 0){
+      fetch('/obtener_tanqueos_validacion', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: EMPRESA_ID })
+      }).then(r => r.json()).then(d => {
+        if (d.success && d.items.length > 0) {
           d.items.forEach(i => {
             let trs = '';
-            i.subfilas.forEach(t => { trs += `<tr><td>TK-${t.numero}</td><td>Antes: ${t.pct_antes}% ${t.foto_antes?`<br><img src="${t.foto_antes}" class="thumb-val" onclick="verFoto(this.src)">`:''}</td><td>Desp: ${t.pct_despues}% ${t.foto_despues?`<br><img src="${t.foto_despues}" class="thumb-val" onclick="verFoto(this.src)">`:''}</td><td>Voucher: ${t.foto_voucher?`<br><img src="${t.foto_voucher}" class="thumb-val" onclick="verFoto(this.src)">`:''}</td><td><input type="checkbox" class="chk-pre form-check-input"></td></tr>`; });
+            i.subfilas.forEach(t => { trs += `<tr><td>TK-${t.numero}</td><td>Antes: ${t.pct_antes}% ${t.foto_antes ? `<br><img src="${t.foto_antes}" class="thumb-val" onclick="verFoto(this.src)">` : ''}</td><td>Desp: ${t.pct_despues}% ${t.foto_despues ? `<br><img src="${t.foto_despues}" class="thumb-val" onclick="verFoto(this.src)">` : ''}</td><td>Voucher: ${t.foto_voucher ? `<br><img src="${t.foto_voucher}" class="thumb-val" onclick="verFoto(this.src)">` : ''}</td><td><input type="checkbox" class="chk-pre form-check-input"></td></tr>`; });
             grid.innerHTML += `<div class="tanqueo-card mb-3" id="card-t-${i.id}"><div class="tanqueo-header"><span>${i.fecha}</span><span>${i.ubicacion}</span></div><div class="row g-0"><div class="col-md-9 p-2"><table class="table table-sm">${trs}</table></div><div class="col-md-3 p-3 text-center"><button class="btn btn-success w-100 mb-2" onclick="validarChecks(${i.id})">✅ VALIDAR</button><button class="btn btn-outline-danger w-100" onclick="abrirModalDecision(${i.id}, 'NO')">❌ RECHAZAR</button></div></div></div>`;
           });
         } else { document.getElementById('emptyTanqueos').style.display = 'block'; }
@@ -579,26 +1067,28 @@
     }
 
     function validarChecks(id) {
-      let ok = true; document.getElementById(`card-t-${id}`).querySelectorAll('.chk-pre').forEach(c => { if(!c.checked) ok=false; });
-      if(!ok){ alert("Marca todas las casillas."); return; }
+      let ok = true; document.getElementById(`card-t-${id}`).querySelectorAll('.chk-pre').forEach(c => { if (!c.checked) ok = false; });
+      if (!ok) { alert("Marca todas las casillas."); return; }
       idTanqueoSeleccionado = id; confirmarDecisionTanqueo('SI');
     }
     function abrirModalDecision(id, tipo) {
       idTanqueoSeleccionado = id;
-      if(tipo==='NO'){ if(confirm("¿Rechazar?")) confirmarDecisionTanqueo('NO'); } else { new bootstrap.Modal(document.getElementById('modalDecisionTanqueo')).show(); }
+      if (tipo === 'NO') { if (confirm("¿Rechazar?")) confirmarDecisionTanqueo('NO'); } else { new bootstrap.Modal(document.getElementById('modalDecisionTanqueo')).show(); }
     }
     function confirmarDecisionTanqueo(dec) {
-      fetch('/procesar_validacion_tanqueo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idTanqueoSeleccionado, decision: dec })
-      }).then(r=>r.json()).then(d=>{ if(d.success){ document.getElementById(`card-t-${idTanqueoSeleccionado}`).remove(); bootstrap.Modal.getInstance(document.getElementById('modalDecisionTanqueo'))?.hide(); } });
+      fetch('/procesar_validacion_tanqueo', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idTanqueoSeleccionado, decision: dec })
+      }).then(r => r.json()).then(d => { if (d.success) { document.getElementById(`card-t-${idTanqueoSeleccionado}`).remove(); bootstrap.Modal.getInstance(document.getElementById('modalDecisionTanqueo'))?.hide(); } });
     }
     function verFoto(src) { document.getElementById('lbImg').src = src; document.getElementById('lightboxSimple').style.display = 'flex'; }
 
     function mostrarPendientes() {
       new bootstrap.Modal(document.getElementById('modalPendientesTanqueo')).show();
       const tb = document.getElementById('tablaPendientesTanqueoBody'); tb.innerHTML = '';
-      fetch('/obtener_pendientes_tanqueo_reporte', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: EMPRESA_ID })
-      }).then(r=>r.json()).then(d => {
-        if(d.success && d.items.length>0){
+      fetch('/obtener_pendientes_tanqueo_reporte', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: EMPRESA_ID })
+      }).then(r => r.json()).then(d => {
+        if (d.success && d.items.length > 0) {
           d.items.forEach(i => tb.innerHTML += `<tr><td>${i.fecha}</td><td>${i.ubicacion}</td><td>${i.proveedor}</td><td>${i.solicitado}%</td><td>${i.dias} días</td></tr>`);
         } else { document.getElementById('msgSinPendientesTanqueo').style.display = 'block'; }
       });
@@ -613,7 +1103,7 @@
       document.getElementById("repUbicacion").textContent = document.getElementById("tituloInforme").textContent;
       document.getElementById("repPeriodo").textContent = document.getElementById("subtituloPeriodo").textContent;
 
-      if(datosGlobales && datosGlobales.tipo === 'saldos') {
+      if (datosGlobales && datosGlobales.tipo === 'saldos') {
         document.getElementById('repSectionKPIs').style.display = 'none';
         document.getElementById('repSectionGraph').style.display = 'none';
         document.getElementById('repTablaMain').querySelector('thead').innerHTML = `<tr style="background:#015249;color:white;"><th>Granja</th><th>Fecha</th><th>Tanque</th><th>Nivel</th><th>Saldo</th></tr>`;
@@ -621,15 +1111,16 @@
       } else {
         document.getElementById('repSectionKPIs').style.display = 'grid';
         document.getElementById('repSectionGraph').style.display = 'block';
-        for(let i=1;i<=6;i++) { document.getElementById(`lblKpi${i}`).textContent = document.getElementById(`kpi${i}Label`).textContent; document.getElementById(`valKpi${i}`).textContent = document.getElementById(`kpi${i}Value`).textContent; }
+        for (let i = 1; i <= 6; i++) { document.getElementById(`lblKpi${i}`).textContent = document.getElementById(`kpi${i}Label`).textContent; document.getElementById(`valKpi${i}`).textContent = document.getElementById(`kpi${i}Value`).textContent; }
         document.getElementById("repGraficoImg").src = document.getElementById('graficoConsumo').toDataURL("image/jpeg", 1.0);
         document.getElementById('repTablaMain').querySelector('thead').innerHTML = `<tr style="background:#eee;"><th>Granja</th><th>Consumo</th><th>Población</th><th>Eficiencia</th></tr>`;
         document.getElementById('repTablaMain').querySelector('tbody').innerHTML = document.getElementById('tablaConsumo').querySelector('tbody').innerHTML;
       }
 
       html2pdf().set({ margin: 0.5, filename: 'Informe_GLP.pdf', html2canvas: { scale: 2 }, jsPDF: { format: 'letter', orientation: 'portrait' } })
-      .from(phantom).save().then(() => { phantom.style.display = 'none'; btn.textContent = "Descargar PDF"; btn.disabled = false; });
+        .from(phantom).save().then(() => { phantom.style.display = 'none'; btn.textContent = "Descargar PDF"; btn.disabled = false; });
     }
   </script>
 </body>
+
 </html>

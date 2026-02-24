@@ -554,8 +554,17 @@
     });
   }
 
-  // Guardamos las empresas en una variable global para construir selects dinámicos
-  const empresasData = {{ empresas | tojson | safe }};
+  // Usamos un bloque try/catch para evitar que el linter se queje
+  // Los datos reales se leerán del elemento oculto al final del HTML
+  let empresasData = [];
+  try {
+    const dataElement = document.getElementById('empresas-data');
+    if (dataElement) {
+      empresasData = JSON.parse(dataElement.textContent);
+    }
+  } catch (e) {
+    console.warn("Aviso: Esperando renderizado de Jinja2 para empresasData.");
+  }
 </script>
 
 <body>
@@ -2262,7 +2271,34 @@
     function abrirSimuladorProyeccion(idPedido) { idPedidoEnAnalisis = idPedido; const modal = new bootstrap.Modal(document.getElementById('modalProyeccion')); modal.show(); fetch('/glp/admin/analizar_proyeccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idPedido }) }).then(r => r.json()).then(data => { if (!data.success) return; datosSimulacion = data; document.getElementById('sim_nivel_actual').innerText = data.nivel_actual + "%"; document.getElementById('sim_tasa').innerText = "-" + data.tasa_descenso_diaria + "%"; document.getElementById('sim_input_solicita').value = data.solicitado_original; renderizarGraficaProyeccion(); }); }
     function actualizarGraficaSimulacion() { if (chartSimulador) renderizarGraficaProyeccion(); }
     function renderizarGraficaProyeccion() { const ctx = document.getElementById('chartProyeccion').getContext('2d'); let solicita = parseFloat(document.getElementById('sim_input_solicita').value) || 0; const labels = [], dataProyeccion = [], dataSeguridad = []; let nivelSimulado = datosSimulacion.nivel_actual + solicita; if (nivelSimulado > 100) nivelSimulado = 100; let diaInicio = datosSimulacion.dia_actual; let diaFin = 16; if (diaInicio >= 15) diaFin = diaInicio + 3; for (let d = diaInicio; d <= diaFin; d++) { labels.push("Día " + d); dataProyeccion.push(nivelSimulado.toFixed(1)); dataSeguridad.push(20); nivelSimulado -= datosSimulacion.tasa_descenso_diaria; if (nivelSimulado < 0) nivelSimulado = 0; } if (chartSimulador) chartSimulador.destroy(); chartSimulador = new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [{ label: 'Proyección Nivel (%)', data: dataProyeccion, borderColor: '#015249', backgroundColor: 'rgba(1, 82, 73, 0.1)', borderDash: [5, 5], pointRadius: 4, fill: true, tension: 0.1 }, { label: 'Mínimo Seguro (20%)', data: dataSeguridad, borderColor: '#dc3545', borderWidth: 2, pointRadius: 0, fill: false }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } } } }); }
-    function confirmarAprobacionSimulada() { const valorFinal = document.getElementById('sim_input_solicita').value; if (!confirm(`¿Aprobar solicitud con ${valorFinal}%?`)) return; fetch('/glp/admin/aprobar_solicitud', { method: 'POST', body: JSON.stringify({ id: idPedidoEnAnalisis, nivel_aprobado: valorFinal }) }).then(r => r.json()).then(data => { if (data.success) { alert("✅ Aprobado."); bootstrap.Modal.getInstance(document.getElementById('modalProyeccion')).hide(); cargarAprobacionesGLP(); } }); }
+
+
+    function confirmarAprobacionSimulada() {
+      const valorFinal = document.getElementById('sim_input_solicita').value;
+      if (!confirm(`¿Confirmar aprobación de despacho hasta el ${valorFinal}%?`)) return;
+
+      fetch('/glp/admin/aprobar_solicitud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, // <-- FUNDAMENTAL PARA EL BACKEND
+        body: JSON.stringify({
+          id: idPedidoEnAnalisis,
+          nivel_aprobado: valorFinal
+        })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert("✅ Solicitud aprobada con éxito.");
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalProyeccion'));
+            if (modal) modal.hide();
+            cargarAprobacionesGLP();
+          } else {
+            alert("❌ Error: " + data.message);
+          }
+        })
+        .catch(err => alert("Error de red al aprobar."));
+    }
+
     function abrirModalPendientesTanqueo(empresaId) { const modal = new bootstrap.Modal(document.getElementById('modalPendientesTanqueo')); const tbody = document.getElementById('tablaPendientesTanqueoBody'); const msg = document.getElementById('msgSinPendientesTanqueo'); tbody.innerHTML = '<tr><td colspan="5">Cargando datos...</td></tr>'; msg.style.display = 'none'; modal.show(); fetch('/obtener_pendientes_tanqueo_reporte', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: empresaId }) }).then(r => r.json()).then(data => { tbody.innerHTML = ''; if (!data.success || data.items.length === 0) { msg.style.display = 'block'; return; } data.items.forEach(item => { let badgeColor = 'bg-success'; if (item.dias >= 1 && item.dias <= 2) badgeColor = 'bg-warning text-dark'; else if (item.dias >= 3) badgeColor = 'bg-danger'; const tr = document.createElement('tr'); tr.innerHTML = `<td><div>${item.fecha}</div><small class="text-muted text-uppercase" style="font-size:0.7em">${item.codigo}</small></td><td class="fw-bold text-primary">${item.ubicacion}</td><td>${item.proveedor || 'N/D'}</td><td><span class="fw-bold">${item.solicitado}%</span></td><td><div class="badge ${badgeColor}" style="font-size:0.9em;">${item.dias} Días</div></td>`; tbody.appendChild(tr); }); }); }
   </script>
 
@@ -2525,8 +2561,60 @@
     }
   </script>
 
+  <div class="modal fade" id="modalProyeccion" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title">📉 Copiloto GLP: Análisis de Proyección</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="card shadow-sm h-100 border-0">
+                <div class="card-body">
+                  <h6 class="fw-bold text-primary mb-3">Situación Actual</h6>
+                  <div class="d-flex justify-content-between border-bottom py-2">
+                    <span class="text-muted">Nivel Real:</span>
+                    <span id="sim_nivel_actual" class="fw-bold text-dark">--%</span>
+                  </div>
+                  <div class="d-flex justify-content-between border-bottom py-2">
+                    <span class="text-muted">Tasa Descenso:</span>
+                    <span id="sim_tasa" class="fw-bold text-danger">--</span>
+                  </div>
 
+                  <h6 class="fw-bold text-success mt-4 mb-3">Simulación de Carga</h6>
+                  <div class="p-3 bg-success bg-opacity-10 rounded border border-success">
+                    <label class="small fw-bold">Nivel de llenado solicitado (%):</label>
+                    <input type="number" id="sim_input_solicita"
+                      class="form-control form-control-lg fw-bold text-center mt-2"
+                      oninput="actualizarGraficaSimulacion()">
+                    <p class="text-muted small mt-2 mb-0">Ajuste el % para ver la autonomía proyectada.</p>
+                  </div>
 
+                  <div class="d-grid mt-4">
+                    <button class="btn btn-success btn-lg fw-bold shadow-sm" onclick="confirmarAprobacionSimulada()">
+                      ✅ APROBAR SOLICITUD
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <h6 class="fw-bold text-muted mb-3">Proyección Dinámica del Ciclo</h6>
+                  <div style="height: 400px; position: relative;">
+                    <canvas id="chartProyeccion"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </body>
 

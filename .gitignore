@@ -1,28 +1,5 @@
-# Ignorar entorno virtual (nuevo y anterior)
-venv/
-Lib/
-Include/
-Scripts/
-pyvenv.cfg
-
-# Archivos de Python no necesarios
-__pycache__/
-*.pyc
-*.pyo
-*.log
-
-# Variables de entorno
-.env
-
-# Otros temporales
-*.db
-*.sqlite3
-.DS_Store
-
-# ... (todo lo que ya tenías arriba) ...
-
-# Ignorar carpeta de fotos (Testigos)
-app/static/testigos/
-
-# (Opcional) Ignorar archivos de sistema generados por mac/windows si aparecen
-Thumbs.db
+app/static/testigos/*  
+!app/static/testigos/.gitkeep  
+__pycache__/  
+venv/  
+.env 

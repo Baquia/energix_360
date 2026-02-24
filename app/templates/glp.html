@@ -594,6 +594,89 @@
 
   <script>
 
+    /* ==========================================================
+   NUEVO FLUJO ATÓMICO: CONSUMO + NEGOCIACIÓN (OFFLINE FIRST)
+========================================================== */
+
+    function enviarConsumo() {
+      // 1. Evaluación Local Inmediata (Copiloto Offline)
+      let sumaCap = 0;
+      let sumaNivelCap = 0;
+
+      items.forEach(tk => {
+        let cap = parseFloat(tk.capacidad || 0);
+        let niv = parseFloat(tk.nivel || 0);
+        sumaCap += cap;
+        sumaNivelCap += (niv * cap);
+      });
+
+      let nivelPromedio = sumaCap > 0 ? (sumaNivelCap / sumaCap) : 0;
+
+      // 2. ¿Nivel crítico? Abrimos el "Peaje" ANTES de enviar
+      if (nivelPromedio <= 30.0) {
+        let sugerencia = Math.round(80 - nivelPromedio);
+        if (sugerencia < 10) sugerencia = 10;
+        if (sugerencia > 85) sugerencia = 85;
+
+        abrirNegociacionLocal(sugerencia);
+      } else {
+        // Si el nivel está bien, enviamos el consumo directo
+        ejecutarEnvioAtomico(null);
+      }
+    }
+
+    function abrirNegociacionLocal(sugerencia) {
+      const modal = document.getElementById("modalNegociacion");
+      document.getElementById("neg_nivel").value = sugerencia;
+      document.getElementById("neg_dias_act").innerText = "--";
+
+      currentDiasExtra = 0;
+      document.getElementById("neg_dias_extra").innerText = "0";
+
+      // Botón: SÍ PEDIR GAS
+      const btnSi = document.querySelector(".btn-solicitar");
+      btnSi.onclick = function () {
+        let nivelSolicitado = document.getElementById("neg_nivel").value;
+        modal.style.display = "none";
+        // Empacamos la solicitud
+        ejecutarEnvioAtomico({
+          nivel: Number(nivelSolicitado),
+          dias_extra: currentDiasExtra
+        });
+      };
+
+      // Botón: NO PEDIR GAS (Ignorar advertencia)
+      const btnSaltar = modal.querySelector("button[onclick='cerrarNegociacion()']");
+      btnSaltar.onclick = function () {
+        modal.style.display = "none";
+        // Empacamos sin solicitud
+        ejecutarEnvioAtomico(null);
+      };
+
+      modal.style.display = "flex";
+    }
+
+    function ejecutarEnvioAtomico(solicitudGas) {
+      // 3. Empaquetado final de datos (El Súper-Paquete)
+      const payload = {
+        op_id: generarOpId(),
+        sede: sedeQR,
+        tanques: items
+      };
+
+      // Si el usuario negoció gas, inyectamos la orden en el mismo paquete
+      if (solicitudGas) {
+        payload.solicitud_gas = solicitudGas;
+      }
+
+      // 4. Viaje Seguro por la tubería Offline
+      sendWithOffline(
+        "/glp/registrar_consumo",
+        payload,
+        mostrarResumenOperacion // Pasamos directo a mostrar el resultado final
+      );
+    }
+
     // ==========================================
     // CONFIGURAR CÁMARA VS GALERÍA
     // ==========================================
@@ -978,6 +1061,7 @@
     let GLP_LOGIN_WARNING_SHOWN = false;
 
     async function flushOfflineQueue() {
+      // 1. Evitar sync si modo offline manual activo
       if (typeof isForceOffline === "function" && isForceOffline()) return;
 
       const q = await getQueue();
@@ -1009,12 +1093,31 @@
 
           const ct = (r.headers.get("content-type") || "").toLowerCase();
 
-          if (!ct.includes("application/json") || r.status === 401 || r.redirected) {
-            console.warn("⚠️ Sesión vencida detectada.");
+          // ========================================================
+          // CORRECCIÓN CRÍTICA: DIFERENCIAR 500 (ERROR) VS 401 (SESIÓN)
+          // ========================================================
+          const isUnauthorized = (r.status === 401);
+          const isLoginRedirect = r.redirected && r.url.toLowerCase().includes("login");
+
+          if (isUnauthorized || isLoginRedirect) {
+            console.warn("⚠️ Sesión vencida real detectada.");
             needLoginForSync = true;
             remaining.push(it);
             continue;
           }
+
+          if (!r.ok) {
+            console.error(`⚠️ Error del servidor ${r.status}. El código Python falló. Reteniendo en celular.`);
+            remaining.push(it); // Se guarda, no borramos la data
+            continue;
+          }
+
+          if (!ct.includes("application/json")) {
+            console.error("⚠️ El servidor no devolvió JSON. Reteniendo en celular.");
+            remaining.push(it);
+            continue;
+          }
+          // ========================================================
 
           const j = await r.json();
 
@@ -1022,54 +1125,47 @@
             sincronizadosCount++;
             lastSuccessResponse = j;
           } else {
+            // SI EL SERVIDOR DICE "NO" (ERROR LÓGICO DE NEGOCIO)
             alert("⚠️ El servidor rechazó una operación pendiente:\n\n" + (j.message || "Operación rechazada"));
             if (typeof mostrarMenu === 'function') mostrarMenu();
           }
         } catch (e) {
+          // Error de red real -> Se queda en la cola para intentar luego
           remaining.push(it);
         }
       }
 
       await setQueue(remaining);
 
+      // === ACCIONES AL FINALIZAR ===
       if (remaining.length === 0) {
         const warningDiv = document.getElementById("syncWarning");
         if (warningDiv) warningDiv.style.display = 'none';
       }
 
-      if (sincronizadosCount > 0) {
-        if (remaining.length === 0) {
+      if (sincronizadosCount > 0 && remaining.length === 0) {
+        const modalFinal = document.getElementById('modal-resultado-final');
+        const isModalOpen = modalFinal && modalFinal.style.display === 'flex';
 
-          // --- VERIFICAR SI EL MODAL YA ESTÁ VISIBLE ---
-          const modalFinal = document.getElementById('modal-resultado-final');
-          const isModalOpen = modalFinal && modalFinal.style.display === 'flex';
-
-          if (lastSuccessResponse) {
-            // SOLO mostramos la alerta y renderizamos SI el usuario NO está viendo ya el modal final
-            if (!isModalOpen) {
-              alert(`✅ Sincronización completada. Datos guardados en el servidor.`);
-
-              if (lastSuccessResponse.resumen && (lastSuccessResponse.resumen.requiere_gas !== undefined)) {
-                console.log("🧠 Copiloto detectado en respuesta offline. Activando vista inteligente.");
-                procesarRespuestaConsumo(lastSuccessResponse);
-              } else if (typeof mostrarResumenOperacion === 'function') {
-                mostrarResumenOperacion(lastSuccessResponse);
-              }
-            } else {
-              console.log("✅ Sincronización en segundo plano completada. Se omite actualización UI para no borrar el recibo actual.");
+        if (lastSuccessResponse) {
+          if (!isModalOpen) {
+            alert(`✅ Sincronización completada. Datos guardados en el servidor.`);
+            if (typeof mostrarResumenOperacion === 'function') {
+              mostrarResumenOperacion(lastSuccessResponse);
             }
-          } else {
-            if (!isModalOpen) {
-              alert(`✅ ¡Éxito! Se sincronizaron ${sincronizadosCount} operaciones.`);
-              window.location.reload();
-            }
+          }
+        } else {
+          if (!isModalOpen) {
+            alert(`✅ ¡Éxito! Se sincronizaron ${sincronizadosCount} operaciones.`);
+            window.location.reload();
           }
         }
       }
 
+      // Si la sesión venció REALMENTE
       if (needLoginForSync) {
         if (typeof GLP_OPERACION_EN_CURSO !== 'undefined' && GLP_OPERACION_EN_CURSO) {
-          console.warn("⛔ Sesión vencida detectada en background, pero el usuario está operando. Se pospone el logout.");
+          console.warn("⛔ Sesión posponiendo logout por operación en curso.");
           return;
         }
         alert("⚠️ TU SESIÓN HA VENCIDO\n\nDale Aceptar para iniciar sesión nuevamente.");
@@ -1245,8 +1341,9 @@
     // ===================================================
     //   ENVÍO POST CON OFFLINE-FALLBACK
     // ===================================================
+
     // ===================================================
-    //   ENVÍO POST CON OFFLINE-FALLBACK (CORREGIDO)
+    //   ENVÍO POST CON OFFLINE-FALLBACK (VERSIÓN SEMÁFORO ATÓMICO)
     // ===================================================
     async function sendWithOffline(url, payload, onSuccess) {
       // 1. MODO OFFLINE MANUAL (Si el usuario forzó el modo offline)
@@ -1258,24 +1355,27 @@
           mostrarAvisoSyncPendiente();
         }
 
+        // Construimos una respuesta simulada para que el Modal de Resumen sepa qué mostrar
         const fakeResponse = {
           success: true,
           offline: true,
           message: "Guardado offline (modo OFFLINE activo). Se enviará automáticamente al recuperar operatividad.",
-          op_id: payload.op_id,
-          data: payload
+          resumen: {
+            operacion: url.includes("consumo") ? "consumo" : (url.includes("tanqueo") ? "tanqueo" : "operacion"),
+            saldo_estimado_kg: "Calculando...",
+            kg_consumidos: "Calculando...",
+            tanques: payload.tanques,
+            requiere_gas: payload.solicitud_gas ? true : false,
+            razon_alerta: payload.solicitud_gas ? "El pedido se generará automáticamente apenas recuperes la señal." : ""
+          }
         };
 
-        // --- CORRECCIÓN CRÍTICA ---
-        // NO llamamos a onSuccess(fakeResponse) aquí para evitar el modal vacío.
-        // En su lugar, volvemos al menú principal directamente.
-        if (typeof mostrarMenu === 'function') {
-          mostrarMenu();
-        } else {
-          limpiarEstadoOperacion();
+        // ENVIAMOS AL MODAL FINAL (Semáforo Naranja)
+        if (typeof onSuccess === "function") {
+          onSuccess(fakeResponse);
         }
-        // --------------------------
 
+        limpiarEstadoOperacion(); // Limpiamos variables, el modal ya quedó activo
         return fakeResponse;
       }
 
@@ -1338,23 +1438,27 @@
             mostrarAvisoSyncPendiente();
           }
 
+          // Construimos la respuesta simulada para el corte de red
           const fakeResponse = {
             success: true,
             offline: true,
             message: "⚠️ Señal inestable. Operación guardada en el dispositivo.",
-            op_id: payload.op_id,
-            data: payload
+            resumen: {
+              operacion: url.includes("consumo") ? "consumo" : (url.includes("tanqueo") ? "tanqueo" : "operacion"),
+              saldo_estimado_kg: "Calculando...",
+              kg_consumidos: "Calculando...",
+              tanques: payload.tanques,
+              requiere_gas: payload.solicitud_gas ? true : false,
+              razon_alerta: payload.solicitud_gas ? "El pedido se enviará al Webmaster apenas recuperes la señal." : ""
+            }
           };
 
-          // --- CORRECCIÓN CRÍTICA ---
-          // NO llamamos a onSuccess(fakeResponse) aquí tampoco.
-          // Evitamos el modal vacío y volvemos al menú.
-          if (typeof mostrarMenu === 'function') {
-            mostrarMenu();
-          } else {
-            limpiarEstadoOperacion();
+          // ENVIAMOS AL MODAL FINAL (Semáforo Naranja)
+          if (typeof onSuccess === "function") {
+            onSuccess(fakeResponse);
           }
-          // --------------------------
+
+          limpiarEstadoOperacion(); // Limpiamos estado de variables
 
           // Intentos de resincronización en background
           setTimeout(() => flushOfflineQueue(), 2000);
@@ -1369,6 +1473,7 @@
         throw e;
       }
     }
+
     function leerQR(titulo) {
       return new Promise((resolve, reject) => {
         const menu = document.getElementById("menuOpciones");
@@ -1489,44 +1594,60 @@
  * FUNCIÓN ÚNICA DE RESULTADOS (Backend -> Frontend)
  * Reemplaza a la anterior. Maneja éxito (Modal Nuevo) y Error (Alerta Vieja).
  */
+
     function mostrarResumenOperacion(res) {
       if (!res || !res.success) {
         alert((res && res.message) ? res.message : "Error desconocido.");
-        if (document.getElementById('loadingOverlay')) {
-          document.getElementById('loadingOverlay').style.display = 'none';
-        }
+        if (document.getElementById('loadingOverlay')) document.getElementById('loadingOverlay').style.display = 'none';
         return;
       }
 
-      if (document.getElementById('loadingOverlay')) {
-        document.getElementById('loadingOverlay').style.display = 'none';
-      }
+      if (document.getElementById('loadingOverlay')) document.getElementById('loadingOverlay').style.display = 'none';
 
       const resumen = res.resumen || res;
 
-      // =====================================================================
-      // ESCUDO ANTI-PARPADEO: Evitar que el hilo rezagado borre la pantalla
-      // =====================================================================
-      const modalFinal = document.getElementById('modal-resultado-final');
-      const isModalOpen = modalFinal && modalFinal.style.display === 'flex';
+      // ==========================================
+      // EL SEMÁFORO DE CERTIDUMBRE (NUEVO)
+      // ==========================================
+      const headerDiv = document.querySelector("#modal-resultado-final > div > div:first-child");
+      const tituloDiv = headerDiv.querySelector("h2");
+      const subtituloDiv = headerDiv.querySelector("p");
+      const iconoDiv = headerDiv.querySelector("div");
 
-      // Si el modal YA está abierto y esta respuesta NO trae la lista de tanques 
-      // (es la respuesta vacía de Idempotencia del backend), LA IGNORAMOS.
-      if (isModalOpen && (!resumen.tanques || resumen.tanques.length === 0)) {
-        console.log("🛡️ Escudo activo: Evitando sobreescritura del recibo.");
-        return;
+      if (res.offline) {
+        // ESTADO NARANJA: Guardado en el celular, sin internet
+        headerDiv.style.background = "#f57c00"; // Naranja alerta
+        iconoDiv.innerText = "📡";
+        tituloDiv.innerText = "Guardado en Celular";
+        subtituloDiv.innerText = "PENDIENTE DE ENVÍO POR FALTA DE SEÑAL";
+      } else {
+        // ESTADO VERDE: Éxito total en el servidor
+        headerDiv.style.background = "#015249"; // Verde original
+        iconoDiv.innerText = "✅";
+        tituloDiv.innerText = "Operación Exitosa";
+        subtituloDiv.innerText = "REGISTRO GUARDADO EN EL SERVIDOR";
       }
-      // =====================================================================
 
+      // Llenar datos básicos
       const opTitulo = (resumen.operacion || 'OPERACIÓN').replace(/_/g, ' ').toUpperCase();
-      document.getElementById('bqa-operacion').innerText = opTitulo;
+      document.getElementById('bqa-operacion').innerText = opTitulo + (res.offline ? " (OFFLINE)" : "");
 
-      const saldo = resumen.saldo_estimado_kg ? parseFloat(resumen.saldo_estimado_kg).toFixed(2) : '---';
-      document.getElementById('bqa-saldo').innerText = saldo + ' kg';
+      // ==========================================
+      // OCULTAR TARJETAS DE SALDO EN MODO OFFLINE
+      // ==========================================
+      const bloqueSaldos = document.getElementById('bqa-saldo').parentElement.parentElement;
 
-      const consumo = resumen.kg_consumidos ? parseFloat(resumen.kg_consumidos).toFixed(2) : '0.00';
-      document.getElementById('bqa-consumo').innerText = consumo + ' kg';
+      if (res.offline) {
+        // Si es el modal naranja, ocultamos la barra gris por completo para no mostrar NaN
+        bloqueSaldos.style.display = 'none';
+      } else {
+        // Si es el modal verde, la mostramos y calculamos los kilos reales
+        bloqueSaldos.style.display = 'flex';
+        document.getElementById('bqa-saldo').innerText = resumen.saldo_estimado_kg ? parseFloat(resumen.saldo_estimado_kg).toFixed(2) + ' kg' : '---';
+        document.getElementById('bqa-consumo').innerText = resumen.kg_consumidos ? parseFloat(resumen.kg_consumidos).toFixed(2) + ' kg' : '0.00 kg';
+      }
 
+      // Mostrar alertas de pedido
       const divPed = document.getElementById('bqa-bloque-pedido');
       const divAlert = document.getElementById('bqa-bloque-alerta');
       divPed.style.display = 'none';
@@ -1538,21 +1659,27 @@
         document.getElementById('bqa-proveedor').innerText = resumen.pedido_automatico.proveedor;
       } else if (resumen.requiere_gas) {
         divAlert.style.display = 'block';
-        document.getElementById('bqa-razon').innerText = resumen.razon_alerta;
+
+        // MENSAJE CLARO SI PIDIÓ GAS OFFLINE
+        if (res.offline) {
+          document.getElementById('bqa-razon').innerHTML = "<b>⚠️ ATENCIÓN:</b> Tu pedido de gas está guardado en el celular. <b>MUEVETE A UNA ZONA CON SEÑAL</b> para que el sistema lo envíe al Webmaster.";
+        } else {
+          document.getElementById('bqa-razon').innerText = resumen.razon_alerta;
+        }
       }
 
+      // Renderizar Tanques
       const tbody = document.getElementById('bqa-tabla-tanques');
       tbody.innerHTML = '';
-
       if (resumen.tanques && Array.isArray(resumen.tanques)) {
         resumen.tanques.forEach(t => {
           const nivel = parseFloat(t.nivel || 0).toFixed(1);
           const color = nivel <= 30 ? '#d32f2f' : '#333';
           tbody.innerHTML += `
-                <tr style="border-bottom: 1px solid #f0f0f0;">
-                    <td style="padding: 6px 0; color: #555;">${t.numero}</td>
-                    <td style="padding: 6px 0; text-align: right; font-weight: bold; color: ${color};">${nivel}%</td>
-                </tr>`;
+        <tr style="border-bottom: 1px solid #f0f0f0;">
+            <td style="padding: 6px 0; color: #555;">${t.numero}</td>
+            <td style="padding: 6px 0; text-align: right; font-weight: bold; color: ${color};">${nivel}%</td>
+        </tr>`;
         });
       }
 
@@ -1637,67 +1764,6 @@
 
     // 4. Enviar la Solicitud Negociada al Servidor
 
-    // Botón "Confirmar y Solicitar" (Envía a Webmaster -> Muestra Resumen con pedido)
-
-    async function confirmarSolicitud() {
-      const nivelSolicitado = document.getElementById("neg_nivel").value;
-      const btn = document.querySelector(".btn-solicitar");
-
-      // 1. Protección visual y de doble clic
-      btn.innerText = "⏳ PROCESANDO SOLICITUD...";
-      btn.disabled = true;
-      btn.style.opacity = "0.5";
-
-      // 2. PAUSAR MONITOR PWA (Para evitar el choque de red)
-      if (typeof _opw !== 'undefined' && _opw.timer) {
-        console.log("Pausando monitor de red para envío seguro...");
-        clearInterval(_opw.timer);
-      }
-
-      try {
-        const res = await fetch('/glp/solicitar_pedido_manual', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            op_id: currentOpId,
-            nivel_solicitado: nivelSolicitado,
-            dias_extra: currentDiasExtra
-          })
-        });
-
-        // Verificamos si la respuesta es válida antes de leer el JSON
-        if (!res.ok) throw new Error("Error en el servidor: " + res.status);
-
-        const data = await res.json();
-
-        if (data.success) {
-          document.getElementById("modalNegociacion").style.display = "none";
-          if (respuestaConsumoPendiente && respuestaConsumoPendiente.resumen) {
-            respuestaConsumoPendiente.resumen.requiere_gas = true;
-            respuestaConsumoPendiente.resumen.sugerencia_carga = nivelSolicitado;
-            respuestaConsumoPendiente.resumen.dias_extra = currentDiasExtra;
-          }
-          mostrarResumenOperacion(respuestaConsumoPendiente);
-        } else {
-          alert("⚠️ " + data.message);
-          btn.disabled = false;
-          btn.style.opacity = "1";
-          btn.innerText = "Reintentar Solicitud";
-        }
-
-      } catch (error) {
-        console.error("Fallo envío manual:", error);
-        alert("⚠️ NOTA: El servidor está procesando tu solicitud.\n\nEspera 5 segundos y verifica el Panel Webmaster. Si no aparece, vuelve a intentarlo.");
-        btn.disabled = false;
-        btn.style.opacity = "1";
-        btn.innerText = "Reintentar";
-      } finally {
-        // 3. REINICIAR MONITOR PWA
-        if (typeof iniciarMonitorOperatividadPWA === 'function') {
-          iniciarMonitorOperatividadPWA();
-        }
-      }
-    }
 
     /* ============================
     Flujo común: cargar tanques
@@ -2636,44 +2702,6 @@
       }
     }
 
-    function enviarConsumo() {
-      const payload = {
-        op_id: generarOpId(),
-        sede: sedeQR,
-        tanques: items
-      };
-
-      // Envío con tolerancia a offline
-      sendWithOffline(
-        "/glp/registrar_consumo",
-        payload,
-        procesarRespuestaConsumo
-      );
-    }
-
-    function procesarRespuestaConsumo(resp) {
-      // Guardamos la respuesta completa en la variable global
-      respuestaConsumoPendiente = resp;
-      const r = resp.resumen || {};
-
-      // CASO A: El Copiloto detectó necesidad de gas (Nivel bajo o viernes)
-      if (r.requiere_gas) {
-        // Configuramos las variables para la negociación
-        currentOpId = r.op_id;
-
-        // Abrimos el Modal de Negociación (Amarillo/Naranja)
-        abrirNegociacion(r.sugerencia_carga, r.dias_actuales || '--');
-
-        // IMPORTANTE: NO llamamos a mostrarResumenOperacion todavía.
-        // El flujo se detiene aquí esperando al usuario.
-      }
-      // CASO B: Todo normal, no se necesita gas
-      else {
-        // Pasamos directo al Modal Final (Negro/Verde)
-        mostrarResumenOperacion(resp);
-      }
-    }
-
 
     /* ============================
        FINALIZAR CALEFACCIÓN
@@ -2762,30 +2790,45 @@
     // PROTECCIÓN DE CERRAR SESIÓN (logout)
     // =======================================================
 
+    // =======================================================
+    // PROTECCIÓN DE CERRAR SESIÓN (logout) 100% BLINDADA
+    // =======================================================
     function actualizarBloqueoLogout() {
       const logoutLinks = document.querySelectorAll('a[href="/logout"]');
 
       logoutLinks.forEach(a => {
-        // primero quitamos cualquier handler previo
-        a.onclick = null;
+        a.onclick = null; // Limpiamos handlers viejos
 
-        a.addEventListener("click", function (e) {
+        a.addEventListener("click", async function (e) {
+          e.preventDefault(); // Detenemos la salida inmediatamente
 
-          // 1. Si hay operación GLP en curso → SIEMPRE bloquear
-          if (GLP_OPERACION_EN_CURSO) {
-            e.preventDefault();
-            alert("Debes terminar la operación de GLP antes de cerrar sesión.");
+          // 1. Si está a mitad de un formulario
+          if (typeof GLP_OPERACION_EN_CURSO !== 'undefined' && GLP_OPERACION_EN_CURSO) {
+            alert("⛔ Debes terminar la operación actual antes de cerrar sesión.");
             return;
           }
 
-          // 2. Si NO hay internet → bloquear (ya que no puede cerrar sesión)
+          // 2. Si no hay internet (el servidor no podría cerrar la sesión de todos modos)
           if (!navigator.onLine) {
-            e.preventDefault();
-            alert("Estás sin conexión. El cierre de sesión requiere internet.");
+            alert("📡 Estás sin conexión. El cierre de sesión requiere internet.");
             return;
           }
 
-          // 3. Si todo está bien → permitir cerrar sesión
+          // 3. EL NUEVO PEAJE: Verificar la "Caja Fuerte" (IndexedDB)
+          try {
+            if (typeof getQueue === 'function') {
+              const q = await getQueue();
+              if (q && q.length > 0) {
+                alert("⛔ ACCESO DENEGADO\n\nTienes operaciones guardadas en el celular que aún no se han subido al servidor.\n\nPor favor, espera a que se sincronicen o presiona 'Intentar enviar ahora' antes de salir.");
+                return; // Bloqueamos la salida
+              }
+            }
+          } catch (err) {
+            console.error("Error leyendo cola offline:", err);
+          }
+
+          // 4. Si pasó todos los filtros, lo dejamos ir
+          window.location.href = "/logout";
         });
       });
     }
