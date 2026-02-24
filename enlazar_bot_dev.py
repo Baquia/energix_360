@@ -1,89 +1,63 @@
 import telebot
-import MySQLdb  # Esta es la librería que ya tienes instalada
+import MySQLdb
 import sys
 
-# --- CONFIGURACIÓN PARA TU XAMPP (LOCAL) ---
+# CONFIGURACIÓN PRODUCCIÓN
 DB_HOST = "baquiasoft.mysql.pythonanywhere-services.com"
-DB_USER = "baquiasoft"      # Usuario por defecto de XAMPP
-DB_PASS = "Ataraxia123*/"          # Por defecto en XAMPP es vacío
+DB_USER = "baquiasoft"
+DB_PASS = "Ataraxia123*/"
 DB_NAME = "baquiasoft$energix_360"
-
-# TU TOKEN DE TELEGRAM
 TOKEN = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
 
-print("🚀 Iniciando Bot en modo PRODUCCION...")
+bot = telebot.TeleBot(TOKEN)
 
-# Conectamos con Telegram
-try:
-    bot = telebot.TeleBot(TOKEN)
-    print("✅ Conexión con Telegram exitosa.")
-except Exception as e:
-    print(f"❌ Error conectando con Telegram: {e}")
-    sys.exit()
-
-# 1. Cuando el usuario escribe /start
 @bot.message_handler(commands=['start'])
 def enviar_bienvenida(message):
-    print(f"➡️  Usuario {message.chat.first_name} envió /start")
+    # Esto te dirá en la consola si el bot recibió el mensaje
+    print(f"DEBUG 🔍: Recibido /start de {message.chat.first_name} (ID: {message.chat.id})")
     
-    # Creamos el botón especial para pedir el contacto
     markup = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
     boton = telebot.types.KeyboardButton(text="📱 Compartir mi número", request_contact=True)
     markup.add(boton)
     
-    bot.reply_to(message, "👋 Hola. Para recibir tus alertas de gas, presiona el botón abajo:", reply_markup=markup)
+    bot.reply_to(message, "👋 Hola. Presiona el botón abajo para vincular tu cuenta:", reply_markup=markup)
 
-# 2. Cuando el usuario comparte su contacto
 @bot.message_handler(content_types=['contact'])
 def recibir_contacto(message):
     if message.contact:
-        telefono_original = message.contact.phone_number
+        tel = message.contact.phone_number.replace("+", "").replace(" ", "")
+        # Ajustamos para buscar los últimos 9 o 10 dígitos por si acaso
+        tel_busqueda = tel[-9:] 
         chat_id = message.chat.id
-        usuario_tg = message.chat.first_name
-        
-        # LIMPIEZA: Quitamos el '+' y espacios para comparar solo números
-        # Ejemplo: '+57300...' se convierte en '57300...'
-        telefono_limpio = telefono_original.replace("+", "").replace(" ", "")
-        # Tomamos los últimos 10 dígitos (para evitar problemas con el código de país 57)
-        telefono_para_buscar = telefono_limpio[-10:]
 
-        print(f"\n📩 Recibido de Telegram: {telefono_original} (Buscaremos coincidencias con: ...{telefono_para_buscar})")
+        print(f"DEBUG 📞: Procesando contacto {tel}. Buscando: %{tel_busqueda}")
 
         try:
-            # Conexión a tu Base de Datos Local
             conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
-            cur = conn.cursor()
+            cur = conn.cursor(MySQLdb.cursors.DictCursor) # Usamos DictCursor para ver nombres
             
-            # Buscamos el usuario usando LIKE para encontrar el número al final
-            query = "SELECT id, nombre FROM usuarios WHERE telefono LIKE %s"
-            cur.execute(query, (f"%{telefono_para_buscar}",))
-            
-            usuario_db = cur.fetchone()
+            # Buscamos TODOS los usuarios que tengan ese número (por si hay duplicados)
+            cur.execute("SELECT id, nombre, empresa_id FROM usuarios WHERE telefono LIKE %s", (f"%{tel_busqueda}",))
+            usuarios = cur.fetchall()
 
-            if usuario_db:
-                id_usuario = usuario_db[0]
-                nombre_usuario = usuario_db[1]
-                
-                print(f"✅ ¡MATCH ENCONTRADO! Es: {nombre_usuario} (ID BD: {id_usuario})")
-                
-                # GUARDAMOS EL CHAT_ID EN LA BASE DE DATOS
-                cur.execute("UPDATE usuarios SET telegram_id = %s WHERE id = %s", (str(chat_id), id_usuario))
-                conn.commit()
-                print("💾 Guardado en base de datos local.")
-                
-                bot.reply_to(message, f"✅ ¡Listo {nombre_usuario}! Tu Telegram ha sido vinculado exitosamente.", reply_markup=telebot.types.ReplyKeyboardRemove())
+            if len(usuarios) == 0:
+                print("DEBUG ❌: No se encontró nadie en la BD.")
+                bot.reply_to(message, f"El número {tel} no existe en Energix 360.")
+            elif len(usuarios) > 1:
+                print(f"DEBUG ⚠️: Se encontraron {len(usuarios)} usuarios con el mismo número!")
+                bot.reply_to(message, "Error: Tu número está duplicado en el sistema. Contacta a soporte.")
             else:
-                print("❌ No se encontró ese número en la tabla 'usuarios'.")
-                bot.reply_to(message, f"❌ El número {telefono_original} no está registrado en nuestro sistema. Contacta al administrador.", reply_markup=telebot.types.ReplyKeyboardRemove())
-            
+                user = usuarios[0]
+                print(f"DEBUG ✅: Vinculando a {user['nombre']}...")
+                cur.execute("UPDATE usuarios SET telegram_id = %s WHERE id = %s", (str(chat_id), user['id']))
+                conn.commit()
+                bot.reply_to(message, f"✅ ¡Vínculo exitoso, {user['nombre']}!")
+
             cur.close()
             conn.close()
-
         except Exception as e:
-            print(f"🔥 Error de Base de Datos: {e}")
-            bot.reply_to(message, "Ocurrió un error interno en el servidor.")
+            print(f"DEBUG 🔥: Error de BD: {e}")
+            bot.reply_to(message, "Error interno.")
 
-print("🎧 Bot escuchando... (Ve a Telegram y dale /start)")
-# BORRA: bot.polling()
-# PON ESTO EN SU LUGAR:
+print("🚀 BOT CORRIENDO... Mira esta pantalla cuando escribas en Telegram.")
 bot.infinity_polling()
