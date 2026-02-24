@@ -6,21 +6,22 @@ from functools import wraps
 import os
 import MySQLdb.cursors
 
-# 1. DETERMINACIÓN DE RUTAS FÍSICAS (Estructura de Carpetas)
+# 1. CONFIGURACIÓN DE RUTAS FÍSICAS PARA PRODUCCIÓN Y DESARROLLO
 base_dir = os.path.abspath(os.path.dirname(__file__))
 static_path = os.path.join(base_dir, "app", "static")
 
 # 2. INICIALIZACIÓN DE LA APLICACIÓN (Factory Pattern)
+# Nota: La configuración de BD se maneja dentro de app/__init__.py
 app = create_app()
 
-# 3. ASIGNACIÓN DE CARPETA STATIC (Para Logos y PWA)
+# 3. CONFIGURACIÓN DE LA CARPETA ESTÁTICA PARA LOGOS Y RECURSOS
 app.static_folder = static_path
 app.static_url_path = "/static"
 
 # --- CONFIGURACIÓN DE SEGURIDAD Y LIMPIEZA DE CACHÉ ---
 @app.after_request
 def add_security_headers(response):
-    """Garantiza que el navegador no use versiones viejas del HTML tras un despliegue."""
+    """Garantiza que el navegador no almacene versiones obsoletas del sitio."""
     if "text/html" in response.headers.get("Content-Type", ""):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
@@ -37,45 +38,45 @@ def login_required_custom(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# --- RUTAS DE SISTEMA (PWA Y OFFLINE) ---
+# --- RUTAS DE SISTEMA (PWA Y SOPORTE OFFLINE) ---
 @app.route("/login_energix360_offline.html")
 def login_energix360_offline():
     return render_template("login_energix360_offline.html")
 
 @app.route("/sw.js")
 def sw():
-    """Service Worker para soporte Offline."""
+    """Service Worker para el funcionamiento de la PWA."""
     return send_from_directory(app.static_folder, "sw.js", mimetype="application/javascript")
 
-# --- CONTROLADOR PRINCIPAL (INDEX / REDIRECCIONAMIENTO) ---
+# --- CONTROLADOR DE INICIO (INDEX) ---
 @app.route('/')
 def index():
     """
-    Controla el acceso inicial. Si el usuario ya está logueado, 
-    lo envía a su módulo real usando Blueprints.
+    Ruta raíz: Redirige a los usuarios con sesión activa a sus 
+    respectivos módulos mediante Blueprints para evitar errores 404.
     """
     if 'usuario_id' in session:
-        # Recuperamos datos de sesión sanitizados
+        # Sanitización de datos de sesión para comparaciones seguras
         tipo_str = str(session.get('tipo_empresa', '')).strip().lower()
         perfil_str = str(session.get('perfil', '')).strip().lower()
         empresa_id = str(session.get('empresa_id', '')).strip()
 
-        # 1. PRIORIDAD: WEBMASTER (Evita el 404 detectado)
+        # 1. PRIORIDAD: WEBMASTER (Corrección de BuildError: gestionar_usuario)
         if 'webmaster' in tipo_str or empresa_id == '901811727' or 'webmaster' in perfil_str:
-             return redirect(url_for('bp_901811727.control_usuarios'))
+             return redirect(url_for('bp_901811727.gestionar_usuario')) #
 
-        # 2. SECTOR AVÍCOLA (Gestión Genérica)
+        # 2. SECTOR AVÍCOLA (Gestión para NIT 890707006)
         elif 'cria_beneficio_aves_corral' in tipo_str or empresa_id == '890707006':
-             return redirect(url_for('gestionavicola_bp.panel_avicola'))
+             return redirect(url_for('gestionavicola_bp.panel_avicola')) #
         
         # 3. LOGÍSTICA Y DISTRIBUCIÓN
         elif 'ventas_distribucion' in tipo_str:
-             return redirect(url_for('logistica_bp.panel_logistica'))
+             return redirect(url_for('logistica_bp.panel_logistica')) #
 
-        # 4. DEFAULT: MÓDULO GLP
-        return redirect(url_for('bp_glp.ver_facturas_glp'))
+        # 4. DEFAULT: MÓDULO GLP / GAS
+        return redirect(url_for('bp_glp.ver_facturas_glp')) #
 
-    # Si no hay sesión, cargamos el formulario de login con la lista de empresas
+    # Carga de empresas para el selector del formulario de login
     form = LoginForm()
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -84,18 +85,18 @@ def index():
         cur.close()
         form.empresa.choices = [(e['nit'], e['nombre_comercial']) for e in empresas_db]
     except Exception as err:
-        print(f"Error al cargar empresas en el login: {err}")
+        print(f"Error al cargar lista de empresas: {err}")
         form.empresa.choices = []
 
     return render_template('login_energix360.html', form=form) 
 
-# --- CONTROLADOR DE AUTENTICACIÓN (LOGIN) ---
+# --- PROCESADOR DE AUTENTICACIÓN (LOGIN) ---
 @app.route('/login', methods=['POST'])
 @csrf.exempt
 def login():
     """
-    Procesa el login via JSON. Valida empresa, usuario, contraseña 
-    y determina la ruta virtual de destino.
+    Valida las credenciales del usuario y devuelve la ruta virtual 
+    de redirección al frontend mediante JSON.
     """
     data = request.get_json(force=True)
     cedula = data.get('cedula')
@@ -103,21 +104,21 @@ def login():
     nombre_empresa = data.get('empresa')
 
     if not all([cedula, password, nombre_empresa]):
-        return jsonify(success=False, message="Datos incompletos.")
+        return jsonify(success=False, message="Por favor, complete todos los campos.")
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
-    # A. Validar Existencia de Empresa
+    # A. Verificación de Empresa
     cur.execute("SELECT nit, tipo_empresa FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
     emp_info = cur.fetchone()
     if not emp_info:
         cur.close()
-        return jsonify(success=False, message="La empresa seleccionada no existe.")
+        return jsonify(success=False, message="Empresa no encontrada.")
 
     nit_empresa = str(emp_info['nit'])
     tipo_empresa = str(emp_info.get('tipo_empresa') or '').lower()
 
-    # B. Validar Usuario y Password
+    # B. Verificación de Usuario y Contraseña
     cur.execute("SELECT * FROM usuarios WHERE cedula = %s", (cedula,))
     usuario = cur.fetchone()
 
@@ -129,38 +130,42 @@ def login():
         cur.close()
         return jsonify(success=False, message="El usuario no pertenece a la empresa seleccionada.")
 
-    # C. Cargar permisos específicos (Módulos activos para Avícolas)
+    # C. Carga de Módulos (Específico para empresas Avícolas)
     modulos_activos = []
     if 'cria_beneficio_aves_corral' in tipo_empresa or nit_empresa == '890707006':
-        cur.execute("SELECT modulo FROM modulos_empresas_avicolas WHERE id_empresa = %s AND estatus = 'activo'", (nit_empresa,))
+        cur.execute("""
+            SELECT modulo FROM modulos_empresas_avicolas 
+            WHERE id_empresa = %s AND estatus = 'activo'
+        """, (nit_empresa,))
         modulos_activos = [m['modulo'] for m in cur.fetchall()]
     
     cur.close()
 
-    # D. INICIALIZACIÓN DE SESIÓN
+    # D. INICIALIZACIÓN DE VARIABLES DE SESIÓN
     session.update({
         'usuario_id': usuario['id'],
         'cedula': usuario['cedula'],
         'nombre': usuario['nombre'],
         'empresa': usuario['empresa'],
         'empresa_id': usuario['empresa_id'],
+        'nit': usuario['empresa_id'], # Alias para compatibilidad
         'tipo_empresa': tipo_empresa,
         'perfil': str(usuario.get('perfil') or '').strip().lower(),
         'modulos_activos': modulos_activos
     })
 
-    # E. DETERMINACIÓN DE RUTA VIRTUAL (Sin archivos físicos inexistentes)
+    # E. DETERMINACIÓN DE RUTA PARA EL FRONTEND (Evita errores 404 por nombres físicos)
     perfil = session['perfil']
     
-    # Lógica de enrutamiento para el Frontend
+    # Redirección dinámica según perfil y tipo de empresa
     if 'webmaster' in tipo_empresa or nit_empresa == '901811727' or 'webmaster' in perfil:
-        ruta_virtual = "901811727.html" # Ruta manejada por bp_901811727
+        ruta_virtual = "901811727.html" # Endpoint para gestionar_usuario
     elif 'ventas_distribucion' in tipo_empresa:
-        ruta_virtual = "control_logistica.html" # Ruta manejada por logistica_bp
+        ruta_virtual = "control_logistica.html"
     elif 'cria_beneficio_aves_corral' in tipo_empresa or nit_empresa == '890707006':
-        ruta_virtual = "gestion_avicola.html" # Ruta manejada por gestionavicola_bp
+        ruta_virtual = "gestion_avicola.html" # Endpoint virtual del Blueprint
     else:
-        ruta_virtual = "glp.html" # Fallback a GLP para evitar 404
+        ruta_virtual = "glp.html" # Fallback seguro
 
     return jsonify(
         success=True,
@@ -174,10 +179,10 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
-# --- EJECUCIÓN (MODO DESARROLLO) ---
+# --- BLOQUE DE EJECUCIÓN ---
 if __name__ == '__main__':
-    # Verificamos integridad de carpetas antes de arrancar
+    # Validación preventiva de la carpeta de archivos estáticos
     if not os.path.exists(app.static_folder):
-        print(f"⚠️  ALERTA: Carpeta static no encontrada en {app.static_folder}")
+        print(f"ADVERTENCIA: Carpeta static no detectada en: {app.static_folder}")
     
     app.run(debug=True, port=5002)
