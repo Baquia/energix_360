@@ -2433,19 +2433,44 @@ def solicitar_pedido_manual():
 def admin_obtener_solicitudes():
     try:
         cur = mysql.connection.cursor()
-        sql = """SELECT p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra, c.dias_operacion, c.`nivel tk-1`, c.`testigo nivel tk-1`
-                 FROM pedidos_gas_glp p LEFT JOIN cardex_glp c ON p.lote = c.lote AND c.operacion IN ('consumo','inicio_calefaccion')
-                 WHERE p.estatus_flujo = 'pendiente_aprobacion' GROUP BY p.id ORDER BY p.fecha_registro DESC"""
-        cur.execute(sql); rows = cur.fetchall(); items = []
+        # SQL modificado: Usamos subconsultas para evitar el error de GROUP BY en producción
+        sql = """
+            SELECT 
+                p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
+                (SELECT dias_operacion FROM cardex_glp WHERE lote = p.lote AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
+                (SELECT `nivel tk-1` FROM cardex_glp WHERE lote = p.lote AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
+                (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote = p.lote AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
+            FROM pedidos_gas_glp p 
+            WHERE p.estatus_flujo = 'pendiente_aprobacion' 
+            ORDER BY p.fecha_registro DESC
+        """
+        cur.execute(sql)
+        rows = cur.fetchall()
+        items = []
         col_names = [d[0] for d in cur.description]
+        
         for r in rows:
             rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
             tk_info = []
-            if rd.get('nivel tk-1') is not None: tk_info.append({"numero": "Ref", "nivel": rd.get('nivel tk-1'), "foto": rd.get('testigo nivel tk-1')})
-            items.append({"id": rd.get('id'), "fecha": str(rd.get('fecha_registro')), "cliente": rd.get('cliente'), "ubicacion": rd.get('ubicacion'), "lote": rd.get('lote'), "dias_operacion": rd.get('dias_operacion'), "nivel_solicitado": float(rd.get('nivel_solicitado') or 0), "dias_extra": rd.get('dias_extra'), "tanques": tk_info})
+            if rd.get('nivel tk-1') is not None: 
+                tk_info.append({"numero": "Ref", "nivel": rd.get('nivel tk-1'), "foto": rd.get('testigo nivel tk-1')})
+            
+            items.append({
+                "id": rd.get('id'), 
+                "fecha": str(rd.get('fecha_registro')), 
+                "cliente": rd.get('cliente'), 
+                "ubicacion": rd.get('ubicacion'), 
+                "lote": rd.get('lote'), 
+                "dias_operacion": rd.get('dias_operacion'), 
+                "nivel_solicitado": float(rd.get('nivel_solicitado') or 0), 
+                "dias_extra": rd.get('dias_extra'), 
+                "tanques": tk_info
+            })
+        cur.close()
         return jsonify({"success": True, "items": items})
-    except Exception as e: return jsonify({"success": False, "message": str(e)})
-
+    except Exception as e: 
+        print("❌ Error de lectura en solicitudes pendientes:", e) # Esto lo imprimirá en tu error.log si vuelve a fallar
+        return jsonify({"success": False, "message": str(e)})
 
 # ==========================================
 # RUTAS DE ADMIN Y APROBACIÓN (CORREGIDAS)
