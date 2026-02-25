@@ -2433,13 +2433,13 @@ def solicitar_pedido_manual():
 def admin_obtener_solicitudes():
     try:
         cur = mysql.connection.cursor()
-        # SQL modificado: Usamos subconsultas para evitar el error de GROUP BY en producción
+        # SQL blindado contra errores de Collation y Modo Estricto
         sql = """
             SELECT 
                 p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
-                (SELECT dias_operacion FROM cardex_glp WHERE lote = p.lote AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
-                (SELECT `nivel tk-1` FROM cardex_glp WHERE lote = p.lote AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
-                (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote = p.lote AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
+                (SELECT dias_operacion FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
+                (SELECT `nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
+                (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
             FROM pedidos_gas_glp p 
             WHERE p.estatus_flujo = 'pendiente_aprobacion' 
             ORDER BY p.fecha_registro DESC
@@ -2469,9 +2469,8 @@ def admin_obtener_solicitudes():
         cur.close()
         return jsonify({"success": True, "items": items})
     except Exception as e: 
-        print("❌ Error de lectura en solicitudes pendientes:", e) # Esto lo imprimirá en tu error.log si vuelve a fallar
+        print("❌ Error de lectura solicitudes:", e)
         return jsonify({"success": False, "message": str(e)})
-
 # ==========================================
 # RUTAS DE ADMIN Y APROBACIÓN (CORREGIDAS)
 # ==========================================
