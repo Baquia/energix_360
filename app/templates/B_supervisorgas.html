@@ -463,6 +463,9 @@
         <button class="nav-item" onclick="mostrarPendientes()">
           <span class="icon-spacer">⏳</span> Pendientes Tanqueo
         </button>
+        <button class="nav-item" onclick="abrirModalLotesVencidos(EMPRESA_ID)">
+          <span class="icon-spacer">🚨</span> Lotes sin Cerrar Calefacción
+        </button>
       </div>
 
       <div class="sidebar-section-title mt-4">ESTADÍSTICAS Y SALDOS</div>
@@ -1121,6 +1124,90 @@
         .from(phantom).save().then(() => { phantom.style.display = 'none'; btn.textContent = "Descargar PDF"; btn.disabled = false; });
     }
   </script>
+
+  <div class="modal fade" id="modalLotesVencidos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title fw-bold">🚨 Lotes Activos sin Finalizar (>15 días)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <p class="text-muted small mb-3">
+            Granjas que llevan más de 15 días operando y no han registrado "Finalizar Calefacción".
+          </p>
+          <div class="table-responsive">
+            <table class="table table-hover table-bordered text-center align-middle bg-white shadow-sm">
+              <thead class="table-dark">
+                <tr>
+                  <th>Ubicación</th>
+                  <th>Lote</th>
+                  <th>Fecha Inicio</th>
+                  <th>Última Actividad</th>
+                  <th>Días Abierto</th>
+                </tr>
+              </thead>
+              <tbody id="tablaLotesVencidosBody">
+              </tbody>
+            </table>
+          </div>
+          <div id="msgSinLotesVencidos" class="alert alert-success text-center mt-3"
+            style="display:none; font-weight: bold;">
+            ✅ Todo en orden. No hay lotes abandonados.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function abrirModalLotesVencidos(empresaId) {
+      const modalEl = document.getElementById('modalLotesVencidos');
+      if (!modalEl) {
+        alert("Error: No se encontró el HTML del modal.");
+        return;
+      }
+
+      const modal = new bootstrap.Modal(modalEl);
+      const tbody = document.getElementById('tablaLotesVencidosBody');
+      const msg = document.getElementById('msgSinLotesVencidos');
+
+      tbody.innerHTML = '<tr><td colspan="5">Cargando datos...</td></tr>';
+      msg.style.display = 'none';
+      modal.show();
+
+      fetch('/obtener_lotes_vencidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresaId })
+      })
+        .then(r => r.json())
+        .then(data => {
+          tbody.innerHTML = '';
+          if (!data.success || data.items.length === 0) {
+            msg.style.display = 'block';
+            return;
+          }
+          data.items.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+            <td class="fw-bold text-primary">${item.ubicacion}</td>
+            <td><code class="text-dark">${item.lote}</code></td>
+            <td>${item.fecha_inicio}</td>
+            <td class="text-muted small">${item.ultima_actividad}</td>
+            <td><div class="badge bg-danger fs-6">${item.dias} Días</div></td>
+          `;
+            tbody.appendChild(tr);
+          });
+        })
+        .catch(e => {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-danger">Error de conexión</td></tr>';
+          console.error("Error al consultar:", e);
+        });
+    }
+  </script>
+
+
 </body>
 
 </html>

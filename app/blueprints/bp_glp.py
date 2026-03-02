@@ -1475,6 +1475,15 @@ def registrar_inicio_calefaccion():
                     print(f"⚠️ Error generando pedido automático: {ep}")
                     pedido_info = {"generado": False, "error": str(ep)}
 
+            # =======================================================
+            # 🔊 AVISO A LA BITÁCORA
+            # =======================================================
+            try:
+                registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Inicio Calefacción", f"Sede: {ubicacion}. Lote: {lote_id}. Población: {pollitos}.", "INFO")
+            except Exception as e:
+                print("Error audit:", e)
+            # =======================================================
+
             mysql.connection.commit()
 
         # 6. Preparar Respuesta Completa (Esto arregla el UI Roto)
@@ -1511,7 +1520,6 @@ def registrar_inicio_calefaccion():
         print("Error registro inicio:", e)
         return jsonify({"success": False, "message": str(e)})
     
-
 # ======================
 # Registrar tanqueo (VERSION FINAL: PROD + BLINDAJE + PRECIOS CORREGIDOS)
 # ======================
@@ -1801,11 +1809,11 @@ def registrar_tanqueo():
 # ======================
 # Registrar consumo (VERSIÓN ATÓMICA Y BLINDADA)
 # ======================
+
 @csrf.exempt
 @bp_glp.route('/registrar_consumo', methods=['POST'])
 @login_required_custom
 def registrar_consumo():
-    # --- BLINDAJE 1: Captura de errores globales ---
     try:
         try:
             data = request.get_json(force=True) or {}
@@ -1816,14 +1824,14 @@ def registrar_consumo():
         if not op_id:
             return jsonify({"success": False, "message": "Falta op_id en la operación"}), 400
 
-        # 1. BLINDAJE INICIAL: Verificación de Idempotencia (Evita procesar dos veces el mismo op_id)
-        check = _verificar_idempotencia(op_id, "consumo", data.get("sede", ""))
+        # BLINDAJE INICIAL
+        ubicacion = _normalize_sede(data.get('sede'))
+        check = _verificar_idempotencia(op_id, "consumo", ubicacion)
         if check: return check
 
         empresa    = session.get('empresa') or ''
         usuario    = session.get('nombre') or ''
         id_empresa = session.get('empresa_id') or 0
-        ubicacion  = _normalize_sede(data.get('sede'))
         tanques    = data.get('tanques', []) or []
 
         if not empresa or not ubicacion:
@@ -1841,205 +1849,137 @@ def registrar_consumo():
         dias_operacion = 0
         proveedor_principal = None
 
-        # --- INICIO DE TRANSACCIÓN ---
-        with mysql.connection.cursor() as cur:
-            # 1. Buscar Lote Activo
-            cur.execute("""
-                SELECT lote
-                FROM cardex_glp
-                WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
-                ORDER BY fecha DESC, id DESC LIMIT 1
-            """, (empresa, ubicacion))
-
-            row_raw = cur.fetchone()
-            if row_raw:
-                lote_id = row_raw.get("lote") if isinstance(row_raw, dict) else row_raw[0]
-
-            if not lote_id:
-                return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
-
-            # 2. Insertar Registro Base
-            columnas = [
-                "fecha","empresa","id_empresa","ubicacion",
-                "lote","estatus_lote","operacion","tipo","clase",
-                "registro","op_id"
-            ]
-            valores  = [
-                fecha, empresa, id_empresa, ubicacion,
-                lote_id, 'ACTIVO', "consumo", "manual", "egreso",
-                usuario, op_id
-            ]
-            
-            cur.execute(
-                f"INSERT INTO cardex_glp ({', '.join(columnas)}) "
-                f"VALUES ({', '.join(['%s']*len(columnas))})",
-                valores
-            )
-            id_operacion = cur.lastrowid
-
-            carpeta = os.path.join("testigos", empresa.replace(" ","_"), lote_id)
-
-            set_cols, set_vals = [], []
-            densidad = 2.0
-            saldo_estimado_kg = 0.0
-            
-            sum_nivel_cap = 0.0
-            sum_cap = 0.0
-
-            # 3. Procesar Tanques
-            for tk in tanques:
-                num_str = str(tk.get("numero", ""))
-                match = _re.search(r'\d+', num_str)
-                num = match.group() if match else ""
-                if not num: continue
-
-                try: val = float(tk.get("nivel", 0) or 0)
-                except: val = 0.0
-                try: cap = float(tk.get("capacidad", 0) or 0)
-                except: cap = 0.0
-                tst = tk.get("testigo")
-
-                set_cols.append(f"`nivel tk-{num}`=%s"); set_vals.append(val)
-                set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(cap)
-
-                if tst:
-                    ruta = _guardar_testigo(tst, carpeta, f"tk{num}_consumo_{id_operacion}")
-                    set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta)
-
-                saldo_estimado_kg += densidad * cap * (val/100.0)
-                sum_nivel_cap += (val * cap)
-                sum_cap += cap
-
-            if set_cols:
-                cur.execute(
-                    f"UPDATE cardex_glp SET {', '.join(set_cols)} WHERE id=%s",
-                    set_vals + [id_operacion]
-                )
-
-            saldo_estimado_gal = saldo_estimado_kg/densidad if densidad else 0.0
-            cur.execute("""
-                UPDATE cardex_glp
-                   SET saldo_estimado_kg=%s,
-                       saldo_estimado_galones=%s
-                 WHERE id=%s
-            """, (round(saldo_estimado_kg,2), round(saldo_estimado_gal,2), id_operacion))
-
-            # 4. Cálculos de Consumo e Historial
-            consumo_kg, kg_pollito, pollitos = _calcular_consumo_lote(
-                cur, empresa, ubicacion, lote_id, id_operacion, tanques
-            )
-
-            dias_operacion = _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha)
-
-            proveedor_principal = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
-            cur.execute("UPDATE cardex_glp SET proveedor=%s WHERE id=%s", (proveedor_principal, id_operacion))
-
-            # =================================================================================
-            # 5. TRANSACCIÓN ATÓMICA: PROCESAR SOLICITUD DE GAS (CON BLINDAJE DE DUPLICADOS)
-            # =================================================================================
-            solicitud_gas = data.get("solicitud_gas")
-            analisis_riesgo = {"requiere_gas": False, "razon": "", "codigo": None}
-
-            if solicitud_gas:
-                nivel_solicitado = float(solicitud_gas.get("nivel", 60))
-                dias_extra = int(solicitud_gas.get("dias_extra", 0))
-                
-                # Generar código (Internamente intenta el INSERT base)
-                codigo = _generar_codigo_pedido(empresa, lote_id, ubicacion, proveedor_principal, cur)
-                
-                # ACTUALIZACIÓN PROTEGIDA DEL PEDIDO
-                # Usamos un bloque try/except local para que si el pedido ya existe (IntegrityError), no tumbe toda la operación
-                try:
+        # --- NUEVO: SISTEMA DE REINTENTOS PARA DEADLOCKS (Igual que en cierre de lote) ---
+        max_intentos = 3
+        for intento in range(max_intentos):
+            try:
+                with mysql.connection.cursor() as cur:
+                    # 1. Buscar Lote Activo
                     cur.execute("""
-                        UPDATE pedidos_gas_glp 
-                        SET nivel_solicitado=%s, 
-                            dias_extra=%s, 
-                            estatus_flujo='pendiente_aprobacion', 
-                            comentarios='Solicitud generada automáticamente junto al consumo'
-                        WHERE codigo_pedido=%s
-                    """, (nivel_solicitado, dias_extra, codigo))
+                        SELECT lote FROM cardex_glp
+                        WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
+                        ORDER BY fecha DESC, id DESC LIMIT 1
+                    """, (empresa, ubicacion))
+
+                    row_raw = cur.fetchone()
+                    if row_raw:
+                        lote_id = row_raw.get("lote") if isinstance(row_raw, dict) else row_raw[0]
+
+                    if not lote_id:
+                        return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
+
+                    # 2. Insertar Registro Base
+                    columnas = ["fecha","empresa","id_empresa","ubicacion","lote","estatus_lote","operacion","tipo","clase","registro","op_id"]
+                    valores  = [fecha, empresa, id_empresa, ubicacion, lote_id, 'ACTIVO', "consumo", "manual", "egreso", usuario, op_id]
                     
-                    # Si no se pudo actualizar porque por alguna razón el registro no está, lo insertamos forzosamente
-                    if cur.rowcount == 0:
-                         cur.execute("""
-                            INSERT INTO pedidos_gas_glp (
-                                codigo_pedido, fecha_solicitud, cliente, ubicacion, 
-                                proveedor, nivel_solicitado, estatus_flujo, comentarios, lote, dias_extra
-                            ) VALUES (%s, NOW(), %s, %s, %s, %s, 'pendiente_aprobacion', %s, %s, %s)
-                        """, (codigo, empresa, ubicacion, proveedor_principal, nivel_solicitado, "Solicitud generada automáticamente", lote_id, dias_extra))
-                except IntegrityError:
-                    # Si el código ya existía en la tabla por un reintento previo, simplemente lo ignoramos y seguimos
-                    print(f"⚠️ Aviso: El pedido {codigo} ya existía en la base de datos. Continuando...")
-                    pass
-                
-                # Vincular el código del pedido al registro del cardex
-                cur.execute("UPDATE cardex_glp SET codigo_pedido=%s WHERE id=%s", (codigo, id_operacion))
-                
-                analisis_riesgo["requiere_gas"] = True
-                analisis_riesgo["razon"] = f"Solicitud {codigo} enviada a revisión del Webmaster."
-                analisis_riesgo["codigo"] = codigo
+                    cur.execute(f"INSERT INTO cardex_glp ({', '.join(columnas)}) VALUES ({', '.join(['%s']*len(columnas))})", valores)
+                    id_operacion = cur.lastrowid
 
-                # Disparar alertas (Telegram + Email Notif)
-                try:
-                    nivel_notif = round(sum_nivel_cap/sum_cap if sum_cap > 0 else 0, 1)
-                    _enviar_alerta_telegram_oficial(ubicacion, usuario, nivel_notif, codigo)
-                    _enviar_alerta_webmaster_nueva_solicitud_notif(codigo, empresa, ubicacion, nivel_solicitado, dias_extra, op_id)
-                except Exception as e_notif:
-                    print(f"⚠️ Advertencia: Alguna notificación falló: {e_notif}")
+                    carpeta = os.path.join("testigos", empresa.replace(" ","_"), lote_id)
+                    set_cols, set_vals = [], []
+                    densidad = 2.0
+                    saldo_estimado_kg = 0.0
+                    sum_nivel_cap = 0.0
+                    sum_cap = 0.0
 
-            # =================================================================================
+                    # 3. Procesar Tanques
+                    for tk in tanques:
+                        num_str = str(tk.get("numero", ""))
+                        match = _re.search(r'\d+', num_str)
+                        num = match.group() if match else ""
+                        if not num: continue
 
-            registrar_auditoria(
-                empresa_id=id_empresa,
-                empresa_nombre=empresa,
-                modulo="GLP",
-                usuario=usuario,
-                accion="Consumo Registrado",
-                detalle=f"Sede: {ubicacion}. Consumo: {round(consumo_kg, 2)} kg.",
-                nivel="INFO"
-            )
+                        try: val = float(tk.get("nivel", 0) or 0)
+                        except: val = 0.0
+                        try: cap = float(tk.get("capacidad", 0) or 0)
+                        except: cap = 0.0
+                        tst = tk.get("testigo")
 
-            mysql.connection.commit()
+                        set_cols.append(f"`nivel tk-{num}`=%s"); set_vals.append(val)
+                        set_cols.append(f"`capacidad tk-{num}`=%s"); set_vals.append(cap)
 
-        # 6. Preparar Respuesta Exitosa
+                        if tst:
+                            ruta = _guardar_testigo(tst, carpeta, f"tk{num}_consumo_{id_operacion}")
+                            if ruta: set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta)
+
+                        saldo_estimado_kg += densidad * cap * (val/100.0)
+                        sum_nivel_cap += (val * cap)
+                        sum_cap += cap
+
+                    if set_cols:
+                        cur.execute(f"UPDATE cardex_glp SET {', '.join(set_cols)} WHERE id=%s", set_vals + [id_operacion])
+
+                    saldo_estimado_gal = saldo_estimado_kg/densidad if densidad else 0.0
+                    cur.execute("UPDATE cardex_glp SET saldo_estimado_kg=%s, saldo_estimado_galones=%s WHERE id=%s", (round(saldo_estimado_kg,2), round(saldo_estimado_gal,2), id_operacion))
+
+                    # 4. Cálculos
+                    consumo_kg, kg_pollito, pollitos = _calcular_consumo_lote(cur, empresa, ubicacion, lote_id, id_operacion, tanques)
+                    dias_operacion = _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha)
+                    proveedor_principal = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
+                    cur.execute("UPDATE cardex_glp SET proveedor=%s WHERE id=%s", (proveedor_principal, id_operacion))
+
+                    # 5. SOLICITUD DE GAS
+                    solicitud_gas = data.get("solicitud_gas")
+                    analisis_riesgo = {"requiere_gas": False, "razon": "", "codigo": None}
+
+                    if solicitud_gas:
+                        nivel_solicitado = float(solicitud_gas.get("nivel", 60))
+                        dias_extra = int(solicitud_gas.get("dias_extra", 0))
+                        
+                        codigo = _generar_codigo_pedido(empresa, lote_id, ubicacion, proveedor_principal, cur)
+                        
+                        try:
+                            cur.execute("""
+                                UPDATE pedidos_gas_glp 
+                                SET nivel_solicitado=%s, dias_extra=%s, estatus_flujo='pendiente_aprobacion', comentarios='Solicitud generada automáticamente'
+                                WHERE codigo_pedido=%s
+                            """, (nivel_solicitado, dias_extra, codigo))
+                            
+                            if cur.rowcount == 0:
+                                 cur.execute("""
+                                    INSERT INTO pedidos_gas_glp (codigo_pedido, fecha_solicitud, cliente, ubicacion, proveedor, nivel_solicitado, estatus_flujo, comentarios, lote, dias_extra) 
+                                    VALUES (%s, NOW(), %s, %s, %s, %s, 'pendiente_aprobacion', 'Solicitud automática', %s, %s)
+                                """, (codigo, empresa, ubicacion, proveedor_principal, nivel_solicitado, lote_id, dias_extra))
+                        except IntegrityError:
+                            pass
+                        
+                        cur.execute("UPDATE cardex_glp SET codigo_pedido=%s WHERE id=%s", (codigo, id_operacion))
+                        analisis_riesgo.update({"requiere_gas": True, "razon": f"Solicitud {codigo} enviada.", "codigo": codigo})
+
+                        try:
+                            nivel_notif = round(sum_nivel_cap/sum_cap if sum_cap > 0 else 0, 1)
+                            _enviar_alerta_telegram_oficial(ubicacion, usuario, nivel_notif, codigo)
+                            _enviar_alerta_webmaster_nueva_solicitud(empresa, ubicacion, usuario, nivel_notif, codigo)
+                        except Exception: pass
+
+                    # Auditoría
+                    registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Consumo Registrado", f"Sede: {ubicacion}. Consumo: {round(consumo_kg, 2)} kg.", "INFO")
+
+                    mysql.connection.commit()
+                    break # ÉXITO, SALIMOS DEL BUCLE
+
+            except OperationalError as e:
+                if e.args[0] == 1213: # DEADLOCK DETECTADO
+                    print(f"⚠️ Deadlock en Consumo (Intento {intento+1})... reintentando.")
+                    mysql.connection.rollback()
+                    time.sleep(0.2)
+                    if intento == max_intentos - 1: raise e
+                else: raise e
+
+        # 6. Preparar Respuesta
         resumen = {
-            "operacion": "consumo",
-            "sede": ubicacion,
-            "lote": lote_id,
-            "fecha": fecha.strftime("%Y-%m-%d"),
-            "tanques": _resumen_tanques(tanques),
-            "saldo_estimado_kg": round(saldo_estimado_kg,2),
-            "dias_operacion": dias_operacion,
-            "kg_consumidos": round(consumo_kg,2),
-            "kg_pollito": round(kg_pollito,6) if kg_pollito > 0 else 0.0,
-            "pollitos": pollitos,
-            "proveedor": proveedor_principal,
-            "op_id": op_id,
-            "requiere_gas": analisis_riesgo["requiere_gas"],
-            "razon_alerta": analisis_riesgo["razon"],
-            "codigo_pedido": analisis_riesgo["codigo"]
+            "operacion": "consumo", "sede": ubicacion, "lote": lote_id, "fecha": fecha.strftime("%Y-%m-%d"),
+            "tanques": _resumen_tanques(tanques), "saldo_estimado_kg": round(saldo_estimado_kg,2), "dias_operacion": dias_operacion,
+            "kg_consumidos": round(consumo_kg,2), "kg_pollito": round(kg_pollito,6) if kg_pollito > 0 else 0.0,
+            "pollitos": pollitos, "proveedor": proveedor_principal, "op_id": op_id,
+            "requiere_gas": analisis_riesgo["requiere_gas"], "razon_alerta": analisis_riesgo["razon"], "codigo_pedido": analisis_riesgo["codigo"]
         }
-
         return jsonify({"success": True, "message": "Operación guardada exitosamente.", "resumen": resumen})
 
-    except IntegrityError as e:
-        # Barrera final contra condiciones de carrera
-        return _manejar_error_idempotencia(e, "consumo", ubicacion)
+    except IntegrityError as e: return _manejar_error_idempotencia(e, "consumo", ubicacion)
+    except ValueError as e: return jsonify({"success": False, "message": str(e)})
+    except Exception as e: return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
 
-    except ValueError as e:
-        mysql.connection.rollback()
-        try: registrar_auditoria(id_empresa, empresa, "GLP", usuario, "⛔ Error Lógico Consumo", str(e), "WARNING")
-        except: pass
-        return jsonify({"success": False, "message": str(e)})
-
-    except Exception as e:
-        mysql.connection.rollback()
-        print("❌ ERROR CRÍTICO EN REGISTRAR CONSUMO:")
-        traceback.print_exc()
-        try: registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Sistema Consumo", str(e), "CRITICAL")
-        except: pass
-        return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
-    
 # ======================
 # Finalizar calefacción (VERSION PRODUCCIÓN BLINDADA)
 # ======================
@@ -2129,6 +2069,15 @@ def finalizar_calefaccion_batch():
                     # CIERRE DE LOTE
                     cur.execute("UPDATE cardex_glp SET estatus_lote='INACTIVO' WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND lote=%s", (empresa, ubicacion, lote_id))
 
+                    # =======================================================
+                    # 🔊 AVISO A LA BITÁCORA
+                    # =======================================================
+                    try:
+                        registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Fin Calefacción", f"Sede: {ubicacion}. Lote cerrado: {lote_id}.", "INFO")
+                    except Exception as e:
+                        print("Error audit:", e)
+                    # =======================================================
+
                     mysql.connection.commit()
                     break # Éxito: Salir del bucle
 
@@ -2148,6 +2097,8 @@ def finalizar_calefaccion_batch():
         mysql.connection.rollback()
         print("❌ ERROR CRÍTICO FINAL:", e)
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
+    
+
                
 # --- FUNCIÓN DE CONSULTA DE PEDIDOS ---
 @bp_glp.route('/consultar_pedidos_pendientes', methods=['POST'])

@@ -852,13 +852,23 @@ def obtener_audit_log():
 
     try:
         cur = mysql.connection.cursor()
+        
+        # 1. Buscamos el nombre de la empresa para rescatar registros huérfanos (con ID 0)
+        cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
+        row_emp = cur.fetchone()
+        emp_nombre = ""
+        if row_emp:
+            emp_nombre = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
+
+        # 2. Búsqueda blindada: Busca por ID o por Nombre (para atrapar los que tienen ID 0)
+        # Se elimina la restricción de 10 días y se limita a los últimos 100 eventos
         cur.execute("""
             SELECT fecha, modulo, usuario, accion, detalle, nivel 
             FROM audit_log 
-            WHERE empresa_id = %s 
-              AND fecha >= DATE_SUB(NOW(), INTERVAL 10 DAY)
+            WHERE empresa_id = %s OR empresa_nombre = %s
             ORDER BY fecha DESC 
-        """, (empresa_id,))
+            LIMIT 100
+        """, (empresa_id, emp_nombre))
         
         logs = cur.fetchall()
         cur.close()
@@ -886,11 +896,13 @@ def obtener_audit_log():
                 'detalle': r.get('detalle'),
                 'nivel': r.get('nivel')
             }) 
+            
         return jsonify({'success': True, 'logs': data})
 
     except Exception as e:
         print(f"Error Audit Log: {e}")
         return jsonify({'success': False, 'message': str(e)})
+
 
 @csrf.exempt
 @bp_901811727.route('/ejecutar_limpieza_automatica')
@@ -1006,6 +1018,7 @@ def obtener_pendientes_tanqueo_reporte():
             
         nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
 
+        # LOGICA CORREGIDA: Busca pedidos aprobados donde NO haya un 'tanqueo' registrado posteriormente en ese lote.
         sql = """
             SELECT 
                 p.id,
@@ -1016,10 +1029,14 @@ def obtener_pendientes_tanqueo_reporte():
                 p.codigo_pedido,
                 DATEDIFF(NOW(), p.fecha_registro) as dias_retraso
             FROM pedidos_gas_glp p
-            LEFT JOIN cardex_glp c ON p.codigo_pedido = c.codigo_pedido
             WHERE p.cliente = %s
               AND p.estatus_flujo = 'aprobado_webmaster'
-              AND c.id IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM cardex_glp c 
+                  WHERE c.lote = p.lote 
+                    AND c.operacion = 'tanqueo' 
+                    AND c.fecha >= DATE(p.fecha_registro)
+              )
             ORDER BY dias_retraso DESC
         """
         cur.execute(sql, (nombre_empresa,))
@@ -1045,7 +1062,7 @@ def obtener_pendientes_tanqueo_reporte():
     except Exception as e:
         print("Error reporte pendientes:", str(e))
         return jsonify({"success": False, "message": str(e)})
-    
+        
 # ==============================================================================
 # INFORME DE SALDOS AL CIERRE
 # ==============================================================================
@@ -1434,3 +1451,54 @@ def obtener_todos_perfiles():
     rows = cur.fetchall()
     res = [dict(zip(['id','empresa','nit','operacion','perfil'], r)) if not isinstance(r, dict) else r for r in rows]
     cur.close(); return jsonify(success=True, profiles=res)
+    
+# ==============================================================================
+# REPORTE DE LOTES ACTIVOS SIN FINALIZAR (>15 DÍAS)
+# ==============================================================================
+@csrf.exempt
+@bp_901811727.route('/obtener_lotes_vencidos', methods=['POST'])
+@login_required_custom
+def obtener_lotes_vencidos():
+    empresa_id = request.get_json().get('empresa_id')
+    if not empresa_id:
+        return jsonify({"success": False, "message": "ID Empresa requerido"})
+
+    try:
+        cur = mysql.connection.cursor()
+        
+        # Calcula los días reales desde la primera fecha del lote hasta HOY
+        sql = """
+            SELECT 
+                ubicacion, 
+                lote, 
+                MIN(fecha) as fecha_inicio,
+                DATEDIFF(NOW(), MIN(fecha)) as dias_abierto,
+                MAX(fecha) as ultima_actividad
+            FROM cardex_glp
+            WHERE id_empresa = %s AND estatus_lote = 'ACTIVO'
+            GROUP BY ubicacion, lote
+            HAVING DATEDIFF(NOW(), MIN(fecha)) > 15
+            ORDER BY dias_abierto DESC
+        """
+        cur.execute(sql, (empresa_id,))
+        rows = cur.fetchall()
+        
+        lotes_vencidos = []
+        col_names = [d[0] for d in cur.description] if cur.description else []
+        
+        for r in rows:
+            rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
+            lotes_vencidos.append({
+                "ubicacion": rd.get('ubicacion'),
+                "lote": rd.get('lote'),
+                "fecha_inicio": str(rd.get('fecha_inicio')),
+                "ultima_actividad": str(rd.get('ultima_actividad')),
+                "dias": int(rd.get('dias_abierto') or 0)
+            })
+
+        cur.close()
+        return jsonify({"success": True, "items": lotes_vencidos})
+
+    except Exception as e:
+        print("Error lotes vencidos:", str(e))
+        return jsonify({"success": False, "message": str(e)})

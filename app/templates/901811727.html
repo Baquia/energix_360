@@ -1126,9 +1126,6 @@
         <div class="p-3 bg-white border-bottom">
           <select id="selectEmpresaAudit" class="form-select" onchange="cargarLogAudit()">
             <option value="">-- Seleccione Empresa --</option>
-            <script>
-              document.write(empresasData.map(e => `<option value="${e.nit}">${e.nombre_comercial}</option>`).join(''));
-            </script>
           </select>
         </div>
         <div class="audit-modal-body">
@@ -1503,9 +1500,16 @@
     // 2. LOGICA AUDIT LOG
     let auditInterval = null;
     function abrirAuditLog() {
+      // 1. Llenamos el select dinámicamente
+      const select = document.getElementById('selectEmpresaAudit');
+      select.innerHTML = '<option value="">-- Seleccione Empresa --</option>' +
+        empresasData.map(e => `<option value="${e.nit}">${e.nombre_comercial}</option>`).join('');
+
+      // 2. Mostramos el modal
       new bootstrap.Modal(document.getElementById('modalAuditLog')).show();
-      document.getElementById('selectEmpresaAudit').value = "";
+      select.value = "";
       document.getElementById('auditTimeline').innerHTML = '<div class="text-center text-muted mt-4">Selecciona una empresa...</div>';
+
       if (auditInterval) clearInterval(auditInterval);
       document.getElementById('modalAuditLog').addEventListener('hidden.bs.modal', function () {
         if (auditInterval) clearInterval(auditInterval);
@@ -1798,6 +1802,7 @@
         opts.push({ value: "validacion", text: "🧐 Validación Tanqueos" });
         opts.push({ value: "aprobacion_glp", text: "✅ Aprobación Solicitudes" });
         opts.push({ value: "pendientes_tanqueo", text: "⏳ Pendientes de Tanqueo" });
+        opts.push({ value: "lotes_vencidos", text: "🚨 Lotes sin Cerrar Calefacción (>15 días)" });
 
         // --- AQUÍ AGREGAMOS LA OPCIÓN AL MENÚ ---
         opts.push({ value: "saldos", text: "💰 Informe de Saldos (Cierre)" });
@@ -1827,6 +1832,12 @@
         // --- 3. VALIDACIÓN ---
         if (t === "validacion") {
           cargarValidacionesTanqueos(cid);
+          return;
+        }
+
+        // 👇 AGREGA ESTE BLOQUE 👇
+        if (t === "lotes_vencidos") {
+          abrirModalLotesVencidos(cid);
           return;
         }
 
@@ -2312,6 +2323,8 @@
   <script>
     // 1. LECTURA SEGURA
     const empDataTxt = document.getElementById('empresas-data').textContent;
+    // 👇 ESTA LÍNEA FALTABA (Es la que da vida a las listas):
+    empresasData = empDataTxt.trim() ? JSON.parse(empDataTxt) : [];
     const tipoDataTxt = document.getElementById('tipos-empresa-data').textContent;
     const tiposEmpresaData = tipoDataTxt.trim() ? JSON.parse(tipoDataTxt) : [];
 
@@ -2615,6 +2628,114 @@
       </div>
     </div>
   </div>
+
+  <div class="modal fade" id="modalPendientesTanqueo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header" style="background-color: #f59e0b; color: white;">
+          <h5 class="modal-title fw-bold">⏳ Pendientes de Tanqueo (En tránsito)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <p class="text-muted small mb-3">
+            Aquí se muestran las solicitudes <strong>ya aprobadas</strong>, pero que el proveedor aún no ha suministrado
+            físicamente en la granja.
+          </p>
+          <div class="table-responsive">
+            <table class="table table-hover table-bordered text-center align-middle bg-white shadow-sm">
+              <thead class="table-dark">
+                <tr>
+                  <th>Fecha / Código</th>
+                  <th>Ubicación</th>
+                  <th>Proveedor</th>
+                  <th>Nivel Solicitado</th>
+                  <th>Tiempo Transcurrido</th>
+                </tr>
+              </thead>
+              <tbody id="tablaPendientesTanqueoBody">
+              </tbody>
+            </table>
+          </div>
+          <div id="msgSinPendientesTanqueo" class="alert alert-success text-center mt-3"
+            style="display:none; font-weight: bold;">
+            ✅ No hay retrasos. Todos los pedidos aprobados ya fueron tanqueados.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalLotesVencidos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title fw-bold">🚨 Lotes Activos sin Finalizar (>15 días)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <p class="text-muted small mb-3">
+            Granjas que llevan más de 15 días operando y no han registrado "Finalizar Calefacción".
+          </p>
+          <div class="table-responsive">
+            <table class="table table-hover table-bordered text-center align-middle bg-white shadow-sm">
+              <thead class="table-dark">
+                <tr>
+                  <th>Ubicación</th>
+                  <th>Lote</th>
+                  <th>Fecha Inicio</th>
+                  <th>Última Actividad</th>
+                  <th>Días Abierto</th>
+                </tr>
+              </thead>
+              <tbody id="tablaLotesVencidosBody">
+              </tbody>
+            </table>
+          </div>
+          <div id="msgSinLotesVencidos" class="alert alert-success text-center mt-3"
+            style="display:none; font-weight: bold;">
+            ✅ Todo en orden. No hay lotes abandonados.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function abrirModalLotesVencidos(empresaId) {
+      const modal = new bootstrap.Modal(document.getElementById('modalLotesVencidos'));
+      const tbody = document.getElementById('tablaLotesVencidosBody');
+      const msg = document.getElementById('msgSinLotesVencidos');
+
+      tbody.innerHTML = '<tr><td colspan="5">Cargando datos...</td></tr>';
+      msg.style.display = 'none';
+      modal.show();
+
+      fetch('/obtener_lotes_vencidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresaId })
+      })
+        .then(r => r.json())
+        .then(data => {
+          tbody.innerHTML = '';
+          if (!data.success || data.items.length === 0) {
+            msg.style.display = 'block';
+            return;
+          }
+          data.items.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+            <td class="fw-bold text-primary">${item.ubicacion}</td>
+            <td><code class="text-dark">${item.lote}</code></td>
+            <td>${item.fecha_inicio}</td>
+            <td class="text-muted small">${item.ultima_actividad}</td>
+            <td><div class="badge bg-danger fs-6">${item.dias} Días</div></td>
+          `;
+            tbody.appendChild(tr);
+          });
+        });
+    }
+  </script>
 
 </body>
 

@@ -627,18 +627,25 @@
       // 1. Evaluación Local Inmediata (Copiloto Offline)
       let sumaCap = 0;
       let sumaNivelCap = 0;
+      let algunTanqueCritico = false; // NUEVO: Detector individual
 
       items.forEach(tk => {
         let cap = parseFloat(tk.capacidad || 0);
         let niv = parseFloat(tk.nivel || 0);
         sumaCap += cap;
         sumaNivelCap += (niv * cap);
+        
+        // NUEVO: Si algún tanque individual toca el 30%, encendemos la alarma
+        if (niv <= 30.0) {
+            algunTanqueCritico = true;
+        }
       });
 
       let nivelPromedio = sumaCap > 0 ? (sumaNivelCap / sumaCap) : 0;
 
       // 2. ¿Nivel crítico? Abrimos el "Peaje" ANTES de enviar
-      if (nivelPromedio <= 30.0) {
+      // Ahora se dispara por promedio bajo O por un tanque bajo
+      if (nivelPromedio <= 30.0 || algunTanqueCritico) {
         let sugerencia = Math.round(80 - nivelPromedio);
         if (sugerencia < 10) sugerencia = 10;
         if (sugerencia > 85) sugerencia = 85;
