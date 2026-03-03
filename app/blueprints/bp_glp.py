@@ -37,14 +37,13 @@ EMAIL_PASS = os.environ.get("EMAIL_PASS")
 
 EMAIL_FROM = os.environ.get("EMAIL_FROM", EMAIL_USER)
 
-def _enviar_alerta_telegram_oficial(ubicacion, usuario, nivel, codigo):
+def _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, nivel, codigo):
     """
-    Envía alerta usando la API NATIVA de Telegram.
-    100% Confiable para Producción.
+    Envía alerta usando la API NATIVA de Telegram a TODOS los usuarios 
+    vinculados que pertenezcan a la empresa solicitante.
     """
     # ================= TUS DATOS =================
     TOKEN = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"  
-    CHAT_ID = "5368207368"
     # =============================================
 
     mensaje = (
@@ -53,27 +52,50 @@ def _enviar_alerta_telegram_oficial(ubicacion, usuario, nivel, codigo):
         f"👤 User: {usuario}\n"
         f"📉 Nivel: {nivel}%\n"
         f"🆔 Cod: {codigo}\n\n"
-        f"⚠️ *Requiere Aprobación Inmediata*"
+        f"⚠️ *Requiere Aprobación*"
     )
 
     try:
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        data = {
-            "chat_id": CHAT_ID,
-            "text": mensaje,
-            "parse_mode": "Markdown"
-        }
-        # Enviamos la petición directa a Telegram
-        resp = requests.post(url, data=data, timeout=5)
+        # 1. Buscamos TODOS los telegram_id de los usuarios de esa empresa específica
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            SELECT telegram_id 
+            FROM usuarios 
+            WHERE empresa_id = %s AND telegram_id IS NOT NULL AND telegram_id != ''
+        """, (id_empresa,))
         
-        if resp.status_code == 200:
-            print("✅ Telegram enviado OK")
-            return True
-        else:
-            print(f"❌ Error Telegram: {resp.text}")
+        usuarios_destino = cur.fetchall()
+        cur.close()
+
+        # Si nadie de la empresa ha vinculado su Telegram aún
+        if not usuarios_destino:
+            print(f"⚠️ Telegram: No hay usuarios vinculados para la empresa ID {id_empresa}")
             return False
+
+        exitos = 0
+        # 2. Enviamos el mensaje en bucle a cada usuario encontrado
+        for row in usuarios_destino:
+            # Lectura blindada (por si la BD devuelve dict o tupla)
+            chat_id = row['telegram_id'] if isinstance(row, dict) else row[0]
+            
+            url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+            data = {
+                "chat_id": chat_id,
+                "text": mensaje,
+                "parse_mode": "Markdown"
+            }
+            
+            resp = requests.post(url, data=data, timeout=5)
+            if resp.status_code == 200:
+                exitos += 1
+            else:
+                print(f"❌ Error enviando Telegram a {chat_id}: {resp.text}")
+
+        print(f"✅ Telegram enviado exitosamente a {exitos} usuarios de la empresa.")
+        return True
+
     except Exception as e:
-        print(f"❌ Error conexión Telegram: {e}")
+        print(f"❌ Error general en multi-envío Telegram: {e}")
         return False
 
 # ==============
@@ -478,7 +500,7 @@ def _enviar_alerta_webmaster_nueva_solicitud(empresa, ubicacion, usuario, nivel_
         email_port = int(os.environ.get("EMAIL_PORT", "587"))
     except:
         email_port = 587
-    email_webmaster = os.environ.get("EMAIL_ADMIN", "tu_email_webmaster@empresa.com") 
+    email_webmaster = os.environ.get("EMAIL_ADMIN", "bqa-one@baquia-esm.com") 
 
     if not email_user or not email_pass:
         return False
@@ -1355,7 +1377,7 @@ def obtener_tanques():
         return jsonify({"success": False, "tanques": [], "message": f"Error: {e}"}), 500
 
 # ======================
-# Iniciar calefacción (CORREGIDA Y BLINDADA)
+# Iniciar calefacción (CORREGIDA Y BLINDADA CON NOTIFICACIONES)
 # ======================
 @csrf.exempt
 @bp_glp.route('/registrar_inicio', methods=['POST'])
@@ -1445,11 +1467,16 @@ def registrar_inicio_calefaccion():
             proveedor = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
             cur.execute("UPDATE cardex_glp SET saldo_estimado_kg=%s, proveedor=%s WHERE id=%s", (saldo_kg, proveedor, id_operacion))
 
-            # 5. Generación de Pedido (Dentro de try/except para no romper flujo si falla el mail)
+            # 5. Generación de Pedido
             pedido_info = None
+            requiere_gas_ui = False
+            codigo_generado = None
+
             if tanques_para_pedido and proveedor:
                 try:
                     codigo = _generar_codigo_pedido(empresa, lote_id, ubicacion, proveedor, cur)
+                    codigo_generado = codigo
+                    requiere_gas_ui = True
                     
                     cur.execute("""
                         UPDATE pedidos_gas_glp 
@@ -1470,6 +1497,13 @@ def registrar_inicio_calefaccion():
                     
                     if enviado:
                         cur.execute("UPDATE pedidos_gas_glp SET estatus_flujo='enviado_auto' WHERE codigo_pedido=%s", (codigo,))
+                    
+                    # --- NUEVA LÍNEA: NOTIFICAR POR TELEGRAM AL WEBMASTER ---
+                    try:
+                        # Avisamos a Telegram que se generó un pedido en el arranque
+                        _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, "Bajo (Arranque)", codigo)
+                    except Exception as e_tel:
+                        print(f"⚠️ Error Telegram Inicio: {e_tel}")
                         
                 except Exception as ep:
                     print(f"⚠️ Error generando pedido automático: {ep}")
@@ -1486,25 +1520,26 @@ def registrar_inicio_calefaccion():
 
             mysql.connection.commit()
 
-        # 6. Preparar Respuesta Completa (Esto arregla el UI Roto)
+        # 6. Preparar Respuesta Completa (Ahora activa el modal verde con el código)
         mensaje = f"Inicio registrado correctamente."
         if pedido_info and pedido_info.get("generado"):
             mensaje += f" ✅ Se generó pedido automático ({pedido_info['codigo']})."
 
-        # IMPORTANTE: Aquí devolvemos TODA la data que el frontend espera para pintar el recibo
+        # IMPORTANTE: Pasamos requiere_gas en True si se generó pedido para que el frontend active el bloque visual
         resumen = {
             "operacion": "inicio_calefaccion",
             "sede": ubicacion,
             "lote": lote_id,
             "fecha": fecha.strftime("%Y-%m-%d"),
             "pollitos": pollitos,
-            "saldo_estimado_kg": round(saldo_kg, 2),
+            "saldo_estimado_kg": round(saldo_estimado_kg, 2),
             "tanques": _resumen_tanques([
                 {"numero": t.get("numero"), "nivel": t.get("nivel"), "capacidad": t.get("capacidad")}
                 for t in tanques
             ]),
             "pedido_automatico": pedido_info,
-            "requiere_gas": False,
+            "requiere_gas": requiere_gas_ui, # <--- Cambio clave para el Modal UI
+            "razon_alerta": f"Pedido automático generado: {codigo_generado}" if codigo_generado else "",
             "dias_operacion": 1,
             "op_id": op_id
         }
@@ -1948,7 +1983,7 @@ def registrar_consumo():
 
                         try:
                             nivel_notif = round(sum_nivel_cap/sum_cap if sum_cap > 0 else 0, 1)
-                            _enviar_alerta_telegram_oficial(ubicacion, usuario, nivel_notif, codigo)
+                            _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, nivel_notif, codigo)
                             _enviar_alerta_webmaster_nueva_solicitud(empresa, ubicacion, usuario, nivel_notif, codigo)
                         except Exception: pass
 
@@ -2345,12 +2380,8 @@ def solicitar_pedido_manual():
             nivel_reportado = res_nivel['nivel tk-1'] if res_nivel and isinstance(res_nivel, dict) else (res_nivel[0] if res_nivel else 0)
 
             # --- ALERTA 1: TELEGRAM (Inmediata) ---
-            _enviar_alerta_telegram_oficial(
-                ubicacion=ubicacion, 
-                usuario=usuario_actual, 
-                nivel=nivel_reportado, 
-                codigo=codigo
-            )
+            id_empresa_actual = session.get('empresa_id', 0)
+            _enviar_alerta_telegram_oficial(id_empresa_actual, ubicacion, usuario_actual, nivel_reportado, codigo)
             print("Notificación Telegram enviada.")
 
             # --- ALERTA 2: EMAIL (Formal) ---
