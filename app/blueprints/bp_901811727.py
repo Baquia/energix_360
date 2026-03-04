@@ -1018,7 +1018,8 @@ def obtener_pendientes_tanqueo_reporte():
             
         nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
 
-        # LOGICA CORREGIDA: Busca pedidos aprobados donde NO haya un 'ingreso' registrado posteriormente en esa misma ubicación.
+        # LÓGICA CORREGIDA: Busca pedidos aprobados/automáticos sin tanqueo posterior, 
+        # blindado contra errores de mayúsculas y collations.
         sql = """
             SELECT 
                 p.id,
@@ -1029,11 +1030,11 @@ def obtener_pendientes_tanqueo_reporte():
                 p.codigo_pedido,
                 DATEDIFF(NOW(), p.fecha_registro) as dias_retraso
             FROM pedidos_gas_glp p
-            WHERE p.cliente = %s
-              AND p.estatus_flujo = 'aprobado_webmaster'
+            WHERE TRIM(UPPER(p.cliente)) = TRIM(UPPER(%s))
+              AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
               AND NOT EXISTS (
                   SELECT 1 FROM cardex_glp c 
-                  WHERE c.ubicacion = p.ubicacion 
+                  WHERE c.ubicacion COLLATE utf8mb4_general_ci = p.ubicacion COLLATE utf8mb4_general_ci
                     AND (c.operacion = 'tanqueo' OR c.clase = 'ingreso')
                     AND c.fecha >= DATE(p.fecha_registro)
               )
