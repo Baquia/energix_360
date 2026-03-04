@@ -1018,7 +1018,7 @@ def obtener_pendientes_tanqueo_reporte():
             
         nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
 
-        # LOGICA CORREGIDA: Busca pedidos aprobados donde NO haya un 'tanqueo' registrado posteriormente en ese lote.
+        # LOGICA CORREGIDA: Busca pedidos aprobados donde NO haya un 'ingreso' registrado posteriormente en esa misma ubicación.
         sql = """
             SELECT 
                 p.id,
@@ -1033,8 +1033,8 @@ def obtener_pendientes_tanqueo_reporte():
               AND p.estatus_flujo = 'aprobado_webmaster'
               AND NOT EXISTS (
                   SELECT 1 FROM cardex_glp c 
-                  WHERE c.lote = p.lote 
-                    AND c.operacion = 'tanqueo' 
+                  WHERE c.ubicacion = p.ubicacion 
+                    AND (c.operacion = 'tanqueo' OR c.clase = 'ingreso')
                     AND c.fecha >= DATE(p.fecha_registro)
               )
             ORDER BY dias_retraso DESC
