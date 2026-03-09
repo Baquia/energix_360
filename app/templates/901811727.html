@@ -1754,12 +1754,26 @@
         .catch(() => { if (card) card.style.opacity = '1'; alert("Error conexión"); });
     }
 
-    // 5. UTILIDADES FORMULARIOS
+    // 5. UTILIDADES FORMULARIOS Y LIMPIEZA EN SEGUNDO PLANO
     document.addEventListener('DOMContentLoaded', function () {
       window.mostrarFormulario = function (id) {
         document.querySelectorAll('.form-section').forEach(div => div.style.display = 'none');
         const t = document.getElementById(id); if (t) t.style.display = 'block';
       }
+
+      // ---> INICIO DISPARADOR DE LIMPIEZA AUTOMÁTICA <---
+      // Esto ejecuta la limpieza de archivos > 60 días sin que el usuario se dé cuenta ni se bloquee la pantalla
+      fetch('/ejecutar_limpieza_automatica')
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) {
+                console.log("🧹 Mantenimiento exitoso:", data.message);
+            } else {
+                console.warn("⚠️ Mantenimiento falló:", data.message);
+            }
+        })
+        .catch(err => console.error("Error conectando con limpieza automática:", err));
+      // ---> FIN DISPARADOR <---
     });
 
     let formularioActivo = null;
