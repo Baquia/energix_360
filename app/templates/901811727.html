@@ -2502,7 +2502,64 @@
         .catch(err => alert("Error de red al aprobar."));
     }
 
-    function abrirModalPendientesTanqueo(empresaId) { const modal = new bootstrap.Modal(document.getElementById('modalPendientesTanqueo')); const tbody = document.getElementById('tablaPendientesTanqueoBody'); const msg = document.getElementById('msgSinPendientesTanqueo'); tbody.innerHTML = '<tr><td colspan="5">Cargando datos...</td></tr>'; msg.style.display = 'none'; modal.show(); fetch('/obtener_pendientes_tanqueo_reporte', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: empresaId }) }).then(r => r.json()).then(data => { tbody.innerHTML = ''; if (!data.success || data.items.length === 0) { msg.style.display = 'block'; return; } data.items.forEach(item => { let badgeColor = 'bg-success'; if (item.dias >= 1 && item.dias <= 2) badgeColor = 'bg-warning text-dark'; else if (item.dias >= 3) badgeColor = 'bg-danger'; const tr = document.createElement('tr'); tr.innerHTML = `<td><div>${item.fecha}</div><small class="text-muted text-uppercase" style="font-size:0.7em">${item.codigo}</small></td><td class="fw-bold text-primary">${item.ubicacion}</td><td>${item.proveedor || 'N/D'}</td><td><span class="fw-bold">${item.solicitado}%</span></td><td><div class="badge ${badgeColor}" style="font-size:0.9em;">${item.dias} Días</div></td>`; tbody.appendChild(tr); }); }); }
+    function abrirModalPendientesTanqueo(empresaId) {
+      const modal = new bootstrap.Modal(document.getElementById('modalPendientesTanqueo'));
+      const bodyRuptura = document.getElementById('tablaRupturaBody');
+      const containerRuptura = document.getElementById('seccionRupturaCritica');
+      const tbody = document.getElementById('tablaPendientesTanqueoBody');
+      const msg = document.getElementById('msgSinPendientesTanqueo');
+
+      modal.show();
+      tbody.innerHTML = '<tr><td colspan="5">Cargando datos operativos...</td></tr>';
+      msg.style.display = 'none';
+
+      // A. CONSULTA DE RUPTURAS (Facturas validadas sin registro físico)
+      fetch('/obtener_alertas_ruptura_validacion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresaId })
+      }).then(r => r.json()).then(data => {
+        bodyRuptura.innerHTML = '';
+        if (data.success && data.items.length > 0) {
+          containerRuptura.style.display = 'block';
+          data.items.forEach(item => {
+            bodyRuptura.innerHTML += `
+                    <tr class="fw-bold text-danger">
+                        <td>${item.codigo}</td>
+                        <td>${item.ubicacion}</td>
+                        <td><span class="badge bg-secondary">${item.factura}</span></td>
+                        <td>${item.dias} Días</td>
+                    </tr>`;
+          });
+        } else {
+          containerRuptura.style.display = 'none';
+        }
+      });
+
+      // B. CONSULTA DE TRÁNSITO (Pedidos generados esperando al camión)
+      fetch('/obtener_pendientes_tanqueo_reporte', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresaId })
+      }).then(r => r.json()).then(data => {
+        tbody.innerHTML = '';
+        if (data.success && data.items.length > 0) {
+          msg.style.display = 'none';
+          data.items.forEach(item => {
+            tbody.innerHTML += `
+                    <tr>
+                        <td><div>${item.fecha}</div><small class="text-muted">${item.codigo}</small></td>
+                        <td class="fw-bold text-primary">${item.ubicacion}</td>
+                        <td>${item.proveedor || 'N/D'}</td>
+                        <td><span class="fw-bold">${item.solicitado}%</span></td>
+                        <td><div class="badge bg-warning text-dark">${item.dias} Días</div></td>
+                    </tr>`;
+          });
+        } else {
+          msg.style.display = 'block';
+        }
+      });
+    }
   </script>
 
   <script id="empresas-data" type="application/json">
@@ -2869,22 +2926,20 @@
     </div>
   </div>
 
-  <div class="modal fade" id="modalPendientesTanqueo" tabindex="-1" aria-hidden="true">
+  <div class="modal fade" id="modalPendientesTanqueo" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header bg-dark text-white">
+        <div class="modal-header bg-warning text-dark">
           <h5 class="modal-title fw-bold">⏳ Control Logístico de Suministro</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body bg-light">
 
           <div id="seccionRupturaCritica" style="display:none;" class="mb-4">
             <div class="alert alert-danger border-danger shadow-sm">
-              <h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> 🚨 ALERTA: RUPTURA EN PROCESO DE
-                VALIDACIÓN</h6>
-              <p class="small mb-0">Los siguientes pedidos ya fueron <b>contabilizados (validados)</b>, pero el
-                galponero no ha registrado el ingreso físico en el kárdex. Esto representa un riesgo de pérdida de
-                trazabilidad.</p>
+              <h6 class="fw-bold">🚨 ALERTA: PEDIDOS VALIDADOS SIN REGISTRO EN KÁRDEX</h6>
+              <p class="small mb-0">Los siguientes pedidos ya fueron contabilizados, pero el galponero no ha registrado
+                el ingreso físico.</p>
             </div>
             <div class="table-responsive">
               <table class="table table-sm table-hover table-bordered bg-white text-center align-middle border-danger">
@@ -2893,8 +2948,7 @@
                     <th>Código</th>
                     <th>Granja</th>
                     <th>Factura</th>
-                    <th>Validado hace</th>
-                    <th>Acción Sugerida</th>
+                    <th>Días de Retraso</th>
                   </tr>
                 </thead>
                 <tbody id="tablaRupturaBody"></tbody>
@@ -2911,14 +2965,14 @@
                   <th>Ubicación</th>
                   <th>Proveedor</th>
                   <th>Nivel Solicitado</th>
-                  <th>Tiempo Espera</th>
+                  <th>Espera</th>
                 </tr>
               </thead>
               <tbody id="tablaPendientesTanqueoBody"></tbody>
             </table>
           </div>
-          <div id="msgSinPendientesTanqueo" class="alert alert-success text-center mt-3" style="display:none;">
-            ✅ No hay pedidos pendientes de registro.
+          <div id="msgSinPendientesTanqueo" class="text-center p-4 text-muted" style="display:none;">
+            ✅ Todo al día.
           </div>
         </div>
       </div>

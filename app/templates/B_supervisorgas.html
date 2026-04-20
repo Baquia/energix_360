@@ -703,26 +703,27 @@
   <div class="modal fade" id="modalPendientesTanqueo" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header bg-dark text-white">
+        <div class="modal-header bg-warning text-dark">
           <h5 class="modal-title fw-bold">⏳ Control Logístico de Suministro</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body bg-light">
 
           <div id="seccionRupturaCritica" style="display:none;" class="mb-4">
             <div class="alert alert-danger border-danger shadow-sm">
-              <h6 class="fw-bold">🚨 ALERTA: RUPTURA EN PROCESO DE VALIDACIÓN</h6>
-              <p class="small mb-0">Los siguientes pedidos ya fueron <b>contabilizados (validados)</b>, pero no se ha
-                registrado el ingreso físico en el kárdex de la granja.</p>
+              <h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> 🚨 ALERTA: PEDIDOS VALIDADOS SIN
+                REGISTRO EN KÁRDEX</h6>
+              <p class="small mb-0">Los siguientes pedidos ya tienen factura contabilizada, pero <b>no se ha registrado
+                  el ingreso físico</b> en la granja. Esto rompe el proceso de validación.</p>
             </div>
             <div class="table-responsive">
               <table class="table table-sm table-hover table-bordered bg-white text-center align-middle border-danger">
                 <thead class="table-danger">
                   <tr class="small">
-                    <th>Código</th>
-                    <th>Granja</th>
-                    <th>Factura</th>
-                    <th>Retraso Registro</th>
+                    <th>Código Pedido</th>
+                    <th>Ubicación</th>
+                    <th>Factura Ref.</th>
+                    <th>Días de Retraso</th>
                   </tr>
                 </thead>
                 <tbody id="tablaRupturaBody"></tbody>
@@ -730,12 +731,12 @@
             </div>
           </div>
 
-          <h6 class="fw-bold text-muted border-bottom pb-2 mb-3">🚚 Pedidos en Tránsito (Pendientes de Tanqueo)</h6>
+          <h6 class="fw-bold text-muted border-bottom pb-2 mb-3">🚚 Pedidos en Tránsito (Esperando Camión)</h6>
           <div class="table-responsive">
             <table class="table table-hover table-bordered text-center align-middle bg-white shadow-sm">
               <thead class="table-dark small">
                 <tr>
-                  <th>Fecha</th>
+                  <th>Fecha / Código</th>
                   <th>Sede</th>
                   <th>Proveedor</th>
                   <th>Solicitado</th>
@@ -1255,10 +1256,10 @@
       const msgSin = document.getElementById('msgSinPendientesTanqueo');
 
       modal.show();
-      tb.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+      tb.innerHTML = '<tr><td colspan="5" class="p-3">Consultando base de datos...</td></tr>';
       msgSin.style.display = 'none';
 
-      // 1. NUEVA CONSULTA: Alertas de Ruptura (Validados sin Kárdex) [Usa la ruta de bp_901811727.py]
+      // A. CONSULTAR RUPTURAS: Facturas validadas que no aparecen en el Cardex
       fetch('/obtener_alertas_ruptura_validacion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1266,7 +1267,7 @@
       }).then(r => r.json()).then(d => {
         bodyRuptura.innerHTML = '';
         if (d.success && d.items.length > 0) {
-          containerRuptura.style.display = 'block';
+          containerRuptura.style.display = 'block'; // Muestra la alerta roja
           d.items.forEach(i => {
             bodyRuptura.innerHTML += `
                     <tr class="fw-bold text-danger">
@@ -1281,7 +1282,7 @@
         }
       });
 
-      // 2. CONSULTA ORIGINAL: Pedidos en Tránsito (Estatus Generado)
+      // B. CONSULTAR EN TRÁNSITO: Pedidos generados/aprobados esperando al proveedor
       fetch('/obtener_pendientes_tanqueo_reporte', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1293,11 +1294,11 @@
           d.items.forEach(i => {
             tb.innerHTML += `
                     <tr>
-                        <td>${i.fecha}</td>
+                        <td><div>${i.fecha}</div><small class="text-muted">${i.codigo}</small></td>
                         <td class="fw-bold">${i.ubicacion}</td>
                         <td>${i.proveedor}</td>
                         <td>${i.solicitado}%</td>
-                        <td>${i.dias} días</td>
+                        <td><div class="badge bg-warning text-dark">${i.dias} días</div></td>
                     </tr>`;
           });
         } else {
