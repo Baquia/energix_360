@@ -823,19 +823,29 @@
                 if (i.numero_orden_origen) {
                     extraBadges += `<span style="display:inline-block; background:#e0f2fe; color:#0369a1; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-right:5px; margin-top:5px;">📦 Ord: #${i.numero_orden_origen}</span>`;
                 }
-                if (i.zona) {
-                    extraBadges += `<span style="display:inline-block; background:#fce7f3; color:#be185d; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-top:5px;">🚚 Ruta: ${i.zona}</span>`;
+
+                // AQUÍ ESTÁ EL CAMBIO PARA MOSTRAR EL MUELLE/PUERTA
+                if (i.puerta_asignada) {
+                    extraBadges += `<span style="display:inline-block; background:#fce7f3; color:#be185d; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-top:5px;">🚚 Muelle/Puerta: ${i.puerta_asignada}</span>`;
                 }
+
+                // Petición 1: Extraccion de embalaje dinámico
+                let embalaje = (i.unidad_embalaje && i.unidad_embalaje.trim() !== '') ? i.unidad_embalaje.toUpperCase() : 'UNIDADES';
+                if (embalaje === 'UND') embalaje = 'UNIDADES';
+
+                let htmlCantidades = '';
+                if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.9rem;">📦 ${i.req_cajas} CAJAS</div>`;
+                if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.9rem; color: var(--secondary);">🍬 ${i.req_unidades} ${embalaje}</div>`;
+                if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.9rem;">📦 0</div>`;
 
                 c.innerHTML += `
             <div id="card_${i.id}" class="item-row active" onclick="abrirModalPickingId(${i.id})">
-                <div class="qty-indicator" style="font-size: 0.85rem; flex-direction: column; gap: 4px;">
-                    <div>📦 ${i.req_cajas}</div>
-                    <div style="color: var(--secondary);">🍬 ${i.req_unidades}</div>
+                <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 10px; width: auto; font-size: 0.85rem;">
+                    ${htmlCantidades}
                 </div>
-                <div class="item-details">
+                <div class="item-details" style="overflow: hidden;">
                     <div class="id-code">${i.codigo_producto || 'S/C'}</div>
-                    <div class="id-name">${badgeHtml}${nombre}</div>
+                    <div class="id-name" style="word-break: break-word;">${badgeHtml}${nombre}</div>
                     <div>${extraBadges}</div>
                 </div>
             </div>`;
@@ -856,39 +866,48 @@
             const nombre = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
             document.getElementById('pk-name').textContent = nombre;
             document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
-            document.getElementById('pk-loc').textContent = item.zona || "A-01";
 
-            // Requeridos vs Actuales (Aseguramos que sean números enteros)
+            // Inyectamos la puerta asignada por el supervisor
+            document.getElementById('pk-loc').textContent = "Muelle " + (item.puerta_asignada || 'S/A');
+
+            // Requeridos vs Actuales
             itemActivo.req_cajas = parseInt(item.req_cajas) || 0;
             itemActivo.req_unidades = parseInt(item.req_unidades) || 0;
             itemActivo.act_cajas = parseInt(item.act_cajas) || 0;
             itemActivo.act_unidades = parseInt(item.act_unidades) || 0;
 
-            document.getElementById('pk-req').innerHTML = `📦 ${itemActivo.req_cajas} <br> 🍬 ${itemActivo.req_unidades}`;
+            let embalajeModal = (itemActivo.unidad_embalaje && itemActivo.unidad_embalaje.trim() !== '') ? itemActivo.unidad_embalaje.toUpperCase() : 'UNIDADES';
+            if (embalajeModal === 'UND') embalajeModal = 'UNIDADES';
+
+            let htmlReqModal = '';
+            if (itemActivo.req_cajas > 0) htmlReqModal += `📦 ${itemActivo.req_cajas} CAJAS<br>`;
+            if (itemActivo.req_unidades > 0) htmlReqModal += `🍬 ${itemActivo.req_unidades} ${embalajeModal}`;
+
+            document.getElementById('pk-req').innerHTML = htmlReqModal || '0';
+
             document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
             document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
 
-            // RESETEAR INTERFAZ VISUAL DEL MODAL
+            // Mostrar Cámara y TODAS las herramientas (Sin bloqueos)
             document.getElementById('cam-overlay-btn').style.display = 'flex';
-            document.getElementById('area-conteo-cajas').classList.add('hidden');
-            document.getElementById('area-teclado-fracciones').classList.add('hidden');
 
-            // MÁQUINA DE ESTADOS: Determinar en qué fase iniciamos al abrir
-            if (itemActivo.req_cajas > itemActivo.act_cajas) {
-                // Faltan cajas: Modo Estricto (Cámara como contador)
-                faseAlistamiento = 'CAJAS';
+            // Solo mostrar las áreas si el producto las requiere
+            if (itemActivo.req_cajas > 0) {
                 document.getElementById('area-conteo-cajas').classList.remove('hidden');
-            } else if (itemActivo.req_unidades > 0 && itemActivo.act_unidades < itemActivo.req_unidades) {
-                // Cajas listas (o cero requeridas). Vamos por las fracciones
-                // Iniciamos la cámara en "Modo Llave" (requiere 1 escaneo para desbloquear el teclado)
-                faseAlistamiento = 'LLAVE';
-                alert("🔑 Escanea la caja principal una vez para desbloquear las fracciones.");
             } else {
-                // Ya todo estaba listo (caso raro al reabrir, pero se maneja por seguridad)
-                faseAlistamiento = 'MANUAL';
-                document.getElementById('area-teclado-fracciones').classList.remove('hidden');
+                document.getElementById('area-conteo-cajas').classList.add('hidden');
             }
 
+            if (itemActivo.req_unidades > 0) {
+                document.getElementById('area-teclado-fracciones').classList.remove('hidden');
+                // Quitamos el texto de "Validado con llave EAN" del HTML dinámicamente si existe
+                const smallText = document.querySelector('#area-teclado-fracciones small');
+                if (smallText) smallText.style.display = 'none';
+            } else {
+                document.getElementById('area-teclado-fracciones').classList.add('hidden');
+            }
+
+            evaluarBotonTerminar(); // Revisa si ya está completo al abrir
             document.getElementById('modal-picking').style.display = 'flex';
         }
 
@@ -923,6 +942,20 @@
                 itemActivo.act_unidades = nuevo;
                 document.getElementById('pk-count-unidades').textContent = nuevo;
                 playBeep();
+                evaluarBotonTerminar(); // Revisa y enciende el botón verde si ya se completó el ítem
+            }
+        }
+
+        function evaluarBotonTerminar() {
+            const btn = document.querySelector('.btn-finish');
+            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
+                btn.style.background = '#10b981';
+                btn.textContent = 'TERMINAR ÍTEM ✓';
+                btn.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.4)';
+            } else {
+                btn.style.background = '#374151';
+                btn.textContent = 'GUARDAR PARCIAL';
+                btn.style.boxShadow = 'none';
             }
         }
 
@@ -932,7 +965,6 @@
             if (!itemActivo) return;
             document.getElementById('cam-overlay-btn').style.display = 'none';
 
-            // Si entramos y ya está todo lleno, no dejar arrancar la cámara
             if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
                 alert("⚠️ Este ítem ya está completo. Presiona 'Terminar Ítem'.");
                 return;
@@ -947,41 +979,38 @@
                     const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
 
                     if (target && scanned === target) {
+                        playBeep();
 
-                        // FLUJO 1: Llenando Cajas (Modo Estricto, 1 escaneo = 1 caja)
-                        if (faseAlistamiento === 'CAJAS') {
-                            if (itemActivo.act_cajas >= itemActivo.req_cajas) return; // Seguro anti-rebote
-
-                            playBeep();
+                        // Solo sumamos cajas si faltan
+                        if (itemActivo.act_cajas < itemActivo.req_cajas) {
                             itemActivo.act_cajas++;
                             document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
 
+                            // Efecto visual rápido
+                            document.getElementById('pk-count-cajas').style.color = '#10b981';
+                            setTimeout(() => document.getElementById('pk-count-cajas').style.color = '#0284c7', 300);
+
+                            // ¿Alcanzó la meta de cajas?
                             if (itemActivo.act_cajas >= itemActivo.req_cajas) {
-                                // Cajas completas. ¿Hay fracciones pendientes en el pedido?
-                                if (itemActivo.req_unidades > 0) {
-                                    scanner.pause(true);
-                                    faseAlistamiento = 'MANUAL'; // Pasamos a la fase 2 automáticamente
-                                    document.getElementById('area-conteo-cajas').classList.add('hidden');
-                                    document.getElementById('area-teclado-fracciones').classList.remove('hidden');
-                                    setTimeout(() => alert("✅ Cajas completas.\nAhora digita las unidades sueltas abajo."), 200);
-                                } else {
-                                    scanner.pause(true);
-                                    setTimeout(() => alert("✅ Meta alcanzada. Presiona 'TERMINAR ITEM'."), 200);
-                                }
+                                scanner.pause(true); // Apagamos la cámara sin molestar
+                                document.getElementById('embedded-reader').style.opacity = '0.5';
                             } else {
-                                // Faltan más cajas, pausar 1 segundo para no escanear la misma caja 10 veces rápido
+                                // Faltan cajas: Pausa de 1 segundo anti-doble-lectura
                                 scanner.pause(true);
-                                setTimeout(() => scanner.resume(), 1000);
+                                setTimeout(() => { if (scanner) scanner.resume(); }, 1000);
                             }
+                        } else {
+                            // Si ya terminó cajas y escanea de nuevo, o si es un ítem solo de fracciones
+                            scanner.pause(true);
+                            document.getElementById('embedded-reader').style.opacity = '0.5';
                         }
-                        // FLUJO 2: Validación Llave (El pedido era solo fracciones / Break-pack)
-                        else if (faseAlistamiento === 'LLAVE') {
-                            playBeep();
-                            scanner.pause(true); // Bloqueamos la cámara porque ya cumplió su función
-                            faseAlistamiento = 'MANUAL';
-                            document.getElementById('area-teclado-fracciones').classList.remove('hidden');
-                            setTimeout(() => alert("🔓 Producto validado.\nYa puedes digitar las unidades sueltas con los botones."), 200);
-                        }
+
+                        evaluarBotonTerminar();
+                    } else {
+                        // Código incorrecto
+                        scanner.pause(true);
+                        alert(`❌ Código incorrecto. Esperado: ${itemActivo.codigo_producto}`);
+                        setTimeout(() => { if (scanner) scanner.resume(); }, 500);
                     }
                 },
                 (err) => { }

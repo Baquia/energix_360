@@ -71,7 +71,7 @@ def index():
         
         # 3. LOGÍSTICA Y DISTRIBUCIÓN
         elif 'ventas_distribucion' in tipo_str:
-             return redirect(url_for('logistica_bp.panel_logistica')) #
+             return redirect(url_for('logistica_bp.home'))
 
         # 4. DEFAULT: MÓDULO GLP / GAS
         return redirect(url_for('bp_glp.ver_facturas_glp')) #

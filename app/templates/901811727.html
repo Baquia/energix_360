@@ -1097,6 +1097,52 @@
       </div>
     </div>
 
+    <div class="modal fade" id="modalAuditoriaActivos" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content bg-light">
+          <div class="modal-header bg-dark text-white">
+            <h5 class="modal-title fw-bold">👁️ Tablero de Auditoría (Lotes en Calefacción)</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+
+            <div class="row mb-4">
+              <div class="col-md-4">
+                <label class="fw-bold small text-muted">Filtrar por Granja Activa:</label>
+                <select id="filtroGranjaAuditoria" class="form-select form-select-lg shadow-sm fw-bold text-primary"
+                  onchange="renderizarDashboardAuditoria()">
+                </select>
+              </div>
+            </div>
+
+            <div class="row mb-4" id="tarjetasKpiAuditoria">
+            </div>
+
+            <div class="card shadow-sm border-0">
+              <div class="card-body p-0 table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0 text-center">
+                  <thead class="table-dark small">
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Granja</th>
+                      <th>Día</th>
+                      <th>Operación</th>
+                      <th>Gastado / Diferencia</th>
+                      <th>Responsable</th>
+                      <th>Evidencia</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tablaAuditoriaBody">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="modalConfirmacionGlobal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -1766,11 +1812,11 @@
       fetch('/ejecutar_limpieza_automatica')
         .then(response => response.json())
         .then(data => {
-            if(data.success) {
-                console.log("🧹 Mantenimiento exitoso:", data.message);
-            } else {
-                console.warn("⚠️ Mantenimiento falló:", data.message);
-            }
+          if (data.success) {
+            console.log("🧹 Mantenimiento exitoso:", data.message);
+          } else {
+            console.warn("⚠️ Mantenimiento falló:", data.message);
+          }
         })
         .catch(err => console.error("Error conectando con limpieza automática:", err));
       // ---> FIN DISPARADOR <---
@@ -1817,9 +1863,11 @@
         opts.push({ value: "aprobacion_glp", text: "✅ Aprobación Solicitudes" });
         opts.push({ value: "pendientes_tanqueo", text: "⏳ Pendientes de Tanqueo" });
         opts.push({ value: "lotes_vencidos", text: "🚨 Lotes sin Cerrar Calefacción (>15 días)" });
-
         // --- AQUÍ AGREGAMOS LA OPCIÓN AL MENÚ ---
         opts.push({ value: "saldos", text: "💰 Informe de Saldos (Cierre)" });
+        opts.push({ value: "generar_qr", text: "🔲 Generar QR-Granja" });
+        opts.push({ value: "editar_tanques", text: "⚙️ Editar Tanques / Proveedor" });
+        opts.push({ value: "auditoria_activos", text: "👁️ Auditoría Lotes Activos" }); // <-- AGREGA ESTA LÍNEA
       }
 
       mostrarPregunta("Tipo de informe", opts, (t) => {
@@ -1855,10 +1903,54 @@
           return;
         }
 
+        // 👇 AGREGA ESTE BLOQUE 👇
+        if (t === "generar_qr") {
+          mostrarPregunta("Seleccione Modalidad de QR", [
+            { value: "individual", text: "📄 QR Individual (Seleccionar Granja)" },
+            { value: "masivo", text: "📚 QRs Masivos (Todas las Granjas en 1 PDF)" }
+          ], (modo) => {
+            if (modo === "individual") {
+              fetch('/obtener_ubicaciones', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tipo: 'granja', empresa_id: cid })
+              }).then(r => r.json()).then(d => {
+                if (d.success && d.ubicaciones.length > 0) {
+                  mostrarPregunta("Seleccione Granja", d.ubicaciones.map(u => ({ value: u, text: u })), (ubi) => {
+                    descargarPdfQR(cid, 'individual', ubi);
+                  });
+                } else { alert("No hay granjas configuradas para esta empresa."); }
+              });
+            } else {
+              descargarPdfQR(cid, 'masivo', null);
+            }
+          });
+          return;
+        }
+
+        // 👇 AGREGA ESTE BLOQUE 👇
+        if (t === "editar_tanques") {
+          fetch('/obtener_ubicaciones', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tipo: 'granja', empresa_id: cid })
+          }).then(r => r.json()).then(d => {
+            if (d.success && d.ubicaciones.length > 0) {
+              mostrarPregunta("Seleccione Granja a Editar", d.ubicaciones.map(u => ({ value: u, text: u })), (ubi) => {
+                abrirModalEdicionTanques(cid, ubi);
+              });
+            } else { alert("No hay granjas configuradas."); }
+          });
+          return;
+        }
+
         // --- 4. GENERAL ---
         if (t === "general") {
           pregPeriodo(cid, t, null);
           return; // Agrega return por seguridad
+        }
+
+        if (t === "auditoria_activos") {
+          iniciarAuditoriaActivos(cid);
+          return;
         }
 
         // --- 5. POR GRANJA O ZONA (Cualquier otra cosa cae aquí) ---
@@ -2014,11 +2106,35 @@
       if (!datosGlobales) return;
       const ctx = document.getElementById('graficoConsumo').getContext('2d');
       if (chartInstancia) chartInstancia.destroy();
+
       const s = datosGlobales.series;
-      let d = [];
-      if (vista === 'rendimiento') d = [{ label: 'Rendimiento', data: s.kg_pollito, borderColor: '#6366f1', fill: true, backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 }];
-      else d = [{ label: 'Saldos', data: s.saldo_inicial, borderColor: '#3b82f6' }];
-      chartInstancia = new Chart(ctx, { type: 'line', data: { labels: s.fechas, datasets: d }, options: { responsive: true, maintainAspectRatio: false } });
+      const d = vista === 'rendimiento'
+        ? [{ label: 'Rendimiento', data: s.kg_pollito, borderColor: '#6366f1', fill: true, backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 }]
+        : [{ label: 'Saldos', data: s.saldo_inicial, borderColor: '#3b82f6' }];
+
+      chartInstancia = new Chart(ctx, {
+        type: 'line',
+        data: { labels: s.fechas, datasets: d },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          // --- NUEVO: INTERACTIVIDAD PARA DIAGNÓSTICO INTELIGENTE ---
+          onClick: (e, activeEls) => {
+            if (activeEls.length > 0 && vista === 'rendimiento') {
+              const index = activeEls[0].index;
+              abrirAsistenteDiagnostico(index);
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                footer: function () { return "\n👆 Clic aquí para Diagnóstico Inteligente"; }
+              }
+            }
+          }
+          // -----------------------------------------------------------
+        }
+      });
     }
 
     // PDF
@@ -2289,9 +2405,71 @@
     }
 
     function mostrarSeccionAprobacionesGLP() { document.querySelectorAll('.form-section').forEach(el => el.style.display = 'none'); document.getElementById('seccionAprobacionesGLP').style.display = 'block'; cargarAprobacionesGLP(); }
-    function cargarAprobacionesGLP() { const tbody = document.getElementById('tablaAprobacionesGLP'); tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando...</td></tr>'; fetch('/glp/admin/obtener_solicitudes_pendientes').then(r => r.json()).then(data => { tbody.innerHTML = ''; if (!data.success || data.items.length === 0) { document.getElementById('msgSinAprobaciones').style.display = 'block'; return; } document.getElementById('msgSinAprobaciones').style.display = 'none'; data.items.forEach(item => { let htmlTanques = '<div class="d-flex gap-2">'; item.tanques.forEach(t => { let color = t.nivel <= 25 ? 'text-danger fw-bold' : ''; htmlTanques += `<div class="border p-1 rounded text-center" style="min-width:60px;"><div class="small fw-bold">${t.numero}</div><div class="${color}">${t.nivel}%</div></div>`; }); htmlTanques += '</div>'; const tr = document.createElement('tr'); tr.innerHTML = `<td>${item.fecha.substring(0, 16)}</td><td><div class="fw-bold">${item.cliente}</div><div class="small text-muted">${item.ubicacion}</div></td><td><div>${item.lote}</div><div class="badge bg-info text-dark">Día ${item.dias_operacion}</div></td><td>${htmlTanques}</td><td class="text-center"><div class="fs-5 fw-bold text-success">${item.nivel_solicitado}%</div><div class="small text-muted">Llenar hasta</div></td><td class="text-center"><div class="d-flex justify-content-center gap-2"><button class="btn btn-success btn-sm" onclick="aprobarSolicitudGLP(${item.id}, this)">👍</button><button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${item.id})">📈 Analizar</button></div></td>`; tbody.appendChild(tr); }); }); }
-    function aprobarSolicitudGLP(id, btn) { if (!confirm("¿Aprobar esta solicitud para que el cliente pueda enviarla?")) return; btn.disabled = true; btn.textContent = "Procesando..."; fetch('/glp/admin/aprobar_solicitud', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) }).then(r => r.json()).then(data => { if (data.success) { alert("Aprobada correctamente."); cargarAprobacionesGLP(); } else { alert("Error: " + data.message); btn.disabled = false; btn.textContent = "👍"; } }); }
+    function cargarAprobacionesGLP() {
+      const tbody = document.getElementById('tablaAprobacionesGLP');
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando...</td></tr>';
 
+      fetch('/glp/admin/obtener_solicitudes_pendientes')
+        .then(r => r.json())
+        .then(data => {
+          tbody.innerHTML = '';
+          if (!data.success || data.items.length === 0) {
+            document.getElementById('msgSinAprobaciones').style.display = 'block';
+            return;
+          }
+          document.getElementById('msgSinAprobaciones').style.display = 'none';
+
+          data.items.forEach(item => {
+            let htmlTanques = '<div class="d-flex gap-2">';
+            item.tanques.forEach(t => {
+              let color = t.nivel <= 25 ? 'text-danger fw-bold' : '';
+              htmlTanques += `<div class="border p-1 rounded text-center" style="min-width:60px;"><div class="small fw-bold">${t.numero}</div><div class="${color}">${t.nivel}%</div></div>`;
+            });
+            htmlTanques += '</div>';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.fecha.substring(0, 16)}</td>
+                <td><div class="fw-bold">${item.cliente}</div><div class="small text-muted">${item.ubicacion}</div></td>
+                <td><div>${item.lote}</div><div class="badge bg-info text-dark">Día ${item.dias_operacion}</div></td>
+                <td>${htmlTanques}</td>
+                <td class="text-center"><div class="fs-5 fw-bold text-success">${item.nivel_solicitado}%</div><div class="small text-muted">Llenar hasta</div></td>
+                <td class="text-center">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button class="btn btn-success btn-sm" title="Aprobar" onclick="aprobarSolicitudGLP(${item.id}, this)">👍</button>
+                        <button class="btn btn-danger btn-sm" title="Anular" onclick="rechazarSolicitudGLP(${item.id}, this)">❌</button>
+                        <button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${item.id})">📈 Analizar</button>
+                    </div>
+                </td>`;
+            tbody.appendChild(tr);
+          });
+        });
+    }
+    function aprobarSolicitudGLP(id, btn) { if (!confirm("¿Aprobar esta solicitud para que el cliente pueda enviarla?")) return; btn.disabled = true; btn.textContent = "Procesando..."; fetch('/glp/admin/aprobar_solicitud', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) }).then(r => r.json()).then(data => { if (data.success) { alert("Aprobada correctamente."); cargarAprobacionesGLP(); } else { alert("Error: " + data.message); btn.disabled = false; btn.textContent = "👍"; } }); }
+    function rechazarSolicitudGLP(id, btn) {
+      if (!confirm("¿Está seguro de anular esta solicitud? Desaparecerá de la lista.")) return;
+      btn.disabled = true;
+      btn.textContent = "⏳";
+
+      fetch('/glp/admin/rechazar_solicitud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      }).then(r => r.json()).then(data => {
+        if (data.success) {
+          alert("Solicitud anulada correctamente.");
+          cargarAprobacionesGLP(); // Recarga la tabla para que desaparezca
+        } else {
+          alert("Error: " + data.message);
+          btn.disabled = false;
+          btn.textContent = "❌";
+        }
+      }).catch(e => {
+        alert("Error de red al intentar anular.");
+        btn.disabled = false;
+        btn.textContent = "❌";
+      });
+    }
     let chartSimulador = null, datosSimulacion = null, idPedidoEnAnalisis = null;
     function abrirSimuladorProyeccion(idPedido) { idPedidoEnAnalisis = idPedido; const modal = new bootstrap.Modal(document.getElementById('modalProyeccion')); modal.show(); fetch('/glp/admin/analizar_proyeccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idPedido }) }).then(r => r.json()).then(data => { if (!data.success) return; datosSimulacion = data; document.getElementById('sim_nivel_actual').innerText = data.nivel_actual + "%"; document.getElementById('sim_tasa').innerText = "-" + data.tasa_descenso_diaria + "%"; document.getElementById('sim_input_solicita').value = data.solicitado_original; renderizarGraficaProyeccion(); }); }
     function actualizarGraficaSimulacion() { if (chartSimulador) renderizarGraficaProyeccion(); }
@@ -2586,6 +2764,54 @@
         }
       });
     }
+
+    function descargarPdfQR(empresaId, modo, ubicacion) {
+      // 1. Mostrar pantalla de carga
+      const loader = document.createElement('div');
+      loader.className = 'pregunta-overlay';
+      loader.innerHTML = `<div class="pregunta-card text-center"><div class="spinner-border text-primary mb-3"></div><h5 class="fw-bold">Generando PDF...</h5><p class="text-muted small m-0">Dibujando Códigos QR, por favor espere.</p></div>`;
+      document.body.appendChild(loader);
+
+      // 2. Pedir el PDF al servidor
+      fetch('/generar_qrs_pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresaId, modo: modo, ubicacion: ubicacion })
+      })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(err => { throw new Error(err.message || 'Error del servidor'); });
+          }
+
+          // Extraer nombre del archivo enviado por el servidor
+          let filename = "QRs_Granjas.pdf";
+          const disposition = response.headers.get('Content-Disposition');
+          if (disposition && disposition.indexOf('attachment') !== -1) {
+            const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+            if (matches != null && matches[1]) { filename = matches[1].replace(/['"]/g, ''); }
+          }
+          return response.blob().then(blob => ({ blob, filename }));
+        })
+        .then(({ blob, filename }) => {
+          // 3. Crear Link fantasma y forzar descarga
+          loader.remove();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+
+          // 4. Limpiar basura de la RAM del navegador
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        })
+        .catch(err => {
+          loader.remove();
+          alert("❌ Error al generar QR: " + err.message);
+        });
+    }
   </script>
 
   <div class="modal fade" id="modalProyeccion" tabindex="-1" aria-hidden="true">
@@ -2714,6 +2940,55 @@
     </div>
   </div>
 
+  <div class="modal fade" id="modalEditarTanques" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fw-bold">⚙️ Editar Configuración: <span id="edUbicacionTitulo"></span></h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <input type="hidden" id="edEmpresaId">
+          <input type="hidden" id="edUbicacion">
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="fw-bold small text-primary">Proveedor GLP</label>
+              <input type="text" id="edProveedor" class="form-control fw-bold" placeholder="Ej: Gas Union">
+            </div>
+            <div class="col-md-6">
+              <label class="fw-bold small text-primary">Email del Proveedor</label>
+              <input type="email" id="edEmail" class="form-control" placeholder="correo@proveedor.com">
+            </div>
+          </div>
+
+          <h6 class="fw-bold mt-4 mb-2 text-dark border-bottom pb-2">Tanques de la Sede</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered text-center align-middle bg-white shadow-sm">
+              <thead class="table-dark">
+                <tr>
+                  <th>Nombre (Ej. tk-1)</th>
+                  <th>Capacidad (Galones)</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="edTablaTanquesBody">
+              </tbody>
+            </table>
+          </div>
+          <button class="btn btn-outline-success btn-sm fw-bold w-100 mt-2" onclick="agregarFilaTanque('', '')">+
+            Agregar Otro Tanque</button>
+        </div>
+        <div class="modal-footer bg-white">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success fw-bold px-4" onclick="iniciarGuardadoTanques()">💾 Guardar
+            Cambios</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <script>
     function abrirModalLotesVencidos(empresaId) {
       const modal = new bootstrap.Modal(document.getElementById('modalLotesVencidos'));
@@ -2749,7 +3024,596 @@
           });
         });
     }
+
+    // ==========================================
+    // LÓGICA DE EDICIÓN DE TANQUES (FRONTEND)
+    // ==========================================
+
+    function abrirModalEdicionTanques(empresaId, ubicacion) {
+      document.getElementById('edEmpresaId').value = empresaId;
+      document.getElementById('edUbicacion').value = ubicacion;
+      document.getElementById('edUbicacionTitulo').textContent = ubicacion;
+
+      const tbody = document.getElementById('edTablaTanquesBody');
+      tbody.innerHTML = '<tr><td colspan="3"><div class="spinner-border text-primary"></div> Cargando...</td></tr>';
+
+      new bootstrap.Modal(document.getElementById('modalEditarTanques')).show();
+
+      fetch('/obtener_tanques_granja', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresaId, ubicacion: ubicacion })
+      })
+        .then(r => r.json())
+        .then(data => {
+          tbody.innerHTML = '';
+          if (data.success) {
+            document.getElementById('edProveedor').value = data.general.proveedor;
+            document.getElementById('edEmail').value = data.general.email;
+
+            data.tanques.forEach(tk => {
+              agregarFilaTanque(tk.nombre_tanque, tk.capacidad);
+            });
+          } else {
+            tbody.innerHTML = `<tr><td colspan="3" class="text-danger">${data.message}</td></tr>`;
+          }
+        })
+        .catch(e => {
+          tbody.innerHTML = '<tr><td colspan="3" class="text-danger">Error de conexión</td></tr>';
+        });
+    }
+
+    function agregarFilaTanque(nombre, capacidad) {
+      const tbody = document.getElementById('edTablaTanquesBody');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm text-center in-tk-nombre fw-bold" value="${nombre}" placeholder="tk-X"></td>
+        <td><input type="number" class="form-control form-control-sm text-center in-tk-capacidad" value="${capacidad}" placeholder="Galones"></td>
+        <td><button class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">🗑️</button></td>
+    `;
+      tbody.appendChild(tr);
+    }
+
+    function iniciarGuardadoTanques() {
+      // 1. Recolectar datos
+      const empresaId = document.getElementById('edEmpresaId').value;
+      const ubicacion = document.getElementById('edUbicacion').value;
+      const proveedor = document.getElementById('edProveedor').value.trim();
+      const email = document.getElementById('edEmail').value.trim();
+
+      if (!proveedor || !email) {
+        alert("El nombre del Proveedor y el Email son obligatorios.");
+        return;
+      }
+
+      const filas = document.getElementById('edTablaTanquesBody').querySelectorAll('tr');
+      let tanques = [];
+      let error = false;
+
+      filas.forEach(f => {
+        const nombre = f.querySelector('.in-tk-nombre').value.trim();
+        const capacidad = parseInt(f.querySelector('.in-tk-capacidad').value);
+
+        if (!nombre || isNaN(capacidad) || capacidad <= 0) {
+          error = true;
+        } else {
+          tanques.push({ nombre: nombre, capacidad: capacidad });
+        }
+      });
+
+      if (error) {
+        alert("Revisa la tabla: Todos los tanques deben tener nombre y capacidad válida mayor a 0.");
+        return;
+      }
+      if (tanques.length === 0) {
+        alert("Debe haber al menos un tanque registrado para la granja.");
+        return;
+      }
+
+      // 2. Modal de Confirmación (Usando tu Overlay personalizado con z-index 9999)
+      const ov = document.createElement("div");
+      ov.className = "pregunta-overlay";
+      ov.innerHTML = `
+        <div class="pregunta-card" style="max-width: 500px;">
+            <div class="alert alert-warning text-center" style="font-size: 0.95rem;">
+                <strong>⚠️ ¡ATENCIÓN!</strong><br><br>
+                Estás a punto de sobrescribir la configuración de tanques para <b>${ubicacion}</b>.<br><br>
+                <span class="text-danger fw-bold">Si agregaste, eliminaste o modificaste algún tanque, DEBERÁS generar e imprimir un nuevo código QR para esta sede</span>, ya que el anterior quedará obsoleto.
+            </div>
+            <div class="text-center fw-bold mb-3">¿Deseas guardar los cambios?</div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-secondary flex-fill" onclick="this.closest('.pregunta-overlay').remove()">Cancelar</button>
+                <button class="btn btn-success flex-fill fw-bold" id="btnConfirmarGuardadoTks">Sí, Guardar</button>
+            </div>
+        </div>
+    `;
+      document.body.appendChild(ov);
+
+      // Asignar el evento al botón de confirmación del overlay
+      document.getElementById('btnConfirmarGuardadoTks').onclick = () => {
+        ov.remove(); // Cerramos la advertencia
+        ejecutarGuardadoTanques(empresaId, ubicacion, proveedor, email, tanques); // Mandamos los datos
+      };
+    }
+
+    function ejecutarGuardadoTanques(empresaId, ubicacion, proveedor, email, tanques) {
+      const payload = {
+        empresa_id: empresaId,
+        ubicacion: ubicacion,
+        proveedor: proveedor,
+        email: email,
+        tanques: tanques
+      };
+
+      fetch('/guardar_tanques_granja', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert("✅ " + data.message);
+            bootstrap.Modal.getInstance(document.getElementById('modalEditarTanques')).hide();
+          } else {
+            alert("❌ Error: " + data.message);
+          }
+        })
+        .catch(e => {
+          alert("Error de conexión al guardar.");
+        });
+    }
+
+    // ==========================================
+    // LÓGICA DE AUDITORÍA LOTES ACTIVOS
+    // ==========================================
+    let datosAuditoriaGlobal = null;
+
+    function iniciarAuditoriaActivos(empresaId) {
+      const loader = document.createElement('div');
+      loader.className = 'pregunta-overlay';
+      loader.innerHTML = `<div class="pregunta-card text-center"><div class="spinner-border text-primary mb-3"></div><h5 class="fw-bold">Analizando Operaciones...</h5><p class="text-muted small m-0">Construyendo tablero de auditoría.</p></div>`;
+      document.body.appendChild(loader);
+
+      fetch('/obtener_auditoria_activos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: empresaId })
+      })
+        .then(r => r.json())
+        .then(data => {
+          loader.remove();
+          if (data.success) {
+            datosAuditoriaGlobal = data;
+
+            // Llenar el select con las granjas que están activas
+            const select = document.getElementById('filtroGranjaAuditoria');
+            select.innerHTML = '<option value="TODAS">Ver Todas las Granjas</option>';
+            Object.keys(data.resumen).forEach(granja => {
+              select.innerHTML += `<option value="${granja}">${granja}</option>`;
+            });
+
+            new bootstrap.Modal(document.getElementById('modalAuditoriaActivos')).show();
+            renderizarDashboardAuditoria(); // Dibujar todo por primera vez
+          } else {
+            alert("No se pudo cargar la auditoría: " + data.message);
+          }
+        })
+        .catch(e => {
+          loader.remove();
+          alert("Error de conexión con el servidor.");
+        });
+    }
+
+    function renderizarDashboardAuditoria() {
+      if (!datosAuditoriaGlobal) return;
+
+      const filtro = document.getElementById('filtroGranjaAuditoria').value;
+      const historial = datosAuditoriaGlobal.historial;
+      const resumen = datosAuditoriaGlobal.resumen;
+
+      // --- 1. CALCULAR KPIs SEGÚN EL FILTRO ---
+      let totalConsumos = 0, totalTanqueos = 0, calidadHTML = "";
+
+      if (filtro === "TODAS") {
+        totalConsumos = historial.filter(h => h.operacion === 'consumo').length;
+        totalTanqueos = historial.filter(h => h.operacion === 'tanqueo').length;
+        calidadHTML = `<div class="card bg-secondary text-white shadow h-100"><div class="card-body text-center"><h6 class="fw-bold opacity-75">Lotes Activos</h6><h2 class="fw-bold mb-0">${Object.keys(resumen).length}</h2></div></div>`;
+      } else {
+        const r = resumen[filtro];
+        totalConsumos = r.cant_consumos;
+        totalTanqueos = r.cant_tanqueos;
+
+        // Cálculo del Súper Indicador de Calidad
+        let metaDias = Math.max(r.dias_maximos, 1);
+        let porcentaje = Math.round((totalConsumos / metaDias) * 100);
+        let colorCalidad = "bg-success";
+        let icono = "✅";
+        if (porcentaje < 85) { colorCalidad = "bg-warning text-dark"; icono = "⚠️"; }
+        if (porcentaje < 60) { colorCalidad = "bg-danger"; icono = "🛑"; }
+
+        calidadHTML = `
+            <div class="card ${colorCalidad} text-white shadow h-100">
+                <div class="card-body text-center">
+                    <h6 class="fw-bold opacity-75">Calidad de Reporte</h6>
+                    <h2 class="fw-bold mb-0">${porcentaje}% ${icono}</h2>
+                    <small class="opacity-75">(${totalConsumos} reg / ${metaDias} días)</small>
+                </div>
+            </div>`;
+      }
+
+      // Dibujar Tarjetas
+      document.getElementById('tarjetasKpiAuditoria').innerHTML = `
+        <div class="col-md-4 mb-2">
+            <div class="card bg-info text-white shadow h-100">
+                <div class="card-body text-center">
+                    <h6 class="fw-bold opacity-75">Reportes de Consumo</h6>
+                    <h2 class="fw-bold mb-0">🔵 ${totalConsumos}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-2">
+            <div class="card bg-success text-white shadow h-100">
+                <div class="card-body text-center">
+                    <h6 class="fw-bold opacity-75">Tanqueos Recibidos</h6>
+                    <h2 class="fw-bold mb-0">🟢 ${totalTanqueos}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-2">
+            ${calidadHTML}
+        </div>
+    `;
+
+      // --- 2. DIBUJAR LA TABLA ---
+      const tbody = document.getElementById('tablaAuditoriaBody');
+      tbody.innerHTML = '';
+
+      const filasFiltradas = filtro === "TODAS" ? historial : historial.filter(h => h.ubicacion === filtro);
+
+      filasFiltradas.forEach(f => {
+        // Estilo de la operación
+        let badgeOp = `<span class="badge bg-secondary">${f.operacion}</span>`;
+        if (f.operacion === 'consumo') badgeOp = `<span class="badge bg-info text-dark">🔵 Consumo</span>`;
+        if (f.operacion === 'tanqueo') badgeOp = `<span class="badge bg-success">🟢 Tanqueo</span>`;
+
+        // Datos de gastado o diferencia
+        let infoExtra = `<span class="fw-bold text-muted">${f.neto_gastado} gl/kg</span>`;
+        if (f.operacion === 'tanqueo') {
+          let colorDif = "text-success";
+          let alerta = "";
+          if (f.diferencia < -5 || f.diferencia > 5) { colorDif = "text-danger"; alerta = "⚠️"; }
+          infoExtra = `<span class="fw-bold ${colorDif}">${alerta} Dif: ${f.diferencia}%</span>`;
+        }
+
+        // Botón de Evidencia (Fotos)
+        let btnEvidencia = `<span class="text-muted small">Sin fotos</span>`;
+        if (f.fotos.length > 0) {
+          // Guardamos las rutas de las fotos en un string separado por comas
+          const urls = f.fotos.join(',');
+          btnEvidencia = `<button class="btn btn-sm btn-outline-dark fw-bold" onclick="abrirVisorFotosAuditoria('${urls}')">📸 Ver (${f.fotos.length})</button>`;
+        }
+
+        tbody.innerHTML += `
+            <tr>
+                <td class="fw-bold">${f.fecha}</td>
+                <td class="small fw-bold text-primary">${f.ubicacion}</td>
+                <td>Día ${f.dia}</td>
+                <td>${badgeOp}</td>
+                <td>${infoExtra}</td>
+                <td class="small text-muted">${f.registro}</td>
+                <td>${btnEvidencia}</td>
+            </tr>
+        `;
+      });
+    }
+
+    // Visor de fotos súper sencillo
+    function abrirVisorFotosAuditoria(urlsString) {
+      const urls = urlsString.split(',');
+      let galeria = "";
+      urls.forEach(url => {
+        galeria += `<img src="${url}" class="img-fluid rounded mb-3 shadow-sm border" style="max-height: 300px;">`;
+      });
+
+      const ov = document.createElement("div");
+      ov.className = "pregunta-overlay";
+      ov.style.zIndex = "99999";
+      ov.innerHTML = `
+        <div class="pregunta-card text-center" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+            <h5 class="fw-bold mb-3">Evidencia Fotográfica</h5>
+            ${galeria}
+            <button class="btn btn-secondary w-100 mt-2 fw-bold" onclick="this.closest('.pregunta-overlay').remove()">Cerrar Visor</button>
+        </div>
+    `;
+      document.body.appendChild(ov);
+    }
   </script>
+
+  <div class="modal fade" id="modalDiagnosticoInteligente" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold">🧠 Diagnóstico Inteligente BQA</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <div class="alert alert-info py-2 small mb-3 border-info">
+            <strong>Tramo Evaluado:</strong> <span id="diagTramoFechas"></span><br>
+            <strong>Gas Consumido (Real):</strong> <span id="diagTramoKg" class="fw-bold text-danger fs-6"></span> kg
+          </div>
+
+          <form id="formDiagnostico">
+            <label class="fw-bold small text-muted">Tecnología de Calefacción</label>
+            <select id="diagTecnologia" class="form-select border-secondary fw-bold text-dark mb-2">
+              <option value="infrarroja">Criadora Infrarroja</option>
+              <option value="tradicional">Criadora Tradicional</option>
+              <option value="turbo">Turbocalefactor (Aire Forzado)</option>
+            </select>
+
+            <label class="fw-bold small text-muted">Clima Predominante (Turno)</label>
+            <select id="diagClima" class="form-select border-secondary fw-bold mb-2">
+              <option value="calido">☀️ Cálido</option>
+              <option value="frio">❄️ Frío</option>
+            </select>
+
+            <div class="row">
+              <div class="col-6">
+                <label class="fw-bold small text-muted">Equipos Prendidos</label>
+                <input type="number" id="diagEquipos" class="form-control fw-bold border-secondary"
+                  placeholder="Ej: 15">
+              </div>
+              <div class="col-6">
+                <label class="fw-bold small text-muted">Horas de Operación</label>
+                <input type="number" id="diagHoras" class="form-control fw-bold border-secondary" placeholder="Ej: 10">
+              </div>
+            </div>
+          </form>
+
+          <button class="btn btn-primary w-100 fw-bold mt-3 shadow-sm" onclick="ejecutarDiagnostico()">🔎 Generar
+            Diagnóstico</button>
+
+          <div id="diagResultado" class="mt-3" style="display:none;">
+            <div id="diagVeredicto" class="small"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+let diagDataTemporal = {}; 
+
+function abrirAsistenteDiagnostico(index) {
+    // 1. BLOQUEO PARA LOTES HISTÓRICOS
+    const periodoTxt = document.getElementById('subtituloPeriodo').textContent;
+    if (!periodoTxt.includes('Actual')) {
+        alert("🔒 El Diagnóstico Inteligente solo está habilitado para LOTES ACTIVOS (Periodo Actual), garantizando la precisión de la edad del lote y permitiendo correcciones en tiempo real.");
+        return;
+    }
+
+    if (index === 0) {
+        alert("📊 Selecciona un punto a partir del segundo registro para poder calcular la velocidad del tramo (Diferencia vs día anterior).");
+        return;
+    }
+
+    const s = datosGlobales.series;
+    const fechaActual = s.fechas[index];
+    const fechaAnterior = s.fechas[index - 1];
+    const fechaInicioLote = s.fechas[0]; 
+
+    // 2. CALCULAR EL DELTA DE TIEMPO (Días transcurridos y Edad del lote)
+    const dateActual = new Date(fechaActual);
+    const dateAnterior = new Date(fechaAnterior);
+    const dateInicio = new Date(fechaInicioLote);
+
+    let diasTranscurridos = (dateActual - dateAnterior) / (1000 * 60 * 60 * 24);
+    if (isNaN(diasTranscurridos) || diasTranscurridos <= 0) diasTranscurridos = 1; 
+
+    let diaDelCiclo = Math.ceil((dateActual - dateInicio) / (1000 * 60 * 60 * 24));
+    if (isNaN(diaDelCiclo) || diaDelCiclo <= 0) diaDelCiclo = index || 1;
+
+    // 3. CÁLCULO DEL TRAMO Y DEL ACUMULADO GLOBAL
+    const kgAveAcumActual = parseFloat(s.kg_pollito[index]) || 0;
+    const kgAveAcumAnterior = parseFloat(s.kg_pollito[index - 1]) || 0;
+    const deltaKgAve = kgAveAcumActual - kgAveAcumAnterior;
+
+    if (deltaKgAve < 0) {
+        alert("⚠️ Anomalía de Datos: La gráfica indica un retroceso en el consumo acumulado. Revisa la digitación de los tanques.");
+        return;
+    }
+
+    // 4. EXTRACCIÓN PURA DE LA POBLACIÓN (Garantiza lectura de miles)
+    const poblacionStr = document.getElementById('kpi5Value').innerText;
+    const poblacion = parseInt(poblacionStr.replace(/[^0-9]/g, ''), 10) || 0;
+
+    // 5. CONSUMO FÍSICO REAL DEL TRAMO
+    const consumoNetoTramo = deltaKgAve * poblacion;
+
+    // 6. GUARDAR DATOS EN MEMORIA PARA EL DIAGNÓSTICO
+    diagDataTemporal = {
+        diaCiclo: diaDelCiclo,
+        diasTranscurridos: diasTranscurridos,
+        fecha1: fechaAnterior,
+        fecha2: fechaActual,
+        kgTramo: consumoNetoTramo,
+        kgAveTramo: deltaKgAve,
+        kgAveAcumulado: kgAveAcumActual, // Dato clave para el MACRO
+        poblacion: poblacion
+    };
+
+    // 7. PREPARAR INTERFAZ
+    document.getElementById('diagTramoFechas').innerHTML = `${fechaAnterior} ➡️ ${fechaActual}<br><span class="badge bg-secondary">Lapso analizado: ${diasTranscurridos.toFixed(1)} días</span> <span class="badge bg-info text-dark">Edad Lote: Día ${diaDelCiclo}</span>`;
+    document.getElementById('diagTramoKg').innerText = consumoNetoTramo.toFixed(2);
+    document.getElementById('diagResultado').style.display = 'none';
+    
+    document.getElementById('diagEquipos').value = '';
+    document.getElementById('diagHoras').value = '';
+
+    new bootstrap.Modal(document.getElementById('modalDiagnosticoInteligente')).show();
+}
+
+function ejecutarDiagnostico() {
+    const tec = document.getElementById('diagTecnologia').value;
+    const clima = document.getElementById('diagClima').value;
+    const equipos = parseFloat(document.getElementById('diagEquipos').value);
+    const horasDiarias = parseFloat(document.getElementById('diagHoras').value); 
+
+    if (!equipos || !horasDiarias) {
+        alert("Por favor ingrese la cantidad de equipos encendidos y las horas promedio diarias de operación.");
+        return;
+    }
+
+    // =========================================================
+    // VARIABLES BASE (Ciclo 15 Días - Ambiente Controlado)
+    // =========================================================
+    let factor_kgh_max = 0;
+    let meta_15d_min = 0, meta_15d_max = 0;
+
+    if (tec === 'infrarroja') {
+        factor_kgh_max = 0.25; 
+        meta_15d_min = (clima === 'calido') ? 0.02 : 0.03;
+        meta_15d_max = (clima === 'calido') ? 0.04 : 0.06;
+    } else if (tec === 'tradicional') {
+        factor_kgh_max = 0.25;
+        meta_15d_min = (clima === 'calido') ? 0.04 : 0.05;
+        meta_15d_max = (clima === 'calido') ? 0.055 : 0.07;
+    } else if (tec === 'turbo') {
+        factor_kgh_max = 8.0; 
+        meta_15d_min = (clima === 'calido') ? 0.018 : 0.020;
+        meta_15d_max = (clima === 'calido') ? 0.022 : 0.025;
+    }
+
+    const dia = diagDataTemporal.diaCiclo;
+    const diasT = diagDataTemporal.diasTranscurridos;
+    const poblacion = diagDataTemporal.poblacion;
+
+    // =========================================================
+    // 1. ANÁLISIS MACRO: ACUMULADO HASTA EL DÍA ACTUAL
+    // =========================================================
+    let factor_acumulado = 0;
+    if (dia <= 5) {
+        factor_acumulado = dia * 0.12;
+    } else if (dia <= 10) {
+        factor_acumulado = (5 * 0.12) + ((dia - 5) * 0.06);
+    } else if (dia <= 15) {
+        factor_acumulado = (5 * 0.12) + (5 * 0.06) + ((dia - 10) * 0.02);
+    } else {
+        factor_acumulado = 1.0; 
+    }
+
+    const acumuladoEstandarMin = meta_15d_min * factor_acumulado;
+    const acumuladoEstandarMax = meta_15d_max * factor_acumulado;
+    const kgAveAcumuladoReal = diagDataTemporal.kgAveAcumulado;
+
+    let htmlVeredicto = '';
+    let estadoMacro = '';
+    let colorMacro = '';
+
+    if (kgAveAcumuladoReal > acumuladoEstandarMax * 1.1) {
+        estadoMacro = `⚠️ <b>Por encima del presupuesto esperado</b> (${kgAveAcumuladoReal.toFixed(3)} vs máx ${acumuladoEstandarMax.toFixed(3)} kg/ave).`;
+        colorMacro = 'text-danger';
+    } else if (kgAveAcumuladoReal < acumuladoEstandarMin * 0.9) {
+        estadoMacro = `🔵 <b>Por debajo del presupuesto</b> (${kgAveAcumuladoReal.toFixed(3)} vs min ${acumuladoEstandarMin.toFixed(3)} kg/ave).`;
+        colorMacro = 'text-primary';
+    } else {
+        estadoMacro = `✅ <b>Excelente. Dentro del estándar de eficiencia</b> (${kgAveAcumuladoReal.toFixed(3)} kg/ave).`;
+        colorMacro = 'text-success';
+    }
+
+    htmlVeredicto += `
+        <div class="alert alert-light border border-secondary shadow-sm py-2 px-3 mb-3">
+            <h6 class="fw-bold mb-1 border-bottom pb-1 text-primary">📊 1. ANÁLISIS MACRO (Desempeño Acumulado)</h6>
+            <p class="mb-0 small">En el histórico al <b>Día ${dia}</b>, la eficiencia global del lote va: <br><span class="${colorMacro}">${estadoMacro}</span></p>
+        </div>
+    `;
+
+    // =========================================================
+    // 2. ANÁLISIS MICRO: VELOCIDAD DEL TRAMO Y LÍMITES FÍSICOS
+    // =========================================================
+    let peso_dia_actual = 0;
+    if (dia <= 5) peso_dia_actual = 0.12;       
+    else if (dia <= 10) peso_dia_actual = 0.06; 
+    else peso_dia_actual = 0.02;                
+
+    const velEstandarMin = meta_15d_min * peso_dia_actual;
+    const velEstandarMax = meta_15d_max * peso_dia_actual;
+    const velRealTramo = diagDataTemporal.kgAveTramo / diasT;
+    const kgRealTramo = diagDataTemporal.kgTramo;
+    const topeFisicoEquipos = equipos * horasDiarias * diasT * factor_kgh_max;
+
+    htmlVeredicto += `<h6 class="fw-bold mb-2 text-primary mt-3">🔎 2. ANÁLISIS MICRO (Auditoría del Tramo)</h6>`;
+
+    if (kgRealTramo > topeFisicoEquipos) {
+        htmlVeredicto += `
+            <div class="alert alert-danger border-danger py-2 px-3 mb-2">
+                <span class="fw-bold">🚨 ALERTA CRÍTICA (Fuga o Avalancha):</span><br>
+                Se consumieron <b>${kgRealTramo.toFixed(1)} kg</b> en este lapso. Es FÍSICAMENTE IMPOSIBLE que ${equipos} equipos operando ${horasDiarias}h diarias gasten tanto gas.<br>
+                <hr class="my-1 border-danger">
+                <b>Puntos a revisar inmediatamente:</b>
+                <ul class="mb-0 ps-3 small">
+                    <li><b>Manejo de Presión:</b> Reguladores abiertos al máximo. El exceso de presión fuerza el flujo y genera llama amarilla (desperdicio hacia el techo).</li>
+                    <li>Fuga grave en la red (mangueras/acoples).</li>
+                    <li>Registro atrasado: El operador sumó consumos de días anteriores.</li>
+                </ul>
+            </div>`;
+    } 
+    else if (velRealTramo > (velEstandarMax * 1.25)) {
+        htmlVeredicto += `
+            <div class="alert alert-warning border-warning text-dark py-2 px-3 mb-2">
+                <span class="fw-bold">⚠️ INEFICIENCIA TÉRMICA:</span><br>
+                La velocidad de consumo en este tramo fue de <b>${velRealTramo.toFixed(4)} kg/ave/día</b>, superando la meta de eficiencia operativa para su edad.<br>
+                <hr class="my-1 border-warning">
+                <b>Causas probables a revisar:</b>
+                <ul class="mb-0 ps-3 small">
+                    <li><b>Manejo de Presión:</b> Reguladores abiertos al máximo forzando combustión incompleta (llama naranja).</li>
+                    <li>Equipos en modo manual continuo en lugar de operar con termostato.</li>
+                    <li>Pérdida de calor por cortinas en mal estado.</li>
+                </ul>
+            </div>`;
+    } 
+    else if (velRealTramo < (velEstandarMin * 0.5)) {
+         htmlVeredicto += `
+            <div class="alert alert-secondary border-secondary text-dark py-2 px-3 mb-2">
+                <span class="fw-bold">🧐 REVISIÓN DE DATOS:</span><br>
+                La velocidad de consumo bajó a <b>${velRealTramo.toFixed(4)} kg/ave/día</b>. Es anormalmente bajo para el clima y la etapa de cría.<br>
+                <span class="small">Posible falla de encendido de equipos, ausencia de frío, o error de digitación de tanques.</span>
+            </div>`;
+    } 
+    else {
+        htmlVeredicto += `
+            <div class="alert alert-success border-success py-2 px-3 fw-bold mb-2">
+                ✅ OPERACIÓN EFICIENTE: El consumo físico (${kgRealTramo.toFixed(1)} kg) en este tramo lleva una velocidad térmica perfecta para el estándar esperado.
+            </div>`;
+    }
+
+    // =========================================================
+    // 3. PROYECCIÓN DINÁMICA A CIERRE
+    // =========================================================
+    let proyeccion_15d = 0;
+    if (dia < 15) {
+        proyeccion_15d = kgAveAcumuladoReal + ((15 - dia) * velRealTramo);
+    } else {
+        proyeccion_15d = kgAveAcumuladoReal;
+    }
+
+    let colorProy = (proyeccion_15d > meta_15d_max) ? 'text-danger fw-bold' : 'text-success fw-bold';
+    
+    htmlVeredicto += `
+        <div class="bg-white p-2 rounded border mt-3 small shadow-sm">
+            <b class="text-primary">📈 Proyección Dinámica a 15 Días:</b><br>
+            A la velocidad térmica de este último tramo, el lote cerraría la fase con <span class="${colorProy}">${proyeccion_15d.toFixed(4)} kg/ave</span>.<br>
+            <span class="text-muted">Meta gerencial en estas condiciones: <b>${meta_15d_min.toFixed(3)} a ${meta_15d_max.toFixed(3)}</b>.</span>
+        </div>`;
+
+    const resDiv = document.getElementById('diagResultado');
+    resDiv.className = `mt-3`;
+    resDiv.style.display = 'block';
+    document.getElementById('diagVeredicto').innerHTML = htmlVeredicto;
+}
+</script>
+
+
+
 
 </body>
 

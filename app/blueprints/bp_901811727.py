@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, session, request, jsonify, flash, redirect, url_for, current_app
+from flask import Blueprint, render_template, session, request, jsonify, flash, redirect, url_for, current_app, send_file
 from datetime import datetime
 from app import mysql, csrf
 from app.forms import RegistroUsuarioForm
@@ -6,6 +6,11 @@ from app.utils import login_required_custom
 from flask_bcrypt import Bcrypt
 import traceback
 import math
+import io
+import json
+import qrcode
+import MySQLdb
+import textwrap
 
 import os
 import smtplib
@@ -14,6 +19,11 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 import holidays 
+
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import cm
+from reportlab.lib.utils import ImageReader
 
 bcrypt = Bcrypt()
 
@@ -1503,3 +1513,324 @@ def obtener_lotes_vencidos():
     except Exception as e:
         print("Error lotes vencidos:", str(e))
         return jsonify({"success": False, "message": str(e)})
+    
+        
+# ==============================================================================
+# EDICIÓN DINÁMICA DE TANQUES Y PROVEEDORES
+# ==============================================================================
+
+@csrf.exempt
+@bp_901811727.route('/obtener_tanques_granja', methods=['POST'])
+@login_required_custom
+def obtener_tanques_granja():
+    data = request.get_json()
+    empresa_id = data.get('empresa_id')
+    ubicacion = data.get('ubicacion')
+    
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("SELECT * FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s ORDER BY id ASC", (empresa_id, ubicacion))
+        filas = cur.fetchall()
+        
+        if not filas:
+            return jsonify({'success': False, 'message': 'No se encontró configuración para esta granja.'}), 404
+        
+        # Extraer datos generales (tomamos la primera fila como referencia)
+        general = {
+            'proveedor': filas[0]['proveedor'],
+            'email': filas[0]['email'],
+            'zona': filas[0]['zona'],
+            'propietario': filas[0]['propietario'],
+            'empresa': filas[0]['empresa']
+        }
+        
+        # Mapear los tanques
+        tanques = []
+        for f in filas:
+            cap = int(f['capacidad_gls']) if f['capacidad_gls'] else 0
+            if cap > 0:
+                tanques.append({
+                    'nombre_tanque': f['nombre_tanque'],
+                    'capacidad': cap
+                })
+            
+        return jsonify({'success': True, 'general': general, 'tanques': tanques})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        cur.close()
+
+@csrf.exempt
+@bp_901811727.route('/guardar_tanques_granja', methods=['POST'])
+@login_required_custom
+def guardar_tanques_granja():
+    data = request.get_json()
+    empresa_id = data.get('empresa_id')
+    ubicacion = data.get('ubicacion')
+    proveedor = data.get('proveedor')
+    email = data.get('email')
+    tanques = data.get('tanques') # Lista de diccionarios [{'nombre': 'tk-1', 'capacidad': 210}, ...]
+    
+    if not tanques or len(tanques) == 0:
+        return jsonify({'success': False, 'message': 'Debe haber al menos un tanque registrado.'}), 400
+        
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        # 1. Rescatar variables estáticas originales de la base de datos
+        cur.execute("SELECT empresa, zona, propietario FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s LIMIT 1", (empresa_id, ubicacion))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({'success': False, 'message': 'Granja original no encontrada en la base de datos.'}), 404
+            
+        empresa_nombre = row['empresa']
+        zona = row['zona']
+        propietario = row['propietario']
+        
+        # 2. Borrar todos los tanques actuales de esa sede (¡Limpieza Total!)
+        cur.execute("DELETE FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s", (empresa_id, ubicacion))
+        
+        # 3. Insertar la nueva configuración exacta
+        for tk in tanques:
+            cur.execute("""
+                INSERT INTO tanques_sedes (empresa, empresa_id, nombre_tanque, propietario, capacidad_gls, ubicacion, zona, proveedor, email)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (empresa_nombre, empresa_id, tk['nombre'], propietario, tk['capacidad'], ubicacion, zona, proveedor, email))
+            
+        mysql.connection.commit()
+        return jsonify({'success': True, 'message': f'Configuración de tanques para {ubicacion} actualizada correctamente.'})
+    except Exception as e:
+        mysql.connection.rollback() # Si algo falla, se cancela el borrado
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        cur.close()
+        
+@csrf.exempt
+@bp_901811727.route('/generar_qrs_pdf', methods=['POST'])
+@login_required_custom
+def generar_qrs_pdf():
+    try:
+        data = request.get_json()
+        empresa_id = data.get('empresa_id')
+        ubicacion_filtro = data.get('ubicacion') 
+
+        if not empresa_id:
+            return jsonify({'success': False, 'message': 'Falta el ID de la empresa'}), 400
+
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        if ubicacion_filtro:
+            query = "SELECT * FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s"
+            cur.execute(query, (empresa_id, ubicacion_filtro))
+        else:
+            query = "SELECT * FROM tanques_sedes WHERE empresa_id = %s"
+            cur.execute(query, (empresa_id,))
+            
+        tanques_data = cur.fetchall()
+        cur.close()
+
+        if not tanques_data:
+            nombre_lugar = ubicacion_filtro if ubicacion_filtro else "esta empresa"
+            return jsonify({
+                'success': False, 
+                'message': f'No hay tanques registrados para {nombre_lugar}. Ve a "Editar Tanques" primero.'
+            }), 404
+
+        # 1. AGRUPAR LOS DATOS POR GRANJA
+        granjas_agrupadas = {}
+        for row in tanques_data:
+            ubi = row['ubicacion']
+            if ubi not in granjas_agrupadas:
+                granjas_agrupadas[ubi] = {
+                    "sede": ubi,
+                    "empresa": row['empresa'],
+                    "tanques": [],
+                    "proveedor": row['proveedor'],
+                    "email_proveedor": row['email']
+                }
+            granjas_agrupadas[ubi]["tanques"].append({
+                "numero": row['nombre_tanque'],
+                "capacidad": row['capacidad_gls']
+            })
+
+        # 2. CONSTRUCCIÓN DEL PDF (DISEÑO EXACTO AL ORIGINAL)
+        buffer = io.BytesIO()
+        pdf = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        
+        x_pos = 50  # Margen izquierdo alineado a tu original
+        y_pos = height - 50
+        
+        for ubi, datos_granja in granjas_agrupadas.items():
+            # Convertimos a JSON sin escapar caracteres especiales
+            qr_content = json.dumps(datos_granja, ensure_ascii=False)
+            
+            # Generar el código QR
+            qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+            qr.add_data(qr_content)
+            qr.make(fit=True)
+            img_qr = qr.make_image(fill_color="black", back_color="white")
+            
+            qr_buffer = io.BytesIO()
+            img_qr.save(qr_buffer, format="PNG")
+            qr_buffer.seek(0)
+            
+            # Control de salto de página
+            if y_pos < 300:
+                pdf.showPage()
+                y_pos = height - 50
+            
+            # A. Dibujar el QR (Tamaño ajustado al original)
+            qr_size = 180
+            img_reader = ImageReader(qr_buffer)
+            pdf.drawImage(img_reader, x_pos, y_pos - qr_size, width=qr_size, height=qr_size)
+            
+            # B. Título exacto: "QR - Nombre Granja"
+            text_y = y_pos - qr_size - 20
+            pdf.setFont("Helvetica-Bold", 12)
+            pdf.drawString(x_pos, text_y, f"QR - {datos_granja['sede']}")
+            
+            # C. Imprimir el JSON puro asegurando que salte de línea
+            text_y -= 15
+            pdf.setFont("Helvetica", 10)
+            
+            # textwrap corta la línea inteligentemente a los 90 caracteres
+            wrapped_text = textwrap.wrap(qr_content, width=90) 
+            
+            for line in wrapped_text:
+                pdf.drawString(x_pos, text_y, line)
+                text_y -= 14 # Espacio entre cada renglón del JSON
+            
+            # Bajar la coordenada Y para el siguiente bloque
+            y_pos = text_y - 40
+
+        pdf.save()
+        buffer.seek(0)
+
+        nombre_archivo = f"QRs_{ubicacion_filtro.replace(' ', '_') if ubicacion_filtro else 'General'}.pdf"
+
+        return send_file(buffer, as_attachment=True, download_name=nombre_archivo, mimetype='application/pdf')
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Error interno: {str(e)}'}), 500
+    
+# ==============================================================================
+# TABLERO DE AUDITORÍA DE LOTES ACTIVOS (DASHBOARD)
+# ==============================================================================
+@csrf.exempt
+@bp_901811727.route('/obtener_auditoria_activos', methods=['POST'])
+@login_required_custom
+def obtener_auditoria_activos():
+    data = request.get_json()
+    empresa_id = data.get('empresa_id')
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        # 1. Traer todo el historial de lotes activos
+        query = """
+            SELECT id, fecha, ubicacion, lote, dias_operacion, operacion, 
+                   neto_gastado, porcentaje_diferencia, registro,
+                   `testigo nivel tk-1`, `testigo nivel tk-2`, `testigo nivel tk-3`, `testigo nivel tk-4`, `testigo nivel tk-5`, `testigo nivel tk-6`, `testigo nivel tk-7`, `testigo nivel tk-8`, `testigo nivel tk-9`, `testigo nivel tk-10`, `testigo nivel tk-11`,
+                   `testigo nivelfinal tk-1`, `testigo nivelfinal tk-2`, `testigo nivelfinal tk-3`, `testigo nivelfinal tk-4`, `testigo nivelfinal tk-5`, `testigo nivelfinal tk-6`, `testigo nivelfinal tk-7`, `testigo nivelfinal tk-8`, `testigo nivelfinal tk-9`, `testigo nivelfinal tk-10`, `testigo nivelfinal tk-11`,
+                   testigo_baucher_tk_1, testigo_baucher_tk_2, testigo_baucher_tk_3, testigo_baucher_tk_4, testigo_baucher_tk_5, testigo_baucher_tk_6, testigo_baucher_tk_7, testigo_baucher_tk_8, testigo_baucher_tk_9, testigo_baucher_tk_10, testigo_baucher_tk_11
+            FROM cardex_glp 
+            WHERE id_empresa = %s AND estatus_lote = 'ACTIVO'
+            ORDER BY fecha DESC, id DESC
+        """
+        cur.execute(query, (empresa_id,))
+        filas = cur.fetchall()
+
+        if not filas:
+            return jsonify({'success': False, 'message': 'No hay lotes activos en este momento.'}), 404
+
+        resumen_granjas = {}
+        historial = []
+
+        for f in filas:
+            ubi = f['ubicacion']
+            op = f['operacion']
+
+            # Inicializar granja en el resumen
+            if ubi not in resumen_granjas:
+                resumen_granjas[ubi] = {
+                    'dias_maximos': 0,
+                    'cant_consumos': 0,
+                    'cant_tanqueos': 0,
+                    'total_gastado': 0.0
+                }
+
+            # Actualizar el día máximo de edad del lote
+            if f['dias_operacion'] and f['dias_operacion'] > resumen_granjas[ubi]['dias_maximos']:
+                resumen_granjas[ubi]['dias_maximos'] = f['dias_operacion']
+
+            # Acumular contadores
+            if op == 'consumo':
+                resumen_granjas[ubi]['cant_consumos'] += 1
+                if f['neto_gastado']:
+                    resumen_granjas[ubi]['total_gastado'] += float(f['neto_gastado'])
+            elif op == 'tanqueo':
+                resumen_granjas[ubi]['cant_tanqueos'] += 1
+
+            # Recolectar todas las fotos válidas de esa fila (limpiando nulos)
+            fotos = []
+            for i in range(1, 12):
+                col_ini = f'testigo nivel tk-{i}'
+                col_fin = f'testigo nivelfinal tk-{i}'
+                col_bau = f'testigo_baucher_tk_{i}'
+                
+                if f.get(col_ini) and str(f[col_ini]).strip(): fotos.append(f[col_ini])
+                if f.get(col_fin) and str(f[col_fin]).strip(): fotos.append(f[col_fin])
+                if f.get(col_bau) and str(f[col_bau]).strip(): fotos.append(f[col_bau])
+
+            # Guardar el registro limpio para la tabla
+            historial.append({
+                'id': f['id'],
+                'fecha': f['fecha'].strftime('%Y-%m-%d') if f['fecha'] else 'Sin Fecha',
+                'ubicacion': ubi,
+                'operacion': op,
+                'neto_gastado': float(f['neto_gastado']) if f['neto_gastado'] else 0.0,
+                'diferencia': float(f['porcentaje_diferencia']) if f['porcentaje_diferencia'] else 0.0,
+                'registro': f['registro'] or 'Desconocido',
+                'fotos': fotos,
+                'dia': f['dias_operacion'] or 0
+            })
+
+        return jsonify({'success': True, 'resumen': resumen_granjas, 'historial': historial})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        cur.close()
+        
+@csrf.exempt
+@bp_901811727.route('/glp/admin/rechazar_solicitud', methods=['POST'])
+@login_required_custom
+def rechazar_solicitud():
+    try:
+        data = request.get_json()
+        id_solicitud = data.get('id')
+        
+        if not id_solicitud:
+            return jsonify({"success": False, "message": "ID de solicitud requerido."}), 400
+
+        cur = mysql.connection.cursor()
+        
+        # Cambiamos el estatus a 'rechazado' o 'anulado'
+        query = """
+            UPDATE pedidos_gas_glp 
+            SET estatus_flujo = 'rechazado' 
+            WHERE id = %s
+        """
+        cur.execute(query, (id_solicitud,))
+        mysql.connection.commit()
+        cur.close()
+
+        return jsonify({"success": True, "message": "Solicitud anulada correctamente."})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500

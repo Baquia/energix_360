@@ -483,6 +483,19 @@
           <span class="icon-spacer">💰</span> Saldos al Cierre
         </button>
       </div>
+
+      <div class="sidebar-section-title mt-4">CONFIGURACIÓN Y AUDITORÍA</div>
+      <div class="mt-2">
+        <button class="nav-item" onclick="seleccionarGranjaYEjecutar('qr')">
+          <span class="icon-spacer">🔲</span> Generar QR-Granja
+        </button>
+        <button class="nav-item" onclick="seleccionarGranjaYEjecutar('editar')">
+          <span class="icon-spacer">⚙️</span> Editar Tanques / Prov.
+        </button>
+        <button class="nav-item" onclick="iniciarAuditoriaActivos(EMPRESA_ID)">
+          <span class="icon-spacer">👁️</span> Auditoría Lotes Activos
+        </button>
+      </div>
     </div>
 
     <div class="main-content">
@@ -782,6 +795,89 @@
     </div>
   </div>
 
+  <div class="modal fade" id="modalEditarTanques" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fw-bold">⚙️ Editar Configuración: <span id="edUbicacionTitulo"></span></h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <input type="hidden" id="edUbicacion">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="fw-bold small text-primary">Proveedor GLP</label>
+              <input type="text" id="edProveedor" class="form-control fw-bold" placeholder="Ej: Gas Union">
+            </div>
+            <div class="col-md-6">
+              <label class="fw-bold small text-primary">Email del Proveedor</label>
+              <input type="email" id="edEmail" class="form-control" placeholder="correo@proveedor.com">
+            </div>
+          </div>
+          <h6 class="fw-bold mt-4 mb-2 text-dark border-bottom pb-2">Tanques de la Sede</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered text-center align-middle bg-white shadow-sm">
+              <thead class="table-dark">
+                <tr>
+                  <th>Nombre (Ej. tk-1)</th>
+                  <th>Capacidad (Galones)</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="edTablaTanquesBody"></tbody>
+            </table>
+          </div>
+          <button class="btn btn-outline-success btn-sm fw-bold w-100 mt-2" onclick="agregarFilaTanque('', '')">+
+            Agregar Otro Tanque</button>
+        </div>
+        <div class="modal-footer bg-white">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success fw-bold px-4" onclick="iniciarGuardadoTanques()">💾 Guardar
+            Cambios</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalAuditoriaActivos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content bg-light">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold">👁️ Tablero de Auditoría (Lotes en Calefacción)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-4">
+            <div class="col-md-4">
+              <label class="fw-bold small text-muted">Filtrar por Granja Activa:</label>
+              <select id="filtroGranjaAuditoria" class="form-select form-select-lg shadow-sm fw-bold text-primary"
+                onchange="renderizarDashboardAuditoria()"></select>
+            </div>
+          </div>
+          <div class="row mb-4" id="tarjetasKpiAuditoria"></div>
+          <div class="card shadow-sm border-0">
+            <div class="card-body p-0 table-responsive">
+              <table class="table table-hover table-striped align-middle mb-0 text-center">
+                <thead class="table-dark small">
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Granja</th>
+                    <th>Día</th>
+                    <th>Operación</th>
+                    <th>Gastado / Diferencia</th>
+                    <th>Responsable</th>
+                    <th>Evidencia</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaAuditoriaBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
@@ -959,7 +1055,21 @@
           let tks = '<div class="d-flex gap-2">';
           i.tanques.forEach(t => { tks += `<div class="border p-1 rounded text-center"><div class="small fw-bold">${t.numero}</div><div class="${t.nivel <= 25 ? 'text-danger' : ''}">${t.nivel}%</div></div>`; });
           tks += '</div>';
-          tbody.innerHTML += `<tr><td>${i.fecha.substring(0, 16)}</td><td><b>${i.ubicacion}</b></td><td>${i.lote} <span class="badge bg-info text-dark">Día ${i.dias_operacion}</span></td><td>${tks}</td><td><h5 class="text-success m-0">${i.nivel_solicitado}%</h5></td><td><button class="btn btn-success btn-sm me-1" onclick="aprobarSolicitudGLP(${i.id}, this)">Aprobar</button><button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${i.id})">Analizar</button></td></tr>`;
+          tbody.innerHTML += `<tr>
+    <td>${i.fecha.substring(0, 16)}</td>
+    <td><b>${i.ubicacion}</b></td>
+    <td>${i.lote} <span class="badge bg-info text-dark">Día ${i.dias_operacion}</span></td>
+    <td>${tks}</td>
+    <td><h5 class="text-success m-0">${i.nivel_solicitado}%</h5></td>
+    <td class="text-center">
+        <div class="d-flex justify-content-center gap-2">
+            <button class="btn btn-success btn-sm" title="Aprobar" onclick="aprobarSolicitudGLP(${i.id}, this)">👍</button>
+            <button class="btn btn-danger btn-sm" title="Anular/Rechazar" onclick="rechazarSolicitudGLP(${i.id}, this)">❌</button>
+            <button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${i.id})">📈 Analizar</button>
+        </div>
+    </td>
+</tr>`;
+
         });
       });
     }
@@ -970,6 +1080,34 @@
       fetch('/glp/admin/aprobar_solicitud', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id })
       }).then(r => r.json()).then(d => { if (d.success) { alert("Aprobada"); mostrarAprobaciones(); } else { alert(d.message); btn.disabled = false; } });
+    }
+
+    function rechazarSolicitudGLP(id, btn) {
+      if (!confirm("¿Está seguro de anular esta solicitud? Desaparecerá de esta lista.")) return;
+      btn.disabled = true;
+      btn.textContent = "⏳";
+
+      fetch('/glp/admin/rechazar_solicitud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            alert("Solicitud anulada correctamente.");
+            mostrarAprobaciones(); // Recarga la tabla en la vista del supervisor
+          } else {
+            alert("Error: " + data.message);
+            btn.disabled = false;
+            btn.textContent = "❌";
+          }
+        })
+        .catch(e => {
+          alert("Error de red al intentar anular.");
+          btn.disabled = false;
+          btn.textContent = "❌";
+        });
     }
 
     function abrirSimuladorProyeccion(id) {
@@ -1204,6 +1342,215 @@
           tbody.innerHTML = '<tr><td colspan="5" class="text-danger">Error de conexión</td></tr>';
           console.error("Error al consultar:", e);
         });
+    }
+  </script>
+
+  <script>
+    // ==========================================
+    // NUEVAS FUNCIONES: QR, EDICIÓN Y AUDITORÍA
+    // ==========================================
+
+    // 1. Selector de Granja genérico (Para QR y Edición)
+    function seleccionarGranjaYEjecutar(accion) {
+      fetch('/obtener_ubicaciones', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'granja', empresa_id: EMPRESA_ID })
+      }).then(r => r.json()).then(d => {
+        if (d.success && d.ubicaciones.length > 0) {
+          mostrarPregunta("Seleccione Granja", d.ubicaciones.map(u => ({ value: u, text: u })), (ubi) => {
+            if (accion === 'qr') descargarQRGranja(ubi);
+            if (accion === 'editar') abrirModalEdicionTanques(ubi);
+          });
+        } else { alert("No hay granjas configuradas."); }
+      });
+    }
+
+    // 2. Lógica Generar QR (Ruta corregida: /generar_qrs_pdf)
+    function descargarQRGranja(ubicacion) {
+      const loader = document.createElement('div');
+      loader.className = 'pregunta-overlay';
+      loader.style.zIndex = '99999';
+      loader.innerHTML = `<div class="pregunta-card text-center"><div class="spinner-border text-primary mb-3"></div><h5 class="fw-bold">Generando Código QR...</h5></div>`;
+      document.body.appendChild(loader);
+
+      // 👇 AQUÍ ESTÁ EL CAMBIO IMPORTANTE 👇
+      fetch('/generar_qrs_pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: EMPRESA_ID, ubicacion: ubicacion })
+      })
+        .then(async (res) => {
+          const contentType = res.headers.get("content-type") || "";
+
+          // 1. Si Python manda un error estructurado (JSON)
+          if (contentType.includes("application/json")) {
+            const data = await res.json();
+            throw new Error(data.message || "El servidor reportó un error al intentar crear el QR.");
+          }
+          // 2. Si Python colapsó y manda una página de error (HTML)
+          else if (contentType.includes("text/html")) {
+            const htmlError = await res.text();
+            console.error("Error del servidor Flask:", htmlError);
+            throw new Error("Error interno en el servidor de Python (Error 500). Revisa la consola.");
+          }
+
+          // 3. Si todo salió bien, leemos el archivo crudo y pasamos su tipo
+          return { blob: await res.blob(), contentType: contentType };
+        })
+        .then(({ blob, contentType }) => {
+          loader.remove();
+
+          // Asignamos la extensión correcta según lo que mandó Python realmente
+          let extension = "pdf";
+          if (contentType.includes("image/png")) extension = "png";
+          else if (contentType.includes("image/jpeg")) extension = "jpg";
+
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `QR_Tanques_${ubicacion.replace(/\s+/g, '_')}.${extension}`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url); // Limpiamos la memoria
+        })
+        .catch((err) => {
+          loader.remove();
+          alert("❌ Ocurrió un problema:\n" + err.message);
+        });
+    }
+    // 3. Lógica Edición de Tanques
+    function abrirModalEdicionTanques(ubicacion) {
+      document.getElementById('edUbicacion').value = ubicacion;
+      document.getElementById('edUbicacionTitulo').textContent = ubicacion;
+      const tbody = document.getElementById('edTablaTanquesBody');
+      tbody.innerHTML = '<tr><td colspan="3"><div class="spinner-border text-primary"></div> Cargando...</td></tr>';
+
+      new bootstrap.Modal(document.getElementById('modalEditarTanques')).show();
+
+      fetch('/obtener_tanques_granja', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: EMPRESA_ID, ubicacion: ubicacion })
+      }).then(r => r.json()).then(data => {
+        tbody.innerHTML = '';
+        if (data.success) {
+          document.getElementById('edProveedor').value = data.general.proveedor;
+          document.getElementById('edEmail').value = data.general.email;
+          data.tanques.forEach(tk => agregarFilaTanque(tk.nombre_tanque, tk.capacidad));
+        } else { tbody.innerHTML = `<tr><td colspan="3" class="text-danger">${data.message}</td></tr>`; }
+      });
+    }
+
+    function agregarFilaTanque(nombre, capacidad) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><input type="text" class="form-control form-control-sm text-center in-tk-nombre fw-bold" value="${nombre}" placeholder="tk-X"></td><td><input type="number" class="form-control form-control-sm text-center in-tk-capacidad" value="${capacidad}" placeholder="Galones"></td><td><button class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">🗑️</button></td>`;
+      document.getElementById('edTablaTanquesBody').appendChild(tr);
+    }
+
+    function iniciarGuardadoTanques() {
+      const ubicacion = document.getElementById('edUbicacion').value;
+      const proveedor = document.getElementById('edProveedor').value.trim();
+      const email = document.getElementById('edEmail').value.trim();
+      if (!proveedor || !email) { alert("Proveedor y Email obligatorios."); return; }
+
+      let tanques = [], error = false;
+      document.getElementById('edTablaTanquesBody').querySelectorAll('tr').forEach(f => {
+        const nombre = f.querySelector('.in-tk-nombre').value.trim();
+        const capacidad = parseInt(f.querySelector('.in-tk-capacidad').value);
+        if (!nombre || isNaN(capacidad) || capacidad <= 0) error = true;
+        else tanques.push({ nombre, capacidad });
+      });
+
+      if (error) { alert("Revisa la tabla: datos inválidos."); return; }
+      if (tanques.length === 0) { alert("Debe haber al menos un tanque."); return; }
+
+      // Overlay Confirmación
+      const ov = document.createElement("div");
+      ov.className = "pregunta-overlay"; ov.style.zIndex = "99999";
+      ov.innerHTML = `<div class="pregunta-card"><div class="alert alert-warning text-center small"><strong>⚠️ ATENCIÓN</strong><br>Vas a sobrescribir la configuración de <b>${ubicacion}</b>.<br><span class="text-danger fw-bold">DEBERÁS generar un nuevo código QR</span>.</div><div class="text-center fw-bold mb-3">¿Guardar cambios?</div><div class="d-flex gap-2"><button class="btn btn-secondary flex-fill" onclick="this.closest('.pregunta-overlay').remove()">Cancelar</button><button class="btn btn-success flex-fill fw-bold" id="btnConfGuardar">Sí, Guardar</button></div></div>`;
+      document.body.appendChild(ov);
+
+      document.getElementById('btnConfGuardar').onclick = () => {
+        ov.remove();
+        fetch('/guardar_tanques_granja', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ empresa_id: EMPRESA_ID, ubicacion, proveedor, email, tanques })
+        }).then(r => r.json()).then(d => {
+          if (d.success) { alert("✅ " + d.message); bootstrap.Modal.getInstance(document.getElementById('modalEditarTanques')).hide(); }
+          else alert("❌ Error: " + d.message);
+        });
+      };
+    }
+
+    // 4. Lógica Auditoría de Activos
+    let datosAuditoriaGlobal = null;
+    function iniciarAuditoriaActivos() {
+      const loader = document.createElement('div');
+      loader.className = 'pregunta-overlay'; loader.style.zIndex = '99999';
+      loader.innerHTML = `<div class="pregunta-card text-center"><div class="spinner-border text-primary mb-3"></div><h5 class="fw-bold">Analizando...</h5></div>`;
+      document.body.appendChild(loader);
+
+      fetch('/obtener_auditoria_activos', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: EMPRESA_ID })
+      }).then(r => r.json()).then(data => {
+        loader.remove();
+        if (data.success) {
+          datosAuditoriaGlobal = data;
+          const sel = document.getElementById('filtroGranjaAuditoria');
+          sel.innerHTML = '<option value="TODAS">Ver Todas las Granjas</option>';
+          Object.keys(data.resumen).forEach(g => sel.innerHTML += `<option value="${g}">${g}</option>`);
+          new bootstrap.Modal(document.getElementById('modalAuditoriaActivos')).show();
+          renderizarDashboardAuditoria();
+        } else { alert("No se pudo cargar: " + data.message); }
+      }).catch(() => { loader.remove(); alert("Error de red."); });
+    }
+
+    function renderizarDashboardAuditoria() {
+      if (!datosAuditoriaGlobal) return;
+      const filtro = document.getElementById('filtroGranjaAuditoria').value;
+      const hist = datosAuditoriaGlobal.historial, res = datosAuditoriaGlobal.resumen;
+      let tConsumos = 0, tTanqueos = 0, calHTML = "";
+
+      if (filtro === "TODAS") {
+        tConsumos = hist.filter(h => h.operacion === 'consumo').length;
+        tTanqueos = hist.filter(h => h.operacion === 'tanqueo').length;
+        calHTML = `<div class="card bg-secondary text-white shadow h-100"><div class="card-body text-center"><h6 class="fw-bold opacity-75">Lotes Activos</h6><h2 class="fw-bold mb-0">${Object.keys(res).length}</h2></div></div>`;
+      } else {
+        const r = res[filtro]; tConsumos = r.cant_consumos; tTanqueos = r.cant_tanqueos;
+        let p = Math.round((tConsumos / Math.max(r.dias_maximos, 1)) * 100), color = "bg-success", ico = "✅";
+        if (p < 85) { color = "bg-warning text-dark"; ico = "⚠️"; }
+        if (p < 60) { color = "bg-danger"; ico = "🛑"; }
+        calHTML = `<div class="card ${color} text-white shadow h-100"><div class="card-body text-center"><h6 class="fw-bold opacity-75">Calidad de Reporte</h6><h2 class="fw-bold mb-0">${p}% ${ico}</h2><small class="opacity-75">(${tConsumos} reg / ${r.dias_maximos} días)</small></div></div>`;
+      }
+
+      document.getElementById('tarjetasKpiAuditoria').innerHTML = `
+        <div class="col-md-4 mb-2"><div class="card bg-info text-white shadow h-100"><div class="card-body text-center"><h6 class="fw-bold opacity-75">Reportes Consumo</h6><h2 class="fw-bold mb-0">🔵 ${tConsumos}</h2></div></div></div>
+        <div class="col-md-4 mb-2"><div class="card bg-success text-white shadow h-100"><div class="card-body text-center"><h6 class="fw-bold opacity-75">Tanqueos</h6><h2 class="fw-bold mb-0">🟢 ${tTanqueos}</h2></div></div></div>
+        <div class="col-md-4 mb-2">${calHTML}</div>`;
+
+      const tbody = document.getElementById('tablaAuditoriaBody'); tbody.innerHTML = '';
+      const filas = filtro === "TODAS" ? hist : hist.filter(h => h.ubicacion === filtro);
+
+      filas.forEach(f => {
+        let bOp = `<span class="badge bg-secondary">${f.operacion}</span>`;
+        if (f.operacion === 'consumo') bOp = `<span class="badge bg-info text-dark">🔵 Consumo</span>`;
+        if (f.operacion === 'tanqueo') bOp = `<span class="badge bg-success">🟢 Tanqueo</span>`;
+
+        let extra = `<span class="fw-bold text-muted">${f.neto_gastado} gl/kg</span>`;
+        if (f.operacion === 'tanqueo') extra = `<span class="fw-bold ${f.diferencia < -5 || f.diferencia > 5 ? 'text-danger' : 'text-success'}">${f.diferencia < -5 || f.diferencia > 5 ? '⚠️ ' : ''}Dif: ${f.diferencia}%</span>`;
+
+        let evBtn = `<span class="text-muted small">Sin fotos</span>`;
+        if (f.fotos.length > 0) evBtn = `<button class="btn btn-sm btn-outline-dark fw-bold" onclick="abrirVisorFotosAuditoria('${f.fotos.join(',')}')">📸 Ver (${f.fotos.length})</button>`;
+
+        tbody.innerHTML += `<tr><td class="fw-bold">${f.fecha}</td><td class="small fw-bold text-primary">${f.ubicacion}</td><td>Día ${f.dia}</td><td>${bOp}</td><td>${extra}</td><td class="small text-muted">${f.registro}</td><td>${evBtn}</td></tr>`;
+      });
+    }
+
+    function abrirVisorFotosAuditoria(urlsStr) {
+      const ov = document.createElement("div"); ov.className = "pregunta-overlay"; ov.style.zIndex = "999999";
+      let imgs = ""; urlsStr.split(',').forEach(u => imgs += `<img src="${u}" class="img-fluid rounded mb-3 shadow-sm border" style="max-height: 300px;">`);
+      ov.innerHTML = `<div class="pregunta-card text-center" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><h5 class="fw-bold mb-3">Evidencia Fotográfica</h5>${imgs}<button class="btn btn-secondary w-100 mt-2 fw-bold" onclick="this.closest('.pregunta-overlay').remove()">Cerrar Visor</button></div>`;
+      document.body.appendChild(ov);
     }
   </script>
 

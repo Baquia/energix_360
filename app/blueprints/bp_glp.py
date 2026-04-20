@@ -202,19 +202,22 @@ def _resumen_tanques(tanques):
 def _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha_actual=None):
     """
     Calcula y actualiza los días de operación de un lote en cardex_glp.
+    Usa la fecha de llegada real de los pollitos para arrancar a contar.
     """
     if fecha_actual is None:
         fecha_actual = datetime.now().date()
 
+    # CAMBIO CLAVE: Usamos COALESCE. Si hay fecha de llegada, usa esa. Si no, usa la fecha del registro.
     cur.execute("""
-        SELECT MIN(fecha) AS fecha_ini
+        SELECT COALESCE(fecha_llegada_pollitos, fecha) AS fecha_ini
         FROM cardex_glp
         WHERE empresa = %s
           AND TRIM(ubicacion) = TRIM(%s)
           AND lote = %s
+          AND operacion = 'inicio_calefaccion'
+        LIMIT 1
     """, (empresa, ubicacion, lote_id))
     
-    # --- BLINDAJE ---
     row = cur.fetchone()
     fecha_ini = None
     if row:
@@ -222,16 +225,24 @@ def _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha_
             fecha_ini = row.get("fecha_ini")
         else:
             fecha_ini = row[0]
-    # ----------------
 
     dias = 1
     if fecha_ini:
         try:
-            # Aseguramos que fecha_ini sea date si es necesario
-            if isinstance(fecha_ini, datetime):
+            # Blindaje por si el motor de BD devuelve un string en vez de Date
+            if isinstance(fecha_ini, str):
+                fecha_ini = datetime.strptime(fecha_ini, '%Y-%m-%d').date()
+            elif isinstance(fecha_ini, datetime):
                 fecha_ini = fecha_ini.date()
+                
             dias = (fecha_actual - fecha_ini).days + 1
-        except Exception:
+            
+            # Si los días son negativos o 0 (El técnico fue antes de que llegaran los pollitos)
+            if dias <= 0:
+                dias = 0 
+                
+        except Exception as e:
+            print(f"Error calculando días: {e}")
             dias = 1
 
     cur.execute("""
@@ -243,7 +254,6 @@ def _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha_
     """, (dias, empresa, ubicacion, lote_id))
 
     return dias
-
 
 def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, tanques):
     """
@@ -1324,7 +1334,7 @@ def obtener_tanques():
 
     try:
         with mysql.connection.cursor() as cur:
-            # 1. Buscar Tanques
+            # 1. Buscar Tanques de la sede
             cur.execute("""
                 SELECT nombre_tanque AS numero,
                        capacidad_gls  AS capacidad
@@ -1335,35 +1345,69 @@ def obtener_tanques():
             """, (empresa, sede))
             rows = cur.fetchall() or []
             
-            tanques = []
-            for r in rows:
-                # Lectura Híbrida (Dict o Tupla) para tanques
-                num = r.get("numero") if isinstance(r, dict) else r[0]
-                cap = r.get("capacidad") if isinstance(r, dict) else r[1]
-                tanques.append({
-                    "numero": num or "",
-                    "capacidad": float(cap or 0),
-                    "etiqueta": num or ""
-                })
-
-            # 2. NUEVO: Verificar si hay lote ACTIVO en esta sede
+            # 2. Verificar si hay lote ACTIVO en esta sede
             cur.execute("""
-                SELECT lote FROM cardex_glp 
+                SELECT * FROM cardex_glp 
                 WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO' 
-                LIMIT 1
+                ORDER BY fecha DESC, id DESC LIMIT 1
             """, (empresa, sede))
-            row_lote = cur.fetchone()
+            ultimo_reg = cur.fetchone()
             
             lote_activo = False
             info_lote = ""
             
-            if row_lote:
+            if ultimo_reg:
+                # Convertir a dict si el cursor devuelve tuplas
+                if not isinstance(ultimo_reg, dict):
+                    cols = [desc[0] for desc in cur.description]
+                    ultimo_reg = dict(zip(cols, ultimo_reg))
+                
                 lote_activo = True
-                # Lectura Híbrida para el lote
-                if isinstance(row_lote, dict):
-                    info_lote = row_lote.get('lote', '')
-                else:
-                    info_lote = row_lote[0]
+                info_lote = ultimo_reg.get('lote', '')
+
+            # 3. Armar la lista de tanques inyectando el último nivel conocido "Histórico"
+            tanques = []
+            for r in rows:
+                num = r.get("numero") if isinstance(r, dict) else r[0]
+                cap = r.get("capacidad") if isinstance(r, dict) else r[1]
+                
+                num_limpio = str(num).upper().replace('TK-', '').replace('TK', '').strip()
+                ultimo_nivel = None
+                
+                if lote_activo:
+                    # ⚠️ EL TRUCO ESTÁ AQUÍ: Buscamos hacia atrás el último nivel registrado PARA ESTE TANQUE
+                    cur.execute(f"""
+                        SELECT operacion, `nivel tk-{num_limpio}`, `nivelfinal tk-{num_limpio}`
+                        FROM cardex_glp
+                        WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
+                          AND (`nivel tk-{num_limpio}` IS NOT NULL OR `nivelfinal tk-{num_limpio}` IS NOT NULL)
+                        ORDER BY id DESC LIMIT 1
+                    """, (empresa, sede))
+                    ultimo_tk = cur.fetchone()
+                    
+                    if ultimo_tk:
+                        if not isinstance(ultimo_tk, dict):
+                            cols = [desc[0] for desc in cur.description]
+                            ultimo_tk = dict(zip(cols, ultimo_tk))
+                            
+                        # Si fue tanqueo, su nivel real es el final. Si no, es el inicial.
+                        if ultimo_tk.get('operacion') == 'tanqueo' and ultimo_tk.get(f'nivelfinal tk-{num_limpio}') is not None:
+                            val_nivel = ultimo_tk.get(f'nivelfinal tk-{num_limpio}')
+                        else:
+                            val_nivel = ultimo_tk.get(f'nivel tk-{num_limpio}')
+                            
+                        if val_nivel is not None:
+                            try:
+                                ultimo_nivel = float(val_nivel)
+                            except Exception:
+                                ultimo_nivel = None
+
+                tanques.append({
+                    "numero": num or "",
+                    "capacidad": float(cap or 0),
+                    "etiqueta": num or "",
+                    "ultimo_nivel": ultimo_nivel
+                })
 
         return jsonify({
             "success": True, 
@@ -1373,9 +1417,9 @@ def obtener_tanques():
         })
 
     except Exception as e:
+        import traceback
         traceback.print_exc()
         return jsonify({"success": False, "tanques": [], "message": f"Error: {e}"}), 500
-
 # ======================
 # Iniciar calefacción (CORREGIDA Y BLINDADA CON NOTIFICACIONES)
 # ======================
@@ -1402,6 +1446,11 @@ def registrar_inicio_calefaccion():
     if check: return check
 
     pollitos = data.get('pollitos')
+    # NUEVO: Capturar fecha_llegada_pollitos
+    fecha_llegada_p = data.get('fecha_llegada_pollitos')
+    if not fecha_llegada_p:
+        fecha_llegada_p = None
+        
     tanques  = data.get('tanques', []) or []
 
     try:
@@ -1416,9 +1465,9 @@ def registrar_inicio_calefaccion():
 
             # 3. Insertar Registro
             cur.execute("""
-                INSERT INTO cardex_glp (fecha, empresa, id_empresa, ubicacion, lote, estatus_lote, operacion, tipo, clase, pollitos, registro, dias_operacion, op_id)
-                VALUES (%s, %s, %s, %s, %s, 'ACTIVO', 'inicio_calefaccion', 'manual', 'saldo inicial', %s, %s, 1, %s)
-            """, (fecha, empresa, id_empresa, ubicacion, lote_id, pollitos, usuario, op_id))
+                INSERT INTO cardex_glp (fecha, empresa, id_empresa, ubicacion, lote, estatus_lote, operacion, tipo, clase, pollitos, fecha_llegada_pollitos, registro, dias_operacion, op_id)
+                VALUES (%s, %s, %s, %s, %s, 'ACTIVO', 'inicio_calefaccion', 'manual', 'saldo inicial', %s, %s, %s, 1, %s)
+            """, (fecha, empresa, id_empresa, ubicacion, lote_id, pollitos, fecha_llegada_p, usuario, op_id))
             
             id_operacion = cur.lastrowid
             carpeta = os.path.join("testigos", empresa.replace(" ", "_"), lote_id)
@@ -1445,8 +1494,10 @@ def registrar_inicio_calefaccion():
                 col_t = f"testigo nivel tk-{num}"
                 
                 ruta_foto = None
-                if tk.get("testigo"):
-                    ruta_foto = _guardar_testigo(tk.get("testigo"), carpeta, f"tk{num}_{id_operacion}")
+                # BUSCA 'fotoBase64' (como lo manda el frontend) o 'testigo'
+                foto_recibida = tk.get("fotoBase64") or tk.get("testigo")
+                if foto_recibida:
+                    ruta_foto = _guardar_testigo(foto_recibida, carpeta, f"tk{num}_{id_operacion}")
 
                 query_tk = f"UPDATE cardex_glp SET `{col_n}`=%s, `{col_c}`=%s"
                 params_tk = [nivel, cap]
@@ -1513,11 +1564,14 @@ def registrar_inicio_calefaccion():
             # 🔊 AVISO A LA BITÁCORA
             # =======================================================
             try:
-                registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Inicio Calefacción", f"Sede: {ubicacion}. Lote: {lote_id}. Población: {pollitos}.", "INFO")
+                registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Inicio Calefacción", f"Sede: {ubicacion}. Lote: {lote_id}. Población: {pollitos}. Fecha Llegada: {fecha_llegada_p or 'Hoy'}.", "INFO")
             except Exception as e:
                 print("Error audit:", e)
             # =======================================================
 
+            # Llama a la función actualizada para calcular los días (forzando día 0 si es futuro)
+            _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha)
+            
             mysql.connection.commit()
 
         # 6. Preparar Respuesta Completa (Ahora activa el modal verde con el código)
@@ -1532,7 +1586,7 @@ def registrar_inicio_calefaccion():
             "lote": lote_id,
             "fecha": fecha.strftime("%Y-%m-%d"),
             "pollitos": pollitos,
-            "saldo_estimado_kg": round(saldo_estimado_kg, 2),
+            "saldo_estimado_kg": round(saldo_kg, 2),
             "tanques": _resumen_tanques([
                 {"numero": t.get("numero"), "nivel": t.get("nivel"), "capacidad": t.get("capacidad")}
                 for t in tanques
@@ -1546,15 +1600,9 @@ def registrar_inicio_calefaccion():
 
         return jsonify({"success": True, "message": mensaje, "resumen": resumen})
 
-    except IntegrityError as e:
-        # 2. BLINDAJE FINAL (SI PASA LA CONDICIÓN DE CARRERA)
-        return _manejar_error_idempotencia(e, "inicio_calefaccion", ubicacion)
-
     except Exception as e:
-        mysql.connection.rollback()
-        print("Error registro inicio:", e)
-        return jsonify({"success": False, "message": str(e)})
-    
+        print(f"Error GLP inicio: {e}")
+        return jsonify({"success": False, "message": "Error interno al iniciar calefacción"}), 500
 # ======================
 # Registrar tanqueo (VERSION FINAL: PROD + BLINDAJE + PRECIOS CORREGIDOS)
 # ======================

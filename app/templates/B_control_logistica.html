@@ -35,6 +35,27 @@
             padding: 1.5rem;
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
+            /* PERMITE SCROLL INTERNO */
+            overflow-x: hidden;
+        }
+
+        /* Personalizar el scrollbar del sidebar para que se vea fino y elegante */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
 
         .brand-container {
@@ -368,17 +389,7 @@
 
         <div class="menu-label">Gestión Logística</div>
 
-        <button class="menu-item active">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="7" height="7"></rect>
-                <rect x="14" y="3" width="7" height="7"></rect>
-                <rect x="14" y="14" width="7" height="7"></rect>
-                <rect x="3" y="14" width="7" height="7"></rect>
-            </svg>
-            Dashboard
-        </button>
-
-        <button onclick="openAlistamientoModal()" class="menu-item btn-alistamiento">
+        <button onclick="openAlistamientoModal()" class="menu-item btn-alistamiento" style="margin-bottom: 0.5rem;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M9 11l3 3L22 4"></path>
                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
@@ -386,7 +397,7 @@
             Alistamiento
         </button>
 
-        <button onclick="openUploadModal()" class="menu-item btn-upload">
+        <button onclick="openUploadModal()" class="menu-item btn-upload" style="margin-bottom: 1.5rem;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 8 12 3 7 8"></polyline>
@@ -395,7 +406,98 @@
             Cargar Picking (Excel)
         </button>
 
-        <a href="/logout" class="menu-item btn-logout">
+        <div class="menu-label">Gestión de Productos</div>
+
+        <button onclick="openProductosModal()" class="menu-item"
+            style="background: #f3e8ff; color: #7e22ce; margin-bottom: 0.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                    d="M20 16V7a2 2 0 00-2-2H6a2 2 0 00-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 01-.9 1.45H3.62a1 1 0 01-.9-1.45L4 16">
+                </path>
+            </svg>
+            Agregar de Productos
+        </button>
+
+        <button onclick="abrirModalEditar()" class="menu-item"
+            style="background: #faf5ff; color: #9333ea; margin-bottom: 0.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            Editar Productos
+        </button>
+
+        <button onclick="abrirModalEliminar()" class="menu-item"
+            style="background: #fdf4ff; color: #c026d3; margin-bottom: 1.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Eliminar Productos
+        </button>
+
+        <button onclick="abrirModalPromociones()" class="menu-item"
+            style="background: #fdf2f8; color: #db2777; margin-bottom: 1.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 12 20 22 4 22 4 12"></polyline>
+                <rect x="2" y="7" width="20" height="5"></rect>
+                <line x1="12" y1="22" x2="12" y2="7"></line>
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+            </svg>
+            Gestión de Promociones
+        </button>
+
+        <div class="menu-label">Gestión de Inventarios</div>
+
+        <button onclick="alert('Módulo de Ajustes de Inventario en construcción 🛠️')" class="menu-item"
+            style="background: #ecfdf5; color: #059669; margin-bottom: 1.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            Ajustes y Conteos
+        </button>
+
+        <div class="menu-label">Gestión de Rutas</div>
+
+        <button onclick="alert('Módulo de Flotas y Rutas en construcción 🛠️')" class="menu-item"
+            style="background: #eef2ff; color: #4338ca; margin-bottom: 1.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 18H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3"></path>
+                <polyline points="9 18 12 18 15 18"></polyline>
+                <path d="M19 18h2a2 2 0 0 0 2-2v-5l-3-4h-5v11"></path>
+                <circle cx="7" cy="18" r="2"></circle>
+                <circle cx="17" cy="18" r="2"></circle>
+            </svg>
+            Flota y Despachos
+        </button>
+
+        <div class="menu-label">Gestión de Usuarios</div>
+
+        <button onclick="alert('Módulo de Usuarios en construcción 🛠️')" class="menu-item"
+            style="background: #f1f5f9; color: #475569; margin-bottom: 1.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Perfiles Operativos
+        </button>
+
+        <div class="menu-label">Reportes</div>
+
+        <button onclick="alert('Módulo de Reportes en construcción 🛠️')" class="menu-item"
+            style="background: #fff7ed; color: #c2410c; margin-bottom: 2.5rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+            KPIs y Productividad
+        </button>
+
+        <a href="/logout" class="menu-item btn-logout" style="margin-top: auto;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M9 21H5a2 2 0 0 1-2 2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
@@ -462,7 +564,7 @@
             <div class="modal-body" style="background: #f3f4f6;">
 
                 <div class="section-box">
-                    <h4 class="section-title">📦 Pedidos Pendientes por Asignar</h4>
+                    <h4 class="section-title">🚢 1. Asignación de Muelles de Embarque</h4>
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -479,17 +581,20 @@
                             <tr>
                                 <td><b>{{ orden.orden }}</b></td>
                                 <td><span class="badge badge-blue">{{ orden.zona }}</span></td>
-                                <td>{{ orden.items }}</td>
+                                <td>
+                                    <span style="font-size: 1.1rem; font-weight: bold;">{{ orden.total_items }}</span>
+                                </td>
                                 <td>{{ orden.fecha }}</td>
                                 <td>
-                                    <button onclick="abrirAsignar('{{ orden.orden }}', this)" class="btn-assign">Asignar 👤</button>
+                                    <button onclick="abrirAsignar('{{ orden.orden }}', this)" class="btn-assign">Muelle
+                                        🚢</button>
                                 </td>
                             </tr>
                             {% endfor %}
                             {% else %}
                             <tr>
                                 <td colspan="5" style="text-align:center; padding:1.5rem; color:#6b7280;">✅ No hay
-                                    pedidos pendientes.</td>
+                                    pedidos pendientes sin muelle.</td>
                             </tr>
                             {% endif %}
                         </tbody>
@@ -497,13 +602,14 @@
                 </div>
 
                 <div class="section-box" style="border-left: 4px solid var(--color-primary);">
-                    <h4 class="section-title">🏷️ Lotes Pendientes por Marca (Batch Picking)</h4>
+                    <h4 class="section-title">📦 2. Productos Pendientes por Asignar (Operarios)</h4>
                     <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Marca / Fabricante</th>
                                 <th>Órdenes Incluidas</th>
                                 <th>Total Items</th>
+                                <th>Puerta</th>
                                 <th>Creación</th>
                                 <th>Acción</th>
                             </tr>
@@ -514,7 +620,9 @@
                             <tr>
                                 <td><b style="color:var(--color-primary-dark);">{{ m.marca }}</b></td>
                                 <td><span class="badge badge-yellow">{{ m.ordenes }} órdenes</span></td>
-                                <td>{{ m.items }}</td>
+                                <td>{{ m.total_items }}</td>
+                                <td><span style="font-weight:bold; color:var(--color-primary);">{{ m.puerta }}</span>
+                                </td>
                                 <td>{{ m.fecha }}</td>
                                 <td>
                                     <button onclick="abrirAsignarMarca('{{ m.marca }}', this)"
@@ -524,7 +632,7 @@
                             {% endfor %}
                             {% else %}
                             <tr>
-                                <td colspan="5" style="text-align:center; padding:1.5rem; color:#6b7280;">✅ No hay lotes
+                                <td colspan="6" style="text-align:center; padding:1.5rem; color:#6b7280;">✅ No hay lotes
                                     por marca pendientes.</td>
                             </tr>
                             {% endif %}
@@ -546,9 +654,11 @@
                             <tr>
                                 <th>Operario</th>
                                 <th>Estado</th>
+                                <th>Puerta</th>
                                 <th>Orden Actual</th>
-                                <th>Progreso (Items)</th>
+                                <th>Progreso</th>
                                 <th>Tiempo Total</th>
+                                <th>Acción</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -556,14 +666,18 @@
                             {% for op in ordenes_asignadas %}
                             <tr
                                 class="{% if op.estado_visual == 'FINALIZADO' %}fila-finalizada{% else %}fila-normal{% endif %}">
-                                <td><b>{{ op.operario }}</b></td>
+                                <td><b>{{ op.operario or 'Varios (Lotes)' }}</b></td>
                                 <td>
                                     {% if op.estado_visual == 'FINALIZADO' %}
                                     <span class="badge badge-green">COMPLETADO</span>
+                                    {% elif op.estado_visual == 'DESPACHADO' %}
+                                    <span class="badge badge-blue">DESPACHADO</span>
                                     {% else %}
                                     <span class="badge badge-yellow">ALISTANDO...</span>
                                     {% endif %}
                                 </td>
+                                <td><span style="font-weight:bold; color:var(--color-primary);">{{ op.puerta_asignada or
+                                        'S/A' }}</span></td>
                                 <td>{{ op.orden }}</td>
 
                                 <td onclick="verDetalleOrden('{{ op.orden }}')"
@@ -573,7 +687,7 @@
                                 </td>
 
                                 <td>
-                                    {% if op.estado_visual == 'FINALIZADO' %}
+                                    {% if op.estado_visual in ['FINALIZADO', 'DESPACHADO'] %}
                                     <span style="color:#059669; font-weight:bold; font-family:monospace;">
                                         🏁 {{ op.duracion_str }}
                                     </span>
@@ -586,11 +700,27 @@
                                     <span style="color:#9ca3af;">--:--</span>
                                     {% endif %}
                                 </td>
+                                <td>
+                                    {% if op.estado_visual == 'FINALIZADO' %}
+                                    <button onclick="abrirModalDespacho('{{ op.orden }}')" class="btn-assign"
+                                        style="background:#10b981; color:white; border:none; width: 100%;">🚚
+                                        Vehículo</button>
+                                    {% elif op.estado_visual == 'DESPACHADO' %}
+                                    <button onclick="window.open('/bodegas/imprimir_acta/{{ op.orden }}', '_blank')"
+                                        class="btn-assign"
+                                        style="background:#3b82f6; color:white; border:none; width: 100%;">🖨️
+                                        Acta</button>
+                                    {% else %}
+                                    <span
+                                        style="color:#9ca3af; font-size:0.8rem; display: block; text-align: center;">En
+                                        Proceso</span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                             {% else %}
                             <tr>
-                                <td colspan="5" style="text-align:center; padding:1.5rem; color:#6b7280;">😴 No hay
+                                <td colspan="7" style="text-align:center; padding:1.5rem; color:#6b7280;">😴 No hay
                                     operarios activos.</td>
                             </tr>
                             {% endif %}
@@ -598,6 +728,33 @@
                     </table>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <div id="modalDespacho" class="modal-overlay" style="z-index: 1050;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="titulo-modal-despacho">Despachar Orden</h3>
+                <button class="btn-cancel" onclick="cerrarModalDespacho()"
+                    style="border:none; padding:0; font-size:1.5rem;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:#6b7280; font-size:0.9rem; margin-top:5px; margin-bottom:20px;">
+                    Selecciona el vehículo que transportará la mercancía.
+                </p>
+                <div style="text-align:left;">
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:bold;">VEHÍCULO / CONDUCTOR</label>
+                    <select id="selVehiculos"
+                        style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--color-border); margin-top:5px; font-size:1rem; margin-bottom:20px;">
+                        <option value="">Cargando vehículos...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="cerrarModalDespacho()">Cancelar</button>
+                <button class="btn-confirm" id="btnConfirmarDespacho" onclick="ejecutarDespacho()">Confirmar
+                    Despacho</button>
             </div>
         </div>
     </div>
@@ -632,8 +789,8 @@
                             <thead style="position: sticky; top: 0; background: white; z-index: 10;">
                                 <tr>
                                     <th style="text-align:left; padding:12px; background:#f9fafb;">PRODUCTO</th>
-                                    <th style="text-align:center; width:60px; padding:12px; background:#f9fafb;">CANT
-                                    </th>
+                                    <th style="text-align:center; width:90px; padding:12px; background:#f9fafb;">CANT /
+                                        UND</th>
                                 </tr>
                             </thead>
                             <tbody id="tblPendientesBody"></tbody>
@@ -656,8 +813,8 @@
                             <thead style="position: sticky; top: 0; background: white; z-index: 10;">
                                 <tr>
                                     <th style="text-align:left; padding:12px; background:#f9fafb;">PRODUCTO</th>
-                                    <th style="text-align:center; width:60px; padding:12px; background:#f9fafb;">CANT
-                                    </th>
+                                    <th style="text-align:center; width:90px; padding:12px; background:#f9fafb;">CANT /
+                                        UND</th>
                                 </tr>
                             </thead>
                             <tbody id="tblListosBody"></tbody>
@@ -669,22 +826,306 @@
         </div>
     </div>
 
-    <div id="modalAsignar" class="modal-overlay" style="z-index: 1050;">
+    <div id="modalAsignarPuerta" class="modal-overlay" style="z-index: 1050;">
         <div class="modal-card">
             <div class="modal-header">
-                <h3>Asignar Orden <span id="targetOrden" style="color:var(--color-primary);"></span></h3>
-                <button class="btn-cancel" onclick="cerrarAsignar()"
+                <h3>Asignar Muelle a <span id="targetPuertaOrden" style="color:var(--color-primary);"></span></h3>
+                <button class="btn-cancel" onclick="cerrarAsignarPuerta()"
                     style="border:none; padding:0; font-size:1.5rem;">&times;</button>
             </div>
             <div class="modal-body">
-                <p>Seleccione operario disponible:</p>
-                <select id="selOperario" style="width:100%; padding:10px; border-radius:8px; border:1px solid #ccc;">
-                    <option value="">Cargando...</option>
-                </select>
+                <div style="text-align:left;">
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:bold;">ASIGNAR PUERTA DE EMBARQUE
+                        (GATE)</label>
+                    <select id="selPuerta"
+                        style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--color-border); margin-top:5px; font-size:1rem;">
+                        <option value="">-- Seleccionar Puerta --</option>
+                        <option value="1">Puerta 1</option>
+                        <option value="2">Puerta 2</option>
+                        <option value="3">Puerta 3</option>
+                        <option value="4">Puerta 4</option>
+                        <option value="5">Puerta 5</option>
+                        <option value="6">Puerta 6</option>
+                        <option value="7">Puerta 7</option>
+                        <option value="8">Puerta 8</option>
+                        <option value="9">Puerta 9</option>
+                        <option value="10">Puerta 10</option>
+                        <option value="11">Puerta 11</option>
+                        <option value="12">Puerta 12</option>
+                        <option value="13">Puerta 13</option>
+                        <option value="14">Puerta 14</option>
+                        <option value="15">Puerta 15</option>
+                        <option value="16">Puerta 16</option>
+                        <option value="17">Puerta 17</option>
+                        <option value="18">Puerta 18</option>
+                        <option value="19">Puerta 19</option>
+                        <option value="20">Puerta 20</option>
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="cerrarAsignar()">Cancelar</button>
+                <button class="btn-cancel" onclick="cerrarAsignarPuerta()">Cancelar</button>
+                <button class="btn-confirm" id="btnConfirmarPuerta" onclick="ejecutarAsignarPuerta()">Confirmar
+                    Muelle</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalAsignarOperario" class="modal-overlay" style="z-index: 1050;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Asignar Lote a Operario <span id="targetOperarioOrden" style="color:var(--color-primary);"></span>
+                </h3>
+                <button class="btn-cancel" onclick="cerrarAsignarOperario()"
+                    style="border:none; padding:0; font-size:1.5rem;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align:left;">
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:bold;">ASIGNAR OPERARIO LOGÍSTICO</label>
+                    <select id="selOperario"
+                        style="width:100%; padding:10px; border-radius:8px; border:1px solid #ccc; margin-top:5px; font-size:1rem;">
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="cerrarAsignarOperario()">Cancelar</button>
                 <button class="btn-confirm" onclick="confirmarAsignar()">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-eliminar-producto" class="modal-overlay"
+        style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(15,23,42,0.85); z-index: 1000; padding: 20px;">
+        <div class="modal-content"
+            style="background: white; width: 100%; max-width: 600px; border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+
+            <div
+                style="background: #fff1f2; border-bottom: 1px solid #fecdd3; padding: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div
+                        style="background: #fecdd3; color: #e11d48; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24"
+                            height="24">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 style="margin: 0; color: #9f1239; font-size: 1.25rem;">Eliminar del Catálogo</h2>
+                        <p style="margin: 0; color: #be123c; font-size: 0.85rem; font-weight: bold;">⚠️ Acción
+                            destructiva e irreversible</p>
+                    </div>
+                </div>
+                <button onclick="cerrarModalEliminar()"
+                    style="background: none; border: none; color: #9ca3af; cursor: pointer; padding: 5px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div style="padding: 1.5rem;">
+                <div style="margin-bottom: 1.5rem;">
+                    <label
+                        style="display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 0.5rem;">1.
+                        Selecciona la Marca / Fabricante a afectar</label>
+                    <select id="del-select-marca" onchange="evaluarModoEliminacion()"
+                        style="width: 100%; padding: 0.75rem; border: 1px solid #fecaca; border-radius: 8px; background: #fef2f2; font-size: 0.95rem; outline: none;">
+                        <option value="">Seleccione una marca...</option>
+                    </select>
+                </div>
+
+                <div id="del-opciones-container" style="display: none; margin-bottom: 1.5rem;">
+                    <label
+                        style="display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 0.5rem;">2.
+                        ¿Qué deseas eliminar?</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btn-modo-single" onclick="setModoEliminacion('single')"
+                            style="flex: 1; padding: 10px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: bold; color: #4b5563;">Borrar
+                            un Producto</button>
+                        <button id="btn-modo-bulk" onclick="setModoEliminacion('bulk')"
+                            style="flex: 1; padding: 10px; border: 2px solid #e5e7eb; background: white; border-radius: 8px; cursor: pointer; font-weight: bold; color: #4b5563;">Borrar
+                            TODA la Marca</button>
+                    </div>
+                </div>
+
+                <div id="del-single-container"
+                    style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem;">
+                    <label
+                        style="display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 0.5rem;">Selecciona
+                        el Producto Específico</label>
+                    <select id="del-select-producto"
+                        style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 1rem;">
+                        <option value="">Cargando...</option>
+                    </select>
+                    <button onclick="prepararEliminacion('single')"
+                        style="width: 100%; background: #e11d48; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">
+                        Eliminar este Producto
+                    </button>
+                </div>
+
+                <div id="del-bulk-container"
+                    style="display: none; background: #fff1f2; border: 1px dashed #f43f5e; border-radius: 12px; padding: 1.5rem; text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">☢️</div>
+                    <h4 style="color: #9f1239; margin: 0 0 10px 0;">Destrucción Masiva</h4>
+                    <p style="color: #be123c; font-size: 0.85rem; margin-bottom: 15px;">Estás a punto de borrar
+                        <b>todos</b> los productos de esta marca. Para habilitar el botón, escribe la palabra
+                        <b>ELIMINAR</b> en mayúsculas.
+                    </p>
+                    <input type="text" id="del-input-seguridad" onkeyup="validarPalabraSeguridad()"
+                        placeholder="Escribe ELIMINAR aquí"
+                        style="width: 80%; padding: 0.75rem; border: 2px solid #fda4af; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 15px;">
+                    <button id="btn-ejecutar-bulk" onclick="prepararEliminacion('bulk')" disabled
+                        style="width: 100%; background: #9ca3af; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: not-allowed; transition: 0.3s;">
+                        Eliminar TODA la Marca
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-confirm-delete" class="modal-overlay"
+        style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1050;">
+        <div
+            style="background: white; padding: 30px; border-radius: 12px; max-width: 400px; text-align: center; border-top: 6px solid #e11d48;">
+            <h3 style="margin-top: 0; color: #9f1239; font-size: 1.5rem;">¿ESTÁS 100% SEGURO?</h3>
+            <p id="txt-confirm-delete" style="color: #4b5563; font-size: 0.95rem; margin-bottom: 25px;">Esta acción
+                borrará el dato permanentemente de la base de datos de tu empresa.</p>
+            <input type="hidden" id="tipo-delete-hidden">
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button onclick="document.getElementById('modal-confirm-delete').style.display='none'"
+                    style="padding: 12px 24px; background: #e5e7eb; color: #4b5563; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem;">NO,
+                    CANCELAR</button>
+                <button onclick="ejecutarDestruccionFinal()"
+                    style="padding: 12px 24px; background: #e11d48; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem; box-shadow: 0 4px 6px rgba(225,29,72,0.4);">SÍ,
+                    BORRAR DEFINITIVAMENTE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editar-producto" class="modal-overlay"
+        style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(15,23,42,0.8); z-index: 1000; padding: 20px;">
+        <div class="modal-content"
+            style="background: white; width: 100%; max-width: 600px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+
+            <div
+                style="background: #faf5ff; border-bottom: 1px solid #e9d5ff; padding: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div
+                        style="background: #e9d5ff; color: #7e22ce; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24"
+                            height="24">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 style="margin: 0; color: #4c1d95; font-size: 1.25rem;">Editar Producto</h2>
+                        <p style="margin: 0; color: #6b7280; font-size: 0.85rem;">Busca por marca y corrige
+                            descripciones o embalajes</p>
+                    </div>
+                </div>
+                <button onclick="cerrarModalEditar()"
+                    style="background: none; border: none; color: #9ca3af; cursor: pointer; padding: 5px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div style="padding: 1.5rem;">
+
+                <div style="margin-bottom: 1.5rem;">
+                    <label
+                        style="display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 0.5rem;">1.
+                        Selecciona el Fabricante / Marca</label>
+                    <select id="edit-select-marca" onchange="cargarProductosParaEdicion()"
+                        style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; font-size: 0.95rem; outline: none; cursor: pointer;">
+                        <option value="">Seleccione una marca...</option>
+                    </select>
+                </div>
+
+                <div id="edit-paso2-container" style="display: none; margin-bottom: 1.5rem;">
+                    <label
+                        style="display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 0.5rem;">2.
+                        Selecciona el Producto</label>
+                    <select id="edit-select-producto" onchange="seleccionarProductoParaEdicion()"
+                        style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; font-size: 0.95rem; outline: none; cursor: pointer;">
+                        <option value="">Seleccione un producto...</option>
+                    </select>
+                </div>
+
+                <div id="edit-form-container"
+                    style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem;">
+                    <input type="hidden" id="edit-input-ean">
+
+                    <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+                        <div style="flex: 1;">
+                            <label
+                                style="display: block; font-size: 0.75rem; font-weight: bold; color: #64748b; margin-bottom: 0.3rem;">EAN
+                                / CÓDIGO BARRAS</label>
+                            <div id="edit-display-ean"
+                                style="background: #e2e8f0; color: #475569; padding: 0.5rem; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
+                                -</div>
+                        </div>
+                        <div style="flex: 1;">
+                            <label
+                                style="display: block; font-size: 0.75rem; font-weight: bold; color: #64748b; margin-bottom: 0.3rem;">MARCA
+                                ACTUAL</label>
+                            <div id="edit-display-marca"
+                                style="background: #e2e8f0; color: #475569; padding: 0.5rem; border-radius: 6px; font-size: 0.9rem;">
+                                -</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <label
+                            style="display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 0.5rem;">Nombre
+                            / Descripción del Producto</label>
+                        <input type="text" id="edit-input-nombre"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; box-sizing: border-box;">
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label
+                            style="display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 0.5rem;">Unidad
+                            de Embalaje</label>
+                        <select id="edit-input-embalaje"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem;">
+                            <option value="UND">UNIDADES (UND)</option>
+                            <option value="CAJA">CAJAS</option>
+                            <option value="DISPLAY">DISPLAY / PAQUETE</option>
+                        </select>
+                    </div>
+
+                    <button onclick="confirmarEdicion()"
+                        style="width: 100%; background: #9333ea; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.2s;">
+                        Guardar Cambios
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-confirm-edit" class="modal-overlay"
+        style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1050;">
+        <div
+            style="background: white; padding: 25px; border-radius: 12px; max-width: 400px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <div style="color: #ea580c; font-size: 3rem; margin-bottom: 10px;">⚠️</div>
+            <h3 style="margin-top: 0; color: #1f2937;">¿Confirmar Actualización?</h3>
+            <p style="color: #4b5563; font-size: 0.9rem; margin-bottom: 20px;">Estás a punto de modificar el catálogo
+                maestro para toda la empresa. Asegúrate de que la descripción sea correcta.</p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button onclick="document.getElementById('modal-confirm-edit').style.display='none'"
+                    style="padding: 10px 20px; background: #e5e7eb; color: #4b5563; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Cancelar</button>
+                <button onclick="ejecutarGuardadoEdicion()"
+                    style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Sí,
+                    Actualizar</button>
             </div>
         </div>
     </div>
@@ -698,10 +1139,13 @@
             </div>
             <div class="modal-body">
                 <form id="frmUpload">
-                    <input type="file" name="file" id="fi" accept=".xlsx" style="display:none"
-                        onchange="document.getElementById('fn').textContent=this.files[0].name">
+                    <input type="file" name="file" id="fi" accept=".xlsx" style="display:none" multiple
+                        onchange="actualizarTextoUpload(this)">
                     <div class="drop-area" onclick="document.getElementById('fi').click()">
-                        <p id="fn" style="margin:0">Clic para seleccionar Excel</p>
+                        <p id="fn" style="margin:0; font-weight:bold; color:var(--color-primary);">Clic para seleccionar
+                            Excel(s)</p>
+                        <p style="font-size:0.8rem; color:#6b7280; margin-top:5px;">Puedes seleccionar varios al tiempo
+                        </p>
                     </div>
                 </form>
             </div>
@@ -730,6 +1174,183 @@
         </div>
     </div>
 
+    <div id="modal-promociones" class="modal-overlay"
+        style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.85); z-index: 1000; padding: 20px; align-items: center; justify-content: center;">
+        <div
+            style="background: #f8fafc; width: 100%; max-width: 1200px; height: 90vh; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+
+            <div
+                style="background: #fff; border-bottom: 1px solid #fce7f3; padding: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div
+                        style="background: #fce7f3; color: #db2777; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24"
+                            height="24">
+                            <polyline points="20 12 20 22 4 22 4 12"></polyline>
+                            <rect x="2" y="7" width="20" height="5"></rect>
+                            <line x1="12" y1="22" x2="12" y2="7"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 style="margin: 0; color: #9d174d; font-size: 1.25rem;">Gestor de Promociones (Kits)</h2>
+                        <p style="margin: 0; color: #be185d; font-size: 0.85rem;">Arma, edita o desactiva combos
+                            multi-producto</p>
+                    </div>
+                </div>
+                <button onclick="cerrarModalPromociones()"
+                    style="background: none; border: none; color: #9ca3af; cursor: pointer; padding: 5px; font-size: 1.5rem;">&times;</button>
+            </div>
+
+            <div style="display: flex; flex: 1; overflow: hidden;">
+                <div
+                    style="flex: 1; padding: 1.5rem; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; overflow-y: auto;">
+                    <h3 style="margin-top: 0; color: #4b5563;">Mis Promociones</h3>
+                    <table
+                        style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <thead
+                            style="background: #f3f4f6; color: #4b5563; font-size: 0.85rem; text-transform: uppercase;">
+                            <tr>
+                                <th style="padding: 12px; text-align: left;">Promo</th>
+                                <th style="padding: 12px; text-align: center;">Estado</th>
+                                <th style="padding: 12px; text-align: right;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-promos-body" style="font-size: 0.9rem;">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div
+                    style="flex: 1; padding: 1.5rem; display: flex; flex-direction: column; background: white; overflow-y: auto;">
+                    <h3 id="titulo-armador" style="margin-top: 0; color: #db2777;">✨ Armar Nueva Promoción</h3>
+
+                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-bottom: 1rem;">
+                        <div>
+                            <label style="font-size: 0.8rem; font-weight: bold; color: #6b7280;">CÓDIGO (PROMO
+                                PADRE)</label>
+                            <input type="text" id="promo-codigo" placeholder="Ej: PROMO-01"
+                                style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem; font-weight: bold; color: #6b7280;">NOMBRE (Ej: Ancheta
+                                Navidad)</label>
+                            <input type="text" id="promo-nombre" placeholder="Nombre descriptivo"
+                                style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                        </div>
+                    </div>
+
+                    <hr style="border: none; border-top: 1px dashed #e5e7eb; margin: 1rem 0;">
+
+                    <h4 style="margin: 0 0 10px 0; color: #4b5563;">🔍 Buscar y Agregar "Hijos"</h4>
+                    <div
+                        style="background: #fdf2f8; padding: 15px; border-radius: 8px; border: 1px solid #fce7f3; margin-bottom: 1rem;">
+                        <select id="promo-select-marca" onchange="cargarProdsPromo()"
+                            style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #d1d5db;">
+                            <option value="">1. Filtra por Marca...</option>
+                        </select>
+
+                        <select id="promo-select-prod"
+                            style="width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #d1d5db;">
+                            <option value="">2. Selecciona Producto...</option>
+                        </select>
+
+                        <div style="display: flex; gap: 10px; align-items: flex-end;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.75rem; font-weight: bold; color: #6b7280;">CAJAS</label>
+                                <input type="number" id="promo-cajas" value="0" min="0"
+                                    style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.75rem; font-weight: bold; color: #6b7280;">UNIDADES</label>
+                                <input type="number" id="promo-unidades" value="0" min="0"
+                                    style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                            </div>
+                            <button onclick="agregarComponenteAKit()"
+                                style="padding: 9px 15px; background: #db2777; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">➕
+                                Bajar al Kit</button>
+                        </div>
+                    </div>
+
+                    <h4 style="margin: 0 0 10px 0; color: #4b5563;">📦 Contenido Físico del Kit</h4>
+                    <div style="flex: 1; border: 2px dashed #d1d5db; border-radius: 8px; padding: 10px; background: #f9fafb; overflow-y: auto;"
+                        id="caja-kit">
+                    </div>
+
+                    <button onclick="guardarPromocionFinal()"
+                        style="width: 100%; margin-top: 15px; padding: 12px; background: #9d174d; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">💾
+                        Guardar Promoción Master</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalProductos" class="modal-overlay">
+        <div class="modal-card" style="max-width: 550px; width: 95%;">
+            <div class="modal-header">
+                <h3>📦 Maestro de Productos</h3>
+                <button class="btn-cancel" onclick="closeProductosModal()"
+                    style="border:none; padding:0; font-size:1.5rem;">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 20px;">
+
+                <div style="border: 1px solid var(--color-border); border-radius: 12px; padding: 15px;">
+                    <h4
+                        style="margin-top: 0; color: var(--color-primary); border-bottom: 1px solid #eee; padding-bottom: 8px;">
+                        1. Registro Manual</h4>
+
+                    <input type="text" id="prodEan" placeholder="EAN / Cód. Barras (Requerido)"
+                        style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 10px; box-sizing: border-box;">
+
+                    <input type="text" id="prodDesc" placeholder="Descripción del Producto (Requerido)"
+                        style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 10px; box-sizing: border-box;">
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <input type="text" id="prodMarca" placeholder="Marca / Fabricante"
+                            style="padding: 10px; border-radius: 6px; border: 1px solid #ccc; width: 100%; box-sizing: border-box;">
+                        <input type="text" id="prodEmbalaje" placeholder="Embalaje (Ej: UND, CAJA)"
+                            style="padding: 10px; border-radius: 6px; border: 1px solid #ccc; width: 100%; box-sizing: border-box;">
+                    </div>
+
+                    <button onclick="guardarProductoManual(this)"
+                        style="width: 100%; padding: 12px; background: var(--color-primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                        ➕ Guardar Producto
+                    </button>
+                </div>
+
+                <div
+                    style="border: 1px solid var(--color-border); border-radius: 12px; padding: 15px; background: #f8fafc;">
+                    <h4 style="margin-top: 0; color: #7e22ce; border-bottom: 1px solid #eee; padding-bottom: 8px;">2.
+                        Carga Masiva (Excel/CSV)</h4>
+                    <form id="frmUploadProductos">
+                        <input type="file" name="file" id="fiProductos" accept=".xlsx, .csv" style="display:none"
+                            onchange="document.getElementById('fnProductos').textContent=this.files[0].name">
+                        <div class="drop-area" onclick="document.getElementById('fiProductos').click()"
+                            style="padding: 1.5rem; text-align: center; border: 2px dashed #ccc; border-radius: 8px; cursor: pointer; background: white;">
+                            <p id="fnProductos" style="margin:0; font-weight:bold; color:#7e22ce;">Clic para seleccionar
+                                Excel o CSV</p>
+                            <p style="font-size:0.8rem; color:#6b7280; margin-top:5px;">El archivo debe contener EAN,
+                                Descripción, Marca y Embalaje</p>
+                        </div>
+                    </form>
+
+                    <div style="text-align: center; margin-top: 15px;">
+                        <a href="/bodegas/descargar_plantilla" target="_blank"
+                            style="color: #0284c7; text-decoration: none; font-size: 0.95rem; font-weight: bold;">
+                            📥 Descargar plantilla pre-diligenciada
+                        </a>
+                    </div>
+
+                    <button onclick="doUploadProductos(this)"
+                        style="width: 100%; padding: 12px; background: #7e22ce; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px;">
+                        🚀 Subir Archivo
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
     <script>
         // VARIABLE GLOBAL PARA EL POLLING DE DETALLES
         let intervaloDetalle = null;
@@ -753,49 +1374,71 @@
         }
 
         // -- 2. LOGICA DINÁMICA MEJORADA (Manejo de estados robusto) --
+        // -- 2. LOGICA DINÁMICA MEJORADA (Matemáticas en vivo) --
         function cargarDatosDetalle(orden) {
             const tbPend = document.getElementById('tblPendientesBody');
             const tbList = document.getElementById('tblListosBody');
 
-            // Agregamos '?t=' + Date.now() para evitar caché del navegador
             fetch(`/bodegas/api/items_orden/${orden}?t=${Date.now()}`)
                 .then(r => r.json())
                 .then(items => {
-                    // Limpiar tablas
                     tbPend.innerHTML = '';
                     tbList.innerHTML = '';
 
-                    // FUNCION AUXILIAR PARA DETERMINAR SI UN ITEM ESTÁ LISTO
-                    const isItemReady = (i) => {
-                        const estado = (i.estado_actividad || '').toUpperCase();
-                        const cantPedida = parseFloat(i.cantidad || 0);
-                        const cantAlistada = parseFloat(i.cantidad_alistada || 0);
+                    let pendientes = [];
+                    let alistados = [];
 
-                        // Listo si: Estado finalizado OR cantidad completada
-                        return estado === 'FINALIZADO' || (cantPedida > 0 && cantAlistada >= cantPedida);
-                    };
+                    items.forEach(i => {
+                        // Extraemos lo que se pidió vs lo que ya se alistó
+                        let reqCajas = parseFloat(i.cajas_calculadas) || 0;
+                        let pickCajas = parseFloat(i.cajas_alistadas) || 0;
+                        let reqUnid = parseFloat(i.unidades_calculadas) || 0;
+                        let pickUnid = parseFloat(i.unidades_alistadas) || 0;
 
-                    const pendientes = items.filter(i => !isItemReady(i));
-                    const alistados = items.filter(i => isItemReady(i));
+                        // Calculamos la resta (lo que falta por recoger)
+                        let faltCajas = Math.max(0, reqCajas - pickCajas);
+                        let faltUnid = Math.max(0, reqUnid - pickUnid);
 
-                    // Actualizar contadores
+                        let estado = (i.estado_actividad || '').toUpperCase();
+
+                        if (estado === 'FINALIZADO') {
+                            // Si el operario lo cerró forzosamente, todo va a listos
+                            alistados.push({ ...i, mostrarCajas: pickCajas, mostrarUnid: pickUnid });
+                        } else {
+                            // Matemáticas dinámicas en proceso:
+                            // Si falta algo por recoger, lo pone en la tabla izquierda
+                            if (faltCajas > 0 || faltUnid > 0) {
+                                pendientes.push({ ...i, mostrarCajas: faltCajas, mostrarUnid: faltUnid });
+                            }
+                            // Si ya recogió una parte, la pone en la tabla derecha
+                            if (pickCajas > 0 || pickUnid > 0) {
+                                alistados.push({ ...i, mostrarCajas: pickCajas, mostrarUnid: pickUnid });
+                            }
+                        }
+                    });
+
                     document.getElementById('countPendientes').textContent = pendientes.length;
                     document.getElementById('countListos').textContent = alistados.length;
 
-                    // Renderizar filas
+                    // Función para pintar la fila
                     const crearFila = (item, color, esPar) => {
                         let desc = item.descripcion_producto || '';
                         let badge = '';
-
-                        // DETECTAR SI ES PROMOCIÓN
                         const matchPromo = desc.match(/\(Kit:\s*(.*?)\)/i);
                         if (matchPromo) {
-                            const promoName = matchPromo[1];
                             desc = desc.replace(/\(Kit:\s*.*?\)/i, '').trim();
-                            badge = `<span style="background:#fef08a; color:#92400e; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:8px; border:1px solid #fde68a; white-space: nowrap;">
-                                        🎁 KIT: ${promoName}
-                                     </span>`;
+                            badge = `<span style="background:#fef08a; color:#92400e; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:8px; border:1px solid #fde68a; white-space: nowrap;">🎁 KIT: ${matchPromo[1]}</span>`;
                         }
+
+                        // Formateamos para que diga "X CAJA" o "Y [Unidad de Embalaje]"
+                        let strCantidades = '';
+                        if (item.mostrarCajas > 0) {
+                            strCantidades += `<div style="margin-bottom:2px;">${item.mostrarCajas} <small style="font-size:0.65rem; color:#6b7280;">CAJA</small></div>`;
+                        }
+                        if (item.mostrarUnid > 0) {
+                            strCantidades += `<div>${item.mostrarUnid} <small style="font-size:0.65rem; color:#6b7280;">${item.embalaje}</small></div>`;
+                        }
+                        if (strCantidades === '') strCantidades = '0';
 
                         return `
                         <tr style="background-color: ${esPar ? '#f9fafb' : '#ffffff'}; border-bottom: 1px solid #f3f4f6; animation: fadeIn 0.5s;">
@@ -805,8 +1448,8 @@
                                 </div>
                                 <div style="font-size:0.75rem; color:#6b7280; margin-top:2px;">${item.codigo_producto}</div>
                             </td>
-                            <td style="padding: 10px; text-align: center; font-weight: 700; color: ${color}; font-size:1.1rem;">
-                                ${item.cantidad}
+                            <td style="padding: 10px; text-align: center; font-weight: 800; color: ${color}; font-size:1.1rem; min-width:80px;">
+                                ${strCantidades}
                             </td>
                         </tr>
                         `;
@@ -820,7 +1463,6 @@
                 })
                 .catch(err => console.error("Error polling:", err));
         }
-
         // -- 3. ALISTAMIENTO (MODALES) --
         function openAlistamientoModal() { document.getElementById('modalAlistamiento').style.display = 'flex'; }
         function closeAlistamientoModal() { document.getElementById('modalAlistamiento').style.display = 'none'; }
@@ -828,10 +1470,44 @@
         // -- 4. UPLOAD --
         function openUploadModal() { document.getElementById('modalUpload').style.display = 'flex'; }
         function closeUpload() { document.getElementById('modalUpload').style.display = 'none'; }
+        // NUEVA: Muestra cuántos archivos seleccionaste
+        function actualizarTextoUpload(input) {
+            const txt = document.getElementById('fn');
+            if (input.files.length === 0) {
+                txt.textContent = 'Clic para seleccionar Excel(s)';
+            } else if (input.files.length === 1) {
+                txt.textContent = '📄 ' + input.files[0].name;
+            } else {
+                txt.textContent = '📚 ' + input.files.length + ' archivos seleccionados';
+            }
+        }
+
+        // ACTUALIZADA: Envía todos los archivos al mismo tiempo
         function doUpload() {
+            const fileInput = document.getElementById('fi');
+            if (fileInput.files.length === 0) return alert('Selecciona al menos un archivo.');
+
+            const btnSubir = document.querySelector('#modalUpload .btn-confirm');
+            btnSubir.textContent = 'Subiendo...';
+            btnSubir.disabled = true;
+
             const fd = new FormData(document.getElementById('frmUpload'));
+
             fetch('/bodegas/upload_excel', { method: 'POST', body: fd })
-                .then(r => r.json()).then(d => { alert(d.message || d.error); if (!d.error) location.reload(); });
+                .then(r => r.json())
+                .then(d => {
+                    alert(d.message || d.error);
+                    // Recargamos solo si hubo al menos un éxito (la variable 'recargar' viene del backend)
+                    if (d.recargar) location.reload();
+                })
+                .catch(e => {
+                    alert('Error crítico de red o servidor.');
+                    console.error(e);
+                })
+                .finally(() => {
+                    btnSubir.textContent = 'Subir';
+                    btnSubir.disabled = false;
+                });
         }
 
         // -- 5. ASIGNAR (UX AVANZADA CON AUTO-REAPERTURA Y CONFIRMACIÓN) --
@@ -842,21 +1518,61 @@
         let opSeleccionadoNombre = null;
         let curFilaDOM = null; // Guardará la fila HTML para borrarla luego
 
+        // MODAL 1: ASIGNAR PUERTA
         function abrirAsignar(orden, btn) {
-            curOrden = orden; 
-            modoAsignacion = 'orden';
+            curOrden = orden;
             curFilaDOM = btn.closest('tr');
-            document.getElementById('targetOrden').textContent = "Orden #" + orden;
-            document.getElementById('modalAsignar').style.display = 'flex';
-            cargarListaOperarios();
+            document.getElementById('targetPuertaOrden').textContent = "Orden #" + orden;
+            document.getElementById('modalAsignarPuerta').style.display = 'flex';
         }
 
+        function cerrarAsignarPuerta() {
+            document.getElementById('modalAsignarPuerta').style.display = 'none';
+        }
+
+        function ejecutarAsignarPuerta() {
+            const puertaVal = document.getElementById('selPuerta').value;
+            if (!puertaVal) return alert('⚠️ Debes asignar un Muelle (Puerta) antes de continuar.');
+
+            const btn = document.getElementById('btnConfirmarPuerta');
+            btn.textContent = 'Guardando...';
+            btn.disabled = true;
+
+            fetch('/bodegas/asignar_puerta', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ numero_orden: curOrden, puerta: puertaVal })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    cerrarAsignarPuerta();
+                    if (curFilaDOM) {
+                        curFilaDOM.style.transition = "opacity 0.4s ease";
+                        curFilaDOM.style.opacity = "0";
+                        setTimeout(() => curFilaDOM.remove(), 400);
+                    }
+                    sessionStorage.setItem('reabrirAlistamiento', 'true');
+                    setTimeout(() => {
+                        alert(`✅ Muelle asignado con éxito a la Orden #${curOrden}`);
+                        location.reload();
+                    }, 450);
+                })
+                .catch(e => {
+                    alert("❌ Error de conexión.");
+                })
+                .finally(() => {
+                    btn.textContent = 'Confirmar Muelle';
+                    btn.disabled = false;
+                });
+        }
+
+        // MODAL 2: ASIGNAR OPERARIO A MARCA/LOTE
         function abrirAsignarMarca(marca, btn) {
-            curMarca = marca; 
+            curMarca = marca;
             modoAsignacion = 'marca';
             curFilaDOM = btn.closest('tr');
-            document.getElementById('targetOrden').textContent = "Lote: " + marca;
-            document.getElementById('modalAsignar').style.display = 'flex';
+            document.getElementById('targetOperarioOrden').textContent = "Lote: " + marca;
+            document.getElementById('modalAsignarOperario').style.display = 'flex';
             cargarListaOperarios();
         }
 
@@ -870,66 +1586,54 @@
                 });
         }
 
-        function cerrarAsignar() { 
-            document.getElementById('modalAsignar').style.display = 'none'; 
+        function cerrarAsignarOperario() {
+            document.getElementById('modalAsignarOperario').style.display = 'none';
         }
 
         function confirmarAsignar() {
             const s = document.getElementById('selOperario');
             if (!s.value) return alert('⚠️ Seleccione un operario.');
-            
+
             opSeleccionadoId = s.value;
             opSeleccionadoNombre = s.options[s.selectedIndex].getAttribute('data-n');
-            
-            const itemNombre = modoAsignacion === 'orden' ? `la orden <b>#${curOrden}</b>` : `el lote de la marca <b>${curMarca}</b>`;
-            document.getElementById('txtConfirmacion').innerHTML = `¿Asignar ${itemNombre} a <b style="color:var(--color-primary);">${opSeleccionadoNombre}</b>?`;
-            
-            document.getElementById('modalAsignar').style.display = 'none';
+
+            document.getElementById('txtConfirmacion').innerHTML = `¿Asignar el lote de la marca <b>${curMarca}</b> a <b style="color:var(--color-primary);">${opSeleccionadoNombre}</b>?`;
+
+            document.getElementById('modalAsignarOperario').style.display = 'none';
             document.getElementById('modalConfirmacion').style.display = 'flex';
         }
 
         function cancelarConfirmacion() {
             document.getElementById('modalConfirmacion').style.display = 'none';
-            document.getElementById('modalAsignar').style.display = 'flex';
+            document.getElementById('modalAsignarOperario').style.display = 'flex';
         }
 
         function ejecutarAsignacion() {
-            const payload = { id_operario: opSeleccionadoId, nombre_operario: opSeleccionadoNombre };
-            let url = '';
-            
-            if (modoAsignacion === 'orden') {
-                payload.numero_orden = curOrden;
-                url = '/bodegas/asignar_orden';
-            } else {
-                payload.marca = curMarca;
-                url = '/bodegas/asignar_marca';
-            }
+            const payload = { id_operario: opSeleccionadoId, nombre_operario: opSeleccionadoNombre, marca: curMarca };
+            const url = '/bodegas/asignar_marca';
 
             const btnEjecutar = document.getElementById('btnEjecutarAsignacion');
             btnEjecutar.textContent = 'Procesando...';
             btnEjecutar.disabled = true;
 
             fetch(url, {
-                method: 'POST', 
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            }).then(r => r.json()).then(d => { 
-                
+            }).then(r => r.json()).then(d => {
                 document.getElementById('modalConfirmacion').style.display = 'none';
 
-                // Desvanece y borra la fila de la vista
-                if(curFilaDOM) {
+                if (curFilaDOM) {
                     curFilaDOM.style.transition = "opacity 0.4s ease";
                     curFilaDOM.style.opacity = "0";
                     setTimeout(() => curFilaDOM.remove(), 400);
                 }
 
-                // Guardamos la instrucción en el navegador para reabrir el modal grande automáticamente
                 sessionStorage.setItem('reabrirAlistamiento', 'true');
-                
+
                 setTimeout(() => {
                     alert(`✅ ¡Asignado con éxito a ${opSeleccionadoNombre}!`);
-                    location.reload(); 
+                    location.reload();
                 }, 450);
 
             }).catch(e => {
@@ -941,15 +1645,70 @@
             });
         }
 
+        // --- LOGICA DE DESPACHOS Y VEHICULOS ---
+        let ordenParaDespacho = null;
+
+        function cerrarModalDespacho() {
+            document.getElementById('modalDespacho').style.display = 'none';
+        }
+
+        function cargarVehiculos() {
+            const sel = document.getElementById('selVehiculos');
+            sel.innerHTML = '<option value="">Cargando...</option>';
+            fetch('/bodegas/api/vehiculos')
+                .then(r => r.json())
+                .then(data => {
+                    sel.innerHTML = '<option value="">-- Seleccione un Vehículo --</option>';
+                    data.forEach(v => {
+                        sel.innerHTML += `<option value="${v.id}">${v.placa} - ${v.conductor}</option>`;
+                    });
+                })
+                .catch(e => sel.innerHTML = '<option value="">Error cargando vehículos</option>');
+        }
+
+        function abrirModalDespacho(orden) {
+            ordenParaDespacho = orden;
+            document.getElementById('titulo-modal-despacho').textContent = `Despachar Orden #${orden}`;
+            cargarVehiculos();
+            document.getElementById('modalDespacho').style.display = 'flex';
+        }
+
+        function ejecutarDespacho() {
+            const vehiculoId = document.getElementById('selVehiculos').value;
+            if (!vehiculoId) return alert("⚠️ Selecciona un vehículo para poder despachar.");
+
+            const btn = document.getElementById('btnConfirmarDespacho');
+            btn.disabled = true; btn.textContent = 'Despachando...';
+
+            fetch('/bodegas/despachar_orden', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    numero_orden: ordenParaDespacho,
+                    id_vehiculo: vehiculoId
+                })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.error) alert(d.error);
+                    else {
+                        alert("✅ Orden despachada correctamente.");
+                        location.reload();
+                    }
+                })
+                .catch(e => alert("❌ Error de conexión."))
+                .finally(() => { btn.disabled = false; btn.textContent = 'Confirmar Despacho'; });
+        }
+
         // =========================================================
         // MAGIA UX: REABRIR MODAL AUTOMÁTICAMENTE AL RECARGAR
         // =========================================================
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
             if (sessionStorage.getItem('reabrirAlistamiento') === 'true') {
                 if (typeof openAlistamientoModal === "function") {
-                    openAlistamientoModal(); 
+                    openAlistamientoModal();
                 }
-                sessionStorage.removeItem('reabrirAlistamiento'); 
+                sessionStorage.removeItem('reabrirAlistamiento');
             }
         });
 
@@ -992,6 +1751,558 @@
 
         setInterval(actualizarCronometros, 1000);
         actualizarCronometros();
+
+        // --- MAESTRO DE PRODUCTOS ---
+        function openProductosModal() { document.getElementById('modalProductos').style.display = 'flex'; }
+        function closeProductosModal() { document.getElementById('modalProductos').style.display = 'none'; }
+
+        // Función 1: Guardar Manualmente
+        function guardarProductoManual(btn) {
+            const ean = document.getElementById('prodEan').value.trim();
+            const desc = document.getElementById('prodDesc').value.trim();
+            const marca = document.getElementById('prodMarca').value.trim();
+            const embalaje = document.getElementById('prodEmbalaje').value.trim() || 'UND';
+
+            if (!desc) return alert("⚠️ La descripción del producto es obligatoria.");
+            if (!ean) return alert("⚠️ El EAN / Código de Barras es obligatorio.");
+
+            btn.textContent = 'Guardando...';
+            btn.disabled = true;
+
+            fetch('/bodegas/crear_producto_manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ean: ean, producto: desc, fabricante: marca, unidad_embalaje: embalaje })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    alert(d.message || d.error);
+                    if (!d.error) {
+                        document.getElementById('prodEan').value = '';
+                        document.getElementById('prodDesc').value = '';
+                        document.getElementById('prodMarca').value = '';
+                        document.getElementById('prodEmbalaje').value = '';
+                    }
+                })
+                .catch(e => alert('Error de conexión.'))
+                .finally(() => {
+                    btn.textContent = '➕ Guardar Producto';
+                    btn.disabled = false;
+                });
+        }
+
+        // Función 2: Carga Masiva
+        function doUploadProductos(btn) {
+            const fileInput = document.getElementById('fiProductos');
+            if (fileInput.files.length === 0) return alert('⚠️ Selecciona un archivo Excel o CSV.');
+
+            btn.textContent = 'Procesando archivo...';
+            btn.disabled = true;
+
+            const fd = new FormData(document.getElementById('frmUploadProductos'));
+
+            fetch('/bodegas/upload_productos_masivo', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(d => {
+                    alert(d.message || d.error);
+                    if (!d.error) {
+                        document.getElementById('fnProductos').textContent = 'Clic para seleccionar Excel o CSV';
+                        fileInput.value = ''; // Reset input
+                    }
+                })
+                .catch(e => alert('Error procesando el archivo.'))
+                .finally(() => {
+                    btn.textContent = '🚀 Subir Archivo';
+                    btn.disabled = false;
+                });
+        }
+
+        // ==========================================
+        // LÓGICA DE EDICIÓN DE PRODUCTOS
+        // ==========================================
+        let productosEdicionCache = []; // Para guardar en memoria temporal los productos de la marca seleccionada
+
+        function abrirModalEditar() {
+            document.getElementById('modal-editar-producto').style.display = 'flex';
+            // Pedimos al backend las marcas de esta empresa
+            fetch('/api/bodegas/marcas')
+                .then(r => r.json())
+                .then(data => {
+                    const select = document.getElementById('edit-select-marca');
+                    select.innerHTML = '<option value="">Seleccione una marca...</option>';
+                    data.forEach(m => {
+                        if (m.fabricante) {
+                            select.innerHTML += `<option value="${m.fabricante}">${m.fabricante}</option>`;
+                        }
+                    });
+                }).catch(err => console.error("Error cargando marcas", err));
+        }
+
+        function cerrarModalEditar() {
+            document.getElementById('modal-editar-producto').style.display = 'none';
+            document.getElementById('edit-paso2-container').style.display = 'none';
+            document.getElementById('edit-form-container').style.display = 'none';
+            document.getElementById('edit-select-marca').value = '';
+        }
+
+        function cargarProductosParaEdicion() {
+            const marca = document.getElementById('edit-select-marca').value;
+            const container2 = document.getElementById('edit-paso2-container');
+            const formContainer = document.getElementById('edit-form-container');
+            const selectProd = document.getElementById('edit-select-producto');
+
+            formContainer.style.display = 'none'; // Ocultar el formulario si cambia la marca
+
+            if (!marca) {
+                container2.style.display = 'none';
+                return;
+            }
+
+            // Mostrar el selector de productos y poner "Cargando"
+            container2.style.display = 'block';
+            selectProd.innerHTML = '<option value="">Cargando productos...</option>';
+
+            fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}`)
+                .then(r => r.json())
+                .then(data => {
+                    productosEdicionCache = data; // Guardamos para no volver a consultar la BD
+                    selectProd.innerHTML = '<option value="">Seleccione un producto...</option>';
+                    data.forEach(p => {
+                        selectProd.innerHTML += `<option value="${p.ean}">${p.producto} (EAN: ${p.ean})</option>`;
+                    });
+                }).catch(err => {
+                    console.error(err);
+                    selectProd.innerHTML = '<option value="">Error al cargar productos</option>';
+                });
+        }
+
+        function seleccionarProductoParaEdicion() {
+            const ean = document.getElementById('edit-select-producto').value;
+            const formContainer = document.getElementById('edit-form-container');
+
+            if (!ean) {
+                formContainer.style.display = 'none';
+                return;
+            }
+
+            // Buscar en nuestra memoria temporal los datos de este producto
+            const producto = productosEdicionCache.find(p => p.ean === ean);
+            if (producto) {
+                // Rellenar el formulario
+                document.getElementById('edit-input-ean').value = producto.ean;
+                document.getElementById('edit-display-ean').textContent = producto.ean;
+                document.getElementById('edit-display-marca').textContent = producto.fabricante || 'N/A';
+                document.getElementById('edit-input-nombre').value = producto.producto;
+
+                // Ajustar la unidad de embalaje
+                let emb = producto.unidad_embalaje ? producto.unidad_embalaje.toUpperCase() : 'UND';
+                if (emb !== 'UND' && emb !== 'CAJA' && emb !== 'DISPLAY') emb = 'UND';
+                document.getElementById('edit-input-embalaje').value = emb;
+
+                // Mostrar el formulario
+                formContainer.style.display = 'block';
+            }
+        }
+
+        function confirmarEdicion() {
+            const nombre = document.getElementById('edit-input-nombre').value.trim();
+            if (!nombre) {
+                alert("⚠️ El nombre del producto no puede estar vacío.");
+                return;
+            }
+            // Mostrar el modal pequeño de confirmación
+            document.getElementById('modal-confirm-edit').style.display = 'flex';
+        }
+
+        function ejecutarGuardadoEdicion() {
+            const ean = document.getElementById('edit-input-ean').value;
+            const nombre = document.getElementById('edit-input-nombre').value.trim();
+            const embalaje = document.getElementById('edit-input-embalaje').value;
+
+            // Enviamos los cambios al Backend
+            fetch('/api/bodegas/editar_producto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ean: ean, producto: nombre, unidad_embalaje: embalaje })
+            })
+                .then(r => r.json())
+                .then(res => {
+                    document.getElementById('modal-confirm-edit').style.display = 'none';
+                    if (res.status === 'success') {
+                        // Si todo salió bien, cerramos todo y mostramos un alert verde
+                        cerrarModalEditar();
+
+                        // Pequeña alerta visual
+                        const Toast = document.createElement('div');
+                        Toast.innerHTML = '✅ Producto actualizado correctamente';
+                        Toast.style = 'position:fixed; top:20px; right:20px; background:#10b981; color:white; padding:15px; border-radius:8px; z-index:9999; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+                        document.body.appendChild(Toast);
+                        setTimeout(() => Toast.remove(), 3000);
+
+                    } else {
+                        alert("❌ Error: " + res.message);
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('modal-confirm-edit').style.display = 'none';
+                    alert("❌ Error de conexión al guardar.");
+                });
+        }
+
+        // ==========================================
+        // LÓGICA DE ELIMINACIÓN DE PRODUCTOS
+        // ==========================================
+        let modoEliminacionActual = '';
+
+        function abrirModalEliminar() {
+            document.getElementById('modal-eliminar-producto').style.display = 'flex';
+            // Reciclamos el endpoint de marcas que ya hicimos para Editar!
+            fetch('/api/bodegas/marcas')
+                .then(r => r.json())
+                .then(data => {
+                    const select = document.getElementById('del-select-marca');
+                    select.innerHTML = '<option value="">Seleccione una marca...</option>';
+                    data.forEach(m => {
+                        if (m.fabricante) select.innerHTML += `<option value="${m.fabricante}">${m.fabricante}</option>`;
+                    });
+                }).catch(err => console.error("Error cargando marcas", err));
+        }
+
+        function cerrarModalEliminar() {
+            document.getElementById('modal-eliminar-producto').style.display = 'none';
+            document.getElementById('del-opciones-container').style.display = 'none';
+            document.getElementById('del-single-container').style.display = 'none';
+            document.getElementById('del-bulk-container').style.display = 'none';
+            document.getElementById('del-select-marca').value = '';
+            document.getElementById('del-input-seguridad').value = '';
+            modoEliminacionActual = '';
+        }
+
+        function evaluarModoEliminacion() {
+            const marca = document.getElementById('del-select-marca').value;
+            if (marca) {
+                document.getElementById('del-opciones-container').style.display = 'block';
+            } else {
+                document.getElementById('del-opciones-container').style.display = 'none';
+                document.getElementById('del-single-container').style.display = 'none';
+                document.getElementById('del-bulk-container').style.display = 'none';
+            }
+        }
+
+        function setModoEliminacion(modo) {
+            modoEliminacionActual = modo;
+            const btnSingle = document.getElementById('btn-modo-single');
+            const btnBulk = document.getElementById('btn-modo-bulk');
+
+            // Estilos de selección
+            btnSingle.style.borderColor = modo === 'single' ? '#3b82f6' : '#e5e7eb';
+            btnSingle.style.background = modo === 'single' ? '#eff6ff' : 'white';
+            btnBulk.style.borderColor = modo === 'bulk' ? '#e11d48' : '#e5e7eb';
+            btnBulk.style.background = modo === 'bulk' ? '#fff1f2' : 'white';
+
+            if (modo === 'single') {
+                document.getElementById('del-bulk-container').style.display = 'none';
+                document.getElementById('del-single-container').style.display = 'block';
+
+                // Cargar los productos de esa marca reciclando el endpoint anterior
+                const marca = document.getElementById('del-select-marca').value;
+                const selectProd = document.getElementById('del-select-producto');
+                selectProd.innerHTML = '<option value="">Cargando productos...</option>';
+
+                fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        selectProd.innerHTML = '<option value="">Seleccione el producto a eliminar...</option>';
+                        data.forEach(p => {
+                            selectProd.innerHTML += `<option value="${p.ean}">${p.producto} (EAN: ${p.ean})</option>`;
+                        });
+                    });
+            } else {
+                document.getElementById('del-single-container').style.display = 'none';
+                document.getElementById('del-bulk-container').style.display = 'block';
+                document.getElementById('del-input-seguridad').value = '';
+                validarPalabraSeguridad();
+            }
+        }
+
+        function validarPalabraSeguridad() {
+            const input = document.getElementById('del-input-seguridad').value;
+            const btn = document.getElementById('btn-ejecutar-bulk');
+            if (input === 'ELIMINAR') {
+                btn.disabled = false;
+                btn.style.background = '#e11d48';
+                btn.style.cursor = 'pointer';
+            } else {
+                btn.disabled = true;
+                btn.style.background = '#9ca3af';
+                btn.style.cursor = 'not-allowed';
+            }
+        }
+
+        function prepararEliminacion(tipo) {
+            const marca = document.getElementById('del-select-marca').value;
+            let txtConfirm = '';
+
+            if (tipo === 'single') {
+                const ean = document.getElementById('del-select-producto').value;
+                if (!ean) { alert("⚠️ Selecciona un producto primero."); return; }
+                const selectEl = document.getElementById('del-select-producto');
+                const nombreProd = selectEl.options[selectEl.selectedIndex].text;
+                txtConfirm = `Vas a borrar el producto:<br><br><b>${nombreProd}</b>`;
+                document.getElementById('tipo-delete-hidden').value = `single|${ean}`;
+            } else {
+                txtConfirm = `Vas a destruir <b>TODOS</b> los productos vinculados a la marca:<br><br><b style='font-size:1.5rem;'>${marca}</b>`;
+                document.getElementById('tipo-delete-hidden').value = `bulk|${marca}`;
+            }
+
+            document.getElementById('txt-confirm-delete').innerHTML = txtConfirm;
+            document.getElementById('modal-confirm-delete').style.display = 'flex';
+        }
+
+        function ejecutarDestruccionFinal() {
+            const comando = document.getElementById('tipo-delete-hidden').value.split('|');
+            const tipo = comando[0];
+            const valor = comando[1];
+
+            const url = tipo === 'single' ? '/api/bodegas/eliminar_producto' : '/api/bodegas/eliminar_marca';
+            const payload = tipo === 'single' ? { ean: valor } : { fabricante: valor };
+
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(r => r.json())
+                .then(res => {
+                    document.getElementById('modal-confirm-delete').style.display = 'none';
+                    if (res.status === 'success') {
+                        cerrarModalEliminar();
+                        alert(`✅ Eliminación completada: ${res.message}`);
+                    } else {
+                        alert("❌ Error: " + res.message);
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('modal-confirm-delete').style.display = 'none';
+                    alert("❌ Error de conexión.");
+                });
+        }
+
+        // ==========================================
+        // LÓGICA DE PROMOCIONES (KITS / COMBOS)
+        // ==========================================
+        let kitActual = []; // Memoria RAM del navegador para armar el kit
+
+        function abrirModalPromociones() {
+            document.getElementById('modal-promociones').style.display = 'flex';
+            cargarTablaPromociones();
+
+            // Reciclamos nuestro endpoint viejo para llenar las marcas
+            fetch('/api/bodegas/marcas')
+                .then(r => r.json())
+                .then(data => {
+                    const select = document.getElementById('promo-select-marca');
+                    select.innerHTML = '<option value="">1. Filtra por Marca...</option>';
+                    data.forEach(m => {
+                        if (m.fabricante) select.innerHTML += `<option value="${m.fabricante}">${m.fabricante}</option>`;
+                    });
+                });
+        }
+
+        function cerrarModalPromociones() {
+            document.getElementById('modal-promociones').style.display = 'none';
+            limpiarArmador();
+        }
+
+        function cargarTablaPromociones() {
+            fetch('/api/promociones/listar')
+                .then(r => r.json())
+                .then(data => {
+                    const tbody = document.getElementById('tbl-promos-body');
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:15px; color:#9ca3af;">No hay promociones creadas. Crea una a la derecha 👉</td></tr>';
+                        return;
+                    }
+                    data.forEach(p => {
+                        const isActivo = p.estado === 'ACTIVO';
+                        const colorBtn = isActivo ? '#10b981' : '#9ca3af'; // Verde si Activo, Gris si Inactivo
+
+                        tbody.innerHTML += `
+                            <tr style="border-bottom: 1px solid #f3f4f6;">
+                                <td style="padding: 12px;">
+                                    <div style="font-weight: bold; color: #1f2937;">${p.nombre_promo}</div>
+                                    <div style="font-size: 0.75rem; color: #6b7280; font-family: monospace;">EAN PADRE: ${p.ean_promo}</div>
+                                    <div style="font-size: 0.7rem; color: #db2777; font-weight: bold;">${p.total_componentes} Sub-Productos</div>
+                                </td>
+                                <td style="padding: 12px; text-align: center;">
+                                    <button onclick="toggleEstadoPromo('${p.ean_promo}', '${isActivo ? 'INACTIVO' : 'ACTIVO'}')" 
+                                            style="background: ${colorBtn}; color: white; border: none; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                        ${p.estado}
+                                    </button>
+                                </td>
+                                <td style="padding: 12px; text-align: right;">
+                                    <button onclick="cargarEdicionPromo('${p.ean_promo}', '${p.nombre_promo}')" style="background: none; border: none; cursor: pointer; font-size: 1.2rem;" title="Editar">✏️</button>
+                                    <button onclick="confirmarBorrarPromo('${p.ean_promo}')" style="background: none; border: none; cursor: pointer; font-size: 1.2rem;" title="Borrar Físicamente">🗑️</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                });
+        }
+
+        function cargarProdsPromo() {
+            const marca = document.getElementById('promo-select-marca').value;
+            const selectProd = document.getElementById('promo-select-prod');
+            if (!marca) { selectProd.innerHTML = '<option value="">2. Selecciona Producto...</option>'; return; }
+
+            selectProd.innerHTML = '<option value="">Cargando...</option>';
+            fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}`)
+                .then(r => r.json())
+                .then(data => {
+                    selectProd.innerHTML = '<option value="">2. Selecciona Producto...</option>';
+                    data.forEach(p => {
+                        selectProd.innerHTML += `<option value="${p.ean}">${p.producto} (${p.unidad_embalaje})</option>`;
+                    });
+                });
+        }
+
+        function agregarComponenteAKit() {
+            const selectProd = document.getElementById('promo-select-prod');
+            const ean = selectProd.value;
+            if (!ean) return alert("⚠️ Selecciona un producto hijo primero.");
+            const nombre = selectProd.options[selectProd.selectedIndex].text;
+            const cajas = parseInt(document.getElementById('promo-cajas').value) || 0;
+            const unidades = parseInt(document.getElementById('promo-unidades').value) || 0;
+
+            if (cajas === 0 && unidades === 0) return alert("⚠️ Debes indicar la cantidad de cajas o unidades.");
+
+            // Si el producto ya estaba en la "caja", le sumamos la cantidad
+            const existente = kitActual.find(k => k.ean === ean);
+            if (existente) {
+                existente.cajas += cajas;
+                existente.unidades += unidades;
+            } else {
+                kitActual.push({ ean, nombre, cajas, unidades });
+            }
+
+            // Limpiar inputs
+            document.getElementById('promo-cajas').value = '0';
+            document.getElementById('promo-unidades').value = '0';
+            selectProd.value = '';
+            renderizarCajaKit();
+        }
+
+        function renderizarCajaKit() {
+            const caja = document.getElementById('caja-kit');
+            caja.innerHTML = '';
+            if (kitActual.length === 0) {
+                caja.innerHTML = '<div style="text-align:center; color:#9ca3af; padding-top:20px;">Tu kit está vacío</div>';
+                return;
+            }
+
+            kitActual.forEach((item, index) => {
+                caja.innerHTML += `
+                    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); animation: fadeIn 0.3s;">
+                        <div>
+                            <div style="font-weight: bold; font-size: 0.85rem; color: #374151;">${item.nombre}</div>
+                            <div style="font-size: 0.75rem; color: #db2777; font-weight: bold;">
+                                ${item.cajas > 0 ? item.cajas + ' CAJAS ' : ''} ${item.unidades > 0 ? item.unidades + ' UNIDADES' : ''}
+                            </div>
+                        </div>
+                        <button onclick="quitarDeKit(${index})" style="background: #fee2e2; color: #dc2626; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-weight: bold;">X</button>
+                    </div>
+                `;
+            });
+        }
+
+        function quitarDeKit(index) {
+            kitActual.splice(index, 1);
+            renderizarCajaKit();
+        }
+
+        function guardarPromocionFinal() {
+            const eanPromo = document.getElementById('promo-codigo').value.trim();
+            const nombrePromo = document.getElementById('promo-nombre').value.trim();
+
+            if (!eanPromo || !nombrePromo) return alert("⚠️ Falta el Código o Nombre del Combo Padre.");
+            if (kitActual.length === 0) return alert("⚠️ No has metido ningún producto en la caja del kit.");
+
+            fetch('/api/promociones/guardar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ean_promo: eanPromo,
+                    nombre_promo: nombrePromo,
+                    componentes: kitActual
+                })
+            })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status === 'success') {
+                        alert("✅ Promoción guardada en la base de datos.");
+                        limpiarArmador();
+                        cargarTablaPromociones();
+                    } else { alert("❌ Error: " + res.message); }
+                });
+        }
+
+        function limpiarArmador() {
+            document.getElementById('promo-codigo').value = '';
+            document.getElementById('promo-nombre').value = '';
+            document.getElementById('promo-codigo').readOnly = false; // Desbloquear si estaba editando
+            document.getElementById('titulo-armador').textContent = '✨ Armar Nueva Promoción';
+            kitActual = [];
+            renderizarCajaKit();
+        }
+
+        // --- Acciones Administrativas ---
+        function toggleEstadoPromo(ean_promo, nuevoEstado) {
+            fetch('/api/promociones/estado', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ean_promo, estado: nuevoEstado })
+            }).then(() => cargarTablaPromociones());
+        }
+
+        function confirmarBorrarPromo(ean_promo) {
+            const pass = prompt(`Estás a punto de destruir la promoción ${ean_promo}.\nEscribe la palabra ELIMINAR en mayúsculas para confirmar:`);
+            if (pass === 'ELIMINAR') {
+                fetch('/api/promociones/eliminar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ean_promo })
+                }).then(() => {
+                    alert("🗑️ Promoción destruida.");
+                    cargarTablaPromociones();
+                    limpiarArmador();
+                });
+            } else if (pass !== null) {
+                alert("❌ Cancelado. La palabra no coincide.");
+            }
+        }
+
+        function cargarEdicionPromo(ean_promo, nombre_promo) {
+            document.getElementById('titulo-armador').textContent = '✏️ Editando Promoción';
+            document.getElementById('promo-codigo').value = ean_promo;
+            document.getElementById('promo-codigo').readOnly = true; // El código padre no se debe cambiar
+            document.getElementById('promo-nombre').value = nombre_promo;
+
+            // Extraemos la receta desde el servidor
+            fetch(`/api/promociones/detalle/${encodeURIComponent(ean_promo)}`)
+                .then(r => r.json())
+                .then(data => {
+                    kitActual = data.map(d => ({
+                        ean: d.ean_componente,
+                        nombre: d.descripcion_componente,
+                        cajas: d.cajas_componente,
+                        unidades: d.fracciones_componente
+                    }));
+                    renderizarCajaKit();
+                });
+        }
     </script>
 </body>
 
