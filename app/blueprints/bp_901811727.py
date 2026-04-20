@@ -1834,3 +1834,56 @@ def rechazar_solicitud():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "message": str(e)}), 500
+
+# ==============================================================================
+# AUDITORÍA DE RUPTURA: VALIDADOS SIN REGISTRO EN KÁRDEX
+# ==============================================================================
+@csrf.exempt
+@bp_901811727.route('/obtener_alertas_ruptura_validacion', methods=['POST'])
+@login_required_custom
+def obtener_alertas_ruptura_validacion():
+    empresa_id = request.get_json().get('empresa_id')
+    if not empresa_id:
+        return jsonify({"success": False, "message": "ID Empresa requerido"})
+
+    try:
+        cur = mysql.connection.cursor()
+        
+        # SQL: Busca pedidos validados sin contraparte en cardex_glp
+        sql = """
+            SELECT 
+                p.codigo_pedido,
+                p.fecha_validacion,
+                p.ubicacion,
+                p.numero_factura,
+                DATEDIFF(NOW(), p.fecha_validacion) as dias_alerta
+            FROM pedidos_gas_glp p
+            WHERE p.estatus = 'validado'
+              AND NOT EXISTS (
+                  SELECT 1 FROM cardex_glp c 
+                  WHERE TRIM(c.ubicacion) COLLATE utf8mb4_general_ci = TRIM(p.ubicacion) COLLATE utf8mb4_general_ci
+                    AND (c.operacion = 'tanqueo' OR c.clase = 'ingreso')
+                    AND c.fecha >= DATE(p.fecha_registro)
+              )
+            ORDER BY dias_alerta DESC
+        """
+        cur.execute(sql)
+        rows = cur.fetchall()
+        
+        alertas = []
+        col_names = [d[0] for d in cur.description] if cur.description else []
+        
+        for r in rows:
+            rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
+            alertas.append({
+                "codigo": rd.get('codigo_pedido'),
+                "fecha_v": str(rd.get('fecha_validacion')),
+                "ubicacion": rd.get('ubicacion'),
+                "factura": rd.get('numero_factura'),
+                "dias": int(rd.get('dias_alerta') or 0)
+            })
+
+        cur.close()
+        return jsonify({"success": True, "items": alertas})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})

@@ -701,16 +701,39 @@
   </div>
 
   <div class="modal fade" id="modalPendientesTanqueo" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header bg-warning text-dark">
-          <h5 class="modal-title fw-bold">⏳ Pendientes de Tanqueo</h5><button type="button" class="btn-close"
-            data-bs-dismiss="modal"></button>
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold">⏳ Control Logístico de Suministro</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body p-0">
+        <div class="modal-body bg-light">
+
+          <div id="seccionRupturaCritica" style="display:none;" class="mb-4">
+            <div class="alert alert-danger border-danger shadow-sm">
+              <h6 class="fw-bold">🚨 ALERTA: RUPTURA EN PROCESO DE VALIDACIÓN</h6>
+              <p class="small mb-0">Los siguientes pedidos ya fueron <b>contabilizados (validados)</b>, pero no se ha
+                registrado el ingreso físico en el kárdex de la granja.</p>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover table-bordered bg-white text-center align-middle border-danger">
+                <thead class="table-danger">
+                  <tr class="small">
+                    <th>Código</th>
+                    <th>Granja</th>
+                    <th>Factura</th>
+                    <th>Retraso Registro</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaRupturaBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <h6 class="fw-bold text-muted border-bottom pb-2 mb-3">🚚 Pedidos en Tránsito (Pendientes de Tanqueo)</h6>
           <div class="table-responsive">
-            <table class="table table-striped text-center align-middle m-0">
-              <thead class="table-light">
+            <table class="table table-hover table-bordered text-center align-middle bg-white shadow-sm">
+              <thead class="table-dark small">
                 <tr>
                   <th>Fecha</th>
                   <th>Sede</th>
@@ -722,7 +745,8 @@
               <tbody id="tablaPendientesTanqueoBody"></tbody>
             </table>
           </div>
-          <div id="msgSinPendientesTanqueo" class="text-center p-4 text-muted" style="display:none;">✅ Todo al día.
+          <div id="msgSinPendientesTanqueo" class="text-center p-4 text-muted" style="display:none;">
+            ✅ No hay pedidos pendientes de registro.
           </div>
         </div>
       </div>
@@ -1224,14 +1248,61 @@
     function verFoto(src) { document.getElementById('lbImg').src = src; document.getElementById('lightboxSimple').style.display = 'flex'; }
 
     function mostrarPendientes() {
-      new bootstrap.Modal(document.getElementById('modalPendientesTanqueo')).show();
-      const tb = document.getElementById('tablaPendientesTanqueoBody'); tb.innerHTML = '';
-      fetch('/obtener_pendientes_tanqueo_reporte', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: EMPRESA_ID })
+      const modal = new bootstrap.Modal(document.getElementById('modalPendientesTanqueo'));
+      const bodyRuptura = document.getElementById('tablaRupturaBody');
+      const containerRuptura = document.getElementById('seccionRupturaCritica');
+      const tb = document.getElementById('tablaPendientesTanqueoBody');
+      const msgSin = document.getElementById('msgSinPendientesTanqueo');
+
+      modal.show();
+      tb.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+      msgSin.style.display = 'none';
+
+      // 1. NUEVA CONSULTA: Alertas de Ruptura (Validados sin Kárdex) [Usa la ruta de bp_901811727.py]
+      fetch('/obtener_alertas_ruptura_validacion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: EMPRESA_ID })
       }).then(r => r.json()).then(d => {
+        bodyRuptura.innerHTML = '';
         if (d.success && d.items.length > 0) {
-          d.items.forEach(i => tb.innerHTML += `<tr><td>${i.fecha}</td><td>${i.ubicacion}</td><td>${i.proveedor}</td><td>${i.solicitado}%</td><td>${i.dias} días</td></tr>`);
-        } else { document.getElementById('msgSinPendientesTanqueo').style.display = 'block'; }
+          containerRuptura.style.display = 'block';
+          d.items.forEach(i => {
+            bodyRuptura.innerHTML += `
+                    <tr class="fw-bold text-danger">
+                        <td>${i.codigo}</td>
+                        <td>${i.ubicacion}</td>
+                        <td><span class="badge bg-secondary">${i.factura}</span></td>
+                        <td><div class="badge bg-danger">${i.dias} Días</div></td>
+                    </tr>`;
+          });
+        } else {
+          containerRuptura.style.display = 'none';
+        }
+      });
+
+      // 2. CONSULTA ORIGINAL: Pedidos en Tránsito (Estatus Generado)
+      fetch('/obtener_pendientes_tanqueo_reporte', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empresa_id: EMPRESA_ID })
+      }).then(r => r.json()).then(d => {
+        tb.innerHTML = '';
+        if (d.success && d.items.length > 0) {
+          msgSin.style.display = 'none';
+          d.items.forEach(i => {
+            tb.innerHTML += `
+                    <tr>
+                        <td>${i.fecha}</td>
+                        <td class="fw-bold">${i.ubicacion}</td>
+                        <td>${i.proveedor}</td>
+                        <td>${i.solicitado}%</td>
+                        <td>${i.dias} días</td>
+                    </tr>`;
+          });
+        } else {
+          msgSin.style.display = 'block';
+        }
       });
     }
 

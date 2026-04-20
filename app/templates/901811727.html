@@ -2870,35 +2870,55 @@
   </div>
 
   <div class="modal fade" id="modalPendientesTanqueo" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header" style="background-color: #f59e0b; color: white;">
-          <h5 class="modal-title fw-bold">⏳ Pendientes de Tanqueo (En tránsito)</h5>
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold">⏳ Control Logístico de Suministro</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body bg-light">
-          <p class="text-muted small mb-3">
-            Aquí se muestran las solicitudes <strong>ya aprobadas</strong>, pero que el proveedor aún no ha suministrado
-            físicamente en la granja.
-          </p>
+
+          <div id="seccionRupturaCritica" style="display:none;" class="mb-4">
+            <div class="alert alert-danger border-danger shadow-sm">
+              <h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> 🚨 ALERTA: RUPTURA EN PROCESO DE
+                VALIDACIÓN</h6>
+              <p class="small mb-0">Los siguientes pedidos ya fueron <b>contabilizados (validados)</b>, pero el
+                galponero no ha registrado el ingreso físico en el kárdex. Esto representa un riesgo de pérdida de
+                trazabilidad.</p>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover table-bordered bg-white text-center align-middle border-danger">
+                <thead class="table-danger">
+                  <tr class="small">
+                    <th>Código</th>
+                    <th>Granja</th>
+                    <th>Factura</th>
+                    <th>Validado hace</th>
+                    <th>Acción Sugerida</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaRupturaBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <h6 class="fw-bold text-muted border-bottom pb-2 mb-3">🚚 Pedidos en Tránsito (Pendientes de Tanqueo)</h6>
           <div class="table-responsive">
             <table class="table table-hover table-bordered text-center align-middle bg-white shadow-sm">
-              <thead class="table-dark">
+              <thead class="table-dark small">
                 <tr>
                   <th>Fecha / Código</th>
                   <th>Ubicación</th>
                   <th>Proveedor</th>
                   <th>Nivel Solicitado</th>
-                  <th>Tiempo Transcurrido</th>
+                  <th>Tiempo Espera</th>
                 </tr>
               </thead>
-              <tbody id="tablaPendientesTanqueoBody">
-              </tbody>
+              <tbody id="tablaPendientesTanqueoBody"></tbody>
             </table>
           </div>
-          <div id="msgSinPendientesTanqueo" class="alert alert-success text-center mt-3"
-            style="display:none; font-weight: bold;">
-            ✅ No hay retrasos. Todos los pedidos aprobados ya fueron tanqueados.
+          <div id="msgSinPendientesTanqueo" class="alert alert-success text-center mt-3" style="display:none;">
+            ✅ No hay pedidos pendientes de registro.
           </div>
         </div>
       </div>
@@ -3381,56 +3401,56 @@
     </div>
   </div>
   <script>
-let diagDataTemporal = {}; 
+    let diagDataTemporal = {};
 
-function abrirAsistenteDiagnostico(index) {
-    // 1. BLOQUEO PARA LOTES HISTÓRICOS
-    const periodoTxt = document.getElementById('subtituloPeriodo').textContent;
-    if (!periodoTxt.includes('Actual')) {
+    function abrirAsistenteDiagnostico(index) {
+      // 1. BLOQUEO PARA LOTES HISTÓRICOS
+      const periodoTxt = document.getElementById('subtituloPeriodo').textContent;
+      if (!periodoTxt.includes('Actual')) {
         alert("🔒 El Diagnóstico Inteligente solo está habilitado para LOTES ACTIVOS (Periodo Actual), garantizando la precisión de la edad del lote y permitiendo correcciones en tiempo real.");
         return;
-    }
+      }
 
-    if (index === 0) {
+      if (index === 0) {
         alert("📊 Selecciona un punto a partir del segundo registro para poder calcular la velocidad del tramo (Diferencia vs día anterior).");
         return;
-    }
+      }
 
-    const s = datosGlobales.series;
-    const fechaActual = s.fechas[index];
-    const fechaAnterior = s.fechas[index - 1];
-    const fechaInicioLote = s.fechas[0]; 
+      const s = datosGlobales.series;
+      const fechaActual = s.fechas[index];
+      const fechaAnterior = s.fechas[index - 1];
+      const fechaInicioLote = s.fechas[0];
 
-    // 2. CALCULAR EL DELTA DE TIEMPO (Días transcurridos y Edad del lote)
-    const dateActual = new Date(fechaActual);
-    const dateAnterior = new Date(fechaAnterior);
-    const dateInicio = new Date(fechaInicioLote);
+      // 2. CALCULAR EL DELTA DE TIEMPO (Días transcurridos y Edad del lote)
+      const dateActual = new Date(fechaActual);
+      const dateAnterior = new Date(fechaAnterior);
+      const dateInicio = new Date(fechaInicioLote);
 
-    let diasTranscurridos = (dateActual - dateAnterior) / (1000 * 60 * 60 * 24);
-    if (isNaN(diasTranscurridos) || diasTranscurridos <= 0) diasTranscurridos = 1; 
+      let diasTranscurridos = (dateActual - dateAnterior) / (1000 * 60 * 60 * 24);
+      if (isNaN(diasTranscurridos) || diasTranscurridos <= 0) diasTranscurridos = 1;
 
-    let diaDelCiclo = Math.ceil((dateActual - dateInicio) / (1000 * 60 * 60 * 24));
-    if (isNaN(diaDelCiclo) || diaDelCiclo <= 0) diaDelCiclo = index || 1;
+      let diaDelCiclo = Math.ceil((dateActual - dateInicio) / (1000 * 60 * 60 * 24));
+      if (isNaN(diaDelCiclo) || diaDelCiclo <= 0) diaDelCiclo = index || 1;
 
-    // 3. CÁLCULO DEL TRAMO Y DEL ACUMULADO GLOBAL
-    const kgAveAcumActual = parseFloat(s.kg_pollito[index]) || 0;
-    const kgAveAcumAnterior = parseFloat(s.kg_pollito[index - 1]) || 0;
-    const deltaKgAve = kgAveAcumActual - kgAveAcumAnterior;
+      // 3. CÁLCULO DEL TRAMO Y DEL ACUMULADO GLOBAL
+      const kgAveAcumActual = parseFloat(s.kg_pollito[index]) || 0;
+      const kgAveAcumAnterior = parseFloat(s.kg_pollito[index - 1]) || 0;
+      const deltaKgAve = kgAveAcumActual - kgAveAcumAnterior;
 
-    if (deltaKgAve < 0) {
+      if (deltaKgAve < 0) {
         alert("⚠️ Anomalía de Datos: La gráfica indica un retroceso en el consumo acumulado. Revisa la digitación de los tanques.");
         return;
-    }
+      }
 
-    // 4. EXTRACCIÓN PURA DE LA POBLACIÓN (Garantiza lectura de miles)
-    const poblacionStr = document.getElementById('kpi5Value').innerText;
-    const poblacion = parseInt(poblacionStr.replace(/[^0-9]/g, ''), 10) || 0;
+      // 4. EXTRACCIÓN PURA DE LA POBLACIÓN (Garantiza lectura de miles)
+      const poblacionStr = document.getElementById('kpi5Value').innerText;
+      const poblacion = parseInt(poblacionStr.replace(/[^0-9]/g, ''), 10) || 0;
 
-    // 5. CONSUMO FÍSICO REAL DEL TRAMO
-    const consumoNetoTramo = deltaKgAve * poblacion;
+      // 5. CONSUMO FÍSICO REAL DEL TRAMO
+      const consumoNetoTramo = deltaKgAve * poblacion;
 
-    // 6. GUARDAR DATOS EN MEMORIA PARA EL DIAGNÓSTICO
-    diagDataTemporal = {
+      // 6. GUARDAR DATOS EN MEMORIA PARA EL DIAGNÓSTICO
+      diagDataTemporal = {
         diaCiclo: diaDelCiclo,
         diasTranscurridos: diasTranscurridos,
         fecha1: fechaAnterior,
@@ -3439,111 +3459,111 @@ function abrirAsistenteDiagnostico(index) {
         kgAveTramo: deltaKgAve,
         kgAveAcumulado: kgAveAcumActual, // Dato clave para el MACRO
         poblacion: poblacion
-    };
+      };
 
-    // 7. PREPARAR INTERFAZ
-    document.getElementById('diagTramoFechas').innerHTML = `${fechaAnterior} ➡️ ${fechaActual}<br><span class="badge bg-secondary">Lapso analizado: ${diasTranscurridos.toFixed(1)} días</span> <span class="badge bg-info text-dark">Edad Lote: Día ${diaDelCiclo}</span>`;
-    document.getElementById('diagTramoKg').innerText = consumoNetoTramo.toFixed(2);
-    document.getElementById('diagResultado').style.display = 'none';
-    
-    document.getElementById('diagEquipos').value = '';
-    document.getElementById('diagHoras').value = '';
+      // 7. PREPARAR INTERFAZ
+      document.getElementById('diagTramoFechas').innerHTML = `${fechaAnterior} ➡️ ${fechaActual}<br><span class="badge bg-secondary">Lapso analizado: ${diasTranscurridos.toFixed(1)} días</span> <span class="badge bg-info text-dark">Edad Lote: Día ${diaDelCiclo}</span>`;
+      document.getElementById('diagTramoKg').innerText = consumoNetoTramo.toFixed(2);
+      document.getElementById('diagResultado').style.display = 'none';
 
-    new bootstrap.Modal(document.getElementById('modalDiagnosticoInteligente')).show();
-}
+      document.getElementById('diagEquipos').value = '';
+      document.getElementById('diagHoras').value = '';
 
-function ejecutarDiagnostico() {
-    const tec = document.getElementById('diagTecnologia').value;
-    const clima = document.getElementById('diagClima').value;
-    const equipos = parseFloat(document.getElementById('diagEquipos').value);
-    const horasDiarias = parseFloat(document.getElementById('diagHoras').value); 
-
-    if (!equipos || !horasDiarias) {
-        alert("Por favor ingrese la cantidad de equipos encendidos y las horas promedio diarias de operación.");
-        return;
+      new bootstrap.Modal(document.getElementById('modalDiagnosticoInteligente')).show();
     }
 
-    // =========================================================
-    // VARIABLES BASE (Ciclo 15 Días - Ambiente Controlado)
-    // =========================================================
-    let factor_kgh_max = 0;
-    let meta_15d_min = 0, meta_15d_max = 0;
+    function ejecutarDiagnostico() {
+      const tec = document.getElementById('diagTecnologia').value;
+      const clima = document.getElementById('diagClima').value;
+      const equipos = parseFloat(document.getElementById('diagEquipos').value);
+      const horasDiarias = parseFloat(document.getElementById('diagHoras').value);
 
-    if (tec === 'infrarroja') {
-        factor_kgh_max = 0.25; 
+      if (!equipos || !horasDiarias) {
+        alert("Por favor ingrese la cantidad de equipos encendidos y las horas promedio diarias de operación.");
+        return;
+      }
+
+      // =========================================================
+      // VARIABLES BASE (Ciclo 15 Días - Ambiente Controlado)
+      // =========================================================
+      let factor_kgh_max = 0;
+      let meta_15d_min = 0, meta_15d_max = 0;
+
+      if (tec === 'infrarroja') {
+        factor_kgh_max = 0.25;
         meta_15d_min = (clima === 'calido') ? 0.02 : 0.03;
         meta_15d_max = (clima === 'calido') ? 0.04 : 0.06;
-    } else if (tec === 'tradicional') {
+      } else if (tec === 'tradicional') {
         factor_kgh_max = 0.25;
         meta_15d_min = (clima === 'calido') ? 0.04 : 0.05;
         meta_15d_max = (clima === 'calido') ? 0.055 : 0.07;
-    } else if (tec === 'turbo') {
-        factor_kgh_max = 8.0; 
+      } else if (tec === 'turbo') {
+        factor_kgh_max = 8.0;
         meta_15d_min = (clima === 'calido') ? 0.018 : 0.020;
         meta_15d_max = (clima === 'calido') ? 0.022 : 0.025;
-    }
+      }
 
-    const dia = diagDataTemporal.diaCiclo;
-    const diasT = diagDataTemporal.diasTranscurridos;
-    const poblacion = diagDataTemporal.poblacion;
+      const dia = diagDataTemporal.diaCiclo;
+      const diasT = diagDataTemporal.diasTranscurridos;
+      const poblacion = diagDataTemporal.poblacion;
 
-    // =========================================================
-    // 1. ANÁLISIS MACRO: ACUMULADO HASTA EL DÍA ACTUAL
-    // =========================================================
-    let factor_acumulado = 0;
-    if (dia <= 5) {
+      // =========================================================
+      // 1. ANÁLISIS MACRO: ACUMULADO HASTA EL DÍA ACTUAL
+      // =========================================================
+      let factor_acumulado = 0;
+      if (dia <= 5) {
         factor_acumulado = dia * 0.12;
-    } else if (dia <= 10) {
+      } else if (dia <= 10) {
         factor_acumulado = (5 * 0.12) + ((dia - 5) * 0.06);
-    } else if (dia <= 15) {
+      } else if (dia <= 15) {
         factor_acumulado = (5 * 0.12) + (5 * 0.06) + ((dia - 10) * 0.02);
-    } else {
-        factor_acumulado = 1.0; 
-    }
+      } else {
+        factor_acumulado = 1.0;
+      }
 
-    const acumuladoEstandarMin = meta_15d_min * factor_acumulado;
-    const acumuladoEstandarMax = meta_15d_max * factor_acumulado;
-    const kgAveAcumuladoReal = diagDataTemporal.kgAveAcumulado;
+      const acumuladoEstandarMin = meta_15d_min * factor_acumulado;
+      const acumuladoEstandarMax = meta_15d_max * factor_acumulado;
+      const kgAveAcumuladoReal = diagDataTemporal.kgAveAcumulado;
 
-    let htmlVeredicto = '';
-    let estadoMacro = '';
-    let colorMacro = '';
+      let htmlVeredicto = '';
+      let estadoMacro = '';
+      let colorMacro = '';
 
-    if (kgAveAcumuladoReal > acumuladoEstandarMax * 1.1) {
+      if (kgAveAcumuladoReal > acumuladoEstandarMax * 1.1) {
         estadoMacro = `⚠️ <b>Por encima del presupuesto esperado</b> (${kgAveAcumuladoReal.toFixed(3)} vs máx ${acumuladoEstandarMax.toFixed(3)} kg/ave).`;
         colorMacro = 'text-danger';
-    } else if (kgAveAcumuladoReal < acumuladoEstandarMin * 0.9) {
+      } else if (kgAveAcumuladoReal < acumuladoEstandarMin * 0.9) {
         estadoMacro = `🔵 <b>Por debajo del presupuesto</b> (${kgAveAcumuladoReal.toFixed(3)} vs min ${acumuladoEstandarMin.toFixed(3)} kg/ave).`;
         colorMacro = 'text-primary';
-    } else {
+      } else {
         estadoMacro = `✅ <b>Excelente. Dentro del estándar de eficiencia</b> (${kgAveAcumuladoReal.toFixed(3)} kg/ave).`;
         colorMacro = 'text-success';
-    }
+      }
 
-    htmlVeredicto += `
+      htmlVeredicto += `
         <div class="alert alert-light border border-secondary shadow-sm py-2 px-3 mb-3">
             <h6 class="fw-bold mb-1 border-bottom pb-1 text-primary">📊 1. ANÁLISIS MACRO (Desempeño Acumulado)</h6>
             <p class="mb-0 small">En el histórico al <b>Día ${dia}</b>, la eficiencia global del lote va: <br><span class="${colorMacro}">${estadoMacro}</span></p>
         </div>
     `;
 
-    // =========================================================
-    // 2. ANÁLISIS MICRO: VELOCIDAD DEL TRAMO Y LÍMITES FÍSICOS
-    // =========================================================
-    let peso_dia_actual = 0;
-    if (dia <= 5) peso_dia_actual = 0.12;       
-    else if (dia <= 10) peso_dia_actual = 0.06; 
-    else peso_dia_actual = 0.02;                
+      // =========================================================
+      // 2. ANÁLISIS MICRO: VELOCIDAD DEL TRAMO Y LÍMITES FÍSICOS
+      // =========================================================
+      let peso_dia_actual = 0;
+      if (dia <= 5) peso_dia_actual = 0.12;
+      else if (dia <= 10) peso_dia_actual = 0.06;
+      else peso_dia_actual = 0.02;
 
-    const velEstandarMin = meta_15d_min * peso_dia_actual;
-    const velEstandarMax = meta_15d_max * peso_dia_actual;
-    const velRealTramo = diagDataTemporal.kgAveTramo / diasT;
-    const kgRealTramo = diagDataTemporal.kgTramo;
-    const topeFisicoEquipos = equipos * horasDiarias * diasT * factor_kgh_max;
+      const velEstandarMin = meta_15d_min * peso_dia_actual;
+      const velEstandarMax = meta_15d_max * peso_dia_actual;
+      const velRealTramo = diagDataTemporal.kgAveTramo / diasT;
+      const kgRealTramo = diagDataTemporal.kgTramo;
+      const topeFisicoEquipos = equipos * horasDiarias * diasT * factor_kgh_max;
 
-    htmlVeredicto += `<h6 class="fw-bold mb-2 text-primary mt-3">🔎 2. ANÁLISIS MICRO (Auditoría del Tramo)</h6>`;
+      htmlVeredicto += `<h6 class="fw-bold mb-2 text-primary mt-3">🔎 2. ANÁLISIS MICRO (Auditoría del Tramo)</h6>`;
 
-    if (kgRealTramo > topeFisicoEquipos) {
+      if (kgRealTramo > topeFisicoEquipos) {
         htmlVeredicto += `
             <div class="alert alert-danger border-danger py-2 px-3 mb-2">
                 <span class="fw-bold">🚨 ALERTA CRÍTICA (Fuga o Avalancha):</span><br>
@@ -3556,8 +3576,8 @@ function ejecutarDiagnostico() {
                     <li>Registro atrasado: El operador sumó consumos de días anteriores.</li>
                 </ul>
             </div>`;
-    } 
-    else if (velRealTramo > (velEstandarMax * 1.25)) {
+      }
+      else if (velRealTramo > (velEstandarMax * 1.25)) {
         htmlVeredicto += `
             <div class="alert alert-warning border-warning text-dark py-2 px-3 mb-2">
                 <span class="fw-bold">⚠️ INEFICIENCIA TÉRMICA:</span><br>
@@ -3570,47 +3590,47 @@ function ejecutarDiagnostico() {
                     <li>Pérdida de calor por cortinas en mal estado.</li>
                 </ul>
             </div>`;
-    } 
-    else if (velRealTramo < (velEstandarMin * 0.5)) {
-         htmlVeredicto += `
+      }
+      else if (velRealTramo < (velEstandarMin * 0.5)) {
+        htmlVeredicto += `
             <div class="alert alert-secondary border-secondary text-dark py-2 px-3 mb-2">
                 <span class="fw-bold">🧐 REVISIÓN DE DATOS:</span><br>
                 La velocidad de consumo bajó a <b>${velRealTramo.toFixed(4)} kg/ave/día</b>. Es anormalmente bajo para el clima y la etapa de cría.<br>
                 <span class="small">Posible falla de encendido de equipos, ausencia de frío, o error de digitación de tanques.</span>
             </div>`;
-    } 
-    else {
+      }
+      else {
         htmlVeredicto += `
             <div class="alert alert-success border-success py-2 px-3 fw-bold mb-2">
                 ✅ OPERACIÓN EFICIENTE: El consumo físico (${kgRealTramo.toFixed(1)} kg) en este tramo lleva una velocidad térmica perfecta para el estándar esperado.
             </div>`;
-    }
+      }
 
-    // =========================================================
-    // 3. PROYECCIÓN DINÁMICA A CIERRE
-    // =========================================================
-    let proyeccion_15d = 0;
-    if (dia < 15) {
+      // =========================================================
+      // 3. PROYECCIÓN DINÁMICA A CIERRE
+      // =========================================================
+      let proyeccion_15d = 0;
+      if (dia < 15) {
         proyeccion_15d = kgAveAcumuladoReal + ((15 - dia) * velRealTramo);
-    } else {
+      } else {
         proyeccion_15d = kgAveAcumuladoReal;
-    }
+      }
 
-    let colorProy = (proyeccion_15d > meta_15d_max) ? 'text-danger fw-bold' : 'text-success fw-bold';
-    
-    htmlVeredicto += `
+      let colorProy = (proyeccion_15d > meta_15d_max) ? 'text-danger fw-bold' : 'text-success fw-bold';
+
+      htmlVeredicto += `
         <div class="bg-white p-2 rounded border mt-3 small shadow-sm">
             <b class="text-primary">📈 Proyección Dinámica a 15 Días:</b><br>
             A la velocidad térmica de este último tramo, el lote cerraría la fase con <span class="${colorProy}">${proyeccion_15d.toFixed(4)} kg/ave</span>.<br>
             <span class="text-muted">Meta gerencial en estas condiciones: <b>${meta_15d_min.toFixed(3)} a ${meta_15d_max.toFixed(3)}</b>.</span>
         </div>`;
 
-    const resDiv = document.getElementById('diagResultado');
-    resDiv.className = `mt-3`;
-    resDiv.style.display = 'block';
-    document.getElementById('diagVeredicto').innerHTML = htmlVeredicto;
-}
-</script>
+      const resDiv = document.getElementById('diagResultado');
+      resDiv.className = `mt-3`;
+      resDiv.style.display = 'block';
+      document.getElementById('diagVeredicto').innerHTML = htmlVeredicto;
+    }
+  </script>
 
 
 
