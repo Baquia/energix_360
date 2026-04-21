@@ -2510,10 +2510,10 @@
       const msg = document.getElementById('msgSinPendientesTanqueo');
 
       modal.show();
-      tbody.innerHTML = '<tr><td colspan="5">Cargando datos operativos...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">Cargando datos operativos...</td></tr>';
       msg.style.display = 'none';
 
-      // A. CONSULTA DE RUPTURAS (Facturas validadas sin registro físico)
+      // A. CONSULTA DE RUPTURAS
       fetch('/obtener_alertas_ruptura_validacion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2528,7 +2528,11 @@
                         <td>${item.codigo}</td>
                         <td>${item.ubicacion}</td>
                         <td><span class="badge bg-secondary">${item.factura}</span></td>
-                        <td>${item.dias} Días</td>
+                        <td><div class="badge bg-danger">${item.dias} Días</div></td>
+                        <td class="pdf-ocultar">
+                            <button class="btn btn-success btn-sm me-1" onclick="prepararLegalizacion(${item.id}, '${item.ubicacion}', '${item.codigo}')" title="Legalizar">⚖️</button>
+                            <button class="btn btn-danger btn-sm" onclick="prepararAnulacion(${item.id})" title="Anular (Sin Evidencia)">❌</button>
+                        </td>
                     </tr>`;
           });
         } else {
@@ -2536,7 +2540,7 @@
         }
       });
 
-      // B. CONSULTA DE TRÁNSITO (Pedidos generados esperando al camión)
+      // B. CONSULTA DE TRÁNSITO
       fetch('/obtener_pendientes_tanqueo_reporte', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2553,6 +2557,10 @@
                         <td>${item.proveedor || 'N/D'}</td>
                         <td><span class="fw-bold">${item.solicitado}%</span></td>
                         <td><div class="badge bg-warning text-dark">${item.dias} Días</div></td>
+                        <td class="pdf-ocultar">
+                            <button class="btn btn-success btn-sm me-1" onclick="prepararLegalizacion(${item.id}, '${item.ubicacion}', '${item.codigo}')" title="Legalizar">⚖️</button>
+                            <button class="btn btn-danger btn-sm" onclick="prepararAnulacion(${item.id})" title="Anular (Sin Evidencia)">❌</button>
+                        </td>
                     </tr>`;
           });
         } else {

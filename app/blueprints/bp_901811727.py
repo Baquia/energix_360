@@ -1849,9 +1849,10 @@ def obtener_alertas_ruptura_validacion():
     try:
         cur = mysql.connection.cursor()
         
-        # SQL: Busca pedidos validados sin contraparte en cardex_glp
+        # SQL: Busca pedidos validados sin contraparte en cardex_glp (AHORA INCLUYE p.id)
         sql = """
             SELECT 
+                p.id,
                 p.codigo_pedido,
                 p.fecha_validacion,
                 p.ubicacion,
@@ -1876,6 +1877,7 @@ def obtener_alertas_ruptura_validacion():
         for r in rows:
             rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
             alertas.append({
+                "id": rd.get('id'), # <-- ESTE ES EL DATO CRÍTICO QUE FALTABA
                 "codigo": rd.get('codigo_pedido'),
                 "fecha_v": str(rd.get('fecha_validacion')),
                 "ubicacion": rd.get('ubicacion'),

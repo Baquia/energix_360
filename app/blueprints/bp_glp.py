@@ -1512,7 +1512,7 @@ def registrar_inicio_calefaccion():
                 
                 saldo_kg += (nivel/100.0) * cap * densidad
 
-                if nivel < 78.0:
+                if nivel < 70.0:
                     tanques_para_pedido.append({"numero": num, "nivel": nivel})
 
             proveedor = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)

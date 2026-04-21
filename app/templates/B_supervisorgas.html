@@ -1258,10 +1258,10 @@
       const msgSin = document.getElementById('msgSinPendientesTanqueo');
 
       modal.show();
-      tb.innerHTML = '<tr><td colspan="5" class="p-3">Consultando base de datos...</td></tr>';
+      tb.innerHTML = '<tr><td colspan="6" class="p-3">Consultando base de datos...</td></tr>';
       msgSin.style.display = 'none';
 
-      // A. CONSULTAR RUPTURAS: Facturas validadas que no aparecen en el Cardex
+      // A. CONSULTAR RUPTURAS
       fetch('/obtener_alertas_ruptura_validacion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1269,7 +1269,7 @@
       }).then(r => r.json()).then(d => {
         bodyRuptura.innerHTML = '';
         if (d.success && d.items.length > 0) {
-          containerRuptura.style.display = 'block'; // Muestra la alerta roja
+          containerRuptura.style.display = 'block';
           d.items.forEach(i => {
             bodyRuptura.innerHTML += `
                     <tr class="fw-bold text-danger">
@@ -1277,6 +1277,10 @@
                         <td>${i.ubicacion}</td>
                         <td><span class="badge bg-secondary">${i.factura}</span></td>
                         <td><div class="badge bg-danger">${i.dias} Días</div></td>
+                        <td class="pdf-ocultar">
+                            <button class="btn btn-success btn-sm me-1" onclick="prepararLegalizacion(${i.id}, '${i.ubicacion}', '${i.codigo}')" title="Legalizar">⚖️</button>
+                            <button class="btn btn-danger btn-sm" onclick="prepararAnulacion(${i.id})" title="Anular (Sin Evidencia)">❌</button>
+                        </td>
                     </tr>`;
           });
         } else {
@@ -1284,7 +1288,7 @@
         }
       });
 
-      // B. CONSULTAR EN TRÁNSITO: Pedidos generados/aprobados esperando al proveedor
+      // B. CONSULTAR EN TRÁNSITO
       fetch('/obtener_pendientes_tanqueo_reporte', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1301,6 +1305,10 @@
                         <td>${i.proveedor}</td>
                         <td>${i.solicitado}%</td>
                         <td><div class="badge bg-warning text-dark">${i.dias} días</div></td>
+                        <td class="pdf-ocultar">
+                            <button class="btn btn-success btn-sm me-1" onclick="prepararLegalizacion(${i.id}, '${i.ubicacion}', '${i.codigo}')" title="Legalizar">⚖️</button>
+                            <button class="btn btn-danger btn-sm" onclick="prepararAnulacion(${i.id})" title="Anular (Sin Evidencia)">❌</button>
+                        </td>
                     </tr>`;
           });
         } else {
