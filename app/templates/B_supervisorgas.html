@@ -724,6 +724,7 @@
                     <th>Ubicación</th>
                     <th>Factura Ref.</th>
                     <th>Días de Retraso</th>
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody id="tablaRupturaBody"></tbody>
@@ -741,6 +742,7 @@
                   <th>Proveedor</th>
                   <th>Solicitado</th>
                   <th>Espera</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody id="tablaPendientesTanqueoBody"></tbody>
@@ -1624,7 +1626,236 @@
       ov.innerHTML = `<div class="pregunta-card text-center" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><h5 class="fw-bold mb-3">Evidencia Fotográfica</h5>${imgs}<button class="btn btn-secondary w-100 mt-2 fw-bold" onclick="this.closest('.pregunta-overlay').remove()">Cerrar Visor</button></div>`;
       document.body.appendChild(ov);
     }
+
+    // =========================================================================
+    // LÓGICA DE SANEAMIENTO: ANULACIÓN Y LEGALIZACIÓN EXTEMPORÁNEA
+    // =========================================================================
+
+    // --- 1. ANULAR ---
+    function prepararAnulacion(idPedido) {
+      document.getElementById('anular_pedido_id').value = idPedido;
+      document.getElementById('anular_justificacion').value = '';
+      new bootstrap.Modal(document.getElementById('modalAnularPedido')).show();
+    }
+
+    function ejecutarAnulacion() {
+      const id = document.getElementById('anular_pedido_id').value;
+      const justificacion = document.getElementById('anular_justificacion').value.trim();
+      const btn = document.getElementById('btnConfirmaAnular');
+
+      if (justificacion.length < 10) {
+        alert("Por favor, escriba una justificación detallada (mínimo 10 caracteres).");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Enviando alerta...";
+
+      fetch('/glp/anular_pedido_sin_evidencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, justificacion: justificacion })
+      }).then(r => r.json()).then(d => {
+        btn.disabled = false;
+        btn.textContent = "Confirmar Anulación";
+        if (d.success) {
+          alert("✅ " + d.message);
+          bootstrap.Modal.getInstance(document.getElementById('modalAnularPedido')).hide();
+          // Recargar la tabla principal (Dependiendo del archivo, llama a la función correcta)
+          if (typeof abrirModalPendientesTanqueo === "function") abrirModalPendientesTanqueo(EMPRESA_ID || document.getElementById('clienteSelect').value);
+          else if (typeof mostrarPendientes === "function") mostrarPendientes();
+        } else {
+          alert("❌ Error: " + d.message);
+        }
+      }).catch(e => {
+        btn.disabled = false; btn.textContent = "Confirmar Anulación"; alert("Error de red.");
+      });
+    }
+
+    // --- 2. LEGALIZAR ---
+    function prepararLegalizacion(idPedido, sede, codigo) {
+      document.getElementById('leg_pedido_id').value = idPedido;
+      document.getElementById('leg_sede').value = sede;
+      document.getElementById('leg_codigo').value = codigo;
+      document.getElementById('leg_fecha_real').value = '';
+
+      // Limpiar tabla y agregar una fila inicial
+      document.getElementById('legTablaTanquesBody').innerHTML = '';
+      agregarFilaLegalizacion();
+
+      new bootstrap.Modal(document.getElementById('modalLegalizarTanqueo')).show();
+    }
+
+    function agregarFilaLegalizacion() {
+      const tbody = document.getElementById('legTablaTanquesBody');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm text-center leg-tk fw-bold" placeholder="TK-1"></td>
+        <td><input type="number" class="form-control form-control-sm text-center leg-cap" placeholder="Gal"></td>
+        <td><input type="number" class="form-control form-control-sm text-center leg-ini" placeholder="%"></td>
+        <td><input type="number" class="form-control form-control-sm text-center leg-fin" placeholder="%"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm text-center leg-den" value="2.0"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm text-center leg-kg" placeholder="Kg"></td>
+        <td><button class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">🗑️</button></td>
+    `;
+      tbody.appendChild(tr);
+    }
+
+    function ejecutarLegalizacion() {
+      const pedido_id = document.getElementById('leg_pedido_id').value;
+      const fecha_real = document.getElementById('leg_fecha_real').value;
+      const btn = document.getElementById('btnConfirmaLegalizar');
+
+      if (!fecha_real) { alert("Debe seleccionar la fecha exacta en la que ocurrió el tanqueo."); return; }
+
+      let tanques = [];
+      let error = false;
+      document.getElementById('legTablaTanquesBody').querySelectorAll('tr').forEach(f => {
+        const num = f.querySelector('.leg-tk').value.trim();
+        const cap = parseFloat(f.querySelector('.leg-cap').value);
+        const ini = parseFloat(f.querySelector('.leg-ini').value);
+        const fin = parseFloat(f.querySelector('.leg-fin').value);
+        const den = parseFloat(f.querySelector('.leg-den').value);
+        const kg = parseFloat(f.querySelector('.leg-kg').value);
+
+        if (!num || isNaN(cap) || isNaN(ini) || isNaN(fin) || isNaN(den) || isNaN(kg)) error = true;
+        else tanques.push({ numero: num, capacidad: cap, nivel_inicial: ini, nivel_final: fin, densidad_suministrada: den, kg_suministrados: kg });
+      });
+
+      if (error || tanques.length === 0) { alert("Revise la tabla: Todos los campos numéricos y el nombre del tanque son obligatorios."); return; }
+
+      btn.disabled = true; btn.textContent = "Procesando recálculo... ⏳";
+
+      fetch('/glp/legalizar_tanqueo_extemporaneo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pedido_id: pedido_id,
+          fecha_real: fecha_real,
+          tanques: tanques,
+          op_id: "ext_" + Date.now()
+        })
+      }).then(r => r.json()).then(d => {
+        btn.disabled = false; btn.textContent = "💾 Guardar y Recalcular Historia";
+        if (d.success) {
+          alert("✅ " + d.message);
+          bootstrap.Modal.getInstance(document.getElementById('modalLegalizarTanqueo')).hide();
+          if (typeof abrirModalPendientesTanqueo === "function") abrirModalPendientesTanqueo(EMPRESA_ID || document.getElementById('clienteSelect').value);
+          else if (typeof mostrarPendientes === "function") mostrarPendientes();
+        } else { alert("❌ Error: " + d.message); }
+      }).catch(e => { btn.disabled = false; btn.textContent = "💾 Guardar y Recalcular Historia"; alert("Error de conexión."); });
+    }
+
+    // --- 3. DESCARGAR PDF DEL REPORTE DE PENDIENTES ---
+    function descargarPDFPendientes() {
+      const modalBody = document.querySelector('#modalPendientesTanqueo .modal-body');
+      const originalBorder = modalBody.style.border;
+      modalBody.style.padding = '20px';
+      modalBody.style.background = 'white';
+
+      // Ocultar temporalmente la columna de acciones para el PDF
+      const style = document.createElement('style');
+      style.innerHTML = '.pdf-ocultar { display: none !important; }';
+      document.head.appendChild(style);
+
+      html2pdf().set({
+        margin: 0.4,
+        filename: 'Reporte_Pendientes_Tanqueo.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
+      }).from(modalBody).save().then(() => {
+        style.remove();
+        modalBody.style.padding = '';
+        modalBody.style.background = '';
+      });
+    }
   </script>
+
+  <div class="modal fade" id="modalAnularPedido" tabindex="-1" style="z-index: 1055;">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-danger">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title fw-bold">❌ Anular Pedido (Sin Evidencia)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <div class="alert alert-warning small border-warning text-dark">
+            <strong>⚠️ ATENCIÓN:</strong> Esta acción es irreversible. Se enviará un reporte formal a Gerencia y
+            Auditoría para la investigación de la factura o el pedido asociado.
+          </div>
+          <input type="hidden" id="anular_pedido_id">
+          <label class="fw-bold small text-danger">Justificación detallada (Obligatorio):</label>
+          <textarea id="anular_justificacion" class="form-control border-danger mt-1" rows="4"
+            placeholder="Explique por qué se da de baja este pedido... (Mínimo 10 caracteres)"></textarea>
+        </div>
+        <div class="modal-footer bg-white">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger fw-bold" onclick="ejecutarAnulacion()"
+            id="btnConfirmaAnular">Confirmar Anulación</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalLegalizarTanqueo" tabindex="-1" style="z-index: 1055;">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header" style="background-color: #015249; color: white;">
+          <h5 class="modal-title fw-bold">⚖️ Legalizar Tanqueo Extemporáneo</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <div class="alert alert-success small">
+            <strong>ℹ️ Información:</strong> Esta herramienta insertará el tanqueo en el pasado y recalculará
+            automáticamente la historia de la granja (saldos y consumos) hacia adelante.
+          </div>
+          <input type="hidden" id="leg_pedido_id">
+
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label class="fw-bold small text-primary">Sede / Granja</label>
+              <input type="text" id="leg_sede" class="form-control fw-bold" readonly>
+            </div>
+            <div class="col-md-4">
+              <label class="fw-bold small text-danger">Fecha EXACTA del Tanqueo Real</label>
+              <input type="date" id="leg_fecha_real" class="form-control border-danger fw-bold" required>
+            </div>
+            <div class="col-md-4">
+              <label class="fw-bold small text-primary">Código de Pedido</label>
+              <input type="text" id="leg_codigo" class="form-control fw-bold" readonly>
+            </div>
+          </div>
+
+          <h6 class="fw-bold mt-4 border-bottom pb-2 text-dark">Datos de los Tanques (Según Documento Físico)</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered text-center align-middle bg-white shadow-sm">
+              <thead class="table-dark">
+                <tr class="small">
+                  <th>Tanque (Ej. TK-1)</th>
+                  <th>Capacidad (gal)</th>
+                  <th>Nivel Ini %</th>
+                  <th>Nivel Fin %</th>
+                  <th>Densidad (kg/gal)</th>
+                  <th>Kg Sumin.</th>
+                  <th>Eliminar</th>
+                </tr>
+              </thead>
+              <tbody id="legTablaTanquesBody">
+              </tbody>
+            </table>
+          </div>
+          <button class="btn btn-outline-success btn-sm fw-bold w-100 mb-3" onclick="agregarFilaLegalizacion()">+
+            Agregar Fila de Tanque</button>
+        </div>
+        <div class="modal-footer bg-white">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success fw-bold px-4" onclick="ejecutarLegalizacion()"
+            id="btnConfirmaLegalizar">💾 Guardar y Recalcular Historia</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
 
 </body>

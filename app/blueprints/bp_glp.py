@@ -2759,3 +2759,359 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
 
     except Exception as e:
         app.logger.error(f"⛔ GLP Email: Falló el envío. Error: {str(e)}")
+        
+# ==============================================================================
+# ❌ CAMINO B: ANULACIÓN INVESTIGATIVA (SIN EVIDENCIA)
+# ==============================================================================
+
+@csrf.exempt
+@bp_glp.route('/anular_pedido_sin_evidencia', methods=['POST'])
+@login_required_custom
+def anular_pedido_sin_evidencia():
+    data = request.get_json(force=True) or {}
+    pedido_id = data.get('id')
+    justificacion = data.get('justificacion', '').strip()
+    
+    usuario = session.get('nombre', 'Desconocido')
+    perfil = session.get('perfil', 'Usuario')
+    empresa_actor = session.get('empresa', 'N/D') # Para saber si fue el Webmaster o un Supervisor
+
+    if not pedido_id or len(justificacion) < 10:
+        return jsonify({"success": False, "message": "La justificación es obligatoria y debe ser detallada."}), 400
+
+    try:
+        cur = mysql.connection.cursor()
+        
+        # 1. Obtener los datos del pedido y del cliente
+        cur.execute("""
+            SELECT cliente, ubicacion, codigo_pedido, numero_factura, estatus, estatus_flujo, lote 
+            FROM pedidos_gas_glp 
+            WHERE id = %s
+        """, (pedido_id,))
+        row = cur.fetchone()
+        
+        if not row:
+            return jsonify({"success": False, "message": "Pedido no encontrado."}), 404
+            
+        rd = dict(zip([d[0] for d in cur.description], row)) if not isinstance(row, dict) else row
+        
+        cliente = rd['cliente']
+        ubicacion = rd['ubicacion']
+        codigo = rd['codigo_pedido']
+        factura = rd['numero_factura'] or "N/D"
+        estatus_base = rd['estatus']
+        
+        # 2. Cambiar el estatus para ocultarlo del reporte
+        firma = f"Anulado por {perfil} ({usuario}). Razón: {justificacion}"
+        
+        cur.execute("""
+            UPDATE pedidos_gas_glp 
+            SET estatus_flujo = 'anulado_sin_evidencia', 
+                comentarios = CONCAT(COALESCE(comentarios, ''), ' | ', %s)
+            WHERE id = %s
+        """, (firma, pedido_id))
+        
+        # 3. Enviar el correo de alerta si estaba validado (Falta grave)
+        if estatus_base == 'validado':
+            _enviar_correo_investigacion_anulacion(cur, cliente, ubicacion, codigo, factura, justificacion, usuario, perfil)
+        
+        # 4. Auditoría severa
+        nivel_audit = "CRITICAL" if estatus_base == 'validado' else "WARNING"
+        registrar_auditoria(
+            session.get('empresa_id', 0), empresa_actor, "GLP", usuario, 
+            "Anulación Sin Evidencia", f"Pedido {codigo} de {cliente} ({ubicacion}). Razón: {justificacion}", nivel_audit
+        )
+        
+        mysql.connection.commit()
+        cur.close()
+        
+        return jsonify({"success": True, "message": "Pedido anulado y reportado exitosamente."})
+        
+    except Exception as e:
+        mysql.connection.rollback()
+        print(f"Error en anulación investigativa: {str(e)}")
+        return jsonify({"success": False, "message": f"Error interno: {str(e)}"}), 500
+
+def _enviar_correo_investigacion_anulacion(cur, cliente, ubicacion, codigo, factura, justificacion, usuario, perfil):
+    """Envía el correo de alerta a Gerencia con copia a la aplicación."""
+    email_user = os.environ.get("EMAIL_USER")
+    email_pass = os.environ.get("EMAIL_PASS")
+    email_host = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+    email_port = int(os.environ.get("EMAIL_PORT", "587"))
+    email_app = "bqa-one@baquia-esm.com" # Copia inmutable
+
+    # Buscar el correo del cliente en la tabla contactos
+    cur.execute("SELECT email FROM contactos WHERE TRIM(UPPER(empresa)) = TRIM(UPPER(%s))", (cliente,))
+    contactos = cur.fetchall()
+    
+    destinatarios = []
+    for c in contactos:
+        em = c['email'] if isinstance(c, dict) else c[0]
+        if em: destinatarios.append(em)
+        
+    if not destinatarios:
+        print(f"⚠️ No hay contactos registrados para {cliente}. Solo se enviará a la app.")
+    
+    # Unimos los destinatarios del cliente + la copia de la app
+    todos_los_correos = destinatarios + [email_app]
+    
+    rol_texto = "Administrador del Sistema (Webmaster)" if "webmaster" in perfil.lower() else "Supervisor de Sede"
+
+    cuerpo = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+        <div style="background-color: #ffffff; max-width: 600px; margin: 0 auto; border-top: 5px solid #b71c1c; border-radius: 8px; padding: 30px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+            <h2 style="color: #b71c1c; margin-top: 0;">🚨 INVESTIGACIÓN REQUERIDA</h2>
+            <h3 style="color: #333; margin-bottom: 5px;">Anulación de Suministro GLP Sin Evidencia</h3>
+            <p style="color: #666; font-size: 14px; margin-top: 0;">Se ha detectado la baja manual de un pedido previamente contabilizado.</p>
+            
+            <div style="background-color: #ffebee; border-left: 4px solid #b71c1c; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; color: #c62828; font-weight: bold;">⚠️ Alerta Financiera:</p>
+                <p style="margin: 5px 0 0 0; color: #b71c1c; font-size: 14px;">
+                    Se requiere verificación contable urgente de la <b>Factura N° {factura}</b>, ya que no hay registro de ingreso al inventario físico en la granja.
+                </p>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Cliente:</b></td><td style="padding: 8px; border-bottom: 1px solid #eee;">{cliente}</td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Sede (Granja):</b></td><td style="padding: 8px; border-bottom: 1px solid #eee;">{ubicacion}</td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Código Pedido:</b></td><td style="padding: 8px; border-bottom: 1px solid #eee;"><b>{codigo}</b></td></tr>
+                <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><b>Acción ejecutada por:</b></td><td style="padding: 8px; border-bottom: 1px solid #eee;">{rol_texto}: {usuario}</td></tr>
+            </table>
+
+            <p style="font-weight: bold; color: #333;">Justificación registrada en el sistema:</p>
+            <div style="background-color: #f5f5f5; border: 1px solid #ddd; padding: 15px; font-style: italic; color: #555; border-radius: 4px;">
+                "{justificacion}"
+            </div>
+
+            <p style="margin-top: 30px; font-size: 12px; color: #999; text-align: center;">
+                Notificación generada automáticamente por BQA-ONE. Una copia de este mensaje se almacena en los servidores de la aplicación con fines de auditoría.
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+
+    try:
+        msg = MIMEMultipart()
+        msg["Subject"] = f"🚨 INVESTIGACIÓN REQUERIDA: Factura sin respaldo físico - {ubicacion}"
+        msg["From"] = email_user
+        msg["To"] = ", ".join(destinatarios) if destinatarios else email_app
+        if destinatarios:
+            msg["Cc"] = email_app # Copia a la app
+
+        msg.attach(MIMEText(cuerpo, "html", "utf-8"))
+
+        with smtplib.SMTP(email_host, email_port) as server:
+            server.starttls()
+            server.login(email_user, email_pass)
+            # Enviar a la lista combinada (To + Cc)
+            server.sendmail(email_user, todos_los_correos, msg.as_string())
+            
+        print(f"✅ Correo de investigación enviado exitosamente a {todos_los_correos}")
+    except Exception as e:
+        print(f"⛔ Error al enviar correo de investigación: {str(e)}")
+        
+# ==============================================================================
+# ⚖️ CAMINO A: LEGALIZACIÓN EXTEMPORÁNEA (INYECCIÓN EN EL PASADO)
+# ==============================================================================
+
+@csrf.exempt
+@bp_glp.route('/legalizar_tanqueo_extemporaneo', methods=['POST'])
+@login_required_custom
+def legalizar_tanqueo_extemporaneo():
+    data = request.get_json(force=True) or {}
+    pedido_id = data.get('pedido_id')
+    fecha_real = data.get('fecha_real') # Formato YYYY-MM-DD
+    tanques = data.get('tanques', [])
+    op_id = data.get('op_id') # Para idempotencia
+    
+    usuario = session.get('nombre', 'Desconocido')
+    id_empresa_actor = session.get('empresa_id', 0)
+
+    if not pedido_id or not fecha_real or not tanques:
+        return jsonify({"success": False, "message": "Faltan datos obligatorios para legalizar."}), 400
+
+    try:
+        cur = mysql.connection.cursor()
+        
+        # 1. Obtener datos originales del pedido
+        cur.execute("SELECT cliente, ubicacion, lote, proveedor, codigo_pedido FROM pedidos_gas_glp WHERE id = %s", (pedido_id,))
+        row_ped = cur.fetchone()
+        if not row_ped: return jsonify({"success": False, "message": "Pedido no encontrado."}), 404
+        
+        rd_ped = dict(zip([d[0] for d in cur.description], row_ped)) if not isinstance(row_ped, dict) else row_ped
+        cliente = rd_ped['cliente']
+        ubicacion = rd_ped['ubicacion']
+        lote_id = rd_ped['lote']
+        proveedor = rd_ped['proveedor']
+        codigo_pedido = rd_ped['codigo_pedido']
+        
+        # 2. Rescatar el estatus del lote y los pollitos de la historia (Por si el lote ya cerró)
+        cur.execute("SELECT estatus_lote, pollitos FROM cardex_glp WHERE lote = %s ORDER BY id DESC LIMIT 1", (lote_id,))
+        row_lote = cur.fetchone()
+        estatus_lote_heredado = "INACTIVO"
+        pollitos_lote = 0
+        if row_lote:
+            rd_lote = dict(zip([d[0] for d in cur.description], row_lote)) if not isinstance(row_lote, dict) else row_lote
+            estatus_lote_heredado = rd_lote['estatus_lote']
+            pollitos_lote = rd_lote['pollitos']
+
+        # 3. Inyectar el tanqueo en el pasado (cardex_glp)
+        columnas = ["fecha","empresa","id_empresa","ubicacion","lote","estatus_lote","operacion","tipo","clase","registro","op_id", "codigo_pedido", "pollitos"]
+        valores  = [fecha_real, cliente, id_empresa_actor, ubicacion, lote_id, estatus_lote_heredado, "tanqueo", "manual", "ingreso", f"{usuario} (Extemp.)", op_id, codigo_pedido, pollitos_lote]
+        
+        placeholders = ', '.join(['%s'] * len(columnas))
+        cur.execute(f"INSERT INTO cardex_glp ({', '.join(columnas)}) VALUES ({placeholders})", valores)
+        id_operacion = cur.lastrowid
+        
+        # 4. Procesar los tanques y fotos
+        carpeta = os.path.join("testigos", cliente.replace(" ", "_"), lote_id)
+        set_cols = []
+        set_vals = []
+        
+        densidades = []
+        masas_facturadas = []
+        
+        for tk in tanques:
+            num = str(tk.get("numero", "")).upper().replace("TK-", "").replace("TK", "").strip()
+            if not num: continue
+            
+            cap = float(tk.get("capacidad", 0))
+            nivel_ini = float(tk.get("nivel_inicial", 0))
+            nivel_fin = float(tk.get("nivel_final", 0))
+            
+            set_cols.extend([f"`nivel tk-{num}`=%s", f"`nivelfinal tk-{num}`=%s", f"`capacidad tk-{num}`=%s"])
+            set_vals.extend([nivel_ini, nivel_fin, cap])
+            
+            if tk.get("foto_nivel_inicial"):
+                ruta = _guardar_testigo(tk.get("foto_nivel_inicial"), carpeta, f"tk{num}_ini_ext_{id_operacion}")
+                if ruta: set_cols.append(f"`testigo nivel tk-{num}`=%s"); set_vals.append(ruta)
+            
+            if tk.get("foto_nivel_final"):
+                ruta = _guardar_testigo(tk.get("foto_nivel_final"), carpeta, f"tk{num}_fin_ext_{id_operacion}")
+                if ruta: set_cols.append(f"`testigo nivelfinal tk-{num}`=%s"); set_vals.append(ruta)
+                
+            if tk.get("foto_baucher"):
+                ruta = _guardar_testigo(tk.get("foto_baucher"), carpeta, f"tk{num}_baucher_ext_{id_operacion}")
+                if ruta: set_cols.append(f"`testigo_baucher_tk_{num}`=%s"); set_vals.append(ruta)
+                
+            dens = float(tk.get("densidad_suministrada") or 0.0)
+            if dens > 0: densidades.append(dens)
+            masas_facturadas.append(float(tk.get("kg_suministrados") or 0.0))
+
+        # Actualizar la inyección con los datos de los tanques
+        if set_cols:
+            cur.execute(f"UPDATE cardex_glp SET {', '.join(set_cols)} WHERE id=%s", set_vals + [id_operacion])
+
+        dens_prom = sum(densidades)/len(densidades) if densidades else 2.0
+        masa_facturada_total = sum(masas_facturadas)
+        
+        cur.execute("UPDATE cardex_glp SET densidad_suministrada=%s, masa_kg_facturada=%s, proveedor=%s WHERE id=%s", (round(dens_prom,3), round(masa_facturada_total,2), proveedor, id_operacion))
+
+        # 5. SANEAR EL PEDIDO (Sacarlo de pendientes)
+        cur.execute("UPDATE pedidos_gas_glp SET estatus_flujo = 'legalizado_extemporaneo' WHERE id = %s", (pedido_id,))
+
+        # 6. EL MOTOR DEL TIEMPO (RECALCULAR LA HISTORIA)
+        # Llama a un script auxiliar que recorre el lote y arregla los saldos y acumulados.
+        _recalcular_historia_lote(cur, cliente, ubicacion, lote_id)
+
+        # Auditoría
+        registrar_auditoria(id_empresa_actor, session.get('empresa', 'N/D'), "GLP", usuario, "Legalización Extemporánea", f"Se insertó tanqueo ({codigo_pedido}) en {fecha_real} para {ubicacion}. Historia recalculada.", "INFO")
+
+        mysql.connection.commit()
+        cur.close()
+        
+        return jsonify({"success": True, "message": "Tanqueo legalizado exitosamente. La historia de la granja ha sido recalculada y saneada."})
+        
+    except Exception as e:
+        mysql.connection.rollback()
+        print(f"Error en legalización extemporánea: {str(e)}")
+        traceback.print_exc()
+        return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"}), 500
+
+
+def _recalcular_historia_lote(cur, empresa, ubicacion, lote_id):
+    """
+    Recorre TODOS los registros del lote en orden cronológico (fecha ASC, id ASC)
+    y recalcula `neto_gastado`, `kg_pollito` y `saldo_estimado_kg` para sanear la historia.
+    """
+    # Traer todos los registros del lote
+    cur.execute("""
+        SELECT id, operacion, pollitos, 
+               `nivel tk-1`, `nivelfinal tk-1`, `capacidad tk-1`,
+               `nivel tk-2`, `nivelfinal tk-2`, `capacidad tk-2`,
+               `nivel tk-3`, `nivelfinal tk-3`, `capacidad tk-3`,
+               `nivel tk-4`, `nivelfinal tk-4`, `capacidad tk-4`,
+               `nivel tk-5`, `nivelfinal tk-5`, `capacidad tk-5`,
+               `nivel tk-6`, `nivelfinal tk-6`, `capacidad tk-6`,
+               densidad_suministrada
+        FROM cardex_glp 
+        WHERE empresa = %s AND TRIM(ubicacion) = TRIM(%s) AND lote = %s
+        ORDER BY fecha ASC, id ASC
+    """, (empresa, ubicacion, lote_id))
+    
+    registros = cur.fetchall()
+    if not registros: return
+    
+    col_names = [d[0] for d in cur.description]
+    
+    pollitos_base = 0
+    acumulado_kg = 0.0
+    niveles_anteriores = {} # Guardará el nivel de cada tanque del paso anterior
+    
+    for row in registros:
+        r = dict(zip(col_names, row)) if not isinstance(row, dict) else row
+        op_id = r['id']
+        operacion = r['operacion']
+        
+        # Atrapar pollitos iniciales
+        if operacion == 'inicio_calefaccion' and r.get('pollitos'):
+            pollitos_base = int(r['pollitos'])
+            acumulado_kg = 0.0 # Reinicia el acumulado
+            
+        consumo_paso = 0.0
+        saldo_paso = 0.0
+        densidad_usada = float(r.get('densidad_suministrada') or 2.0)
+        
+        # Evaluar cada uno de los 6 tanques posibles
+        for i in range(1, 7):
+            cap = float(r.get(f'capacidad tk-{i}') or 0.0)
+            if cap <= 0: continue
+            
+            niv_ini = r.get(f'nivel tk-{i}')
+            niv_fin = r.get(f'nivelfinal tk-{i}')
+            
+            # 1. Calcular Consumo si bajó de nivel (vs el registro anterior)
+            if operacion in ['consumo', 'tanqueo', 'finalizar_calefaccion']:
+                if niv_ini is not None and str(i) in niveles_anteriores:
+                    delta = niveles_anteriores[str(i)] - float(niv_ini)
+                    if delta > 0:
+                        consumo_paso += (delta / 100.0) * cap * 2.0 # Densidad estándar para consumo
+            
+            # 2. Actualizar la memoria del tanque para el próximo ciclo y calcular Saldo Actual
+            nivel_cierre_tk = 0.0
+            if operacion == 'tanqueo' and niv_fin is not None:
+                nivel_cierre_tk = float(niv_fin)
+            elif niv_ini is not None:
+                nivel_cierre_tk = float(niv_ini)
+                
+            niveles_anteriores[str(i)] = nivel_cierre_tk
+            saldo_paso += (nivel_cierre_tk / 100.0) * cap * densidad_usada
+
+        # Sumar al acumulado histórico
+        acumulado_kg += consumo_paso
+        
+        # Calcular eficiencia
+        eficiencia = (acumulado_kg / float(pollitos_base)) if pollitos_base > 0 else 0.0
+        
+        # Hacer el UPDATE silencioso del registro
+        cur.execute("""
+            UPDATE cardex_glp 
+            SET neto_gastado = %s, 
+                kg_pollito = %s, 
+                saldo_estimado_kg = %s,
+                saldo_estimado_galones = %s
+            WHERE id = %s
+        """, (consumo_paso, eficiencia, saldo_paso, (saldo_paso/densidad_usada if densidad_usada else 0), op_id))
