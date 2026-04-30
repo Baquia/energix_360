@@ -1400,9 +1400,9 @@ def _analizar_riesgo_glp(cur, empresa, ubicacion, lote, nivel_actual_ponderado, 
 def glp_context():
     return jsonify({"success": True, "message": "Servidor disponible"})
 
-# ======================
-# Obtener tanques por sede
-# ======================
+# =========================================================
+# OBTENER TANQUES (VERSIÓN BLINDADA: ID-EMPRESA + UPPER-CASE)
+# =========================================================
 @csrf.exempt
 @bp_glp.route('/obtener_tanques', methods=['POST'])
 @login_required_custom
@@ -1414,19 +1414,25 @@ def obtener_tanques():
             return jsonify({"success": False, "tanques": [], "message": "JSON inválido"}), 400
 
         sede = _normalize_sede(data.get('sede'))
-        empresa = session.get('empresa') or ''
+        # --- CAMBIO CRÍTICO: USAMOS EL ID DE LA EMPRESA (NIT) ---
+        id_empresa = session.get('empresa_id')
+        # Mantenemos el nombre solo para logs o auditorías si fuera necesario
+        empresa_nombre = session.get('empresa') or ''
 
-        if not sede or not empresa:
-            return jsonify({"success": False, "message": "Sede o empresa faltantes."})
+        if not sede or not id_empresa:
+            return jsonify({"success": False, "message": "Sesión expirada o sede faltante. Por favor reingresa."})
 
         with mysql.connection.cursor() as cur:
-            # Info del lote actual (si existe)
+            # 1. Info del lote actual (Blindado con id_empresa y UPPER)
             cur.execute("""
                 SELECT lote, pollitos
                 FROM cardex_glp
-                WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
+                WHERE id_empresa=%s 
+                  AND TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
+                  AND estatus_lote='ACTIVO'
                 ORDER BY fecha DESC, id DESC LIMIT 1
-            """, (empresa, sede))
+            """, (id_empresa, sede))
+            
             lote_row = cur.fetchone()
             lote_activo = False
             info_lote = ""
@@ -1436,12 +1442,13 @@ def obtener_tanques():
                 polli = lote_row.get("pollitos") if isinstance(lote_row, dict) else lote_row[1]
                 info_lote = f"Lote: {nom_lote} | Aves: {polli}"
 
-            # Buscar estructura base de tanques
+            # 2. Buscar estructura base de tanques (Blindado con id_empresa y UPPER)
             cur.execute("""
                 SELECT nombre_tanque as numero, capacidad_gls as capacidad 
                 FROM tanques_sedes 
-                WHERE TRIM(ubicacion)=TRIM(%s) AND empresa=%s
-            """, (sede, empresa))
+                WHERE TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
+                  AND empresa_id = %s
+            """, (sede, id_empresa))
             tks = cur.fetchall()
 
             tanques_list = []
@@ -1450,12 +1457,15 @@ def obtener_tanques():
                 cap = tk.get("capacidad") if isinstance(tk, dict) else tk[1]
                 num_clean = str(num).lower().replace("tk-", "").strip()
 
+                # Buscamos el último nivel registrado (Blindado con id_empresa y UPPER)
                 cur.execute(f"""
                     SELECT `nivel tk-{num_clean}`, `nivelfinal tk-{num_clean}`, operacion 
                     FROM cardex_glp 
-                    WHERE TRIM(ubicacion)=TRIM(%s) AND empresa=%s AND estatus_lote='ACTIVO'
+                    WHERE TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
+                      AND id_empresa = %s 
+                      AND estatus_lote = 'ACTIVO'
                     ORDER BY id DESC LIMIT 1
-                """, (sede, empresa))
+                """, (sede, id_empresa))
                 
                 row = cur.fetchone()
                 ultimo_nivel = 0.0
@@ -1470,7 +1480,7 @@ def obtener_tanques():
                         nivel_fin = row[1]
                         op = row[2]
                         
-                    # Lógica de Espejismo
+                    # Lógica Anti-Espejismo (Si la última op fue tanqueo, mandar nivel final)
                     if op == "tanqueo" and nivel_fin is not None:
                         ultimo_nivel = float(nivel_fin)
                     else:
@@ -1482,36 +1492,44 @@ def obtener_tanques():
                     "ultimo_nivel": ultimo_nivel
                 })
 
-            # --- NUEVO: BÚSQUEDA DE CANDADO (PEDIDOS PENDIENTES) ---
+            # 3. BÚSQUEDA DE CANDADO / PEDIDOS PENDIENTES (Blindado con id_empresa y UPPER)
             hay_pedido_pendiente = False
             codigo_pedido_pendiente = ""
             
             cur.execute("""
                 SELECT codigo_pedido 
                 FROM pedidos_gas_glp 
-                WHERE empresa = %s AND TRIM(ubicacion) = TRIM(%s) 
+                WHERE id_empresa = %s 
+                  AND TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
                   AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
                   AND estatus != 'cancelado'
                 ORDER BY id DESC LIMIT 1
-            """, (empresa, sede))
+            """, (id_empresa, sede))
             
             row_ped = cur.fetchone()
             if row_ped:
                 hay_pedido_pendiente = True
                 codigo_pedido_pendiente = row_ped.get("codigo_pedido") if isinstance(row_ped, dict) else row_ped[0]
 
-        return jsonify({
-            "success": True, 
-            "tanques": tanques_list, 
-            "lote_activo": lote_activo,
-            "info_lote": info_lote,
-            "hay_pedido_pendiente": hay_pedido_pendiente,
-            "codigo_pedido_pendiente": codigo_pedido_pendiente
-        })
+        if tanques_list:
+            return jsonify({
+                "success": True, 
+                "tanques": tanques_list, 
+                "lote_activo": lote_activo,
+                "info_lote": info_lote,
+                "hay_pedido_pendiente": hay_pedido_pendiente,
+                "codigo_pedido_pendiente": codigo_pedido_pendiente
+            })
+        else:
+            # Mensaje descriptivo para ayudar al usuario a diagnosticar el problema de datos
+            return jsonify({
+                "success": False, 
+                "message": f"No se encontraron tanques configurados para la sede '{sede}' bajo el NIT {id_empresa}."
+            })
 
     except Exception as e:
-        print(f"Error obtener_tanques: {e}")
-        return jsonify({"success": False, "message": str(e)})
+        print(f"Error crítico obtener_tanques: {e}")
+        return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
 # ======================
 # Iniciar calefacción (CORREGIDA Y BLINDADA CON NOTIFICACIONES)
 # ======================
