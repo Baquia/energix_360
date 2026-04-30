@@ -1065,7 +1065,7 @@ def obtener_pendientes_tanqueo_reporte():
 
     except Exception as e:
         print("Error reporte pendientes:", str(e))
-        return jsonify({"success": False, "message": str(e)})}
+        return jsonify({"success": False, "message": str(e)})
            
 # ==============================================================================
 # INFORME DE SALDOS AL CIERRE
@@ -1303,7 +1303,7 @@ def gestionar_empresa():
         cur.close()
 
 @csrf.exempt
-@bp_901811727.route('/gestionar_usuario', methods=['POST'])
+@bp_901811727.route('/gestionar_usuario', methods=['GET', 'POST'])
 @login_required_custom
 def gestionar_usuario():
     d = request.form
