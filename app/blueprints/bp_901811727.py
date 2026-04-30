@@ -1028,6 +1028,7 @@ def obtener_pendientes_tanqueo_reporte():
             
         nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
 
+        # FILTRO DE SANEAMIENTO: Solo pedidos a partir del 25 de abril de 2026
         sql = """
             SELECT 
                 p.id,
@@ -1040,6 +1041,7 @@ def obtener_pendientes_tanqueo_reporte():
             FROM pedidos_gas_glp p
             WHERE TRIM(UPPER(p.cliente)) = TRIM(UPPER(%s))
               AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
+              AND p.fecha_registro >= '2026-04-25'
             ORDER BY dias_retraso DESC
         """
         cur.execute(sql, (nombre_empresa,))
@@ -1842,6 +1844,7 @@ def obtener_alertas_ruptura_validacion():
     try:
         cur = mysql.connection.cursor()
         
+        # FILTRO DE SANEAMIENTO: Solo validaciones a partir del 25 de abril de 2026
         sql = """
             SELECT 
                 p.id,
@@ -1852,6 +1855,7 @@ def obtener_alertas_ruptura_validacion():
                 DATEDIFF(NOW(), p.fecha_validacion) as dias_alerta
             FROM pedidos_gas_glp p
             WHERE p.estatus = 'validado'
+              AND p.fecha_validacion >= '2026-04-25'
               AND p.codigo_pedido NOT IN (
                   SELECT codigo_pedido 
                   FROM cardex_glp 
