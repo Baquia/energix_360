@@ -1027,9 +1027,35 @@
       if (!datosGlobales) return;
       const ctx = document.getElementById('graficoConsumo').getContext('2d');
       if (chartInstancia) chartInstancia.destroy();
+
       const s = datosGlobales.series;
-      const d = vista === 'rendimiento' ? [{ label: 'Rendimiento', data: s.kg_pollito, borderColor: '#6366f1', fill: true, backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 }] : [{ label: 'Saldos', data: s.saldo_inicial, borderColor: '#3b82f6' }];
-      chartInstancia = new Chart(ctx, { type: 'line', data: { labels: s.fechas, datasets: d }, options: { responsive: true, maintainAspectRatio: false } });
+      const d = vista === 'rendimiento'
+        ? [{ label: 'Rendimiento', data: s.kg_pollito, borderColor: '#6366f1', fill: true, backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 }]
+        : [{ label: 'Saldos', data: s.saldo_inicial, borderColor: '#3b82f6' }];
+
+      chartInstancia = new Chart(ctx, {
+        type: 'line',
+        data: { labels: s.fechas, datasets: d },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          // --- NUEVO: INTERACTIVIDAD PARA DIAGNÓSTICO INTELIGENTE ---
+          onClick: (e, activeEls) => {
+            if (activeEls.length > 0 && vista === 'rendimiento') {
+              const index = activeEls[0].index;
+              abrirAsistenteDiagnostico(index);
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                footer: function () { return "\n👆 Clic aquí para Diagnóstico Inteligente"; }
+              }
+            }
+          }
+          // -----------------------------------------------------------
+        }
+      });
     }
 
     // ==============================================
@@ -1045,23 +1071,33 @@
 
       const tbody = document.getElementById('tablaConsumo').querySelector('tbody');
       const thead = document.getElementById('tablaConsumo').querySelector('thead tr');
-      tbody.innerHTML = '<tr><td colspan="5">Consultando...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center p-5"><div class="spinner-border text-primary"></div><p class="mt-2">Consultando cierres...</p></td></tr>';
 
       fetch('/generar_informe_saldos', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: EMPRESA_ID })
       }).then(r => r.json()).then(resp => {
-        if (!resp.success) { tbody.innerHTML = `<tr><td colspan="5" class="text-danger">${resp.error}</td></tr>`; return; }
+        if (!resp.success) { tbody.innerHTML = `<tr><td colspan="5" class="text-danger text-center p-3">${resp.error || 'Error del servidor'}</td></tr>`; return; }
 
         datosGlobales = { tipo: 'saldos', data: resp.data || [] };
-        thead.innerHTML = '<th class="bg-dark text-white">Granja / Lote</th><th class="bg-dark text-white">Fecha</th><th class="bg-dark text-white">Tanque</th><th class="bg-dark text-white">Nivel</th><th class="bg-dark text-white">Saldo (kg)</th>';
+        thead.innerHTML = '<th class="bg-dark text-white">Ubicación / Lote</th><th class="bg-dark text-white">Fecha Cierre</th><th class="bg-dark text-white">Tanque</th><th class="bg-dark text-white">Nivel Final</th><th class="bg-dark text-white">Saldo (kg)</th>';
+
+        if (!resp.data || resp.data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted p-5">No se encontraron lotes inactivos con saldos registrados.</td></tr>';
+          return;
+        }
 
         let html = '';
         resp.data.forEach(g => {
-          html += `<tr class="table-primary"><td colspan="5" class="fw-bold text-start">🏠 ${g.ubicacion} <span class="badge bg-secondary">Lote: ${g.lote_cerrado}</span></td></tr>`;
-          g.tanques.forEach(tk => { html += `<tr><td></td><td>${g.fecha_cierre}</td><td>${tk.tanque}</td><td>${tk.nivel.toFixed(1)}%</td><td class="fw-bold text-success">${tk.saldo_kg.toFixed(2)}</td></tr>`; });
-          html += `<tr><td colspan="4" class="text-end fw-bold">TOTAL:</td><td class="fw-bold bg-light">${g.total_kg_granja.toFixed(2)}</td></tr>`;
+          html += `<tr class="table-primary"><td colspan="5" class="fw-bold text-dark text-start ps-3 align-middle">🏠 ${g.ubicacion} <span class="badge bg-secondary ms-2" style="font-weight:normal">Lote: ${g.lote_cerrado}</span></td></tr>`;
+          g.tanques.forEach(tk => {
+            let estiloNivel = tk.nivel < 10 ? 'text-danger fw-bold' : '';
+            html += `<tr><td></td><td class="small text-muted align-middle">${g.fecha_cierre}</td><td class="align-middle">${tk.tanque} <span class="text-muted small">(${tk.capacidad_gl} gl)</span></td><td class="${estiloNivel} align-middle">${tk.nivel.toFixed(1)}%</td><td class="fw-bold text-success align-middle">${tk.saldo_kg.toFixed(2)}</td></tr>`;
+          });
+          html += `<tr style="border-top: 2px solid #dee2e6;"><td colspan="4" class="text-end small text-uppercase fw-bold align-middle">Total Remanente Granja:</td><td class="fw-bold bg-light fs-6 align-middle">${g.total_kg_granja.toFixed(2)}</td></tr>`;
         });
-        tbody.innerHTML = html || '<tr><td colspan="5">Sin datos</td></tr>';
+        tbody.innerHTML = html;
+      }).catch(err => {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-danger text-center p-3">Error de conexión al cargar el informe.</td></tr>';
       });
     }
 
@@ -1778,6 +1814,7 @@
         modalBody.style.background = '';
       });
     }
+
   </script>
 
   <div class="modal fade" id="modalAnularPedido" tabindex="-1" style="z-index: 1055;">
@@ -1864,6 +1901,239 @@
       </div>
     </div>
   </div>
+  <div class="modal fade" id="modalDiagnosticoInteligente" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold">🧠 Diagnóstico Inteligente BQA</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <div class="alert alert-info py-2 small mb-3 border-info">
+            <strong>Tramo Evaluado:</strong> <span id="diagTramoFechas"></span><br>
+            <strong>Gas Consumido (Real):</strong> <span id="diagTramoKg" class="fw-bold text-danger fs-6"></span> kg
+          </div>
+
+          <form id="formDiagnostico">
+            <label class="fw-bold small text-muted">Tecnología de Calefacción</label>
+            <select id="diagTecnologia" class="form-select border-secondary fw-bold text-dark mb-2">
+              <option value="infrarroja">Criadora Infrarroja</option>
+              <option value="tradicional">Criadora Tradicional</option>
+              <option value="turbo">Turbocalefactor (Aire Forzado)</option>
+            </select>
+
+            <label class="fw-bold small text-muted">Clima Predominante (Turno)</label>
+            <select id="diagClima" class="form-select border-secondary fw-bold mb-2">
+              <option value="calido">☀️ Cálido</option>
+              <option value="frio">❄️ Frío</option>
+            </select>
+
+            <div class="row">
+              <div class="col-6">
+                <label class="fw-bold small text-muted">Equipos Prendidos</label>
+                <input type="number" id="diagEquipos" class="form-control fw-bold border-secondary"
+                  placeholder="Ej: 15">
+              </div>
+              <div class="col-6">
+                <label class="fw-bold small text-muted">Horas de Operación</label>
+                <input type="number" id="diagHoras" class="form-control fw-bold border-secondary" placeholder="Ej: 10">
+              </div>
+            </div>
+          </form>
+
+          <button class="btn btn-primary w-100 fw-bold mt-3 shadow-sm" onclick="ejecutarDiagnostico()">🔎 Generar
+            Diagnóstico</button>
+
+          <div id="diagResultado" class="mt-3" style="display:none;">
+            <div id="diagVeredicto" class="small"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // ==========================================
+    // LÓGICA COPILOTO (DIAGNÓSTICO INTELIGENTE)
+    // ==========================================
+    let diagDataTemporal = {};
+
+    function abrirAsistenteDiagnostico(index) {
+      const periodoTxt = document.getElementById('subtituloPeriodo').textContent;
+      if (!periodoTxt.includes('Actual')) {
+        alert("🔒 El Diagnóstico Inteligente solo está habilitado para LOTES ACTIVOS (Periodo Actual).");
+        return;
+      }
+
+      if (index === 0) {
+        alert("📊 Selecciona un punto a partir del segundo registro para poder calcular la velocidad del tramo.");
+        return;
+      }
+
+      const s = datosGlobales.series;
+      const fechaActual = s.fechas[index];
+      const fechaAnterior = s.fechas[index - 1];
+      const fechaInicioLote = s.fechas[0];
+
+      const dateActual = new Date(fechaActual);
+      const dateAnterior = new Date(fechaAnterior);
+      const dateInicio = new Date(fechaInicioLote);
+
+      let diasTranscurridos = (dateActual - dateAnterior) / (1000 * 60 * 60 * 24);
+      if (isNaN(diasTranscurridos) || diasTranscurridos <= 0) diasTranscurridos = 1;
+
+      let diaDelCiclo = Math.ceil((dateActual - dateInicio) / (1000 * 60 * 60 * 24));
+      if (isNaN(diaDelCiclo) || diaDelCiclo <= 0) diaDelCiclo = index || 1;
+
+      const kgAveAcumActual = parseFloat(s.kg_pollito[index]) || 0;
+      const kgAveAcumAnterior = parseFloat(s.kg_pollito[index - 1]) || 0;
+      const deltaKgAve = kgAveAcumActual - kgAveAcumAnterior;
+
+      if (deltaKgAve < 0) {
+        alert("⚠️ Anomalía de Datos: La gráfica indica un retroceso en el consumo acumulado. Revisa la digitación de los tanques.");
+        return;
+      }
+
+      const poblacionStr = document.getElementById('kpi5Value').innerText;
+      const poblacion = parseInt(poblacionStr.replace(/[^0-9]/g, ''), 10) || 0;
+
+      const consumoNetoTramo = deltaKgAve * poblacion;
+
+      diagDataTemporal = {
+        diaCiclo: diaDelCiclo,
+        diasTranscurridos: diasTranscurridos,
+        fecha1: fechaAnterior,
+        fecha2: fechaActual,
+        kgTramo: consumoNetoTramo,
+        kgAveTramo: deltaKgAve,
+        kgAveAcumulado: kgAveAcumActual,
+        poblacion: poblacion
+      };
+
+      document.getElementById('diagTramoFechas').innerHTML = `${fechaAnterior} ➡️ ${fechaActual}<br><span class="badge bg-secondary">Lapso analizado: ${diasTranscurridos.toFixed(1)} días</span> <span class="badge bg-info text-dark">Edad Lote: Día ${diaDelCiclo}</span>`;
+      document.getElementById('diagTramoKg').innerText = consumoNetoTramo.toFixed(2);
+      document.getElementById('diagResultado').style.display = 'none';
+      document.getElementById('diagEquipos').value = '';
+      document.getElementById('diagHoras').value = '';
+
+      new bootstrap.Modal(document.getElementById('modalDiagnosticoInteligente')).show();
+    }
+
+    function ejecutarDiagnostico() {
+      const tec = document.getElementById('diagTecnologia').value;
+      const clima = document.getElementById('diagClima').value;
+      const equipos = parseFloat(document.getElementById('diagEquipos').value);
+      const horasDiarias = parseFloat(document.getElementById('diagHoras').value);
+
+      if (!equipos || !horasDiarias) {
+        alert("Por favor ingrese la cantidad de equipos encendidos y las horas promedio diarias de operación.");
+        return;
+      }
+
+      let factor_kgh_max = 0;
+      let meta_15d_min = 0, meta_15d_max = 0;
+
+      if (tec === 'infrarroja') {
+        factor_kgh_max = 0.25;
+        meta_15d_min = (clima === 'calido') ? 0.02 : 0.03;
+        meta_15d_max = (clima === 'calido') ? 0.04 : 0.06;
+      } else if (tec === 'tradicional') {
+        factor_kgh_max = 0.25;
+        meta_15d_min = (clima === 'calido') ? 0.04 : 0.05;
+        meta_15d_max = (clima === 'calido') ? 0.055 : 0.07;
+      } else if (tec === 'turbo') {
+        factor_kgh_max = 8.0;
+        meta_15d_min = (clima === 'calido') ? 0.018 : 0.020;
+        meta_15d_max = (clima === 'calido') ? 0.022 : 0.025;
+      }
+
+      const dia = diagDataTemporal.diaCiclo;
+      const diasT = diagDataTemporal.diasTranscurridos;
+
+      let factor_acumulado = 0;
+      if (dia <= 5) factor_acumulado = dia * 0.12;
+      else if (dia <= 10) factor_acumulado = (5 * 0.12) + ((dia - 5) * 0.06);
+      else if (dia <= 15) factor_acumulado = (5 * 0.12) + (5 * 0.06) + ((dia - 10) * 0.02);
+      else factor_acumulado = 1.0;
+
+      const acumuladoEstandarMin = meta_15d_min * factor_acumulado;
+      const acumuladoEstandarMax = meta_15d_max * factor_acumulado;
+      const kgAveAcumuladoReal = diagDataTemporal.kgAveAcumulado;
+
+      let htmlVeredicto = '';
+      let estadoMacro = '';
+      let colorMacro = '';
+
+      if (kgAveAcumuladoReal > acumuladoEstandarMax * 1.1) {
+        estadoMacro = `⚠️ <b>Por encima del presupuesto esperado</b> (${kgAveAcumuladoReal.toFixed(3)} vs máx ${acumuladoEstandarMax.toFixed(3)} kg/ave).`;
+        colorMacro = 'text-danger';
+      } else if (kgAveAcumuladoReal < acumuladoEstandarMin * 0.9) {
+        estadoMacro = `🔵 <b>Por debajo del presupuesto</b> (${kgAveAcumuladoReal.toFixed(3)} vs min ${acumuladoEstandarMin.toFixed(3)} kg/ave).`;
+        colorMacro = 'text-primary';
+      } else {
+        estadoMacro = `✅ <b>Excelente. Dentro del estándar de eficiencia</b> (${kgAveAcumuladoReal.toFixed(3)} kg/ave).`;
+        colorMacro = 'text-success';
+      }
+
+      htmlVeredicto += `
+        <div class="alert alert-light border border-secondary shadow-sm py-2 px-3 mb-3">
+            <h6 class="fw-bold mb-1 border-bottom pb-1 text-primary">📊 1. ANÁLISIS MACRO (Desempeño Acumulado)</h6>
+            <p class="mb-0 small">En el histórico al <b>Día ${dia}</b>, la eficiencia global va: <br><span class="${colorMacro}">${estadoMacro}</span></p>
+        </div>
+    `;
+
+      let peso_dia_actual = (dia <= 5) ? 0.12 : ((dia <= 10) ? 0.06 : 0.02);
+      const velEstandarMin = meta_15d_min * peso_dia_actual;
+      const velEstandarMax = meta_15d_max * peso_dia_actual;
+      const velRealTramo = diagDataTemporal.kgAveTramo / diasT;
+      const kgRealTramo = diagDataTemporal.kgTramo;
+      const topeFisicoEquipos = equipos * horasDiarias * diasT * factor_kgh_max;
+
+      htmlVeredicto += `<h6 class="fw-bold mb-2 text-primary mt-3">🔎 2. ANÁLISIS MICRO (Auditoría del Tramo)</h6>`;
+
+      if (kgRealTramo > topeFisicoEquipos) {
+        htmlVeredicto += `
+            <div class="alert alert-danger border-danger py-2 px-3 mb-2">
+                <span class="fw-bold">🚨 ALERTA CRÍTICA (Fuga o Avalancha):</span><br>
+                Consumo físico imposible para ${equipos} equipos operando ${horasDiarias}h.<br>
+                <hr class="my-1 border-danger">
+                <b>Revisar:</b> Fugas, presión de reguladores, o sumatorias acumuladas incorrectas.
+            </div>`;
+      } else if (velRealTramo > (velEstandarMax * 1.25)) {
+        htmlVeredicto += `
+            <div class="alert alert-warning border-warning text-dark py-2 px-3 mb-2">
+                <span class="fw-bold">⚠️ INEFICIENCIA TÉRMICA:</span><br>
+                Consumo superior a la meta de eficiencia.<br>
+                <hr class="my-1 border-warning">
+                <b>Revisar:</b> Exceso de presión, modo continuo sin termostato, o pérdida de calor.
+            </div>`;
+      } else if (velRealTramo < (velEstandarMin * 0.5)) {
+        htmlVeredicto += `
+            <div class="alert alert-secondary border-secondary text-dark py-2 px-3 mb-2">
+                <span class="fw-bold">🧐 REVISIÓN DE DATOS:</span><br>
+                Consumo anormalmente bajo para la etapa de cría.
+            </div>`;
+      } else {
+        htmlVeredicto += `
+            <div class="alert alert-success border-success py-2 px-3 fw-bold mb-2">
+                ✅ OPERACIÓN EFICIENTE: El consumo en este tramo es perfecto para el estándar esperado.
+            </div>`;
+      }
+
+      let proyeccion_15d = (dia < 15) ? kgAveAcumuladoReal + ((15 - dia) * velRealTramo) : kgAveAcumuladoReal;
+      let colorProy = (proyeccion_15d > meta_15d_max) ? 'text-danger fw-bold' : 'text-success fw-bold';
+
+      htmlVeredicto += `
+        <div class="bg-white p-2 rounded border mt-3 small shadow-sm">
+            <b class="text-primary">📈 Proyección Dinámica a 15 Días:</b><br>
+            El lote cerraría con <span class="${colorProy}">${proyeccion_15d.toFixed(4)} kg/ave</span>.<br>
+            <span class="text-muted">Meta gerencial: <b>${meta_15d_min.toFixed(3)} a ${meta_15d_max.toFixed(3)}</b>.</span>
+        </div>`;
+
+      const resDiv = document.getElementById('diagResultado');
+      resDiv.style.display = 'block';
+      document.getElementById('diagVeredicto').innerHTML = htmlVeredicto;
+    }
+  </script>
 
 
 </body>

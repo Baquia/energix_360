@@ -1007,8 +1007,8 @@ def _borrar_lista_archivos(base_dir, lista_rutas):
     return borrados
 
 
-# ==============================================================================
-# REPORTE DE PENDIENTES DE TANQUEO
+ # ==============================================================================
+# REPORTE DE PENDIENTES DE TANQUEO (EN TRÁNSITO)
 # ==============================================================================
 @csrf.exempt
 @bp_901811727.route('/obtener_pendientes_tanqueo_reporte', methods=['POST'])
@@ -1028,8 +1028,6 @@ def obtener_pendientes_tanqueo_reporte():
             
         nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
 
-        # LÓGICA CORREGIDA: Busca pedidos aprobados/automáticos sin tanqueo posterior, 
-        # blindado contra errores de mayúsculas y collations.
         sql = """
             SELECT 
                 p.id,
@@ -1042,12 +1040,6 @@ def obtener_pendientes_tanqueo_reporte():
             FROM pedidos_gas_glp p
             WHERE TRIM(UPPER(p.cliente)) = TRIM(UPPER(%s))
               AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
-              AND NOT EXISTS (
-                  SELECT 1 FROM cardex_glp c 
-                  WHERE c.ubicacion COLLATE utf8mb4_general_ci = p.ubicacion COLLATE utf8mb4_general_ci
-                    AND (c.operacion = 'tanqueo' OR c.clase = 'ingreso')
-                    AND c.fecha >= DATE(p.fecha_registro)
-              )
             ORDER BY dias_retraso DESC
         """
         cur.execute(sql, (nombre_empresa,))
@@ -1059,6 +1051,7 @@ def obtener_pendientes_tanqueo_reporte():
         for r in rows:
             rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
             pendientes.append({
+                "id": rd.get('id'),
                 "fecha": str(rd.get('fecha_registro')),
                 "ubicacion": rd.get('ubicacion'),
                 "proveedor": rd.get('proveedor'),
@@ -1072,8 +1065,8 @@ def obtener_pendientes_tanqueo_reporte():
 
     except Exception as e:
         print("Error reporte pendientes:", str(e))
-        return jsonify({"success": False, "message": str(e)})
-        
+        return jsonify({"success": False, "message": str(e)})}
+           
 # ==============================================================================
 # INFORME DE SALDOS AL CIERRE
 # ==============================================================================
@@ -1849,7 +1842,6 @@ def obtener_alertas_ruptura_validacion():
     try:
         cur = mysql.connection.cursor()
         
-        # SQL: Busca pedidos validados sin contraparte en cardex_glp (AHORA INCLUYE p.id)
         sql = """
             SELECT 
                 p.id,
@@ -1860,15 +1852,14 @@ def obtener_alertas_ruptura_validacion():
                 DATEDIFF(NOW(), p.fecha_validacion) as dias_alerta
             FROM pedidos_gas_glp p
             WHERE p.estatus = 'validado'
-              AND NOT EXISTS (
-                  SELECT 1 FROM cardex_glp c 
-                  WHERE TRIM(c.ubicacion) COLLATE utf8mb4_general_ci = TRIM(p.ubicacion) COLLATE utf8mb4_general_ci
-                    AND (c.operacion = 'tanqueo' OR c.clase = 'ingreso')
-                    AND c.fecha >= DATE(p.fecha_registro)
+              AND p.codigo_pedido NOT IN (
+                  SELECT codigo_pedido 
+                  FROM cardex_glp 
+                  WHERE codigo_pedido IS NOT NULL AND id_empresa = %s
               )
             ORDER BY dias_alerta DESC
         """
-        cur.execute(sql)
+        cur.execute(sql, (empresa_id,))
         rows = cur.fetchall()
         
         alertas = []
@@ -1877,7 +1868,7 @@ def obtener_alertas_ruptura_validacion():
         for r in rows:
             rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
             alertas.append({
-                "id": rd.get('id'), # <-- ESTE ES EL DATO CRÍTICO QUE FALTABA
+                "id": rd.get('id'),
                 "codigo": rd.get('codigo_pedido'),
                 "fecha_v": str(rd.get('fecha_validacion')),
                 "ubicacion": rd.get('ubicacion'),

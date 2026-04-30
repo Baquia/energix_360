@@ -16,6 +16,7 @@ import time
 from MySQLdb import OperationalError
 
 import requests
+import telebot
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -36,6 +37,88 @@ EMAIL_USER = os.environ.get("EMAIL_USER")
 EMAIL_PASS = os.environ.get("EMAIL_PASS")
 
 EMAIL_FROM = os.environ.get("EMAIL_FROM", EMAIL_USER)
+
+
+# ==========================================
+# CONFIGURACIÓN DEL BOT Y WEBHOOK
+# ==========================================
+TOKEN = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
+bot = telebot.TeleBot(TOKEN, threaded=False)
+
+# FUNCIÓN MAESTRA DE NOTIFICACIONES AUDITORÍA (MULTIEMPRESA)
+def notificar_opglp_telegram(id_empresa, usuario, operacion, sede, fecha, estado="exito"):
+    """
+    Envía reportes de estado a los supervisores de la empresa específica.
+    Estados: exito (✅), fallo (❌), sync (🔄), pendientes (⚠️)
+    """
+    iconos = {"exito": "✅ ÉXITO", "fallo": "❌ FALLO SISTEMA", "sync": "🔄 SYNC OFFLINE", "pendientes": "⚠️ PENDIENTES"}
+    titulo = iconos.get(estado, "📢 AVISO")
+    
+    mensaje = (
+        f"*{titulo}*\n\n"
+        f"🏢 *Empresa ID:* {id_empresa}\n"
+        f"📍 *Sede:* {sede}\n"
+        f"👤 *Usuario:* {usuario}\n"
+        f"⚙️ *Operación:* {operacion}\n"
+        f"📅 *Fecha:* {fecha}\n"
+    )
+    
+    if estado == "sync":
+        mensaje += "_Estado: Datos guardados fuera de línea subidos correctamente._"
+    elif estado == "pendientes":
+        mensaje += "_Aviso: El operario ha iniciado una sincronización manual de datos atrasados._"
+
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT telegram_id FROM usuarios WHERE empresa_id = %s AND telegram_id IS NOT NULL", (id_empresa,))
+        destinatarios = cur.fetchall()
+        cur.close()
+
+        for row in destinatarios:
+            chat_id = row['telegram_id'] if isinstance(row, dict) else row[0]
+            url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+            requests.post(url, data={"chat_id": chat_id, "text": mensaje, "parse_mode": "Markdown"}, timeout=5)
+    except Exception as e:
+        print(f"Error notificar_opglp_telegram: {e}")
+
+# RUTA PARA EL WEBHOOK (Registro permanente de usuarios)
+@csrf.exempt
+@bp_glp.route('/telegram_webhook', methods=['POST'])
+def telegram_webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return ''
+    else:
+        return jsonify({"status": "forbidden"}), 403
+
+# Lógica de vinculación (Movida de enlazar_bot_dev.py)
+@bot.message_handler(commands=['start'])
+def start(message):
+    markup = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    markup.add(telebot.types.KeyboardButton(text="📱 Compartir mi número", request_contact=True))
+    bot.reply_to(message, "👋 Hola. Presiona el botón abajo para vincular tu cuenta a BQA ONE:", reply_markup=markup)
+
+@bot.message_handler(content_types=['contact'])
+def contact(message):
+    if message.contact:
+        tel = message.contact.phone_number.replace("+", "").replace(" ", "")[-9:]
+        try:
+            cur = mysql.connection.cursor()
+            cur.execute("SELECT id, nombre FROM usuarios WHERE telefono LIKE %s", (f"%{tel}",))
+            user = cur.fetchone()
+            if user:
+                uid = user['id'] if isinstance(user, dict) else user[0]
+                unom = user['nombre'] if isinstance(user, dict) else user[1]
+                cur.execute("UPDATE usuarios SET telegram_id = %s WHERE id = %s", (str(message.chat.id), uid))
+                mysql.connection.commit()
+                bot.reply_to(message, f"✅ Vínculo exitoso, {unom}!")
+            else:
+                bot.reply_to(message, "❌ Tu número no está registrado en el sistema.")
+            cur.close()
+        except: bot.reply_to(message, "Error en base de datos.")
+
 
 def _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, nivel, codigo):
     """
@@ -1325,101 +1408,110 @@ def glp_context():
 @login_required_custom
 def obtener_tanques():
     try:
-        data = request.get_json(force=True) or {}
-    except Exception:
-        return jsonify({"success": False, "tanques": [], "message": "JSON inválido"}), 400
+        try:
+            data = request.get_json(force=True) or {}
+        except Exception:
+            return jsonify({"success": False, "tanques": [], "message": "JSON inválido"}), 400
 
-    empresa = session.get('empresa') or ''
-    sede = _normalize_sede(data.get('sede') or '')
+        sede = _normalize_sede(data.get('sede'))
+        empresa = session.get('empresa') or ''
 
-    try:
+        if not sede or not empresa:
+            return jsonify({"success": False, "message": "Sede o empresa faltantes."})
+
         with mysql.connection.cursor() as cur:
-            # 1. Buscar Tanques de la sede
+            # Info del lote actual (si existe)
             cur.execute("""
-                SELECT nombre_tanque AS numero,
-                       capacidad_gls  AS capacidad
-                FROM tanques_sedes
-                WHERE empresa = %s
-                  AND TRIM(ubicacion) = TRIM(%s)
-                ORDER BY nombre_tanque
-            """, (empresa, sede))
-            rows = cur.fetchall() or []
-            
-            # 2. Verificar si hay lote ACTIVO en esta sede
-            cur.execute("""
-                SELECT * FROM cardex_glp 
-                WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO' 
+                SELECT lote, pollitos
+                FROM cardex_glp
+                WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
                 ORDER BY fecha DESC, id DESC LIMIT 1
             """, (empresa, sede))
-            ultimo_reg = cur.fetchone()
-            
+            lote_row = cur.fetchone()
             lote_activo = False
             info_lote = ""
-            
-            if ultimo_reg:
-                # Convertir a dict si el cursor devuelve tuplas
-                if not isinstance(ultimo_reg, dict):
-                    cols = [desc[0] for desc in cur.description]
-                    ultimo_reg = dict(zip(cols, ultimo_reg))
-                
+            if lote_row:
                 lote_activo = True
-                info_lote = ultimo_reg.get('lote', '')
+                nom_lote = lote_row.get("lote") if isinstance(lote_row, dict) else lote_row[0]
+                polli = lote_row.get("pollitos") if isinstance(lote_row, dict) else lote_row[1]
+                info_lote = f"Lote: {nom_lote} | Aves: {polli}"
 
-            # 3. Armar la lista de tanques inyectando el último nivel conocido "Histórico"
-            tanques = []
-            for r in rows:
-                num = r.get("numero") if isinstance(r, dict) else r[0]
-                cap = r.get("capacidad") if isinstance(r, dict) else r[1]
-                
-                num_limpio = str(num).upper().replace('TK-', '').replace('TK', '').strip()
-                ultimo_nivel = None
-                
-                if lote_activo:
-                    # ⚠️ EL TRUCO ESTÁ AQUÍ: Buscamos hacia atrás el último nivel registrado PARA ESTE TANQUE
-                    cur.execute(f"""
-                        SELECT operacion, `nivel tk-{num_limpio}`, `nivelfinal tk-{num_limpio}`
-                        FROM cardex_glp
-                        WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
-                          AND (`nivel tk-{num_limpio}` IS NOT NULL OR `nivelfinal tk-{num_limpio}` IS NOT NULL)
-                        ORDER BY id DESC LIMIT 1
-                    """, (empresa, sede))
-                    ultimo_tk = cur.fetchone()
-                    
-                    if ultimo_tk:
-                        if not isinstance(ultimo_tk, dict):
-                            cols = [desc[0] for desc in cur.description]
-                            ultimo_tk = dict(zip(cols, ultimo_tk))
-                            
-                        # Si fue tanqueo, su nivel real es el final. Si no, es el inicial.
-                        if ultimo_tk.get('operacion') == 'tanqueo' and ultimo_tk.get(f'nivelfinal tk-{num_limpio}') is not None:
-                            val_nivel = ultimo_tk.get(f'nivelfinal tk-{num_limpio}')
-                        else:
-                            val_nivel = ultimo_tk.get(f'nivel tk-{num_limpio}')
-                            
-                        if val_nivel is not None:
-                            try:
-                                ultimo_nivel = float(val_nivel)
-                            except Exception:
-                                ultimo_nivel = None
+            # Buscar estructura base de tanques
+            cur.execute("""
+                SELECT nombre_tanque as numero, capacidad_gls as capacidad 
+                FROM tanques_sedes 
+                WHERE TRIM(ubicacion)=TRIM(%s) AND empresa=%s
+            """, (sede, empresa))
+            tks = cur.fetchall()
 
-                tanques.append({
-                    "numero": num or "",
+            tanques_list = []
+            for tk in tks:
+                num = tk.get("numero") if isinstance(tk, dict) else tk[0]
+                cap = tk.get("capacidad") if isinstance(tk, dict) else tk[1]
+                num_clean = str(num).lower().replace("tk-", "").strip()
+
+                cur.execute(f"""
+                    SELECT `nivel tk-{num_clean}`, `nivelfinal tk-{num_clean}`, operacion 
+                    FROM cardex_glp 
+                    WHERE TRIM(ubicacion)=TRIM(%s) AND empresa=%s AND estatus_lote='ACTIVO'
+                    ORDER BY id DESC LIMIT 1
+                """, (sede, empresa))
+                
+                row = cur.fetchone()
+                ultimo_nivel = 0.0
+                
+                if row:
+                    if isinstance(row, dict):
+                        nivel_ini = row.get(f"nivel tk-{num_clean}")
+                        nivel_fin = row.get(f"nivelfinal tk-{num_clean}")
+                        op = row.get("operacion")
+                    else:
+                        nivel_ini = row[0]
+                        nivel_fin = row[1]
+                        op = row[2]
+                        
+                    # Lógica de Espejismo
+                    if op == "tanqueo" and nivel_fin is not None:
+                        ultimo_nivel = float(nivel_fin)
+                    else:
+                        ultimo_nivel = float(nivel_ini) if nivel_ini is not None else 0.0
+
+                tanques_list.append({
+                    "numero": num,
                     "capacidad": float(cap or 0),
-                    "etiqueta": num or "",
                     "ultimo_nivel": ultimo_nivel
                 })
 
+            # --- NUEVO: BÚSQUEDA DE CANDADO (PEDIDOS PENDIENTES) ---
+            hay_pedido_pendiente = False
+            codigo_pedido_pendiente = ""
+            
+            cur.execute("""
+                SELECT codigo_pedido 
+                FROM pedidos_gas_glp 
+                WHERE empresa = %s AND TRIM(ubicacion) = TRIM(%s) 
+                  AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
+                  AND estatus != 'cancelado'
+                ORDER BY id DESC LIMIT 1
+            """, (empresa, sede))
+            
+            row_ped = cur.fetchone()
+            if row_ped:
+                hay_pedido_pendiente = True
+                codigo_pedido_pendiente = row_ped.get("codigo_pedido") if isinstance(row_ped, dict) else row_ped[0]
+
         return jsonify({
             "success": True, 
-            "tanques": tanques, 
+            "tanques": tanques_list, 
             "lote_activo": lote_activo,
-            "info_lote": info_lote
+            "info_lote": info_lote,
+            "hay_pedido_pendiente": hay_pedido_pendiente,
+            "codigo_pedido_pendiente": codigo_pedido_pendiente
         })
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "tanques": [], "message": f"Error: {e}"}), 500
+        print(f"Error obtener_tanques: {e}")
+        return jsonify({"success": False, "message": str(e)})
 # ======================
 # Iniciar calefacción (CORREGIDA Y BLINDADA CON NOTIFICACIONES)
 # ======================
@@ -1441,12 +1533,16 @@ def registrar_inicio_calefaccion():
     ubicacion  = _normalize_sede(data.get('sede'))
     op_id      = data.get('op_id')
 
+    # Captura bandera de sincronización para Telegram
+    es_sync = data.get('is_sync', False)
+    estado_notif = "sync" if es_sync else "exito"
+
     # 1. BLINDAJE INICIAL CENTRALIZADO
     check = _verificar_idempotencia(op_id, "inicio_calefaccion", ubicacion)
     if check: return check
 
     pollitos = data.get('pollitos')
-    # NUEVO: Capturar fecha_llegada_pollitos
+    # Capturar fecha_llegada_pollitos
     fecha_llegada_p = data.get('fecha_llegada_pollitos')
     if not fecha_llegada_p:
         fecha_llegada_p = None
@@ -1494,7 +1590,6 @@ def registrar_inicio_calefaccion():
                 col_t = f"testigo nivel tk-{num}"
                 
                 ruta_foto = None
-                # BUSCA 'fotoBase64' (como lo manda el frontend) o 'testigo'
                 foto_recibida = tk.get("fotoBase64") or tk.get("testigo")
                 if foto_recibida:
                     ruta_foto = _guardar_testigo(foto_recibida, carpeta, f"tk{num}_{id_operacion}")
@@ -1537,7 +1632,6 @@ def registrar_inicio_calefaccion():
                     
                     cur.execute("UPDATE cardex_glp SET codigo_pedido=%s WHERE id=%s", (codigo, id_operacion))
                     
-                    # Intentar enviar correo (si falla, solo loguea error)
                     try:
                         enviado = _enviar_alerta_pedido_inicio(empresa, ubicacion, lote_id, proveedor, tanques_para_pedido, codigo)
                     except Exception as e_mail:
@@ -1549,9 +1643,7 @@ def registrar_inicio_calefaccion():
                     if enviado:
                         cur.execute("UPDATE pedidos_gas_glp SET estatus_flujo='enviado_auto' WHERE codigo_pedido=%s", (codigo,))
                     
-                    # --- NUEVA LÍNEA: NOTIFICAR POR TELEGRAM AL WEBMASTER ---
                     try:
-                        # Avisamos a Telegram que se generó un pedido en el arranque
                         _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, "Bajo (Arranque)", codigo)
                     except Exception as e_tel:
                         print(f"⚠️ Error Telegram Inicio: {e_tel}")
@@ -1560,26 +1652,24 @@ def registrar_inicio_calefaccion():
                     print(f"⚠️ Error generando pedido automático: {ep}")
                     pedido_info = {"generado": False, "error": str(ep)}
 
-            # =======================================================
             # 🔊 AVISO A LA BITÁCORA
-            # =======================================================
             try:
                 registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Inicio Calefacción", f"Sede: {ubicacion}. Lote: {lote_id}. Población: {pollitos}. Fecha Llegada: {fecha_llegada_p or 'Hoy'}.", "INFO")
             except Exception as e:
                 print("Error audit:", e)
-            # =======================================================
 
-            # Llama a la función actualizada para calcular los días (forzando día 0 si es futuro)
             _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha)
             
+            # 🔊 AUDITORÍA TELEGRAM ÉXITO
+            notificar_opglp_telegram(id_empresa, usuario, "Inicio Calefacción", ubicacion, fecha.strftime("%Y-%m-%d"), estado=estado_notif)
+
             mysql.connection.commit()
 
-        # 6. Preparar Respuesta Completa (Ahora activa el modal verde con el código)
+        # 6. Preparar Respuesta Completa
         mensaje = f"Inicio registrado correctamente."
         if pedido_info and pedido_info.get("generado"):
             mensaje += f" ✅ Se generó pedido automático ({pedido_info['codigo']})."
 
-        # IMPORTANTE: Pasamos requiere_gas en True si se generó pedido para que el frontend active el bloque visual
         resumen = {
             "operacion": "inicio_calefaccion",
             "sede": ubicacion,
@@ -1587,24 +1677,29 @@ def registrar_inicio_calefaccion():
             "fecha": fecha.strftime("%Y-%m-%d"),
             "pollitos": pollitos,
             "saldo_estimado_kg": round(saldo_kg, 2),
-            "tanques": _resumen_tanques([
-                {"numero": t.get("numero"), "nivel": t.get("nivel"), "capacidad": t.get("capacidad")}
-                for t in tanques
-            ]),
+            "tanques": _resumen_tanques([{"numero": t.get("numero"), "nivel": t.get("nivel"), "capacidad": t.get("capacidad")} for t in tanques]),
             "pedido_automatico": pedido_info,
-            "requiere_gas": requiere_gas_ui, # <--- Cambio clave para el Modal UI
+            "requiere_gas": requiere_gas_ui,
             "razon_alerta": f"Pedido automático generado: {codigo_generado}" if codigo_generado else "",
             "dias_operacion": 1,
             "op_id": op_id
         }
 
-        return jsonify({"success": True, "message": mensaje, "resumen": resumen})
+        return jsonify({
+            "success": True, 
+            "message": mensaje, 
+            "resumen": resumen,
+            "esperando_pollito": True
+        })
 
     except Exception as e:
         print(f"Error GLP inicio: {e}")
+        # 🔊 REINCORPORADO: AUDITORÍA TELEGRAM FALLO
+        notificar_opglp_telegram(id_empresa, usuario, "Inicio Calefacción", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
         return jsonify({"success": False, "message": "Error interno al iniciar calefacción"}), 500
+    
 # ======================
-# Registrar tanqueo (VERSION FINAL: PROD + BLINDAJE + PRECIOS CORREGIDOS)
+# Registrar Tanqueo (VERSION PRODUCCIÓN BLINDADA ANTI-DEADLOCK)
 # ======================
 @csrf.exempt
 @bp_glp.route('/registrar_tanqueo', methods=['POST'])
@@ -1639,6 +1734,36 @@ def registrar_tanqueo():
 
         # --- INICIO DE TRANSACCIÓN ---
         with mysql.connection.cursor() as cur:
+            # ---------------------------------------------------------
+            # NUEVO: BLOQUE DE TRAZABILIDAD Y CIERRE DE PEDIDO PENDIENTE
+            # ---------------------------------------------------------
+            cur.execute("""
+                SELECT codigo_pedido 
+                FROM pedidos_gas_glp 
+                WHERE empresa = %s AND TRIM(ubicacion) = TRIM(%s) 
+                  AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
+                  AND estatus != 'cancelado'
+                ORDER BY id DESC LIMIT 1
+            """, (empresa, ubicacion))
+            
+            row_ped = cur.fetchone()
+            codigo_trazabilidad = ""
+            usuario_registro = usuario
+            
+            if row_ped:
+                codigo_trazabilidad = row_ped.get("codigo_pedido") if isinstance(row_ped, dict) else row_ped[0]
+                # Estampamos el código en la columna registro del cárdex
+                usuario_registro = f"{usuario} | Pedido: {codigo_trazabilidad}"
+                
+                # Cerramos el pedido para que el candado libere los consumos
+                cur.execute("""
+                    UPDATE pedidos_gas_glp 
+                    SET estatus_flujo = 'tanqueo_registrado', 
+                        comentarios = CONCAT(COALESCE(comentarios, ''), ' | Cumplido por OP: ', %s) 
+                    WHERE codigo_pedido = %s
+                """, (op_id, codigo_trazabilidad))
+            # ---------------------------------------------------------
+
             # 1. Buscar Lote Activo
             cur.execute("""
                 SELECT lote
@@ -1661,12 +1786,12 @@ def registrar_tanqueo():
             columnas = [
                 "fecha","empresa","id_empresa","ubicacion",
                 "lote","estatus_lote","operacion","tipo","clase",
-                "registro","op_id"
+                "registro","op_id","codigo_pedido"
             ]
             valores  = [
                 fecha, empresa, id_empresa, ubicacion,
                 lote_id, 'ACTIVO', "tanqueo", "manual", "ingreso",
-                usuario, op_id
+                usuario_registro, op_id, codigo_trazabilidad  # <-- USAMOS EL USUARIO CON EL CÓDIGO ESTAMPADO
             ]
             
             placeholders = ', '.join(['%s'] * len(columnas))
@@ -1677,8 +1802,8 @@ def registrar_tanqueo():
 
             carpeta = os.path.join("testigos", empresa.replace(" ", "_"), lote_id)
 
-            set_cols = [] # <--- CORRECCION LISTAS VACIAS
-            set_vals = [] # <--- CORRECCION LISTAS VACIAS
+            set_cols = [] 
+            set_vals = [] 
             
             densidad_estimada = 2.0
             saldo_estimado_kg = 0.0
@@ -1824,21 +1949,23 @@ def registrar_tanqueo():
                 except Exception as e_mail:
                     print(f"⛔ Error envío alerta desviación: {e_mail}")
 
-            # Auditoría General del Tanqueo (Siempre se registra)
+            # Auditoría General del Tanqueo (NUEVO: Incluye el código del pedido)
             registrar_auditoria(
                 empresa_id=id_empresa,
                 empresa_nombre=empresa,
                 modulo="GLP",
                 usuario=usuario,
                 accion="Tanqueo Registrado",
-                detalle=f"Sede: {ubicacion}. Carga: {round(masa_facturada_total, 2)} kg. Valor: ${precio_total:,.0f}",
+                detalle=f"Sede: {ubicacion}. Carga: {round(masa_facturada_total, 2)} kg. Valor: ${precio_total:,.0f} | {codigo_trazabilidad}",
                 nivel="INFO"
             )
 
             mysql.connection.commit()
 
-        # Respuesta Exitosa
+        # Respuesta Exitosa (NUEVO: Confirma el cierre del pedido)
         mensaje = "Tanqueo registrado correctamente."
+        if codigo_trazabilidad:
+            mensaje += f" Se ha cerrado el pedido: {codigo_trazabilidad}."
         if masa_esperada_total > 0:
             mensaje += f" Facturado: {round(masa_facturada_total,2)} kg."
             if desvio_total > 8.0: mensaje += " ⚠️ Desviación detectada."
@@ -1888,7 +2015,6 @@ def registrar_tanqueo():
         except: pass
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
 
-
 # ======================
 # Registrar consumo (VERSIÓN ATÓMICA Y BLINDADA)
 # ======================
@@ -1911,6 +2037,10 @@ def registrar_consumo():
         ubicacion = _normalize_sede(data.get('sede'))
         check = _verificar_idempotencia(op_id, "consumo", ubicacion)
         if check: return check
+
+        # NUEVO: Captura bandera de sincronización para Telegram
+        es_sync = data.get('is_sync', False)
+        estado_notif = "sync" if es_sync else "exito"
 
         empresa    = session.get('empresa') or ''
         usuario    = session.get('nombre') or ''
@@ -2027,8 +2157,9 @@ def registrar_consumo():
                             pass
                         
                         cur.execute("UPDATE cardex_glp SET codigo_pedido=%s WHERE id=%s", (codigo, id_operacion))
-                        analisis_riesgo.update({"requiere_gas": True, "razon": f"Solicitud {codigo} enviada.", "codigo": codigo})
+                        analisis_riesgo.update({"requiere_gas": True, "razon": f"Solicitud {codigo} enviada a revisión.", "codigo": codigo})
 
+                        # Alerta a Telegram nativa de solicitud
                         try:
                             nivel_notif = round(sum_nivel_cap/sum_cap if sum_cap > 0 else 0, 1)
                             _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, nivel_notif, codigo)
@@ -2037,6 +2168,9 @@ def registrar_consumo():
 
                     # Auditoría
                     registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Consumo Registrado", f"Sede: {ubicacion}. Consumo: {round(consumo_kg, 2)} kg.", "INFO")
+
+                    # 🔊 NUEVO: AUDITORÍA TELEGRAM ÉXITO
+                    notificar_opglp_telegram(id_empresa, usuario, "Registro de Consumo", ubicacion, fecha.strftime("%Y-%m-%d"), estado=estado_notif)
 
                     mysql.connection.commit()
                     break # ÉXITO, SALIMOS DEL BUCLE
@@ -2061,8 +2195,10 @@ def registrar_consumo():
 
     except IntegrityError as e: return _manejar_error_idempotencia(e, "consumo", ubicacion)
     except ValueError as e: return jsonify({"success": False, "message": str(e)})
-    except Exception as e: return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
-
+    except Exception as e: 
+        # 🔊 NUEVO: AUDITORÍA TELEGRAM FALLO
+        notificar_opglp_telegram(id_empresa, usuario, "Registro de Consumo", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
+        return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
 # ======================
 # Finalizar calefacción (VERSION PRODUCCIÓN BLINDADA)
 # ======================
@@ -2079,6 +2215,10 @@ def finalizar_calefaccion_batch():
         op_id = (data or {}).get("op_id")
         ubicacion = _normalize_sede(data.get('sede'))
         
+        # NUEVO: Captura bandera de sincronización para Telegram
+        es_sync = data.get('is_sync', False)
+        estado_notif = "sync" if es_sync else "exito"
+
         if not op_id:
             return jsonify({"success": False, "message": "Falta op_id en la operación"}), 400
 
@@ -2161,6 +2301,9 @@ def finalizar_calefaccion_batch():
                         print("Error audit:", e)
                     # =======================================================
 
+                    # 🔊 NUEVO: AUDITORÍA TELEGRAM ÉXITO
+                    notificar_opglp_telegram(id_empresa, usuario, "Finalización de Calefacción", ubicacion, fecha.strftime("%Y-%m-%d"), estado=estado_notif)
+
                     mysql.connection.commit()
                     break # Éxito: Salir del bucle
 
@@ -2179,8 +2322,9 @@ def finalizar_calefaccion_batch():
     except Exception as e:
         mysql.connection.rollback()
         print("❌ ERROR CRÍTICO FINAL:", e)
+        # 🔊 NUEVO: AUDITORÍA TELEGRAM FALLO
+        notificar_opglp_telegram(id_empresa, usuario, "Finalización de Calefacción", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
-    
 
                
 # --- FUNCIÓN DE CONSULTA DE PEDIDOS ---
@@ -2806,7 +2950,8 @@ def anular_pedido_sin_evidencia():
         
         cur.execute("""
             UPDATE pedidos_gas_glp 
-            SET estatus_flujo = 'anulado_sin_evidencia', 
+            SET estatus = 'anulado',
+                estatus_flujo = 'anulado_sin_evidencia', 
                 comentarios = CONCAT(COALESCE(comentarios, ''), ' | ', %s)
             WHERE id = %s
         """, (firma, pedido_id))
@@ -3115,3 +3260,89 @@ def _recalcular_historia_lote(cur, empresa, ubicacion, lote_id):
                 saldo_estimado_galones = %s
             WHERE id = %s
         """, (consumo_paso, eficiencia, saldo_paso, (saldo_paso/densidad_usada if densidad_usada else 0), op_id))
+
+# ==========================================
+# RUTA PARA NOTIFICAR INTENTOS DE SINCRONIZACIÓN MANUAL
+# ==========================================
+@csrf.exempt
+@bp_glp.route('/notificar_intento_sync', methods=['POST'])
+@login_required_custom
+def notificar_intento_sync():
+    """
+    Ruta disparada cuando el usuario presiona el botón rojo de 'INTENTAR ENVIAR AHORA'.
+    Informa a Telegram de la intención de sincronización manual.
+    """
+    try:
+        data = request.get_json(force=True) or {}
+        id_empresa = session.get('empresa_id') or 0
+        usuario = session.get('nombre') or 'Usuario'
+        sede = data.get('sede', 'Sede Desconocida')
+        fecha = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        notificar_opglp_telegram(id_empresa, usuario, "Intento de Sincronización Manual", sede, fecha, estado="pendientes")
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Error en notificar_intento_sync: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    
+@bp_glp.route('/confirmar_arribo_pollito', methods=['POST'])
+@login_required_custom
+def confirmar_arribo_pollito():
+    try:
+        data = request.get_json(force=True)
+        sede = data.get('sede')
+        id_empresa = session.get('empresa_id')
+        poblacion_real = int(data.get('poblacion', 0))
+        fecha_arribo = data.get('fecha_arribo') # Formato ISO de JS
+        usuario = session.get('nombre')
+
+        cur = mysql.connection.cursor()
+        
+        # 1. Buscar el registro de inicio_calefaccion activo para esta sede
+        cur.execute("""
+            SELECT id, pollitos, lote FROM cardex_glp 
+            WHERE id_empresa = %s AND ubicacion = %s 
+            AND operacion = 'inicio_calefaccion' AND estatus_lote = 'ACTIVO'
+            ORDER BY id DESC LIMIT 1
+        """, (id_empresa, sede))
+        registro = cur.fetchone()
+
+        if not registro:
+            return jsonify({"success": False, "message": "No se encontró un lote activo en espera."})
+
+        op_id, pollitos_est, lote_nom = registro
+
+        # 2. Actualizar el registro original con los datos REALES
+        cur.execute("""
+            UPDATE cardex_glp 
+            SET pollitos = %s, 
+                fecha_llegada_pollitos = %s,
+                registro = CONCAT(COALESCE(registro, ''), ' | Conf. por ', %s)
+            WHERE id = %s
+        """, (poblacion_real, fecha_arribo, usuario, op_id))
+
+        mysql.connection.commit()
+
+        # 3. ALERTA DE TELEGRAM
+        msg = (
+            f"🐣 *ALOJAMIENTO CONFIRMADO*\n"
+            f"📍 *Sede:* {sede}\n"
+            f"👤 *Operador:* {usuario}\n"
+            f"🔢 *Población Real:* {poblacion_real:,} (Est: {pollitos_est:,})\n"
+            f"📅 *Arribo:* {fecha_arribo}\n"
+            f"✅ El reloj del lote *{lote_nom}* ha iniciado."
+        )
+        # Enviamos directamente a la API de Telegram para este formato especial
+        cur.execute("SELECT telegram_id FROM usuarios WHERE empresa_id = %s AND telegram_id IS NOT NULL", (id_empresa,))
+        destinatarios = cur.fetchall()
+        for row in destinatarios:
+            chat_id = row['telegram_id'] if isinstance(row, dict) else row[0]
+            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                        data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=5)
+
+        return jsonify({"success": True, "message": "Arribo confirmado y alerta enviada."})
+
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({"success": False, "message": str(e)})

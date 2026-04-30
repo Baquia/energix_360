@@ -575,7 +575,7 @@ def asignar_marca():
     
 # --- CREACIÓN MANUAL DE PRODUCTO ---
 # --- CREACIÓN MANUAL ---
-@bp_bodegas.route('/bodegas/crear_producto_manual', methods=['POST'])
+@bp_bodegas.route('/api/bodegas/productos/crear', methods=['POST']) # Ajusta la ruta si la tenías diferente
 @csrf.exempt
 def crear_producto_manual():
     if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
@@ -591,19 +591,23 @@ def crear_producto_manual():
         res = cur.fetchone()
         tipo_empresa = res[0] if res else 'general'
 
+        # 🚀 LA MISMA MAGIA: data.get('ean') se inyecta en SKU y EAN
         cur.execute("""
             INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE 
-            producto = VALUES(producto), fabricante = VALUES(fabricante), unidad_embalaje = VALUES(unidad_embalaje)
-        """, (nit_empresa, nombre_empresa, tipo_empresa, '', data.get('ean'), data.get('producto'), data.get('fabricante'), data.get('unidad_embalaje', 'UND')))
+            producto = VALUES(producto), 
+            fabricante = VALUES(fabricante), 
+            unidad_embalaje = VALUES(unidad_embalaje)
+        """, (nit_empresa, nombre_empresa, tipo_empresa, data.get('ean'), data.get('ean'), data.get('producto'), data.get('fabricante'), data.get('unidad_embalaje', 'UND')))
         
         mysql.connection.commit()
         cur.close()
-        return jsonify({'message': '✅ Producto guardado correctamente.'})
+        return jsonify({'status': 'success'})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
+        print(f"Error creando producto manual: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
+        
 @bp_bodegas.route('/bodegas/descargar_plantilla')
 def descargar_plantilla_productos():
     if 'usuario_id' not in session: return redirect('/')
@@ -662,40 +666,64 @@ def upload_productos_masivo():
     if not file: return jsonify({'error': 'No hay archivo'}), 400
 
     try:
-        df = pd.read_excel(file, dtype=str) if file.filename.endswith('.xlsx') else pd.read_csv(file, dtype=str)
+        # 1. AUTO-DETECTA PUNTO Y COMA (;) O COMA (,) EN LOS CSV
+        if file.filename.endswith('.xlsx'):
+            df = pd.read_excel(file, dtype=str)
+        else:
+            df = pd.read_csv(file, dtype=str, sep=None, engine='python')
+            
         df.columns = df.columns.str.strip().str.upper()
 
+        # 2. EL CANDADO DE SEGURIDAD (Ignora el Excel, usa la Sesión)
+        empresa_id = str(session.get('empresa_id'))
+        
         cur = mysql.connection.cursor()
-        # Mapa de empresas: Buscamos tanto por ID como por NIT para no fallar
-        cur.execute("SELECT id, nit, nombre_comercial, tipo_empresa FROM empresas")
-        rows = cur.fetchall()
-        # Creamos un mapa que entienda NIT e ID
-        mapa = {}
-        for r in rows:
-            mapa[str(r[0])] = {'n': r[2], 't': r[3]} # Por ID
-            mapa[str(r[1])] = {'n': r[2], 't': r[3]} # Por NIT
+        
+        # Buscamos los datos oficiales de esta empresa
+        cur.execute("SELECT nombre_comercial, tipo_empresa FROM empresas WHERE nit = %s OR id = %s", (empresa_id, empresa_id))
+        emp_data = cur.fetchone()
+        
+        nombre_empresa = emp_data[0] if emp_data else 'Empresa'
+        tipo_empresa = emp_data[1] if emp_data else 'general'
 
         data_to_upsert = []
         for _, row in df.iterrows():
-            id_foco = str(row.get('ID_EMPRESA', '')).strip()
-            if id_foco in mapa:
-                nombre_ok = mapa[id_foco]['n']
-                tipo_ok = mapa[id_foco]['t']
-                data_to_upsert.append((id_foco, nombre_ok, tipo_ok, '', row.get('EAN'), row.get('PRODUCTO'), row.get('FABRICANTE'), row.get('UNIDAD_EMBALAJE', 'UND')))
+            ean = str(row.get('EAN', '')).strip()
+            producto = str(row.get('PRODUCTO', '')).strip()
+            fabricante = str(row.get('FABRICANTE', '')).strip()
+            embalaje = str(row.get('UNIDAD_EMBALAJE', 'UND')).strip()
+            
+            # Filtro básico: Si no hay EAN o Nombre, saltamos esa fila dañada
+            if not ean or not producto or ean.upper() == 'NAN':
+                continue
+
+            # 🚀 AQUÍ ESTÁ LA MAGIA: ean, ean (Ocupa el lugar del SKU y del EAN)
+            data_to_upsert.append((
+                empresa_id, nombre_empresa, tipo_empresa, ean, ean, 
+                producto, fabricante, embalaje
+            ))
 
         if data_to_upsert:
+            # 3. EL UPDATE CORREGIDO
             cur.executemany("""
                 INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE empresa=VALUES(empresa), tipo_empresa=VALUES(tipo_empresa), producto=VALUES(producto)
+                ON DUPLICATE KEY UPDATE 
+                empresa=VALUES(empresa), 
+                tipo_empresa=VALUES(tipo_empresa), 
+                producto=VALUES(producto),
+                fabricante=VALUES(fabricante),
+                unidad_embalaje=VALUES(unidad_embalaje)
             """, data_to_upsert)
             mysql.connection.commit()
         
         cur.close()
-        return jsonify({'message': f'✅ {len(data_to_upsert)} productos procesados.'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'message': f'✅ {len(data_to_upsert)} productos procesados y guardados correctamente.'})
     
+    except Exception as e:
+        print("Error en upload masivo:", e)
+        return jsonify({'error': f'Error en el archivo: {str(e)}'}), 500
+        
 # ==============================================================================
 # NUEVAS APIS: DESPACHO, VEHÍCULOS, PUERTAS Y ACTAS DE ENTREGA
 # ==============================================================================
