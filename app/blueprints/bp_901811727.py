@@ -1041,7 +1041,7 @@ def obtener_pendientes_tanqueo_reporte():
             FROM pedidos_gas_glp p
             WHERE TRIM(UPPER(p.cliente)) = TRIM(UPPER(%s))
               AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
-              AND p.fecha_registro >= '2026-04-25'
+              AND p.fecha_registro >= '2026-04-30'
             ORDER BY dias_retraso DESC
         """
         cur.execute(sql, (nombre_empresa,))
@@ -1855,7 +1855,7 @@ def obtener_alertas_ruptura_validacion():
                 DATEDIFF(NOW(), p.fecha_validacion) as dias_alerta
             FROM pedidos_gas_glp p
             WHERE p.estatus = 'validado'
-              AND p.fecha_validacion >= '2026-04-25'
+              AND p.fecha_validacion >= '2026-04-30'
               AND p.codigo_pedido NOT IN (
                   SELECT codigo_pedido 
                   FROM cardex_glp 
