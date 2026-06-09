@@ -1845,6 +1845,8 @@ def obtener_alertas_ruptura_validacion():
         cur = mysql.connection.cursor()
         
         # FILTRO DE SANEAMIENTO: Solo validaciones a partir del 25 de abril de 2026
+        # CORRECCIÓN 1: Se añade el COLLATE utf8mb4_general_ci para evitar que MySQL se confunda al comparar textos.
+        # CORRECCIÓN 2: Se añade el filtro del cliente para aislar los datos multiempresa.
         sql = """
             SELECT 
                 p.id,
@@ -1856,14 +1858,16 @@ def obtener_alertas_ruptura_validacion():
             FROM pedidos_gas_glp p
             WHERE p.estatus = 'validado'
               AND p.fecha_validacion >= '2026-04-30'
-              AND p.codigo_pedido NOT IN (
-                  SELECT codigo_pedido 
+              AND p.cliente = (SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1)
+              AND p.codigo_pedido COLLATE utf8mb4_general_ci NOT IN (
+                  SELECT codigo_pedido COLLATE utf8mb4_general_ci 
                   FROM cardex_glp 
                   WHERE codigo_pedido IS NOT NULL AND id_empresa = %s
               )
             ORDER BY dias_alerta DESC
         """
-        cur.execute(sql, (empresa_id,))
+        # Se pasa empresa_id dos veces: una para el cliente y otra para el kárdex
+        cur.execute(sql, (empresa_id, empresa_id))
         rows = cur.fetchall()
         
         alertas = []

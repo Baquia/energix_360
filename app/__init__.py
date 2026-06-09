@@ -83,13 +83,18 @@ def create_app():
     # --SUBMODULOS PARA VENTAS Y DISTRIBICION --#
     from app.blueprints.B_bp_bodegas import bp_bodegas                     # Modulo de Bodegas (Dashboard/Carga)
     from app.blueprints.B_bp_flotacarga import bp_flotacarga               # Modulo de Flota
+    from app.blueprints.B_bp_gestorflotacarga import bp_gestorflota        # Modulo de Gestor de Flota (NUEVO)
    
+    # NUEVO MÓDULO DE PESAJE DE CARGA
+    from app.blueprints.B_bp_gestion_carga import bp_gestion_carga
+    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
     app.register_blueprint(bp_supervisorgas)                               # Registro del NUEVO blueprint
     app.register_blueprint(bp_bodegas)
     app.register_blueprint(bp_flotacarga)
-
+    app.register_blueprint(bp_gestorflota)                                 # Registro del gestor de flota (NUEVO)
+    app.register_blueprint(bp_gestion_carga)
     # ---------------------------------------------------------
     #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
     #  (Interfaces ligeras para operarios: Picking, Entregas...)

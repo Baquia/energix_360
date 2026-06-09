@@ -1755,13 +1755,15 @@ def registrar_tanqueo():
             # ---------------------------------------------------------
             # NUEVO: BLOQUE DE TRAZABILIDAD Y CIERRE DE PEDIDO PENDIENTE
             # ---------------------------------------------------------
+            # CORRECCIÓN 1: Se cambia 'empresa' por 'cliente'
+            # CORRECCIÓN 2: Se cambia 'ORDER BY id DESC' a 'ASC' para cerrar siempre el pedido más antiguo primero
             cur.execute("""
                 SELECT codigo_pedido 
                 FROM pedidos_gas_glp 
-                WHERE empresa = %s AND TRIM(ubicacion) = TRIM(%s) 
+                WHERE cliente = %s AND TRIM(ubicacion) = TRIM(%s) 
                   AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
                   AND estatus != 'cancelado'
-                ORDER BY id DESC LIMIT 1
+                ORDER BY id ASC LIMIT 1
             """, (empresa, ubicacion))
             
             row_ped = cur.fetchone()
@@ -1781,7 +1783,7 @@ def registrar_tanqueo():
                     WHERE codigo_pedido = %s
                 """, (op_id, codigo_trazabilidad))
             # ---------------------------------------------------------
-
+            
             # 1. Buscar Lote Activo
             cur.execute("""
                 SELECT lote

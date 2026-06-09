@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Preoperacional de Carga | BQA-ONE</title>
+    <meta name="theme-color" content="#015249">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        :root {
+            --verde: #015249;
+            --verde-osc: #003b35;
+            --bg: #f4f6f8;
+            --surface: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --border: #e5e7eb;
+            --radius: 14px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            padding-bottom: 40px;
+        }
+
+        .app-header {
+            background: var(--verde);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .back-btn {
+            color: white;
+            text-decoration: none;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px 12px;
+            border-radius: 8px;
+        }
+
+        .container {
+            max-width: 650px;
+            margin: 20px auto;
+            padding: 0 15px;
+        }
+
+        .qr-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 25px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .qr-icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+
+        #reader {
+            width: 100%;
+            max-width: 350px;
+            margin: 20px auto;
+            border-radius: 12px;
+            overflow: hidden;
+            border: none !important;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 15px;
+            display: none;
+            font-weight: 600;
+        }
+
+        /* --- ESTILOS WIZARD --- */
+        .form-step {
+            display: none;
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        .form-step.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .wizard-nav {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-nav {
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: 0.2s;
+            font-size: 14px;
+        }
+
+        .btn-prev {
+            background: #e5e7eb;
+            color: var(--text);
+        }
+
+        .btn-next {
+            background: var(--verde);
+            color: white;
+            flex-grow: 1;
+        }
+
+        /* --- ESTILOS FORMULARIO --- */
+        .section-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--verde);
+            margin-bottom: 15px;
+            border-bottom: 2px solid #eefcf9;
+            padding-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-group label {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: #f9fafb;
+            outline: none;
+        }
+
+        .input-group input:focus, .input-group textarea:focus {
+            border-color: var(--verde);
+            background: #fff;
+        }
+
+        .question-item {
+            display: flex;
+            flex-direction: column;
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .question-item:last-child {
+            border-bottom: none;
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .question-label {
+            font-size: 13px;
+            font-weight: 500;
+            padding-right: 10px;
+            color: #374151;
+        }
+
+        .status-selector {
+            display: flex;
+            gap: 4px;
+            background: #f3f4f6;
+            padding: 3px;
+            border-radius: 8px;
+        }
+
+        .status-btn {
+            border: none;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--muted);
+            background: transparent;
+            transition: all 0.2s;
+        }
+
+        .status-btn.ok.active { background: #10b981; color: white; }
+        .status-btn.warn.active { background: #f59e0b; color: white; }
+        .status-btn.bad.active { background: #ef4444; color: white; }
+
+        /* --- ESTILOS FECHAS CONDICIONALES --- */
+        .date-wrapper {
+            display: none;
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: #fdfdfd;
+            border-left: 3px solid var(--verde);
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .date-wrapper.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        .date-wrapper input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: var(--verde);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: var(--radius);
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(1, 82, 73, 0.2);
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn-submit:hover {
+            background: var(--verde-osc);
+        }
+
+        /* --- MODAL CUSTOM --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-overlay.active { display: flex; }
+        
+        .modal-box {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            max-width: 90%;
+            width: 320px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            animation: fadeIn 0.2s;
+        }
+        
+        .modal-icon { font-size: 40px; margin-bottom: 10px; }
+        .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+        .modal-desc { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.4; }
+        
+        .modal-actions { display: flex; gap: 10px; justify-content: center; }
+        .btn-confirm { background: var(--verde); color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; flex: 1;}
+        .btn-cancel { background: #f3f4f6; color: var(--text); padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; flex: 1;}
+        
+        /* --- ESTILOS ALERTAS FLASH --- */
+        .flash-alert {
+            padding: 15px; margin-bottom: 20px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; 
+            border: 1px solid currentColor;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .flash-success { background-color: #d1fae5; color: #065f46; }
+        .flash-danger { background-color: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+
+<body>
+
+    <header class="app-header">
+        <span class="header-title">{{ empresa }}</span>
+        <a href="/avicola/router/flota" class="back-btn">&larr; Volver</a>
+    </header>
+
+    <div class="container">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-alert {% if category == 'success' %}flash-success{% else %}flash-danger{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if scanner_mode %}
+        <div class="qr-card">
+            <div class="qr-icon">📷</div>
+            <h3>Escanee el QR del Vehículo</h3>
+            <p style="font-size: 13px; color: var(--muted); margin-top: 5px;">Aproxime el código QR de la cabina para validar acceso.</p>
+
+            <div id="reader"></div>
+            <div id="qr-error" class="alert-error"></div>
+        </div>
+
+        <script>
+            function onScanSuccess(decodedText, decodedResult) {
+                html5QrcodeScanner.clear();
+                let placa = "";
+                let nit = "";
+
+                let cleanText = decodedText
+                    .replace(/&#34;/g, '"')
+                    .replace(/&quot;/g, '"')
+                    .replace(/,,/g, ',')
+                    .replace(/'/g, '"')
+                    .replace(/[\u201C\u201D]/g, '"')
+                    .trim();
+
+                try {
+                    const data = JSON.parse(cleanText);
+                    placa = data.placa || data.PLACA || "";
+                    nit = data.nit || data.NIT || "";
+                } catch (e) {
+                    const matchPlaca = cleanText.match(/placa["'\s:]+([A-Za-z0-9]+)/i);
+                    const matchNit = cleanText.match(/nit["'\s:]+([0-9]+)/i);
+                    if (matchPlaca) placa = matchPlaca[1];
+                    if (matchNit) nit = matchNit[1];
+                }
+
+                placa = String(placa).toUpperCase().trim();
+                nit = String(nit).trim();
+
+                if (!placa || !nit) {
+                    showError("QR inválido. Texto procesado: " + cleanText);
+                    return;
+                }
+
+                const csrfToken = "{{ csrf_token() }}";
+
+                fetch("{{ url_for('flotacarga.validar_qr') }}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrfToken 
+                    },
+                    body: JSON.stringify({ placa: placa, nit: nit })
+                })
+                    .then(response => {
+                        if (!response.ok) throw new Error("Error HTTP del servidor: " + response.status);
+                        return response.json();
+                    })
+                    .then(res => {
+                        if (res.success) {
+                            window.location.reload(); 
+                        } else {
+                            showError(res.message || "Error de validación cruzada.");
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Fallo detallado de conexión:", err);
+                        showError("Error de seguridad o conexión con el servidor.");
+                    });
+            }
+
+            function showError(msg) {
+                const errDiv = document.getElementById('qr-error');
+                errDiv.innerText = msg;
+                errDiv.style.display = 'block';
+                setTimeout(() => { window.location.reload(); }, 4000);
+            }
+
+            const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+            html5QrcodeScanner.render(onScanSuccess);
+        </script>
+
+        {% else %}
+        <form id="wizardForm" action="{{ url_for('flotacarga.guardar_inspeccion') }}" method="POST" style="margin-top: 10px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+            {% macro render_doc_item(id_campo, etiqueta, id_fecha) %}
+            <div class="question-item">
+                <div class="question-header">
+                    <span class="question-label">{{ etiqueta }}</span>
+                    <div class="status-selector">
+                        <button type="button" class="status-btn ok active" onclick="setDocCheck('{{ id_campo }}', 1, this, '{{ id_fecha }}')">Sí</button>
+                        <button type="button" class="status-btn bad" onclick="setDocCheck('{{ id_campo }}', 0, this, '{{ id_fecha }}')">No</button>
+                    </div>
+                    <input type="hidden" id="{{ id_campo }}" name="{{ id_campo }}" value="1">
+                </div>
+                <div class="date-wrapper active" id="wrapper_{{ id_fecha }}">
+                    <label style="font-size: 11px; color: var(--muted); font-weight:bold;">Fecha de Vencimiento:</label>
+                    <input type="date" id="{{ id_fecha }}" name="{{ id_fecha }}" required>
+                </div>
+            </div>
+            {% endmacro %}
+
+            {% macro render_mec_item(id_campo, etiqueta) %}
+            <div class="question-item">
+                <div class="question-header">
+                    <span class="question-label">{{ etiqueta }}</span>
+                    <div class="status-selector">
+                        <button type="button" class="status-btn ok active" onclick="setMecCheck('{{ id_campo }}', 1, this, '{{ etiqueta }}', 'Óptimo')">OK</button>
+                        <button type="button" class="status-btn warn" onclick="setMecCheck('{{ id_campo }}', 2, this, '{{ etiqueta }}', 'Ajustar')">⚠️</button>
+                        <button type="button" class="status-btn bad" onclick="setMecCheck('{{ id_campo }}', 3, this, '{{ etiqueta }}', 'Peligro')">🛑</button>
+                    </div>
+                    <input type="hidden" id="{{ id_campo }}" name="{{ id_campo }}" value="1">
+                </div>
+            </div>
+            {% endmacro %}
+
+            <div class="form-step active">
+                <div class="section-title">📋 Información General (1/6)</div>
+                <div class="meta-grid">
+                    <div class="input-group">
+                        <label>Placa Vehículo</label>
+                        <input type="text" value="{{ vehiculo.placa }}" readonly style="font-weight: 700; color: var(--verde);">
+                    </div>
+                    <div class="input-group">
+                        <label>Tipo (Mapeado)</label>
+                        <input type="text" name="tipo_vehiculo" value="{{ tipo_enum }}" readonly>
+                    </div>
+                </div>
+                <div class="meta-grid">
+                    <div class="input-group">
+                        <label>Kilometraje Inicial</label>
+                        <input type="number" name="kilometraje_inicial" placeholder="Ej. 142050" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Ruta / Destino</label>
+                        <input type="text" name="ruta_destino" placeholder="Ej. Bogota - Norte" required>
+                    </div>
+                </div>
+                <div class="wizard-nav">
+                    <div></div>
+                    <button type="button" class="btn-nav btn-next" onclick="nextStep(0)">Siguiente &rarr;</button>
+                </div>
+            </div>
+
+            <div class="form-step">
+                <div class="section-title">🗂️ Documentos (2/6)</div>
+                {{ render_doc_item('doc_licencia_conduccion', 'Licencia de Conducción', 'fecha_vence_licencia') }}
+                {{ render_doc_item('doc_soat_vigente', 'SOAT', 'fecha_vence_soat') }}
+                {{ render_doc_item('doc_tecnomecanica_vigente', 'Revisión Tecnomecánica', 'fecha_vence_tecnomecanica') }}
+                {{ render_doc_item('doc_tarjeta_operacion', 'Tarjeta de Operación', 'fecha_vence_tarjeta_operacion') }}
+                {{ render_doc_item('doc_manifiesto_carga', 'Manifiesto de Carga', 'fecha_vence_manifiesto') }}
+                <div class="wizard-nav">
+                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(1)">&larr; Atrás</button>
+                    <button type="button" class="btn-nav btn-next" onclick="nextStep(1)">Siguiente &rarr;</button>
+                </div>
+            </div>
+
+            <div class="form-step">
+                <div class="section-title">💧 Motor y Niveles (3/6)</div>
+                {{ render_mec_item('mec_nivel_aceite_motor', 'Nivel de Aceite de Motor') }}
+                {{ render_mec_item('mec_liquido_frenos', 'Nivel Líquido de Frenos') }}
+                {{ render_mec_item('mec_liquido_embrague', 'Nivel Líquido de Embrague / Clutch') }}
+                {{ render_mec_item('mec_nivel_refrigerante', 'Nivel de Líquido Refrigerante') }}
+                {{ render_mec_item('mec_estado_correas', 'Estado de Correas (Alternador/Ventilador)') }}
+                {{ render_mec_item('mec_ausencia_fugas', 'Ausencia de Fugas Visibles de Fluidos') }}
+                <div class="wizard-nav">
+                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(2)">&larr; Atrás</button>
+                    <button type="button" class="btn-nav btn-next" onclick="nextStep(2)">Siguiente &rarr;</button>
+                </div>
+            </div>
+
+            <div class="form-step">
+                <div class="section-title">💡 Sistema de Luces y Llantas (4/6)</div>
+                {{ render_mec_item('luc_altas_bajas', 'Luces Altas y Bajas Frontales') }}
+                {{ render_mec_item('luc_frenos_stop', 'Luces de Frenos y Stop Traseros') }}
+                {{ render_mec_item('luc_direccionales', 'Luces Direccionales (Der / Izq)') }}
+                {{ render_mec_item('luc_parqueo_estacionarias', 'Luces de Parqueo') }}
+                {{ render_mec_item('luc_reversa_alarma', 'Luz de Reversa y Alarma Sonora') }}
+                {{ render_mec_item('luc_delimitadoras_cocuyos', 'Luces Delimitadoras y Cocuyos') }}
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+                {{ render_mec_item('lla_presion_delanteras', 'Presión Llantas Delanteras') }}
+                {{ render_mec_item('lla_presion_traseras_pachas', 'Presión Llantas Traseras / Pachas') }}
+                {{ render_mec_item('lla_profundidad_labrado', 'Profundidad de Labrado Adecuada') }}
+                {{ render_mec_item('lla_tuercas_pernos', 'Ajuste de Tuercas y Pernos de Rines') }}
+                {{ render_mec_item('lla_repuesto_operativa', 'Llanta de Repuesto Operativa') }}
+                {{ render_mec_item('lla_suspension_muelles', 'Estado de Suspensión / Muelles') }}
+                <div class="wizard-nav">
+                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(3)">&larr; Atrás</button>
+                    <button type="button" class="btn-nav btn-next" onclick="nextStep(3)">Siguiente &rarr;</button>
+                </div>
+            </div>
+
+            <div class="form-step">
+                <div class="section-title">🕹️ Cabina, Frenos y Emergencias (5/6)</div>
+                {{ render_mec_item('fre_pedal_firme', 'Pedal de Freno Firme') }}
+                {{ render_mec_item('fre_parqueo_mano', 'Freno de Mano / Parqueo') }}
+                {{ render_mec_item('fre_presion_aire_manometro', 'Presión de Aire (Manómetro)') }}
+                {{ render_mec_item('fre_juego_direccion', 'Dirección Suave (Sin juego excesivo)') }}
+                {{ render_mec_item('fre_limpiaparabrisas_plumillas', 'Limpiaparabrisas / Plumillas') }}
+                {{ render_mec_item('car_estado_estructura', 'Estado General Furgón/Estructura') }}
+                {{ render_mec_item('car_cinturones_seguridad', 'Cinturones de Seguridad Funcionales') }}
+                {{ render_mec_item('car_vidrio_parabrisas', 'Vidrio Parabrisas sin Fisuras') }}
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+                {{ render_mec_item('equ_extintor_10lbs', 'Extintor ABC de 10 Lbs') }}
+                {{ render_mec_item('equ_tacos_bloqueo', 'Tacos de Bloqueo') }}
+                {{ render_mec_item('equ_senales_reflectivas', 'Señales Reflectivas / Conos') }}
+                {{ render_mec_item('equ_gato_hidraulico', 'Gato Hidráulico y Cruceta') }}
+                {{ render_mec_item('equ_botiquin_completo', 'Botiquín Completo') }}
+                <div class="wizard-nav">
+                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(4)">&larr; Atrás</button>
+                    <button type="button" class="btn-nav btn-next" onclick="nextStep(4)">Siguiente &rarr;</button>
+                </div>
+            </div>
+
+            <div class="form-step">
+                <div class="section-title">🔍 Cierre y Firma (6/6)</div>
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label>Observaciones / Hallazgos Detallados</label>
+                    <textarea name="observaciones_hallazgos" rows="3" placeholder="Describa aquí cualquier detalle adicional..."></textarea>
+                </div>
+
+                <div class="wizard-nav">
+                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(5)">&larr; Atrás</button>
+                </div>
+                <button type="submit" class="btn-submit">🔒 Firmar y Finalizar Inspección</button>
+            </div>
+        </form>
+
+        <div id="custom-modal" class="modal-overlay">
+            <div class="modal-box">
+                <div class="modal-icon" id="modal-icon">⚠️</div>
+                <div class="modal-title" id="modal-title">Confirmar Novedad</div>
+                <div class="modal-desc" id="modal-desc">Detalle</div>
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+                    <button class="btn-confirm" onclick="confirmModal()">Sí, Confirmar</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="response-modal" class="modal-overlay">
+            <div class="modal-box">
+                <div class="modal-icon" id="resp-modal-icon">✅</div>
+                <div class="modal-title" id="resp-modal-title" style="color: #10b981;">¡Inspección Completada!</div>
+                <div class="modal-desc" id="resp-modal-desc">Detalle</div>
+                <div class="modal-actions">
+                    <button id="btn-resp-ok" class="btn-confirm" style="background:#10b981; flex: 1;">Aceptar</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // --- LÓGICA DE DOCUMENTOS (Fechas Dinámicas) ---
+            function setDocCheck(fieldId, value, element, dateId) {
+                document.getElementById(fieldId).value = value;
+                
+                const parent = element.parentElement;
+                parent.querySelectorAll('.status-btn').forEach(btn => btn.classList.remove('active'));
+                element.classList.add('active');
+
+                const dateWrapper = document.getElementById('wrapper_' + dateId);
+                const dateInput = document.getElementById(dateId);
+
+                if (value === 1) { 
+                    dateWrapper.classList.add('active');
+                    dateInput.setAttribute('required', 'required');
+                } else { 
+                    dateWrapper.classList.remove('active');
+                    dateInput.removeAttribute('required');
+                    dateInput.value = ''; 
+                }
+            }
+
+            // --- LÓGICA DE 3 ESTADOS ---
+            let pendingAction = null;
+
+            function setMecCheck(fieldId, value, element, label, statusName) {
+                if(value === 1 || value === 0) {
+                    applyMecCheck(fieldId, value, element);
+                } else { 
+                    pendingAction = () => applyMecCheck(fieldId, value, element);
+                    
+                    const isYellow = value === 2;
+                    document.getElementById('modal-icon').innerText = isYellow ? '⚠️' : '🛑';
+                    document.getElementById('modal-title').innerText = isYellow ? 'Novedad de Ajuste' : 'Novedad Crítica';
+                    document.getElementById('modal-title').style.color = isYellow ? '#f59e0b' : '#ef4444';
+                    document.getElementById('modal-desc').innerHTML = `Has marcado <b>${label}</b> en estado <b>${statusName}</b>.<br><br>¿Estás seguro de reportar esta novedad?`;
+                    
+                    document.getElementById('custom-modal').classList.add('active');
+                }
+            }
+
+            function applyMecCheck(fieldId, value, element) {
+                document.getElementById(fieldId).value = value;
+                const parent = element.parentElement;
+                parent.querySelectorAll('.status-btn').forEach(btn => btn.classList.remove('active'));
+                element.classList.add('active');
+            }
+
+            function confirmModal() {
+                if(pendingAction) pendingAction();
+                closeModal();
+            }
+
+            function closeModal() {
+                document.getElementById('custom-modal').classList.remove('active');
+                pendingAction = null;
+            }
+
+            function closeResponseModal() {
+                document.getElementById('response-modal').classList.remove('active');
+            }
+
+            // --- LÓGICA DEL WIZARD ---
+            const steps = document.querySelectorAll('.form-step');
+
+            function nextStep(currentIndex) {
+                if(!validateStep(currentIndex)) return;
+                steps[currentIndex].classList.remove('active');
+                steps[currentIndex + 1].classList.add('active');
+                window.scrollTo(0, 0);
+            }
+
+            function prevStep(currentIndex) {
+                steps[currentIndex].classList.remove('active');
+                steps[currentIndex - 1].classList.add('active');
+                window.scrollTo(0, 0);
+            }
+
+            function validateStep(index) {
+                const currentStep = steps[index];
+                const requiredInputs = currentStep.querySelectorAll('input[required]');
+                
+                for(let input of requiredInputs) {
+                    if(input.offsetParent !== null && !input.value) {
+                        alert("Por favor, complete todos los campos obligatorios antes de continuar. (Revise las fechas de documentos)");
+                        input.focus();
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            // --- LÓGICA DE ENVÍO POR AJAX (FETCH) Y MODAL DE RESPUESTA ---
+            document.getElementById('wizardForm').addEventListener('submit', async function(e) {
+                e.preventDefault(); // Evitamos que la pantalla se recargue
+
+                const btn = document.querySelector('.btn-submit');
+                const originalText = btn.innerHTML;
+                
+                btn.innerHTML = '⏳ Procesando y Enviando Alertas...';
+                btn.style.opacity = '0.7';
+                btn.style.pointerEvents = 'none'; 
+
+                try {
+                    const formData = new FormData(this);
+                    
+                    const response = await fetch(this.action, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    const modal = document.getElementById('response-modal');
+                    const icon = document.getElementById('resp-modal-icon');
+                    const title = document.getElementById('resp-modal-title');
+                    const desc = document.getElementById('resp-modal-desc');
+                    const btnOk = document.getElementById('btn-resp-ok');
+
+                    if (result.success) {
+                        icon.innerText = '✅';
+                        title.innerText = '¡Inspección Completada!';
+                        title.style.color = '#10b981';
+                        desc.innerHTML = result.message;
+                        btnOk.style.background = '#10b981';
+                        
+                        // Al hacer clic en Aceptar, hacemos el redirect
+                        btnOk.onclick = function() {
+                            window.location.href = result.redirect_url;
+                        };
+                    } else {
+                        // En caso de fallo validado por el servidor
+                        icon.innerText = '❌';
+                        title.innerText = 'Error al Guardar';
+                        title.style.color = '#ef4444';
+                        desc.innerHTML = result.message || 'Ocurrió un problema inesperado.';
+                        btnOk.style.background = '#6b7280';
+                        
+                        // Solo cerramos el modal, devolvemos el botón a la normalidad para reintentar
+                        btnOk.onclick = function() {
+                            closeResponseModal();
+                            btn.innerHTML = originalText;
+                            btn.style.opacity = '1';
+                            btn.style.pointerEvents = 'auto';
+                        };
+                    }
+                    
+                    modal.classList.add('active');
+
+                } catch (error) {
+                    console.error("Fallo de conexión o parseo:", error);
+                    alert("Error crítico de conexión con el servidor. Intente nuevamente.");
+                    
+                    btn.innerHTML = originalText;
+                    btn.style.opacity = '1';
+                    btn.style.pointerEvents = 'auto';
+                }
+            });
+        </script>
+        {% endif %}
+
+    </div>
+
+</body>
+</html>

@@ -14,9 +14,9 @@ ACCESO_MODULOS = {
         # Si es Jefe -> Mándalo a la Puerta 2 (Función del archivo B)
         "controlador_logistica": "B_control_logistica.html",
     },
-    "flota_carga": {
-        "operador_transportecarga": "B_dashboard_tc.html",
-        "controlador_transportecarga": "B_dashboard_tc.html"
+    "flota": {
+        "operador_transportecarga":       "B_dashboard_tc.html",
+        "gestor_flotacarga":    "B_dashboard_gestortc.html"
     }
 }
 

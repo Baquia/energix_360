@@ -21,12 +21,12 @@ ACCESO_MODULOS = {
         "admin":              "controlmermas.html"
     },
     "flota": {
-        "operador_transporteespecial":    "vehiculos_tespecial.html",
-        "operador_transportecarga":       "A_control_logistica.html",
-        "controlador_transproteespecial": "control_vehiculos_tespecial.html",
-        "controlador_transportecarga":    "control_logistica.html",
-        "webmaster":                      "control_vehiculos_tcarga.html", 
-        "admin":                          "control_vehiculos_tcarga.html"
+        
+        "operador_transportecarga":       "B_dashboard_tc.html",
+        "gestor_flotacarga":    "B_dashboard_gestortc.html",
+    },
+    "carga": {
+        "operador_bascula": "B_gestion_carga.html"
     }
 }
 
@@ -125,7 +125,8 @@ def router_universal(modulo):
             nombre=session.get('nombre'), 
             empresa=session.get('empresa'),
             perfil=perfil_db,
-            nit=session.get('nit') 
+            nit=session.get('nit'),
+            tipo_empresa=session.get('tipo_empresa')
         )
     else:
         flash(f"Acceso denegado: Tu perfil '{perfil_db}' no tiene permisos para operar '{modulo}'.", "danger")

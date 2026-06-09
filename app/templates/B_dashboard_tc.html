@@ -105,7 +105,7 @@
 <body>
     <header class="header">
         <div class="brand-area">
-            <img src="{{ url_for('static', filename='logo_' + nit + '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
             <span class="brand-divider"></span>
             <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
         </div>
@@ -118,16 +118,16 @@
     <main class="wrap">
         <h2 class="welcome-title">Panel de Control</h2>
         <div class="modules-grid">
-            <a href="{{ url_for('bp_transporte_carga.router_control_flota', nit=nit) }}" class="module-card">
-                <div class="card-icon">🚛</div>
-                <h3 class="card-title">Control de Flota</h3>
-                <p class="card-desc">Monitoreo de carga, asignación de rutas y manifiestos.</p>
+            <a href="{{ url_for('flotacarga.preoperacional_tc', nit=nit) }}" class="module-card">
+                <div class="card-icon">🚧</div>
+                <h3 class="card-title">Preoperacional de seguridad vial</h3>
+                <p class="card-desc">Reporte de novedades del vehiculo y documentos.</p>
                 <div class="btn-card">Ingresar &rarr;</div>
             </a>
-            <a href="{{ url_for('bp_transporte_carga.ruta_conductores', nit=nit) }}" class="module-card">
-                <div class="card-icon">👮‍♂️</div>
-                <h3 class="card-title">Conductores</h3>
-                <p class="card-desc">Base de datos de conductores y gestión de permisos.</p>
+            <a href="{{ url_for('flotacarga.combustible_tc', nit=nit) }}" class="module-card">
+                <div class="card-icon">⛽</div>
+                <h3 class="card-title">Combustible</h3>
+                <p class="card-desc">Monitoreo de consumo y eficiencia de combistible</p>
                 <div class="btn-card">Gestionar &rarr;</div>
             </a>
         </div>

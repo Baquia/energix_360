@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BQA ONE | Módulo de Pesaje Avícola</title>
+    <meta name="theme-color" content="#015249">
+    <style>
+        :root {
+            --color-primary: #015249;
+            --color-primary-dark: #013d36;
+            --color-bg: #f6f7f8;
+            --color-surface: #ffffff;
+            --color-border: #e5e7eb;
+            --color-text: #111827;
+            --color-muted: #6b7280;
+            --color-danger: #b00020;
+            --radius-card: 16px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0; font-family: 'Segoe UI', Verdana, system-ui, sans-serif;
+            background-color: var(--color-bg); color: var(--color-text);
+            display: flex; flex-direction: column; min-height: 100vh;
+        }
+
+        .app-header { background-color: var(--color-primary); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; color: white; position: sticky; top: 0; z-index: 100; }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo-img { width: 40px; height: 40px; border-radius: 50%; background: white; padding: 4px; object-fit: contain; }
+        .user-info h1 { margin: 0; font-size: 16px; font-weight: 600; }
+        .user-info p { margin: 0; font-size: 12px; opacity: 0.9; }
+
+        .btn-header { color: white; text-decoration: none; background: rgba(255, 255, 255, 0.15); padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; text-align: center; }
+        
+        .main-container { flex: 1; padding: 24px 20px; max-width: 600px; margin: 0 auto; width: 100%; }
+        .page-title { font-size: 20px; font-weight: 700; color: var(--color-primary); margin: 0 0 4px; }
+        .page-sub { color: var(--color-muted); font-size: 14px; margin-bottom: 24px; }
+
+        .alert { 
+            padding: 14px 40px 14px 16px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            font-size: 14px; 
+            font-weight: 600; 
+            text-align: left; 
+            position: relative; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .alert-success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .alert-warning { background-color: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; }
+        .alert-danger { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        
+        .alert-close-btn { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 20px; font-weight: bold; opacity: 0.6; }
+        .alert-close-btn:hover { opacity: 1; }
+
+        .form-card { background: var(--color-surface); border-radius: var(--radius-card); padding: 24px 20px; border: 1px solid var(--color-border); box-shadow: 0 4px 14px rgba(15, 23, 42, .04); }
+        .form-group { margin-bottom: 16px; }
+        .form-row { display: flex; gap: 12px; }
+        .form-row .form-group { flex: 1; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--color-text); margin-bottom: 6px; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--color-border); font-size: 0.95rem; outline: none; }
+        input:focus, select:focus { border-color: var(--color-primary); background: #f9fffd; }
+
+        .btn-submit { width: 100%; padding: 14px; margin-top: 15px; border-radius: 8px; border: none; background-color: var(--color-primary); color: #ffffff; font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.3s; }
+        .btn-submit:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        
+        .btn-add { background: #e5e7eb; color: #374151; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 5px; }
+        .btn-remove { background: #fee2e2; color: #b91c1c; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+
+        .bloque-condicional { display: none; padding: 15px; background: #fdfdfd; border: 1px dashed var(--color-border); border-radius: 8px; margin-bottom: 16px; }
+        .remision-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; padding: 10px; background: #f9fafb; border-radius: 8px; border: 1px solid #eee; }
+        
+        .checkbox-scrollbox { border: 1px solid var(--color-border); border-radius: 8px; padding: 12px; max-height: 150px; overflow-y: auto; background: var(--color-surface); }
+        .checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: normal; margin-bottom: 8px; font-size: 0.9rem; cursor: pointer; }
+
+        .hseq-card { padding: 16px; border-radius: 12px; margin-top: 15px; border-left: 5px solid transparent; display: none; font-size: 14px; line-height: 1.5; }
+        .hseq-card.loading { background-color: #f3f4f6; border-left-color: #9ca3af; color: #4b5563; }
+        .hseq-card.success { background-color: #f0fdf4; border-left-color: #16a34a; color: #14532d; }
+        .hseq-card.danger { background-color: #fef2f2; border-left-color: #dc2626; color: #7f1d1d; }
+        .hseq-card-title { font-weight: 700; margin-bottom: 4px; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+
+        hr { border: 0; border-top: 1px solid var(--color-border); margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: var(--color-muted); }
+    </style>
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo-img">
+                {% if nit %}
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-img" onerror="this.style.display='none'">
+                {% endif %}
+            </div>
+            <div class="user-info">
+                <h1>{{ nombre }}</h1>
+                <p>{{ empresa }} | Báscula</p>
+            </div>
+        </div>
+        <a href="{{ url_for('gestionavicola_bp.panel_avicola') }}" class="btn-header">Volver</a>
+    </header>
+
+    <div class="main-container">
+        <h2 class="page-title">⚖️ Módulo de Pesaje</h2>
+        <div class="page-sub">Ingreso secuencial para manifiesto de carga</div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}">
+                  {{ message }}
+                  <span class="alert-close-btn" onclick="this.parentElement.remove()">&times;</span>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <div class="form-card">
+            <form action="/bqa_bascula/registrar_pesaje" method="POST" id="formPesaje">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-group">
+                    <label>Tipo de Vehículo</label>
+                    <select id="tipo_vehiculo" name="tipo_vehiculo" required onchange="toggleTipoFlota()">
+                        <option value="" disabled selected>Seleccione el tipo de flota...</option>
+                        <option value="propio">Flota Propia</option>
+                        <option value="tercero">Tercero / Contratista</option>
+                    </select>
+                </div>
+
+                <div id="grupo_placa_propio" class="bloque-condicional" style="border-color: var(--color-primary);">
+                    <div class="form-group">
+                        <label>Placa del Vehículo (Flota Propia)</label>
+                        <select id="placa_propio" name="placa_propio" onchange="validarHSEQ()">
+                            <option value="" disabled selected>Seleccione la placa registrada...</option>
+                            {% for v in vehiculos %}
+                                <option value="{{ v.placa }}">{{ v.placa }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Conductor en Báscula</label>
+                        <select id="conductor_propio" name="conductor_propio" onchange="validarHSEQ()">
+                            <option value="" disabled selected>Seleccione quién maneja...</option>
+                            {% for c in conductores %}
+                                <option value="{{ c.nombre }}">{{ c.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="mensaje_hseq" class="hseq-card"></div>
+                </div>
+
+                <div id="grupo_placa_tercero" style="display: none;">
+                    <div class="form-group">
+                        <label>Placa del Vehículo (Tercero)</label>
+                        <input type="text" id="placa_tercero" name="placa_tercero" placeholder="Ej. ABC-123" style="text-transform: uppercase;">
+                    </div>
+                    <div class="bloque-condicional" style="display: block; margin-top: 10px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tara (Vehículo Vacío Kg)</label>
+                                <input type="number" id="tara_tercero" name="tara_tercero" step="0.1" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label>Capacidad Carga (Kg)</label>
+                                <input type="number" id="capacidad_tercero" name="capacidad_tercero" step="0.1" min="0">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Conductor (Nombre o Cédula)</label>
+                            <input type="text" id="conductor_tercero" name="conductor_tercero">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" id="bloque_auxiliar" style="display: none;">
+                    <label>Auxiliar Asignado</label>
+                    <select name="auxiliar" id="auxiliar">
+                        <option value="N/A">Sin Auxiliar (N/A)</option>
+                        {% for a in auxiliares %}
+                            <option value="{{ a.nombre }}">{{ a.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div id="seccion_operacion_bascula" style="display: none;">
+                    <hr>
+
+                    <div class="form-group">
+                        <label style="color: var(--color-primary); font-size: 16px;">📋 Detalle de Remisiones</label>
+                        <div id="contenedor-remisiones">
+                            <div class="remision-row">
+                                <div class="form-group" style="margin:0; flex:1;">
+                                    <label>N° Remisión</label>
+                                    <input type="text" name="remision_numero[]" required placeholder="Ej. RM-001">
+                                </div>
+                                <div class="form-group" style="margin:0; flex:1;">
+                                    <label>Peso Mercancía (Kg)</label>
+                                    <input type="number" name="remision_peso[]" step="0.1" min="0.1" required placeholder="Ej. 1500.5">
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-add" onclick="agregarRemision()">+ Agregar otra Remisión</button>
+                    </div>
+
+                    <hr>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Total Canastas</label>
+                            <input type="number" name="total_canastas" min="0" required placeholder="Ej. 100">
+                        </div>
+                        <div class="form-group">
+                            <label>Peso x Canasta (Kg)</label>
+                            <input type="number" name="peso_unitario_canasta" step="0.1" min="0" value="2.0" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Rutas Asignadas (Puede seleccionar varias)</label>
+                        <div class="checkbox-scrollbox">
+                            {% for r in rutas %}
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="rutas_array[]" value="{{ r.nombre_ruta }}"> {{ r.nombre_ruta }} <span style="color: var(--color-muted); font-size: 0.8rem;">({{ r.tipo_ruta|capitalize }})</span>
+                                </label>
+                            {% else %}
+                                <p style="margin:0; font-size: 13px; color: var(--color-muted);">No hay rutas registradas.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="color: #b00020; font-size: 16px;">⚖️ Peso Bruto en Báscula (Kg)</label>
+                        <input type="number" name="peso_bascula" step="0.1" min="0" required placeholder="Peso TOTAL que marca la báscula" style="font-size: 20px; font-weight: bold; padding: 15px;">
+                    </div>
+
+                    <button type="submit" class="btn-submit" id="btn_guardar_pesaje">Finalizar Pesaje y Validar</button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+    <div class="footer">BQA ONE © 2026</div>
+
+    <script>
+        function toggleTipoFlota() {
+            const tipo = document.getElementById('tipo_vehiculo').value;
+            const grupoPlacaPropio = document.getElementById('grupo_placa_propio');
+            const pPropio = document.getElementById('placa_propio');
+            const condPropio = document.getElementById('conductor_propio');
+            
+            const grupoPlacaTercero = document.getElementById('grupo_placa_tercero');
+            const pTercero = document.getElementById('placa_tercero');
+            const tTara = document.getElementById('tara_tercero');
+            const tCap = document.getElementById('capacidad_tercero');
+            const tCond = document.getElementById('conductor_tercero');
+
+            const bloqueAuxiliar = document.getElementById('bloque_auxiliar');
+            const seccionBascula = document.getElementById('seccion_operacion_bascula');
+            const btnSubmit = document.getElementById('btn_guardar_pesaje');
+
+            if (tipo === 'tercero') {
+                grupoPlacaPropio.style.display = 'none';
+                pPropio.required = false; condPropio.required = false;
+                
+                grupoPlacaTercero.style.display = 'block';
+                pTercero.required = true; tTara.required = true; tCap.required = true; tCond.required = true;
+
+                bloqueAuxiliar.style.display = 'block';
+                seccionBascula.style.display = 'block';
+                btnSubmit.disabled = false;
+                document.getElementById('mensaje_hseq').style.display = "none";
+
+            } else if (tipo === 'propio') {
+                grupoPlacaPropio.style.display = 'block';
+                pPropio.required = true; condPropio.required = true;
+                
+                grupoPlacaTercero.style.display = 'none';
+                pTercero.required = false; tTara.required = false; tCap.required = false; tCond.required = false;
+
+                bloqueAuxiliar.style.display = 'block';
+                seccionBascula.style.display = 'none';
+                validarHSEQ();
+            }
+        }
+
+        async function validarHSEQ() {
+            const placa = document.getElementById('placa_propio').value;
+            const conductor = document.getElementById('conductor_propio').value;
+            const divMensaje = document.getElementById('mensaje_hseq');
+            const btnSubmit = document.getElementById('btn_guardar_pesaje'); 
+            const seccionBascula = document.getElementById('seccion_operacion_bascula');
+
+            if (placa && conductor) {
+                divMensaje.style.display = 'block';
+                divMensaje.className = 'hseq-card loading';
+                divMensaje.innerHTML = "<div class='hseq-card-title'>Auditoría Vial HSEQ</div>Validando parámetros del conductor en la base de datos... ⏳";
+                
+                btnSubmit.disabled = true;
+                seccionBascula.style.display = 'none';
+
+                try {
+                    const response = await fetch('/bqa_bascula/api/validar_preoperacional', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                        },
+                        body: JSON.stringify({ placa: placa, conductor: conductor })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.valido) {
+                        divMensaje.className = 'hseq-card success';
+                        divMensaje.innerHTML = `<div class='hseq-card-title'>✅ HSEQ AUTORIZADO</div>${data.mensaje}`;
+                        btnSubmit.disabled = false;
+                        seccionBascula.style.display = 'block'; 
+                    } else {
+                        divMensaje.className = 'hseq-card danger';
+                        divMensaje.innerHTML = `<div class='hseq-card-title'>⚠️ BLOQUEO DE SEGURIDAD</div>${data.mensaje}`;
+                        btnSubmit.disabled = true;
+                        seccionBascula.style.display = 'none'; 
+                    }
+                } catch (error) {
+                    divMensaje.className = 'hseq-card danger';
+                    divMensaje.innerHTML = "<div class='hseq-card-title'>❌ ERROR DE CONEXIÓN</div>No se pudo establecer comunicación con el servidor de auditoría.";
+                    seccionBascula.style.display = 'none';
+                }
+            } else {
+                divMensaje.style.display = 'block';
+                divMensaje.className = 'hseq-card loading';
+                divMensaje.innerHTML = "<div class='hseq-card-title'>⚙️ Control de Báscula</div>Establezca la Placa y Conductor para verificar los parámetros HSEQ.";
+                btnSubmit.disabled = true;
+                seccionBascula.style.display = 'none';
+            }
+        }
+
+        function agregarRemision() {
+            const container = document.getElementById('contenedor-remisiones');
+            const nuevaFila = document.createElement('div');
+            nuevaFila.className = 'remision-row';
+            nuevaFila.innerHTML = `
+                <div class="form-group" style="margin:0; flex:1;">
+                    <label>N° Remisión</label>
+                    <input type="text" name="remision_numero[]" required placeholder="Ej. RM-00X">
+                </div>
+                <div class="form-group" style="margin:0; flex:1;">
+                    <label>Peso Mercancía (Kg)</label>
+                    <input type="number" name="remision_peso[]" step="0.1" min="0.1" required placeholder="Ej. 1000">
+                </div>
+                <button type="button" class="btn-remove" onclick="this.parentElement.remove()" title="Eliminar">✖</button>
+            `;
+            container.appendChild(nuevaFila);
+        }
+
+        // DISPARADOR DE DESCARGA DIFERIDA AUTOMÁTICA
+        window.onload = function() {
+            {% if request.args.get('descargar_id') %}
+                // Si la URL contiene el parámetro de éxito, descarga el PDF en una pestaña oculta
+                const consecutivo = "{{ request.args.get('descargar_id') }}";
+                window.location.href = "/bqa_bascula/descargar_manifiesto/" + consecutivo;
+            {% endif %}
+        }
+    </script>
+</body>
+</html>
