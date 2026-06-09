@@ -35,7 +35,7 @@ def create_app():
         print("DEBUG ENTORNO = PYTHONANYWHERE (producción)")
         app.config['MYSQL_HOST'] = 'baquiasoft.mysql.pythonanywhere-services.com'
         app.config['MYSQL_USER'] = 'baquiasoft'
-        app.config['MYSQL_PASSWORD'] = 'Metanoia765/*'
+        app.config['MYSQL_PASSWORD'] = 'Ataraxia123*/'
         app.config['MYSQL_DB'] = 'baquiasoft$energix_360'
     else:
         print("DEBUG ENTORNO = LOCAL (desarrollo)")
