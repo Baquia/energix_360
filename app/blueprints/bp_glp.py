@@ -1499,12 +1499,12 @@ def obtener_tanques():
             cur.execute("""
                 SELECT codigo_pedido 
                 FROM pedidos_gas_glp 
-                WHERE id_empresa = %s 
+                WHERE cliente = %s 
                   AND TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
                   AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
                   AND estatus != 'cancelado'
                 ORDER BY id DESC LIMIT 1
-            """, (id_empresa, sede))
+            """, (empresa_nombre, sede))
             
             row_ped = cur.fetchone()
             if row_ped:
@@ -3306,6 +3306,7 @@ def notificar_intento_sync():
         print(f"Error en notificar_intento_sync: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
     
+@csrf.exempt
 @bp_glp.route('/confirmar_arribo_pollito', methods=['POST'])
 @login_required_custom
 def confirmar_arribo_pollito():

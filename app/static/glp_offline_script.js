@@ -1,4 +1,13 @@
+// Variable global para controlar el candado
 let pedidoPendienteGlobal = null;
+
+// NUEVA LÍNEA: Variable para evitar colapsos en la sincronización offline
+let IS_SYNCING = false;
+
+/* ==========================================================
+NUEVO FLUJO ATÓMICO: CONSUMO + NEGOCIACIÓN (OFFLINE FIRST)
+========================================================== */
+
 /* ==========================================================
 NUEVO FLUJO ATÓMICO: CONSUMO + NEGOCIACIÓN (OFFLINE FIRST)
 ========================================================== */
@@ -730,13 +739,13 @@ async function obtenerTanquesConFallback(sede) {
     }
 
     // 2. FALLBACK: Si no hay internet o falló el servidor, revisar QR embebido
-    if (typeof sedeQRData !== 'undefined' && sedeQRData && sedeQRData.tanques) {
+    if (tanquesQR && tanquesQR.length > 0) {
       console.log("🔍 Fusionando datos: QR (Hardware) + Caché Local (Niveles)");
 
       const cachedData = getTanquesLocal(sede);
       const nivelesEnCache = (cachedData && Array.isArray(cachedData.tanques)) ? cachedData.tanques : [];
 
-      const tanquesFusionados = sedeQRData.tanques.map(tqr => {
+      const tanquesFusionados = tanquesQR.map(tqr => {
         let nivelRecuperado = null;
         const coincidencia = nivelesEnCache.find(c =>
           String(c.numero).toLowerCase().trim() === String(tqr.numero).toLowerCase().trim()
@@ -2273,7 +2282,13 @@ function pedirFotoBaucher() {
 }
 
 // 9) Enviar todo al backend
-async function enviarTanqueo() {
+function enviarTanqueo() {
+  // 1. CONECTAMOS LA TUBERÍA: Pasamos los datos recolectados
+  items = registrarTanqueoData.tanques;
+
+  // 2. ACTUALIZAMOS LA CACHÉ OFFLINE
+  actualizarCacheUltimoNivel(sedeQR, items, "tanqueo");
+
   if (!items || items.length === 0) {
     alert("Error: No hay tanques cargados.");
     return;
@@ -2291,28 +2306,6 @@ async function enviarTanqueo() {
   if (!valido) { alert("Debes ingresar nivel final para todos los tanques."); return; }
   if (faltanFotos) { alert("Debes tomar la FOTO DEL NIVEL FINAL para cada tanque."); return; }
 
-  const fileInput = document.getElementById("foto_baucher_input");
-  let file = null;
-  if (fileInput && fileInput.files && fileInput.files.length > 0) {
-    file = fileInput.files[0];
-  } else if (!isForceOffline()) {
-    // Si está en offline, luego valida. Online = error si no hay.
-  }
-
-  if (file) {
-    try {
-      const base64_baucher = await comprimirImagenArchivo(file, 800, 0.4);
-      items.forEach(t => t.foto_baucher = base64_baucher);
-    } catch (e) {
-      console.error(e);
-      alert("Error procesando foto del recibo.");
-      return;
-    }
-  } else if (!isForceOffline()) {
-    alert("Debes tomar foto del recibo (vaucher).");
-    return;
-  }
-
   const opId = generarOpId("tanq");
   const payload = {
     operacion: 'tanqueo',
@@ -2322,19 +2315,15 @@ async function enviarTanqueo() {
     timestamp: new Date().toISOString()
   };
 
-  mostrarResumenOperacion("Tanqueo GLP");
+  // Liberamos el candado inmediatamente
+  pedidoPendienteGlobal = null; 
 
-  const ok = await sendWithOffline("/glp/registrar_tanqueo", payload, opId);
-  if (ok) {
-    alert("✅ Operación completada (Tanqueo).");
-    pedidoPendienteGlobal = null; // --- NUEVO: LIBERAMOS CANDADO AL TANQUEAR
-  } else {
-    alert("❌ Error: No se pudo registrar y falló el guardado local.");
-  }
-
-  cerrarResumen();
-  limpiarEstadoOperacion();
-  mostrarMenu();
+  // 3. ENVIAMOS Y DELEGAMOS AL MODAL MODERNO
+  sendWithOffline(
+    "/glp/registrar_tanqueo",
+    payload,
+    mostrarResumenOperacion
+  );
 }
 
 /* ============================
