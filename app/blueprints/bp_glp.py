@@ -1542,7 +1542,7 @@ def obtener_tanques():
             bloqueado_por_arribo = False
             motivo_bloqueo = ""
             
-            # --- SOLUCIÓN: VARIABLES POR DEFECTO PARA EVITAR CRASH (UnboundLocalError) ---
+            # --- VARIABLES POR DEFECTO PARA EVITAR CRASH (UnboundLocalError) ---
             fecha_lote_dt = datetime.now().date()
             limite_fecha = datetime(2026, 6, 15).date()
             # ----------------------------------------------------------------------------
@@ -1599,7 +1599,12 @@ def obtener_tanques():
                 """, (sede, id_empresa))
                 
                 row = cur.fetchone()
-                ultimo_nivel = 0.0
+                
+                # =================================================================
+                # SOLUCIÓN CRÍTICA: NULL en lugar de 0.0 para granjas sin historia
+                # =================================================================
+                ultimo_nivel = None 
+                
                 if row:
                     if isinstance(row, dict):
                         nivel_ini = row.get(f"nivel tk-{num_clean}")
@@ -1648,24 +1653,21 @@ def obtener_tanques():
                 bloqueado_por_pedido = True
                 motivo_bloqueo_pedido = f"⛔ OPERACIÓN BLOQUEADA\n\nNo puedes realizar esta operación porque el sistema registra un pedido de gas en tránsito (Código: {codigo_pedido_pendiente}).\n\nPara liberar el sistema, ve al menú principal y usa la opción 'Registrar tanqueo'."
 
-        if tanques_list:
-            return jsonify({
-                "success": True, 
-                "tanques": tanques_list, 
-                "lote_activo": lote_activo,
-                "info_lote": info_lote,
-                "hay_pedido_pendiente": hay_pedido_pendiente,
-                "codigo_pedido_pendiente": codigo_pedido_pendiente,
-                "bloqueado_por_arribo": bloqueado_por_arribo,
-                "motivo_bloqueo": motivo_bloqueo,
-                "bloqueado_por_pedido": bloqueado_por_pedido,
-                "motivo_bloqueo_pedido": motivo_bloqueo_pedido
-            })
-        else:
-            return jsonify({
-                "success": False, 
-                "message": f"No se encontraron tanques configurados para la sede '{sede}' bajo el NIT {id_empresa}."
-            })
+        # Siempre retornamos success: True si no hubo error de código, para entregar 
+        # las alertas, bloqueos y estados del lote a la app (Single Source of Truth).
+        return jsonify({
+            "success": True, 
+            "tanques": tanques_list,  # Puede ir vacío [] si la granja depende del QR
+            "lote_activo": lote_activo,
+            "info_lote": info_lote,
+            "hay_pedido_pendiente": hay_pedido_pendiente,
+            "codigo_pedido_pendiente": codigo_pedido_pendiente,
+            "bloqueado_por_arribo": bloqueado_por_arribo,
+            "motivo_bloqueo": motivo_bloqueo,
+            "bloqueado_por_pedido": bloqueado_por_pedido,
+            "motivo_bloqueo_pedido": motivo_bloqueo_pedido,
+            "message": "OK" if tanques_list else "Sin tanques en BD, depende de QR"
+        })
 
     except Exception as e:
         print(f"Error crítico obtener_tanques: {e}")
