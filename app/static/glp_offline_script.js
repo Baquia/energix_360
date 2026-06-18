@@ -701,22 +701,24 @@ function getTanquesLocal(sede) {
 // ===================================================
 //   OBTENER TANQUES CON FALLBACK: BD -> CACHE -> QR
 // ===================================================
+// REEMPLAZAR EN: glp_script.js y glp_offline_script.js
 async function obtenerTanquesConFallback(sede) {
   try {
-    // 1. Intentar obtener datos oficiales del servidor si hay internet
-    if (navigator.onLine) {
+    // 1. Intentar obtener datos oficiales del servidor si hay internet y NO estamos en offline forzado
+    if (navigator.onLine && (typeof isForceOffline === "function" ? !isForceOffline() : true)) {
       try {
         const response = await fetch("/glp/obtener_tanques", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sede: sede })
+          body: JSON.stringify({ sede: sede }),
+          cache: "no-store" // <-- SOLUCIÓN 1: Prohíbe al navegador/ServiceWorker usar respuestas viejas
         });
         const data = await response.json();
 
         if (data.success && data.tanques && data.tanques.length > 0) {
           console.log("✅ Datos obtenidos del servidor.");
           
-          // Guardamos la respuesta extendida en la caché local para soportar offline
+          // Guardamos la respuesta extendida en la caché local para soportar offline real
           localStorage.setItem(TANQUES_CACHE_PREFIX + sede, JSON.stringify({
             tanques: data.tanques,
             bloqueado_por_arribo: data.bloqueado_por_arribo || false,
@@ -746,13 +748,20 @@ async function obtenerTanquesConFallback(sede) {
             bloqueado_por_pedido: data.bloqueado_por_pedido || false,
             motivo_bloqueo_pedido: data.motivo_bloqueo_pedido || ""
           };
+        } else {
+          // SOLUCIÓN 2: Si el servidor dice que no hay éxito o está vacío, su palabra es LEY.
+          // Destruimos el caché fantasma para que no vuelva a bloquear operaciones.
+          localStorage.removeItem(TANQUES_CACHE_PREFIX + sede);
+          console.warn("⚠️ El servidor indicó un estado vacío o error. Caché local destruido.");
+          return null;
         }
       } catch (e) {
-        console.warn("Fallo fetch servidor, intentando fallback...", e);
+        console.warn("Fallo fetch servidor por red, intentando fallback a caché local...", e);
+        // Solo cae aquí si no hay internet real o el servidor no responde en absoluto (timeout)
       }
     }
 
-    // 2. FALLBACK: Si no hay internet o falló el servidor, revisar QR embebido
+    // 2. FALLBACK: Si no hay internet o falló el servidor por timeout, revisar QR embebido
     if (tanquesQR && tanquesQR.length > 0) {
       console.log("🔍 Fusionando datos: QR (Hardware) + Caché Local (Niveles)");
 
@@ -1310,17 +1319,27 @@ function cerrarNegociacion() {
   mostrarResumenOperacion(respuestaConsumoPendiente);
 }
 
-
 /* ============================
 Flujo común: cargar tanques
 ============================ */
-// Modificamos para aceptar el parámetro 'bloquearSiActivo'
 async function cargarTanques(callback, bloquearSiActivo = false) {
   try {
     const res = await obtenerTanquesConFallback(sedeQR);
 
+    // CONTROL DE COMPORTAMIENTO: Si el servidor destruyó el caché por inconsistencia o falló totalmente
+    if (!res) {
+      alert("Error: No se encontraron tanques para esta sede o la información fue purgada por el servidor central.");
+      mostrarMenu();
+      return;
+    }
+
     if (bloquearSiActivo && res.lote_activo) {
-      alert("⛔ YA HAY UN LOTE ACTIVO (" + (res.info_lote || "") + ").\n\nNo puedes iniciar calefacción nuevamente en esta sede sin finalizar el anterior.");
+      // Advertencia transparente si el bloqueo viene de la memoria offline local
+      if (res.fuente !== "servidor") {
+        alert("⛔ YA HAY UN LOTE ACTIVO (" + (res.info_lote || "") + ").\n\n(Aviso: Esta información proviene de la memoria del celular porque estás trabajando sin conexión. Si el lote ya fue cerrado por un administrador, conéctate a internet e inténtalo de nuevo).");
+      } else {
+        alert("⛔ YA HAY UN LOTE ACTIVO (" + (res.info_lote || "") + ").\n\nNo puedes iniciar calefacción nuevamente en esta sede sin finalizar el anterior.");
+      }
       mostrarMenu();
       return;
     }
