@@ -1542,6 +1542,11 @@ def obtener_tanques():
             bloqueado_por_arribo = False
             motivo_bloqueo = ""
             
+            # --- SOLUCIÓN: VARIABLES POR DEFECTO PARA EVITAR CRASH (UnboundLocalError) ---
+            fecha_lote_dt = datetime.now().date()
+            limite_fecha = datetime(2026, 6, 15).date()
+            # ----------------------------------------------------------------------------
+            
             if lote_row:
                 lote_activo = True
                 if isinstance(lote_row, dict):
@@ -1565,7 +1570,6 @@ def obtener_tanques():
                 else:
                     fecha_lote_dt = fecha_lote
                 
-                limite_fecha = datetime(2026, 6, 15).date()
                 if fecha_lote_dt >= limite_fecha and "| Conf. por " not in registro_lote:
                     bloqueado_por_arribo = True
                     motivo_bloqueo = "No puedes realizar consumos, tanqueos o cierres en esta granja porque se inició la calefacción pero aún no se confirma la llegada real del pollito. Por favor, ve al menú principal y selecciona 'Confirmar llegada del pollito'."
@@ -1666,6 +1670,7 @@ def obtener_tanques():
     except Exception as e:
         print(f"Error crítico obtener_tanques: {e}")
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
+
 # ======================
 # Iniciar calefacción (CORREGIDA Y BLINDADA CON NOTIFICACIONES)
 # ======================
