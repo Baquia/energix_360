@@ -644,6 +644,10 @@
 
             <button class="btn-finish" onclick="intentarTerminarItem()">TERMINAR ITEM</button>
             <button class="btn-reset" onclick="resetearConteo()">🔄 Reiniciar Conteo</button>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button onclick="declararFaltaExistencias()" style="flex:1; background:#ef4444; color:white; padding:12px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; font-size: 0.85rem;">🚫 Faltan Existencias</button>
+                <button onclick="abrirAuthSupervisor()" style="flex:1; background:#f59e0b; color:white; padding:12px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; font-size: 0.85rem;">⚠️ Alistar sin EAN</button>
+            </div>
         </div>
     </div>
 
@@ -661,8 +665,29 @@
             </div>
         </div>
     </div>
+    <div id="modal-auth-supervisor" class="modal-wrap">
+        <div class="verify-sheet">
+            <div style="font-size: 3rem; margin-bottom: 10px;">🔐</div>
+            <h3 style="margin:0; color:#1e293b; font-size:1.3rem;">Autorización Supervisor</h3>
+            <p style="color:#64748b; font-size:0.85rem; margin-bottom:15px;">Ingresa tus credenciales para autorizar el alistamiento manual sin código de barras.</p>
+            
+            <input type="text" id="auth-cedula" placeholder="Cédula del Supervisor" style="width:100%; padding:12px; border-radius:8px; border:1px solid #cbd5e1; margin-bottom:10px; box-sizing:border-box; font-size:1rem;">
+            <input type="password" id="auth-clave" placeholder="Contraseña" style="width:100%; padding:12px; border-radius:8px; border:1px solid #cbd5e1; margin-bottom:15px; box-sizing:border-box; font-size:1rem;">
+            
+            <div class="verify-btns">
+                <button class="btn-v-cancel" onclick="cerrarAuthSupervisor()">Cancelar</button>
+                <button class="btn-v-confirm" onclick="validarSupervisor()">Autorizar</button>
+            </div>
+        </div>
+    </div>
 
     <script>
+
+        // VARIABLES GLOBALES (Añadir al principio del script)
+        let novedadPendiente = null;
+        let idSupervisorAutorizado = null;
+
+
         let ordenActual = null, listaItems = [], itemActivo = null, scanner = null;
 
         function abrirMarca(marca) {
@@ -911,11 +936,14 @@
             document.getElementById('modal-picking').style.display = 'flex';
         }
 
+        // Modifica la función cerrarModalPicking para limpiar las variables
         function cerrarModalPicking() {
             detenerCamara();
             document.getElementById('modal-picking').style.display = 'none';
             itemActivo = null;
             faseAlistamiento = '';
+            novedadPendiente = null; // NUEVO
+            idSupervisorAutorizado = null; // NUEVO
         }
 
         function resetearConteo() {
@@ -1043,6 +1071,7 @@
             document.getElementById('modal-verify').style.display = 'none';
         }
 
+        / Reemplaza tu función confirmarVerificacion() actual por esta:
         function confirmarVerificacion() {
             const btn = document.querySelector('.btn-v-confirm');
             const textoOriginal = btn.textContent;
@@ -1051,52 +1080,99 @@
 
             const idParaBorrar = itemActivo.id;
 
-            // Enviamos las cajas y las unidades por separado a la base de datos
             fetch('/api/operario/confirmar_item', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id_row: idParaBorrar,
                     cajas_alistadas: itemActivo.act_cajas,
-                    unidades_alistadas: itemActivo.act_unidades
+                    unidades_alistadas: itemActivo.act_unidades,
+                    novedad: novedadPendiente,          // NUEVO DATO ENVIADO
+                    id_supervisor: idSupervisorAutorizado // NUEVO DATO ENVIADO
                 })
             })
-                .then(r => {
-                    if (!r.ok) throw new Error("Error HTTP " + r.status);
-                    return r.json();
-                })
-                .then(d => {
-                    if (d.status === 'ok') {
-                        try {
-                            cancelarVerificacion();
-                            cerrarModalPicking();
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'ok') {
+                    cancelarVerificacion();
+                    cerrarModalPicking();
+                    listaItems = listaItems.filter(i => i.id !== idParaBorrar);
+                    itemActivo = null;
+                    renderizarItems();
+                    playBeep();
+                } else {
+                    alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
+                }
+            })
+            .catch(e => alert("❌ Error de Conexión."))
+            .finally(() => {
+                btn.textContent = textoOriginal;
+                btn.disabled = false;
+            });
+        }
 
-                            listaItems = listaItems.filter(i => i.id !== idParaBorrar);
-                            itemActivo = null;
+        // ==========================================
+        // NUEVAS FUNCIONES DE NOVEDADES
+        // ==========================================
+        function declararFaltaExistencias() {
+            if (!itemActivo) return;
+            if (confirm("⚠️ ¿Seguro que este producto NO se encuentra físicamente? Se cerrará con cantidades en CERO (0).")) {
+                itemActivo.act_cajas = 0;
+                itemActivo.act_unidades = 0;
+                novedadPendiente = 'FALTA_EXISTENCIAS';
+                idSupervisorAutorizado = null; // No requiere auth por ahora, o podrías forzarlo igual si deseas.
+                intentarTerminarItem(); 
+            }
+        }
 
-                            renderizarItems();
-                            playBeep();
+        function abrirAuthSupervisor() {
+            if (!itemActivo) return;
+            document.getElementById('auth-cedula').value = '';
+            document.getElementById('auth-clave').value = '';
+            document.getElementById('modal-auth-supervisor').style.display = 'flex';
+        }
 
-                            setTimeout(() => {
-                                alert("✅ Ítem alistado y guardado correctamente.");
-                            }, 100);
+        function cerrarAuthSupervisor() {
+            document.getElementById('modal-auth-supervisor').style.display = 'none';
+        }
 
-                        } catch (errorVisual) {
-                            console.error("Error visual:", errorVisual);
-                            alert("✅ Guardado correctamente.");
-                        }
-                    } else {
-                        alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
-                    }
-                })
-                .catch(e => {
-                    console.error("Error REAL de conexión:", e);
-                    alert("❌ Error de Conexión. Verifica tu internet.");
-                })
-                .finally(() => {
-                    btn.textContent = textoOriginal;
-                    btn.disabled = false;
-                });
+        function validarSupervisor() {
+            const cedula = document.getElementById('auth-cedula').value;
+            const clave = document.getElementById('auth-clave').value;
+            if (!cedula || !clave) return alert("⚠️ Debes ingresar usuario y contraseña.");
+
+            const btn = document.querySelector('#modal-auth-supervisor .btn-v-confirm');
+            btn.textContent = 'Validando...';
+            btn.disabled = true;
+
+            fetch('/api/operario/validar_supervisor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cedula: cedula, clave: clave })
+            }).then(r => r.json()).then(d => {
+                if (d.status === 'ok') {
+                    alert(`✅ Acción autorizada por: ${d.nombre}`);
+                    idSupervisorAutorizado = d.id_supervisor;
+                    novedadPendiente = 'SIN_EAN';
+                    cerrarAuthSupervisor();
+                    
+                    // Detenemos la cámara obligatoria
+                    detenerCamara();
+                    document.getElementById('cam-overlay-btn').style.display = 'none';
+                    document.getElementById('embedded-reader').style.opacity = '0.3';
+
+                    // Llenamos las cantidades al 100% para que el operario no deba digitar todo
+                    itemActivo.act_cajas = itemActivo.req_cajas;
+                    itemActivo.act_unidades = itemActivo.req_unidades;
+                    document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+                    document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+
+                    evaluarBotonTerminar();
+                } else {
+                    alert("❌ " + (d.error || 'Error de autorización'));
+                }
+            }).catch(e => alert("Error de conexión"))
+              .finally(() => { btn.textContent = 'Autorizar'; btn.disabled = false; });
         }
     </script>
 

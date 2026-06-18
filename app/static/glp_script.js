@@ -717,13 +717,23 @@ async function obtenerTanquesConFallback(sede) {
 
         if (data.success && data.tanques && data.tanques.length > 0) {
           console.log("✅ Datos obtenidos del servidor.");
-          // Actualizamos la caché local con lo más reciente del servidor
-          cacheTanquesLocal(sede, data.tanques);
+          
+          // Guardamos la respuesta extendida en la caché local para soportar offline
+          localStorage.setItem(TANQUES_CACHE_PREFIX + sede, JSON.stringify({
+            tanques: data.tanques,
+            bloqueado_por_arribo: data.bloqueado_por_arribo || false,
+            motivo_bloqueo: data.motivo_bloqueo || "",
+            bloqueado_por_pedido: data.bloqueado_por_pedido || false,
+            motivo_bloqueo_pedido: data.motivo_bloqueo_pedido || "",
+            hay_pedido_pendiente: data.hay_pedido_pendiente || false,
+            codigo_pedido_pendiente: data.codigo_pedido_pendiente || "",
+            lote_activo: data.lote_activo || false,
+            info_lote: data.info_lote || "",
+            ts: Date.now()
+          }));
 
-          // --- NUEVO: REGISTRAMOS SI HAY PEDIDO PENDIENTE ---
           if (data.hay_pedido_pendiente) {
             pedidoPendienteGlobal = data.codigo_pedido_pendiente;
-            console.log("🔒 Candado Activo: Hay un pedido pendiente de tanqueo:", pedidoPendienteGlobal);
           } else {
             pedidoPendienteGlobal = null;
           }
@@ -732,7 +742,11 @@ async function obtenerTanquesConFallback(sede) {
             tanques: data.tanques,
             fuente: "servidor",
             lote_activo: data.lote_activo || false,
-            info_lote: data.info_lote || ""
+            info_lote: data.info_lote || "",
+            bloqueado_por_arribo: data.bloqueado_por_arribo || false,
+            motivo_bloqueo: data.motivo_bloqueo || "",
+            bloqueado_por_pedido: data.bloqueado_por_pedido || false,
+            motivo_bloqueo_pedido: data.motivo_bloqueo_pedido || ""
           };
         }
       } catch (e) {
@@ -765,9 +779,6 @@ async function obtenerTanquesConFallback(sede) {
         };
       });
 
-      cacheTanquesLocal(sede, tanquesFusionados);
-
-      // --- NUEVO: VALIDAMOS CANDADO LOCAL ---
       if (cachedData && cachedData.hay_pedido_pendiente) {
         pedidoPendienteGlobal = cachedData.codigo_pedido_pendiente;
       } else {
@@ -777,8 +788,12 @@ async function obtenerTanquesConFallback(sede) {
       return {
         tanques: tanquesFusionados,
         fuente: "qr_fusionado",
-        lote_activo: false,
-        info_lote: ""
+        lote_activo: cachedData ? cachedData.lote_activo : false,
+        info_lote: cachedData ? cachedData.info_lote : "",
+        bloqueado_por_arribo: cachedData ? cachedData.bloqueado_por_arribo : false,
+        motivo_bloqueo: cachedData ? cachedData.motivo_bloqueo : "",
+        bloqueado_por_pedido: cachedData ? cachedData.bloqueado_por_pedido : false,
+        motivo_bloqueo_pedido: cachedData ? cachedData.motivo_bloqueo_pedido : ""
       };
     }
 
@@ -791,7 +806,16 @@ async function obtenerTanquesConFallback(sede) {
       } else {
         pedidoPendienteGlobal = null;
       }
-      return finalCache;
+      return {
+        tanques: finalCache.tanques,
+        fuente: "cache_pura",
+        lote_activo: finalCache.lote_activo || false,
+        info_lote: finalCache.info_lote || "",
+        bloqueado_por_arribo: finalCache.bloqueado_por_arribo || false,
+        motivo_bloqueo: finalCache.motivo_bloqueo || "",
+        bloqueado_por_pedido: finalCache.bloqueado_por_pedido || false,
+        motivo_bloqueo_pedido: finalCache.motivo_bloqueo_pedido || ""
+      };
     }
 
     return null;
@@ -1271,6 +1295,21 @@ async function cargarTanques(callback, bloquearSiActivo = false) {
       return;
     }
 
+    // --- BLOQUEO DE SEGURIDAD EXPLICITO POR ARRIBO ---
+    if (res && res.bloqueado_por_arribo) {
+      alert(`⛔ OPERACIÓN BLOQUEADA\n\n${res.motivo_bloqueo}`);
+      mostrarMenu();
+      return;
+    }
+
+    // --- NUEVO BLOQUEO DE SEGURIDAD EXPLICITO POR PEDIDO PENDIENTE ---
+    if (res && res.bloqueado_por_pedido) {
+      alert(`${res.motivo_bloqueo_pedido}`);
+      mostrarMenu();
+      return;
+    }
+    // ------------------------------------------------------
+
     let listaTanques = (Array.isArray(res.tanques) && res.tanques.length > 0)
       ? res.tanques
       : tanquesQR;
@@ -1290,7 +1329,6 @@ async function cargarTanques(callback, bloquearSiActivo = false) {
       capacidad: Number(t.capacidad || 250),
       ultimo_nivel: t.ultimo_nivel !== undefined && t.ultimo_nivel !== null ? Number(t.ultimo_nivel) : null
     }));
-
 
     if (typeof callback === "function") callback();
 
@@ -1422,13 +1460,14 @@ function preguntarNivelFoto(onFinish) {
       return;
     }
 
+    // --- PEAJE DE SEGURIDAD (Modificado) ---
     if (tk.ultimo_nivel !== null && tk.ultimo_nivel !== undefined) {
-      if (n > tk.ultimo_nivel) {
+      // Permitimos que el nivel suba o baje SIN BLOQUEAR EXCLUSIVAMENTE en "inicio_calefaccion"
+      if (n > tk.ultimo_nivel && opActual !== "inicio_calefaccion") {
         alert(`⚠️ ERROR DE LECTURA\n\nEl nivel ingresado (${n}%) es MAYOR al último reportado (${tk.ultimo_nivel}%).\n\nEn esta operación el nivel solo puede bajar. Verifica el manómetro.`);
         return;
       }
     }
-
     nivelActualValue = n;
 
     hide(input);
@@ -1674,6 +1713,14 @@ async function cargarTanquesTanqueo(callback) {
   try {
     const res = await obtenerTanquesConFallback(sedeQR);
 
+    // --- NUEVO BLOQUEO DE SEGURIDAD EXPLICITO POR ARRIBO ---
+    if (res && res.bloqueado_por_arribo) {
+      alert(`⛔ OPERACIÓN BLOQUEADA\n\n${res.motivo_bloqueo}`);
+      mostrarMenu();
+      return;
+    }
+    // ------------------------------------------------------
+
     let tanquesDisponiblesTmp = (Array.isArray(res.tanques) ? res.tanques : []).filter(t => t !== null && t !== undefined && t.numero);
 
     if (tanquesDisponiblesTmp.length === 0) {
@@ -1688,7 +1735,6 @@ async function cargarTanquesTanqueo(callback) {
       ultimo_nivel: t.ultimo_nivel !== undefined && t.ultimo_nivel !== null ? Number(t.ultimo_nivel) : null
     }));
 
-
     if (typeof callback === "function") callback();
 
   } catch (err) {
@@ -1696,7 +1742,6 @@ async function cargarTanquesTanqueo(callback) {
     mostrarMenu();
   }
 }
-
 async function registrarTanqueo() {
   activarProteccionOperacion();
   opActual = "tanqueo";
@@ -2241,13 +2286,6 @@ async function iniciarConsumo() {
 async function registrarConsumo() {
   if (!items || items.length === 0) {
     alert("Error: No hay tanques cargados. Vuelve a escanear.");
-    return;
-  }
-
-  // --- NUEVO BLINDAJE: BLOQUEA EL CONSUMO ---
-  if (pedidoPendienteGlobal) {
-    alert(`⛔ OPERACIÓN BLOQUEADA\n\nEl sistema indica que tienes el pedido ${pedidoPendienteGlobal} pendiente de descarga.\n\nDebes ir al menú, presionar "Registrar Tanqueo" y subir las evidencias para liberar el sistema.`);
-    mostrarMenu();
     return;
   }
 

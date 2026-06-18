@@ -917,6 +917,110 @@ def _enviar_alerta_desviacion_tanqueo(
     except Exception as e:
         app.logger.error(f"⛔ Error al enviar correo desviación: {e}")
         return False
+    
+def _enviar_alerta_diferencia_saldos(empresa, ubicacion, usuario, lote_id, tanques_alerta):
+    """Envía un correo corporativo si hay una caída mayor al 10% en el inicio de calefacción (Flameo)."""
+    email_user = os.environ.get("EMAIL_USER")
+    email_pass = os.environ.get("EMAIL_PASS")
+    email_host = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+    try:
+        email_port = int(os.environ.get("EMAIL_PORT", "587"))
+    except:
+        email_port = 587
+    email_from = os.environ.get("EMAIL_FROM", email_user)
+    email_admin = os.environ.get("EMAIL_ADMIN", "bqa-one@baquia-esm.com")
+
+    if not email_user or not email_pass or not tanques_alerta:
+        return False
+
+    items_html = ""
+    for t in tanques_alerta:
+        items_html += f"""
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 8px; text-align: center;"><strong>{t['numero']}</strong></td>
+                <td style="padding: 8px; text-align: center;">{round(t['nivel_anterior'], 1)}%</td>
+                <td style="padding: 8px; text-align: center;">{round(t['nivel_nuevo'], 1)}%</td>
+                <td style="padding: 8px; background-color: #ffebee; color: #c62828; text-align: center;"><strong>-{round(t['diferencia'], 1)}%</strong></td>
+            </tr>
+        """
+
+    cuerpo = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; color: #333; line-height: 1.6; }}
+        .container {{ max-width: 650px; margin: 20px auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }}
+        .header {{ background-color: #d9534f; color: #ffffff; padding: 20px; text-align: center; }} 
+        .header h2 {{ margin: 0; font-size: 22px; }}
+        .content {{ padding: 25px; }}
+        .alert-box {{ background-color: #ffebee; border-left: 4px solid #c62828; color: #c62828; padding: 15px; border-radius: 4px; font-size: 15px; margin-bottom: 20px; }}
+        .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }}
+        .info-item {{ background: #f9fbfb; padding: 12px; border-radius: 6px; border-left: 3px solid #d9534f; }}
+        .info-label {{ font-size: 12px; color: #777; display: block; margin-bottom: 4px; }}
+        .info-value {{ font-size: 15px; font-weight: bold; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 15px; }}
+        th {{ background-color: #f2f2f2; padding: 10px; text-align: center; color: #555; }}
+        .footer {{ background-color: #f4f4f4; color: #777; padding: 15px; text-align: center; font-size: 12px; }}
+    </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>⚠️ Alerta: Diferencia de Saldo en Inicio de Lote</h2>
+            </div>
+            <div class="content">
+                <div class="alert-box">
+                    <strong>Atención:</strong> Se ha detectado una caída de nivel de gas mayor al 10% durante el período de vacío sanitario (flameo) en el inicio de un nuevo lote.
+                </div>
+                <div class="info-grid">
+                    <div class="info-item"><span class="info-label">Empresa</span><span class="info-value">{empresa}</span></div>
+                    <div class="info-item"><span class="info-label">Sede</span><span class="info-value">{ubicacion}</span></div>
+                    <div class="info-item"><span class="info-label">Lote Iniciado</span><span class="info-value">{lote_id}</span></div>
+                    <div class="info-item"><span class="info-label">Usuario Operador</span><span class="info-value">{usuario}</span></div>
+                </div>
+
+                <h3 style="color: #444; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Detalle de Tanques Afectados</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tanque</th>
+                            <th>Saldo Anterior (Cierre)</th>
+                            <th>Nivel de Arranque</th>
+                            <th>Pérdida Detectada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
+                <p style="margin-top: 20px; font-size: 12px; color: #777;">
+                    * El sistema ha permitido el inicio de la calefacción para no detener la operación, pero se requiere conciliación contable de esta diferencia.
+                </p>
+            </div>
+            <div class="footer">
+                <p>Reporte automático generado por <strong>BQA-ONE / Energix360</strong>.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    try:
+        msg = MIMEText(cuerpo, "html", "utf-8")
+        msg["Subject"] = f"🚨 Alerta Saldo GLP (>10%) Flameo - Sede: {ubicacion}"
+        msg["From"] = email_from
+        msg["To"] = email_admin
+
+        with smtplib.SMTP(email_host, email_port) as server:
+            server.starttls()
+            server.login(email_user, email_pass)
+            server.sendmail(email_user, [email_admin], msg.as_string())
+        app.logger.info(f"✅ Correo de alerta de flameo enviado para {ubicacion}")
+        return True
+    except Exception as e:
+        app.logger.error(f"⛔ Error al enviar alerta de flameo: {e}")
+        return False
 
 def _calcular_ts_consumo(dias_operacion: int):
     """
@@ -1414,35 +1518,59 @@ def obtener_tanques():
             return jsonify({"success": False, "tanques": [], "message": "JSON inválido"}), 400
 
         sede = _normalize_sede(data.get('sede'))
-        # --- CAMBIO CRÍTICO: USAMOS EL ID DE LA EMPRESA (NIT) ---
         id_empresa = session.get('empresa_id')
-        # Mantenemos el nombre solo para logs o auditorías si fuera necesario
         empresa_nombre = session.get('empresa') or ''
 
         if not sede or not id_empresa:
             return jsonify({"success": False, "message": "Sesión expirada o sede faltante. Por favor reingresa."})
 
         with mysql.connection.cursor() as cur:
-            # 1. Info del lote actual (Blindado con id_empresa y UPPER)
+            # 1. Info del lote actual (Filtrado por inicio_calefaccion para obtener metadatos de activación)
             cur.execute("""
-                SELECT lote, pollitos
+                SELECT lote, pollitos, fecha, registro
                 FROM cardex_glp
                 WHERE id_empresa=%s 
                   AND TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
                   AND estatus_lote='ACTIVO'
-                ORDER BY fecha DESC, id DESC LIMIT 1
+                  AND operacion='inicio_calefaccion'
+                ORDER BY id DESC LIMIT 1
             """, (id_empresa, sede))
             
             lote_row = cur.fetchone()
             lote_activo = False
             info_lote = ""
+            bloqueado_por_arribo = False
+            motivo_bloqueo = ""
+            
             if lote_row:
                 lote_activo = True
-                nom_lote = lote_row.get("lote") if isinstance(lote_row, dict) else lote_row[0]
-                polli = lote_row.get("pollitos") if isinstance(lote_row, dict) else lote_row[1]
+                if isinstance(lote_row, dict):
+                    nom_lote = lote_row.get("lote")
+                    polli = lote_row.get("pollitos")
+                    fecha_lote = lote_row.get("fecha")
+                    registro_lote = lote_row.get("registro") or ""
+                else:
+                    nom_lote = lote_row[0]
+                    polli = lote_row[1]
+                    fecha_lote = lote_row[2]
+                    registro_lote = lote_row[3] or ""
+                
                 info_lote = f"Lote: {nom_lote} | Aves: {polli}"
 
-            # 2. Buscar estructura base de tanques (Blindado con id_empresa y UPPER)
+                # LÓGICA DE CONTROL DE ARRIBO (A partir del 15 de Junio de 2026)
+                if isinstance(fecha_lote, str):
+                    fecha_lote_dt = datetime.strptime(fecha_lote, '%Y-%m-%d').date()
+                elif isinstance(fecha_lote, datetime):
+                    fecha_lote_dt = fecha_lote.date()
+                else:
+                    fecha_lote_dt = fecha_lote
+                
+                limite_fecha = datetime(2026, 6, 15).date()
+                if fecha_lote_dt >= limite_fecha and "| Conf. por " not in registro_lote:
+                    bloqueado_por_arribo = True
+                    motivo_bloqueo = "No puedes realizar consumos, tanqueos o cierres en esta granja porque se inició la calefacción pero aún no se confirma la llegada real del pollito. Por favor, ve al menú principal y selecciona 'Confirmar llegada del pollito'."
+
+            # 2. Buscar estructura base de tanques
             cur.execute("""
                 SELECT nombre_tanque as numero, capacidad_gls as capacidad 
                 FROM tanques_sedes 
@@ -1457,19 +1585,17 @@ def obtener_tanques():
                 cap = tk.get("capacidad") if isinstance(tk, dict) else tk[1]
                 num_clean = str(num).lower().replace("tk-", "").strip()
 
-                # Buscamos el último nivel registrado (Blindado con id_empresa y UPPER)
                 cur.execute(f"""
                     SELECT `nivel tk-{num_clean}`, `nivelfinal tk-{num_clean}`, operacion 
                     FROM cardex_glp 
                     WHERE TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
                       AND id_empresa = %s 
-                      AND estatus_lote = 'ACTIVO'
+                      AND (`nivel tk-{num_clean}` IS NOT NULL OR `nivelfinal tk-{num_clean}` IS NOT NULL)
                     ORDER BY id DESC LIMIT 1
                 """, (sede, id_empresa))
                 
                 row = cur.fetchone()
                 ultimo_nivel = 0.0
-                
                 if row:
                     if isinstance(row, dict):
                         nivel_ini = row.get(f"nivel tk-{num_clean}")
@@ -1480,7 +1606,6 @@ def obtener_tanques():
                         nivel_fin = row[1]
                         op = row[2]
                         
-                    # Lógica Anti-Espejismo (Si la última op fue tanqueo, mandar nivel final)
                     if op == "tanqueo" and nivel_fin is not None:
                         ultimo_nivel = float(nivel_fin)
                     else:
@@ -1492,7 +1617,7 @@ def obtener_tanques():
                     "ultimo_nivel": ultimo_nivel
                 })
 
-            # 3. BÚSQUEDA DE CANDADO / PEDIDOS PENDIENTES (Blindado con id_empresa y UPPER)
+           # 3. BÚSQUEDA DE CANDADO / PEDIDOS PENDIENTES
             hay_pedido_pendiente = False
             codigo_pedido_pendiente = ""
             
@@ -1511,6 +1636,14 @@ def obtener_tanques():
                 hay_pedido_pendiente = True
                 codigo_pedido_pendiente = row_ped.get("codigo_pedido") if isinstance(row_ped, dict) else row_ped[0]
 
+            # 4. LÓGICA DE CONTROL DE PEDIDO PENDIENTE (A partir del 15 de Junio de 2026)
+            bloqueado_por_pedido = False
+            motivo_bloqueo_pedido = ""
+
+            if hay_pedido_pendiente and fecha_lote_dt >= limite_fecha:
+                bloqueado_por_pedido = True
+                motivo_bloqueo_pedido = f"⛔ OPERACIÓN BLOQUEADA\n\nNo puedes realizar esta operación porque el sistema registra un pedido de gas en tránsito (Código: {codigo_pedido_pendiente}).\n\nPara liberar el sistema, ve al menú principal y usa la opción 'Registrar tanqueo'."
+
         if tanques_list:
             return jsonify({
                 "success": True, 
@@ -1518,10 +1651,13 @@ def obtener_tanques():
                 "lote_activo": lote_activo,
                 "info_lote": info_lote,
                 "hay_pedido_pendiente": hay_pedido_pendiente,
-                "codigo_pedido_pendiente": codigo_pedido_pendiente
+                "codigo_pedido_pendiente": codigo_pedido_pendiente,
+                "bloqueado_por_arribo": bloqueado_por_arribo,
+                "motivo_bloqueo": motivo_bloqueo,
+                "bloqueado_por_pedido": bloqueado_por_pedido,
+                "motivo_bloqueo_pedido": motivo_bloqueo_pedido
             })
         else:
-            # Mensaje descriptivo para ayudar al usuario a diagnosticar el problema de datos
             return jsonify({
                 "success": False, 
                 "message": f"No se encontraron tanques configurados para la sede '{sede}' bajo el NIT {id_empresa}."
@@ -1589,6 +1725,7 @@ def registrar_inicio_calefaccion():
             saldo_kg = 0.0
             densidad = 2.0
             tanques_para_pedido = [] 
+            tanques_alerta_flameo = [] # <-- NUEVO: Lista para guardar caídas bruscas
 
             # 4. Procesar Tanques (Con corrección tk-tk)
             for tk in tanques:
@@ -1603,6 +1740,42 @@ def registrar_inicio_calefaccion():
                 try: cap = float(tk.get("capacidad", 250))
                 except: cap = 250.0
                 
+                # --- NUEVO: VALIDAR SI HAY CAÍDA > 10% RESPECTO AL ÚLTIMO REGISTRO ---
+                try:
+                    cur.execute(f"""
+                        SELECT `nivel tk-{num}`, `nivelfinal tk-{num}`, operacion 
+                        FROM cardex_glp 
+                        WHERE TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
+                          AND id_empresa = %s 
+                          AND (`nivel tk-{num}` IS NOT NULL OR `nivelfinal tk-{num}` IS NOT NULL)
+                        ORDER BY id DESC LIMIT 1
+                    """, (ubicacion, id_empresa))
+                    
+                    row_last = cur.fetchone()
+                    if row_last:
+                        if isinstance(row_last, dict):
+                            n_ini = row_last.get(f"nivel tk-{num}")
+                            n_fin = row_last.get(f"nivelfinal tk-{num}")
+                            op_last = row_last.get("operacion")
+                        else:
+                            n_ini = row_last[0]
+                            n_fin = row_last[1]
+                            op_last = row_last[2]
+                            
+                        ultimo_nivel = float(n_fin) if op_last == "tanqueo" and n_fin is not None else (float(n_ini) if n_ini is not None else 0.0)
+                        
+                        diferencia = ultimo_nivel - nivel
+                        if diferencia > 10.0:
+                            tanques_alerta_flameo.append({
+                                "numero": f"TK-{num}",
+                                "nivel_anterior": ultimo_nivel,
+                                "nivel_nuevo": nivel,
+                                "diferencia": diferencia
+                            })
+                except Exception as e_caida:
+                    print(f"Error evaluando caída de nivel por flameo: {e_caida}")
+                # ----------------------------------------------------------------------
+
                 col_n = f"nivel tk-{num}"
                 col_c = f"capacidad tk-{num}"
                 col_t = f"testigo nivel tk-{num}"
@@ -1630,6 +1803,15 @@ def registrar_inicio_calefaccion():
 
             proveedor = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
             cur.execute("UPDATE cardex_glp SET saldo_estimado_kg=%s, proveedor=%s WHERE id=%s", (saldo_kg, proveedor, id_operacion))
+
+            # --- NUEVO: ENVIAR CORREO SI HUBO CAÍDAS > 10% ---
+            if tanques_alerta_flameo:
+                try:
+                    _enviar_alerta_diferencia_saldos(empresa, ubicacion, usuario, lote_id, tanques_alerta_flameo)
+                    registrar_auditoria(id_empresa, empresa, "GLP", "Sistema", "⚠️ Alerta Saldo Flameo", f"Diferencia >10% en inicio de lote {lote_id}.", "ALERTA")
+                except Exception as e_alerta:
+                    print(f"Error enviando alerta flameo: {e_alerta}")
+            # -------------------------------------------------
 
             # 5. Generación de Pedido
             pedido_info = None
@@ -1714,8 +1896,7 @@ def registrar_inicio_calefaccion():
         print(f"Error GLP inicio: {e}")
         # 🔊 REINCORPORADO: AUDITORÍA TELEGRAM FALLO
         notificar_opglp_telegram(id_empresa, usuario, "Inicio Calefacción", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
-        return jsonify({"success": False, "message": "Error interno al iniciar calefacción"}), 500
-    
+        return jsonify({"success": False, "message": "Error interno al iniciar calefacción"}), 500    
 # ======================
 # Registrar Tanqueo (VERSION PRODUCCIÓN BLINDADA ANTI-DEADLOCK)
 # ======================

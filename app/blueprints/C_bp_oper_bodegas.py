@@ -75,6 +75,10 @@ def operario_confirmar_item():
     act_cajas = d.get('cajas_alistadas', 0)
     act_unidades = d.get('unidades_alistadas', 0)
     
+    # Nuevos campos de novedad
+    novedad = d.get('novedad', None)
+    id_supervisor = d.get('id_supervisor', None)
+    
     if not id_row: return jsonify({'error': 'Datos incompletos'}), 400
 
     try:
@@ -85,9 +89,11 @@ def operario_confirmar_item():
                 estado_actividad='FINALIZADO', 
                 fecha_fin_alistamiento=NOW(),
                 cajas_alistadas=%s,
-                unidades_alistadas=%s 
+                unidades_alistadas=%s,
+                novedad_alistamiento=%s,
+                id_supervisor_novedad=%s
             WHERE id=%s AND id_empresa=%s
-        """, (act_cajas, act_unidades, id_row, session.get('empresa_id')))
+        """, (act_cajas, act_unidades, novedad, id_supervisor, id_row, session.get('empresa_id')))
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'ok', 'message': 'Item confirmado'})
@@ -140,3 +146,39 @@ def operario_items_lote(marca):
         cur.close()
         return jsonify(data)
     except: return jsonify([])
+    
+@bp_oper_bodegas.route('/api/operario/validar_supervisor', methods=['POST'])
+@csrf.exempt
+def validar_supervisor():
+    if 'usuario_id' not in session: 
+        return jsonify({'error': 'Sesión expirada'}), 401
+    
+    d = request.json
+    cedula = d.get('cedula')
+    clave = d.get('clave')
+    
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # Buscamos al usuario verificando que pertenezca a la misma empresa (MULTI-TENANT)
+        cur.execute("""
+            SELECT id, clave, nombre, perfil 
+            FROM usuarios 
+            WHERE cedula = %s AND empresa_id = %s
+        """, (cedula, session.get('empresa_id')))
+        user = cur.fetchone()
+        cur.close()
+
+        if user:
+            from app import bcrypt # Importamos bcrypt para chequear la contraseña
+            if bcrypt.check_password_hash(user['clave'], clave):
+                # Validamos que su perfil tenga autorización
+                if user.get('perfil') in ['controlador_logistica', 'administrador', 'supervisor']:
+                    return jsonify({'status': 'ok', 'id_supervisor': user['id'], 'nombre': user['nombre']})
+                else:
+                    return jsonify({'error': 'El usuario no tiene rol de supervisor'}), 403
+            else:
+                return jsonify({'error': 'Contraseña incorrecta'}), 401
+        
+        return jsonify({'error': 'Supervisor no encontrado o no pertenece a tu empresa'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

@@ -796,16 +796,18 @@ def imprimir_acta(orden):
     if 'usuario_id' not in session: return redirect('/')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Cruzamos las tablas de usuarios y vehículos para generar un documento formal
+        # Cruzamos con tabla usuarios DOS veces (una para despacho, otra para la novedad)
         cur.execute("""
             SELECT 
                 p.codigo_producto, p.descripcion_producto, p.cajas_alistadas, p.unidades_alistadas,
-                p.nombre_auxiliar_asignado, p.puerta_asignada, p.fecha_despacho,
+                p.nombre_auxiliar_asignado, p.puerta_asignada, p.fecha_despacho, p.novedad_alistamiento,
                 v.placa, v.conductor,
-                u.nombre as supervisor
+                u.nombre as supervisor,
+                sup_nov.nombre as nombre_supervisor_novedad
             FROM picking_importacion_raw p
             LEFT JOIN vehiculos v ON p.id_vehiculo = v.id
             LEFT JOIN usuarios u ON p.id_supervisor_despacho = u.id
+            LEFT JOIN usuarios sup_nov ON p.id_supervisor_novedad = sup_nov.id
             WHERE p.numero_orden_origen = %s AND p.id_empresa = %s
         """, (orden, session.get('empresa_id')))
         items = cur.fetchall()
@@ -815,8 +817,9 @@ def imprimir_acta(orden):
             return "Orden no encontrada", 404
             
         head = items[0]
+        items_normales = [i for i in items if i['novedad_alistamiento'] is None]
+        items_novedad = [i for i in items if i['novedad_alistamiento'] is not None]
         
-        # HTML Formateado para impresión (A4)
         html = f"""
         <!DOCTYPE html>
         <html lang="es">
@@ -828,16 +831,13 @@ def imprimir_acta(orden):
                 h1, h2, h3 {{ color: #000; text-align: center; margin: 5px 0; }}
                 .header-box {{ border: 2px solid #000; padding: 20px; border-radius: 10px; margin-bottom: 30px; }}
                 .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }}
-                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }}
                 th, td {{ border: 1px solid #000; padding: 10px; text-align: left; font-size:14px; }}
                 th {{ background: #f0f0f0; }}
-                .firmas {{ display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 80px; }}
+                .firmas {{ display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 80px; page-break-inside: avoid; }}
                 .firma-box {{ border-top: 2px solid #000; text-align: center; padding-top: 10px; font-size:15px; }}
                 .btn-print {{ display: block; margin: 0 auto 30px auto; padding: 15px 30px; background: #004e92; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }}
-                @media print {{
-                    .btn-print {{ display: none; }}
-                    body {{ padding: 0; }}
-                }}
+                @media print {{ .btn-print {{ display: none; }} body {{ padding: 0; }} }}
             </style>
         </head>
         <body>
@@ -854,33 +854,49 @@ def imprimir_acta(orden):
                 </div>
             </div>
             
-            <h3>Detalle de la Mercancía</h3>
+            <h3>Mercancía Alistada Conforme</h3>
             <table>
                 <thead>
                     <tr>
                         <th>Código</th>
                         <th>Producto</th>
-                        <th>Alistado por</th>
+                        <th>Operario</th>
                         <th style="text-align:center;">Cajas</th>
                         <th style="text-align:center;">Unidades</th>
                     </tr>
                 </thead>
                 <tbody>
         """
-        for item in items:
-            html += f"""
-                    <tr>
-                        <td>{item['codigo_producto'] or 'S/C'}</td>
-                        <td>{item['descripcion_producto']}</td>
-                        <td>{item['nombre_auxiliar_asignado'] or 'N/A'}</td>
-                        <td style="text-align:center; font-weight:bold;">{item['cajas_alistadas']}</td>
-                        <td style="text-align:center; font-weight:bold;">{item['unidades_alistadas']}</td>
-                    </tr>
-            """
-        html += f"""
-                </tbody>
-            </table>
+        if items_normales:
+            for item in items_normales:
+                html += f"<tr><td>{item['codigo_producto'] or 'S/C'}</td><td>{item['descripcion_producto']}</td><td>{item['nombre_auxiliar_asignado'] or 'N/A'}</td><td style='text-align:center; font-weight:bold;'>{item['cajas_alistadas']}</td><td style='text-align:center; font-weight:bold;'>{item['unidades_alistadas']}</td></tr>"
+        else:
+            html += "<tr><td colspan='5' style='text-align:center;'>No hay mercancía conforme</td></tr>"
             
+        html += """</tbody></table>"""
+
+        if items_novedad:
+            html += """
+            <h3 style="color:#b00020;">Novedades de Alistamiento</h3>
+            <table>
+                <thead style="background:#fee2e2;">
+                    <tr>
+                        <th style="background:#fecaca;">Producto</th>
+                        <th style="background:#fecaca;">Novedad</th>
+                        <th style="background:#fecaca; text-align:center;">Cajas Entregadas</th>
+                        <th style="background:#fecaca; text-align:center;">Unid. Entregadas</th>
+                        <th style="background:#fecaca;">Autoriza</th>
+                    </tr>
+                </thead>
+                <tbody>
+            """
+            for item in items_novedad:
+                novedad_texto = "Falta Existencia" if item['novedad_alistamiento'] == 'FALTA_EXISTENCIAS' else "Alistado sin EAN"
+                auth = item['nombre_supervisor_novedad'] or 'Automático'
+                html += f"<tr><td>{item['descripcion_producto']} <small>({item['codigo_producto']})</small></td><td style='color:#b00020; font-weight:bold;'>{novedad_texto}</td><td style='text-align:center;'>{item['cajas_alistadas']}</td><td style='text-align:center;'>{item['unidades_alistadas']}</td><td>{auth}</td></tr>"
+            html += """</tbody></table>"""
+            
+        html += f"""
             <div class="firmas">
                 <div class="firma-box">
                     <b>Firma Supervisor</b><br>
@@ -897,9 +913,6 @@ def imprimir_acta(orden):
         return html
     except Exception as e:
         return str(e), 500
-    
-from flask import request, jsonify # Asegúrate de tener request importado al inicio de tu archivo si no lo tienes
-
 # ==========================================
 # API: EDICIÓN Y MANTENIMIENTO DE PRODUCTOS
 # ==========================================
@@ -1188,3 +1201,30 @@ def eliminar_promocion():
     except:
         mysql.connection.rollback()
         return jsonify({'status': 'error'})
+    
+@bp_bodegas.route('/api/bodegas/reportes/novedades')
+def reporte_novedades():
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT 
+                p.numero_orden_origen as orden,
+                p.codigo_producto,
+                p.descripcion_producto,
+                p.novedad_alistamiento,
+                p.nombre_auxiliar_asignado as operario,
+                IFNULL(s.nombre, 'Sin Auth') as supervisor,
+                p.fecha_fin_alistamiento as fecha
+            FROM picking_importacion_raw p
+            LEFT JOIN usuarios s ON p.id_supervisor_novedad = s.id
+            WHERE p.id_empresa = %s AND p.novedad_alistamiento IS NOT NULL
+            ORDER BY p.fecha_fin_alistamiento DESC
+            LIMIT 100
+        """, (session.get('empresa_id'),))
+        data = cur.fetchall()
+        cur.close()
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error reporte novedades: {e}")
+        return jsonify([])
