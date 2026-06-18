@@ -1897,6 +1897,7 @@ def registrar_inicio_calefaccion():
         # 🔊 REINCORPORADO: AUDITORÍA TELEGRAM FALLO
         notificar_opglp_telegram(id_empresa, usuario, "Inicio Calefacción", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
         return jsonify({"success": False, "message": "Error interno al iniciar calefacción"}), 500    
+
 # ======================
 # Registrar Tanqueo (VERSION PRODUCCIÓN BLINDADA ANTI-DEADLOCK)
 # ======================
@@ -1933,19 +1934,36 @@ def registrar_tanqueo():
 
         # --- INICIO DE TRANSACCIÓN ---
         with mysql.connection.cursor() as cur:
+            
             # ---------------------------------------------------------
-            # NUEVO: BLOQUE DE TRAZABILIDAD Y CIERRE DE PEDIDO PENDIENTE
+            # PASO 1: BUSCAR LOTE ACTIVO (Se invierte el orden para asegurar trazabilidad)
             # ---------------------------------------------------------
-            # CORRECCIÓN 1: Se cambia 'empresa' por 'cliente'
-            # CORRECCIÓN 2: Se cambia 'ORDER BY id DESC' a 'ASC' para cerrar siempre el pedido más antiguo primero
+            cur.execute("""
+                SELECT lote
+                FROM cardex_glp
+                WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
+                ORDER BY fecha DESC, id DESC LIMIT 1
+            """, (empresa, ubicacion))
+
+            row_raw = cur.fetchone()
+            lote_id = None
+            if row_raw:
+                lote_id = row_raw.get("lote") if isinstance(row_raw, dict) else row_raw[0]
+
+            if not lote_id:
+                return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
+
+            # ---------------------------------------------------------
+            # PASO 2: TRAZABILIDAD Y CIERRE DE PEDIDO PENDIENTE DEL LOTE ACTIVO
+            # ---------------------------------------------------------
             cur.execute("""
                 SELECT codigo_pedido 
                 FROM pedidos_gas_glp 
-                WHERE cliente = %s AND TRIM(ubicacion) = TRIM(%s) 
+                WHERE cliente = %s AND TRIM(ubicacion) = TRIM(%s) AND lote = %s
                   AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
                   AND estatus != 'cancelado'
-                ORDER BY id ASC LIMIT 1
-            """, (empresa, ubicacion))
+                ORDER BY id DESC LIMIT 1
+            """, (empresa, ubicacion, lote_id))
             
             row_ped = cur.fetchone()
             codigo_trazabilidad = ""
@@ -1964,26 +1982,10 @@ def registrar_tanqueo():
                     WHERE codigo_pedido = %s
                 """, (op_id, codigo_trazabilidad))
             # ---------------------------------------------------------
-            
-            # 1. Buscar Lote Activo
-            cur.execute("""
-                SELECT lote
-                FROM cardex_glp
-                WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
-                ORDER BY fecha DESC, id DESC LIMIT 1
-            """, (empresa, ubicacion))
-
-            row_raw = cur.fetchone()
-            lote_id = None
-            if row_raw:
-                lote_id = row_raw.get("lote") if isinstance(row_raw, dict) else row_raw[0]
-
-            if not lote_id:
-                return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
 
             fecha = datetime.now().date()
             
-            # 2. Insertar Registro Base
+            # 3. Insertar Registro Base
             columnas = [
                 "fecha","empresa","id_empresa","ubicacion",
                 "lote","estatus_lote","operacion","tipo","clase",
@@ -2014,7 +2016,7 @@ def registrar_tanqueo():
             masas_facturadas = []
             errores_tanqueo = []
 
-            # 3. Procesar Tanques
+            # 4. Procesar Tanques
             for tk in tanques:
                 num_str = str(tk.get("numero", ""))
                 match = _re.search(r'\d+', num_str)
@@ -2082,7 +2084,7 @@ def registrar_tanqueo():
             saldo_estimado_gal = saldo_estimado_kg/densidad_estimada if densidad_estimada else 0.0
             cur.execute("UPDATE cardex_glp SET saldo_estimado_kg=%s, saldo_estimado_galones=%s WHERE id=%s", (round(saldo_estimado_kg,2), round(saldo_estimado_gal,2), id_operacion))
 
-            # 4. Cálculos de Consumo (Protegidos)
+            # 5. Cálculos de Consumo (Protegidos)
             consumo_kg, kg_pollito, pollitos = 0.0, 0.0, 0
             try:
                 tks_consumo = [{"numero": t.get("numero"), "capacidad": t.get("capacidad"), "nivel": t.get("nivel_inicial")} for t in tanques]
@@ -2100,7 +2102,7 @@ def registrar_tanqueo():
             if masa_esperada_total > 0:
                 desvio_total = ((masa_facturada_total - masa_esperada_total) / masa_esperada_total) * 100.0
 
-            # 5. BUSCAR PROVEEDOR Y PRECIOS (MEJORADO CON TRIM)
+            # 6. BUSCAR PROVEEDOR Y PRECIOS (MEJORADO CON TRIM)
             proveedor_principal = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
             print(f"🔍 Proveedor encontrado: '{proveedor_principal}'") # Debug en consola
 
@@ -2135,7 +2137,7 @@ def registrar_tanqueo():
                 id_operacion
             ))
 
-            # 6. Auditoría y Alertas
+            # 7. Auditoría y Alertas
             # Alerta Desviación > 8%
             if masa_esperada_total > 0 and desvio_total > 8.0 and proveedor_principal:
                 try:
@@ -2215,7 +2217,7 @@ def registrar_tanqueo():
         try: registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Sistema Tanqueo", str(e), "CRITICAL")
         except: pass
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
-
+    
 # ======================
 # Registrar consumo (VERSIÓN ATÓMICA Y BLINDADA)
 # ======================
