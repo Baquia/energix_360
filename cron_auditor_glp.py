@@ -31,7 +31,7 @@ def auditar_granjas():
         # 1. Buscamos TODOS los lotes activos y calculamos sus fechas clave
         query_lotes = """
             SELECT 
-                empresa_id, 
+                id_empresa, 
                 empresa, 
                 ubicacion, 
                 lote, 
@@ -39,16 +39,16 @@ def auditar_granjas():
                 (SELECT MIN(fecha) FROM cardex_glp c2 WHERE c2.lote = c1.lote) as fecha_inicio
             FROM cardex_glp c1
             WHERE estatus_lote = 'ACTIVO'
-            GROUP BY empresa_id, empresa, ubicacion, lote
+            GROUP BY id_empresa, empresa, ubicacion, lote
         """
         cur.execute(query_lotes)
         lotes_activos = cur.fetchall()
 
-        # Diccionario para agrupar alertas por empresa: {empresa_id: {nombre: '', alertas_frecuencia: [], alertas_vencidos: []}}
+        # Diccionario para agrupar alertas por empresa: {id_empresa: {nombre: '', alertas_frecuencia: [], alertas_vencidos: []}}
         alertas_por_empresa = {}
 
         for row in lotes_activos:
-            emp_id = row['empresa_id']
+            emp_id = row['id_empresa']
             if emp_id not in alertas_por_empresa:
                 alertas_por_empresa[emp_id] = {
                     'nombre': row['empresa'],
@@ -108,7 +108,7 @@ def auditar_granjas():
             # Buscar a los supervisores/webmasters SOLO de esta empresa
             cur.execute("""
                 SELECT telegram_id FROM usuarios 
-                WHERE empresa_id = %s AND telegram_id IS NOT NULL AND telegram_id != ''
+                WHERE id_empresa = %s AND telegram_id IS NOT NULL AND telegram_id != ''
             """, (emp_id,))
             usuarios_destino = cur.fetchall()
 
