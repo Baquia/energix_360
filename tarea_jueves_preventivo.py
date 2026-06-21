@@ -6,7 +6,7 @@ import sys
 # --- TUS CREDENCIALES (CÁMBIALAS POR LAS REALES DE PYTHONANYWHERE) ---
 DB_HOST = "baquiasoft.mysql.pythonanywhere-services.com"
 DB_USER = "baquiasof"
-DB_PASS = "Metanoia765/*"
+DB_PASS = "Ataraxia123*/"
 DB_NAME = "baquiasoft$energix_360"
 TOKEN = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
 
