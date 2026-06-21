@@ -69,7 +69,6 @@ def auditar_granjas():
                 )
 
             # REGLA 2: Frecuencia de Consumo (Pasaron 2 días, o es viernes y no han reportado hoy/ayer)
-            # Si es viernes, exigimos que el último registro sea de máximo hace 1 día (jueves o viernes)
             alerta_frecuencia = False
             razon_frecuencia = ""
 
@@ -88,14 +87,17 @@ def auditar_granjas():
         # 2. Procesar envíos empresa por empresa (Aislamiento de datos)
         for emp_id, datos in alertas_por_empresa.items():
             
-            # Buscamos a los supervisores/webmasters SOLO de esta empresa ANTES de armar el mensaje
+            # NUEVO FILTRO EXPLICITO: Buscamos usuarios que sean supervisores O operadores de gas de esta empresa
             cur.execute("""
                 SELECT telegram_id FROM usuarios 
-                WHERE empresa_id = %s AND telegram_id IS NOT NULL AND telegram_id != ''
+                WHERE empresa_id = %s 
+                  AND perfil IN ('supervisor_gas', 'operador_gas') 
+                  AND telegram_id IS NOT NULL 
+                  AND telegram_id != ''
             """, (emp_id,))
             usuarios_destino = cur.fetchall()
 
-            # Si no hay usuarios con Telegram en esta empresa, no hacemos nada
+            # Si no hay usuarios con Telegram válidos en esta empresa, pasamos a la siguiente
             if not usuarios_destino:
                 continue
 
@@ -104,10 +106,8 @@ def auditar_granjas():
 
             # Evaluar si todo está bien o si hay alertas
             if not datos['alertas_frecuencia'] and not datos['alertas_vencidos']:
-                # EL NUEVO MENSAJE DE TRANQUILIDAD
                 mensaje += "✅ *Todo en orden.*\nNo hay granjas atrasadas ni lotes vencidos el día de hoy."
             else:
-                # LAS ALERTAS DE SIEMPRE
                 if datos['alertas_frecuencia']:
                     mensaje += "⚠️ *Granjas sin reporte de consumo reciente:*\n"
                     mensaje += "\n".join(datos['alertas_frecuencia']) + "\n\n"
@@ -118,7 +118,7 @@ def auditar_granjas():
 
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
 
-            # Enviar el mensaje (ya sea el de alerta o el de todo en orden)
+            # Enviar el mensaje a todos los destinatarios válidos (Supervisores y Operadores)
             for u in usuarios_destino:
                 enviar_telegram(u['telegram_id'], mensaje)
 
@@ -128,5 +128,6 @@ def auditar_granjas():
 
     except Exception as e:
         print(f"❌ Error crítico en el auditor: {e}")
+        
 if __name__ == "__main__":
     auditar_granjas()
