@@ -108,7 +108,7 @@ def auditar_granjas():
             # Buscar a los supervisores/webmasters SOLO de esta empresa
             cur.execute("""
                 SELECT telegram_id FROM usuarios 
-                WHERE id_empresa = %s AND telegram_id IS NOT NULL AND telegram_id != ''
+                WHERE empresa_id = %s AND telegram_id IS NOT NULL AND telegram_id != ''
             """, (emp_id,))
             usuarios_destino = cur.fetchall()
 
