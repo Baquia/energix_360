@@ -44,7 +44,7 @@ def auditar_granjas():
         cur.execute(query_lotes)
         lotes_activos = cur.fetchall()
 
-        # Diccionario para agrupar alertas por empresa: {id_empresa: {nombre: '', alertas_frecuencia: [], alertas_vencidos: []}}
+        # Diccionario para agrupar alertas por empresa
         alertas_por_empresa = {}
 
         for row in lotes_activos:
@@ -88,30 +88,37 @@ def auditar_granjas():
         # 2. Procesar envíos empresa por empresa (Aislamiento de datos)
         for emp_id, datos in alertas_por_empresa.items():
             
-            # Si esta empresa no tiene ninguna alerta, la saltamos
-            if not datos['alertas_frecuencia'] and not datos['alertas_vencidos']:
-                continue
-
-            # Construir el mensaje específico para esta empresa
-            mensaje = f"📊 *REPORTE DE AUDITORÍA GLP* 📊\nEmpresa: {datos['nombre']}\n\n"
-            
-            if datos['alertas_frecuencia']:
-                mensaje += "⚠️ *Granjas sin reporte de consumo reciente:*\n"
-                mensaje += "\n".join(datos['alertas_frecuencia']) + "\n\n"
-                
-            if datos['alertas_vencidos']:
-                mensaje += "🔥 *Granjas que excedieron los 15 días de calefacción:*\n"
-                mensaje += "\n".join(datos['alertas_vencidos']) + "\n\n"
-
-            mensaje += "Por favor, contactar a los operarios de estas sedes."
-
-            # Buscar a los supervisores/webmasters SOLO de esta empresa
+            # Buscamos a los supervisores/webmasters SOLO de esta empresa ANTES de armar el mensaje
             cur.execute("""
                 SELECT telegram_id FROM usuarios 
                 WHERE empresa_id = %s AND telegram_id IS NOT NULL AND telegram_id != ''
             """, (emp_id,))
             usuarios_destino = cur.fetchall()
 
+            # Si no hay usuarios con Telegram en esta empresa, no hacemos nada
+            if not usuarios_destino:
+                continue
+
+            # Construimos el encabezado estándar
+            mensaje = f"📊 *REPORTE DE AUDITORÍA GLP* 📊\nEmpresa: {datos['nombre']}\n\n"
+
+            # Evaluar si todo está bien o si hay alertas
+            if not datos['alertas_frecuencia'] and not datos['alertas_vencidos']:
+                # EL NUEVO MENSAJE DE TRANQUILIDAD
+                mensaje += "✅ *Todo en orden.*\nNo hay granjas atrasadas ni lotes vencidos el día de hoy."
+            else:
+                # LAS ALERTAS DE SIEMPRE
+                if datos['alertas_frecuencia']:
+                    mensaje += "⚠️ *Granjas sin reporte de consumo reciente:*\n"
+                    mensaje += "\n".join(datos['alertas_frecuencia']) + "\n\n"
+                    
+                if datos['alertas_vencidos']:
+                    mensaje += "🔥 *Granjas que excedieron los 15 días de calefacción:*\n"
+                    mensaje += "\n".join(datos['alertas_vencidos']) + "\n\n"
+
+                mensaje += "Por favor, contactar a los operarios de estas sedes."
+
+            # Enviar el mensaje (ya sea el de alerta o el de todo en orden)
             for u in usuarios_destino:
                 enviar_telegram(u['telegram_id'], mensaje)
 
@@ -121,6 +128,5 @@ def auditar_granjas():
 
     except Exception as e:
         print(f"❌ Error crítico en el auditor: {e}")
-
 if __name__ == "__main__":
     auditar_granjas()
