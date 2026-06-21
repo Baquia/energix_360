@@ -18,6 +18,10 @@ from MySQLdb import OperationalError
 import requests
 import telebot
 
+from flask import abort
+from config import TELEGRAM_BOT_TOKEN  # Asegúrate de tener tu Token en la configuración
+from models import db, Usuario         # Tus modelos de base de datos
+
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
@@ -32,94 +36,77 @@ co_holidays = holidays.CO()  # Inicializamos Festivos Colombia
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
-
 EMAIL_USER = os.environ.get("EMAIL_USER")
 EMAIL_PASS = os.environ.get("EMAIL_PASS")
-
 EMAIL_FROM = os.environ.get("EMAIL_FROM", EMAIL_USER)
-
 
 # ==========================================
 # CONFIGURACIÓN DEL BOT Y WEBHOOK
 # ==========================================
 TOKEN = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
+# Inicializar el bot sin iniciar el "polling"
 bot = telebot.TeleBot(TOKEN, threaded=False)
 
-# FUNCIÓN MAESTRA DE NOTIFICACIONES AUDITORÍA (MULTIEMPRESA)
-def notificar_opglp_telegram(id_empresa, usuario, operacion, sede, fecha, estado="exito"):
-    """
-    Envía reportes de estado a los supervisores de la empresa específica.
-    Estados: exito (✅), fallo (❌), sync (🔄), pendientes (⚠️)
-    """
-    iconos = {"exito": "✅ ÉXITO", "fallo": "❌ FALLO SISTEMA", "sync": "🔄 SYNC OFFLINE", "pendientes": "⚠️ PENDIENTES"}
-    titulo = iconos.get(estado, "📢 AVISO")
-    
-    mensaje = (
-        f"*{titulo}*\n\n"
-        f"🏢 *Empresa ID:* {id_empresa}\n"
-        f"📍 *Sede:* {sede}\n"
-        f"👤 *Usuario:* {usuario}\n"
-        f"⚙️ *Operación:* {operacion}\n"
-        f"📅 *Fecha:* {fecha}\n"
-    )
-    
-    if estado == "sync":
-        mensaje += "_Estado: Datos guardados fuera de línea subidos correctamente._"
-    elif estado == "pendientes":
-        mensaje += "_Aviso: El operario ha iniciado una sincronización manual de datos atrasados._"
-
-    try:
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT telegram_id FROM usuarios WHERE empresa_id = %s AND telegram_id IS NOT NULL", (id_empresa,))
-        destinatarios = cur.fetchall()
-        cur.close()
-
-        for row in destinatarios:
-            chat_id = row['telegram_id'] if isinstance(row, dict) else row[0]
-            url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-            requests.post(url, data={"chat_id": chat_id, "text": mensaje, "parse_mode": "Markdown"}, timeout=5)
-    except Exception as e:
-        print(f"Error notificar_opglp_telegram: {e}")
-
-# RUTA PARA EL WEBHOOK (Registro permanente de usuarios)
+# RUTA PARA EL WEBHOOK (Punto de entrada automático)
 @csrf.exempt
-@bp_glp.route('/telegram_webhook', methods=['POST'])
+@bp_glp.route(f'/telegram-webhook/{TOKEN}', methods=['POST'])
 def telegram_webhook():
     if request.headers.get('content-type') == 'application/json':
         json_string = request.get_data().decode('utf-8')
         update = telebot.types.Update.de_json(json_string)
         bot.process_new_updates([update])
-        return ''
+        return 'OK', 200
     else:
-        return jsonify({"status": "forbidden"}), 403
+        abort(403)
 
-# Lógica de vinculación (Movida de enlazar_bot_dev.py)
+# -------------------------------------------------------------------------
+# LÓGICA DEL BOT (Vinculación de Cuentas)
+# -------------------------------------------------------------------------
 @bot.message_handler(commands=['start'])
-def start(message):
+def send_welcome(message):
+    # Crear teclado nativo para solicitar el contacto
     markup = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    markup.add(telebot.types.KeyboardButton(text="📱 Compartir mi número", request_contact=True))
-    bot.reply_to(message, "👋 Hola. Presiona el botón abajo para vincular tu cuenta a BQA ONE:", reply_markup=markup)
+    button_phone = telebot.types.KeyboardButton(text="📱 Compartir mi número de teléfono", request_contact=True)
+    markup.add(button_phone)
+    
+    bot.send_message(
+        message.chat.id, 
+        "👋 Hola. Presiona el botón abajo para vincular tu cuenta a BQA ONE:", 
+        reply_markup=markup
+    )
 
 @bot.message_handler(content_types=['contact'])
-def contact(message):
-    if message.contact:
+def handle_contact(message):
+    if message.contact is not None:
+        # Normalizar el número (tomar últimos 9 dígitos)
         tel = message.contact.phone_number.replace("+", "").replace(" ", "")[-9:]
+        telegram_id = message.chat.id
+
         try:
             cur = mysql.connection.cursor()
+            # Buscamos al usuario por su teléfono (Aislamiento MySQL)
             cur.execute("SELECT id, nombre FROM usuarios WHERE telefono LIKE %s", (f"%{tel}",))
             user = cur.fetchone()
+            
             if user:
                 uid = user['id'] if isinstance(user, dict) else user[0]
                 unom = user['nombre'] if isinstance(user, dict) else user[1]
-                cur.execute("UPDATE usuarios SET telegram_id = %s WHERE id = %s", (str(message.chat.id), uid))
+                
+                # Guardamos el ID de Telegram y confirmamos el vínculo
+                cur.execute("UPDATE usuarios SET telegram_id = %s WHERE id = %s", (str(telegram_id), uid))
                 mysql.connection.commit()
-                bot.reply_to(message, f"✅ Vínculo exitoso, {unom}!")
+                
+                bot.send_message(telegram_id, f"✅ ¡Vínculo exitoso, {unom}!")
             else:
-                bot.reply_to(message, "❌ Tu número no está registrado en el sistema.")
+                bot.send_message(telegram_id, "❌ Tu número no está registrado en el sistema Energix 360.")
+            
             cur.close()
-        except: bot.reply_to(message, "Error en base de datos.")
-
-
+        except Exception as e:
+            print(f"Error vinculando Telegram: {e}")
+            bot.send_message(telegram_id, "Error en base de datos al intentar vincular la cuenta.")
+            
+            
+#hasta acá....
 def _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, nivel, codigo):
     """
     Envía alerta usando la API NATIVA de Telegram a TODOS los usuarios 
@@ -2409,6 +2396,7 @@ def registrar_consumo():
         # 🔊 NUEVO: AUDITORÍA TELEGRAM FALLO
         notificar_opglp_telegram(id_empresa, usuario, "Registro de Consumo", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
+
 # ======================
 # Finalizar calefacción (VERSION PRODUCCIÓN BLINDADA)
 # ======================
@@ -2525,7 +2513,26 @@ def finalizar_calefaccion_batch():
                     if intento == max_intentos - 1: raise e
                 else: raise e
 
-        return jsonify({"success": True, "message": f"Calefacción cerrada correctamente.", "resumen": {"operacion": "finalizar_calefaccion", "sede": ubicacion, "lote": lote_id, "dias": dias_operacion, "kg": round(consumo_kg,2)}})
+        # Preparar la respuesta completa para la tarjeta verde (UI)
+        resumen = {
+            "operacion": "finalizar_calefaccion",
+            "sede": ubicacion,
+            "lote": lote_id,
+            "fecha": fecha.strftime("%Y-%m-%d"),
+            "tanques": _resumen_tanques([{"numero": t.get("numero"), "nivel": t.get("nivel"), "capacidad": t.get("capacidad")} for t in tanques]),
+            "saldo_estimado_kg": round(saldo_estimado_kg, 2),
+            "dias_operacion": dias_operacion,
+            "kg_consumidos": round(consumo_kg, 2),
+            "kg_pollito": round(kg_pollito, 6) if kg_pollito > 0 else 0.0,
+            "pollitos": pollitos,
+            "op_id": op_id
+        }
+
+        return jsonify({
+            "success": True, 
+            "message": "Calefacción cerrada correctamente.", 
+            "resumen": resumen
+        })
 
     except IntegrityError as e:
         return _manejar_error_idempotencia(e, "finalizar_calefaccion", ubicacion)
@@ -2535,7 +2542,6 @@ def finalizar_calefaccion_batch():
         # 🔊 NUEVO: AUDITORÍA TELEGRAM FALLO
         notificar_opglp_telegram(id_empresa, usuario, "Finalización de Calefacción", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
-
                
 # --- FUNCIÓN DE CONSULTA DE PEDIDOS ---
 @bp_glp.route('/consultar_pedidos_pendientes', methods=['POST'])
@@ -3557,3 +3563,123 @@ def confirmar_arribo_pollito():
     except Exception as e:
         print(traceback.format_exc())
         return jsonify({"success": False, "message": str(e)})
+    
+# ==========================================
+# RUTA PARA ANÁLISIS DE LOTE (DASHBOARD)
+# ==========================================
+@csrf.exempt
+@bp_glp.route('/consultar_analisis_lote', methods=['POST'])
+@login_required_custom
+def consultar_analisis_lote():
+    try:
+        data = request.get_json(force=True) or {}
+        sede = _normalize_sede(data.get('sede'))
+        id_empresa = session.get('empresa_id')
+
+        if not sede or not id_empresa:
+            return jsonify({"success": False, "message": "Faltan datos o sesión expirada."}), 400
+
+        with mysql.connection.cursor() as cur:
+            # 1. Buscar lote activo
+            cur.execute("""
+                SELECT lote FROM cardex_glp 
+                WHERE id_empresa = %s AND TRIM(ubicacion) = TRIM(%s) AND estatus_lote = 'ACTIVO'
+                ORDER BY id DESC LIMIT 1
+            """, (id_empresa, sede))
+            lote_row = cur.fetchone()
+            
+            if not lote_row:
+                return jsonify({"success": False, "message": "No hay un lote ACTIVO en esta sede para analizar."})
+            
+            lote_id = lote_row['lote'] if isinstance(lote_row, dict) else lote_row[0]
+
+            # 2. Rescatar la población real (del inicio_calefaccion)
+            cur.execute("""
+                SELECT pollitos FROM cardex_glp 
+                WHERE lote = %s AND operacion = 'inicio_calefaccion' 
+                LIMIT 1
+            """, (lote_id,))
+            pop_row = cur.fetchone()
+            pollitos_arranque = 0
+            if pop_row:
+                pollitos_arranque = pop_row['pollitos'] if isinstance(pop_row, dict) else pop_row[0]
+
+            # 3. Obtener el historial completo
+            cur.execute("""
+                SELECT fecha, operacion, neto_gastado, kg_pollito, saldo_estimado_kg, dias_operacion, precio_total
+                FROM cardex_glp
+                WHERE lote = %s AND id_empresa = %s
+                ORDER BY fecha ASC, id ASC
+            """, (lote_id, id_empresa))
+            
+            historial = cur.fetchall()
+
+            labels = []
+            data_eficiencia = []
+            
+            total_consumo = 0.0
+            total_facturado = 0.0
+            ultimo_saldo = 0.0
+            dias_lote = 0
+            eficiencia_actual = 0.0
+
+            consumo_por_fecha = {}
+
+            # Recorrer historial y sumar KPIs
+            for row in historial:
+                r = dict(zip([d[0] for d in cur.description], row)) if not isinstance(row, dict) else row
+                fecha_str = r['fecha'].strftime('%Y-%m-%d') if hasattr(r['fecha'], 'strftime') else str(r['fecha'])
+                
+                if fecha_str not in consumo_por_fecha:
+                    consumo_por_fecha[fecha_str] = {'eficiencia': 0.0}
+                
+                # Acumular Consumo y Dinero
+                total_consumo += float(r.get('neto_gastado') or 0.0)
+                total_facturado += float(r.get('precio_total') or 0.0)
+                
+                if float(r.get('saldo_estimado_kg') or 0.0) > 0: 
+                    ultimo_saldo = float(r.get('saldo_estimado_kg') or 0.0)
+                if r.get('dias_operacion'):
+                    dias_lote = int(r.get('dias_operacion'))
+                    
+                # Guardar el último Kg/Ave del día para la gráfica
+                ef_tk = float(r.get('kg_pollito') or 0.0)
+                if ef_tk > 0:
+                    eficiencia_actual = ef_tk
+                    consumo_por_fecha[fecha_str]['eficiencia'] = ef_tk 
+
+            # Construir puntos de la gráfica
+            for f, vals in consumo_por_fecha.items():
+                labels.append(f[-5:]) # MM-DD (Mes y Día)
+                if vals['eficiencia'] > 0:
+                    data_eficiencia.append(round(vals['eficiencia'], 4))
+                else:
+                    data_eficiencia.append(data_eficiencia[-1] if data_eficiencia else 0.0)
+
+            # Calcular Costo por Ave
+            costo_por_ave = 0.0
+            if pollitos_arranque and pollitos_arranque > 0:
+                costo_por_ave = total_facturado / pollitos_arranque
+
+            return jsonify({
+                "success": True,
+                "kpis": {
+                    "sede": sede,
+                    "lote": lote_id,
+                    "dias_operacion": dias_lote,
+                    "poblacion": pollitos_arranque or 0,
+                    "total_consumo_kg": round(total_consumo, 2),
+                    "eficiencia_actual": round(eficiencia_actual, 4),
+                    "saldo_actual_kg": round(ultimo_saldo, 2),
+                    "total_facturado": round(total_facturado, 0),
+                    "costo_por_ave": round(costo_por_ave, 2)
+                },
+                "grafica": {
+                    "labels": labels,
+                    "eficiencia": data_eficiencia
+                }
+            })
+
+    except Exception as e:
+        print(f"Error en analisis de lote: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500

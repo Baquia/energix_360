@@ -10,6 +10,7 @@
   <meta name="theme-color" content="#015249">
 
   <script src="/static/js/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
 </head>
@@ -36,8 +37,7 @@
         🐣 Confirmar llegada del pollito
       </button>
 
-      <button class="menu-btn"
-        onclick="solicitarConfirmacion('¿Deseas iniciar una nueva operación de CALEFACCIÓN?', iniciarCalefaccion)">
+      <button class="menu-btn" onclick="solicitarConfirmacion('¿Deseas iniciar una nueva operación de CALEFACCIÓN?', iniciarCalefaccion)">
         🔥 Iniciar calefacción
       </button>
 
@@ -45,18 +45,62 @@
         ⛽ Registrar tanqueo
       </button>
 
-      <button class="menu-btn"
-        onclick="solicitarConfirmacion('¿Deseas registrar el CONSUMO actual?', iniciarConsumo)">
+      <button class="menu-btn" onclick="solicitarConfirmacion('¿Deseas registrar el CONSUMO actual?', iniciarConsumo)">
         📊 Registrar consumo
       </button>
 
-      <button class="menu-btn"
-        onclick="solicitarConfirmacion('¿Estás seguro de que deseas FINALIZAR la calefacción de este lote?', finalizarCalefaccion)">
+      <button class="menu-btn" onclick="solicitarConfirmacion('¿Estás seguro de que deseas FINALIZAR la calefacción de este lote?', finalizarCalefaccion)">
         🔥 Finalizar calefacción
+      </button>
+
+      <button class="menu-btn" 
+        style="background: #ede7f6; color: #283593; border: 2px solid #3f51b5; font-weight: bold;"
+        onclick="iniciarAnalisisLote()">
+        📈 Análisis del lote
       </button>
 
     </div>
 
+    <div id="panelAnalisis" style="display:none; width: 100%; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); text-align: left;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h3 style="color: #015249; margin: 0; font-size: 1.2rem;">Análisis de Lote</h3>
+          <button onclick="cerrarAnalisis()" style="background: #f4f6f7; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; color: #555; cursor: pointer;">Volver</button>
+      </div>
+      
+      <h4 id="analisis_sede_nombre" style="margin: 0 0 5px 0; color: #1976d2; font-size: 1.1rem;"></h4>
+      <p id="analisis_lote_nombre" style="font-size: 0.8rem; color: #888; margin-top: 0; margin-bottom: 20px; word-break: break-all;"></p>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #015249;">
+              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">DÍAS DE LOTE</span>
+              <span id="kpi_dias" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
+          </div>
+          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #1976d2;">
+              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">POBLACIÓN</span>
+              <span id="kpi_poblacion" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
+          </div>
+          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #d32f2f;">
+              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">CONSUMO TOTAL</span>
+              <span id="kpi_consumo" style="font-size: 1.2rem; font-weight: bold; color: #333;">-- kg</span>
+          </div>
+          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #f57c00;">
+              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">Kg / AVE (Acumulado)</span>
+              <span id="kpi_eficiencia" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
+          </div>
+          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #2e7d32;">
+              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">TOTAL FACTURADO</span>
+              <span id="kpi_facturado" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
+          </div>
+          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #7b1fa2;">
+              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">$ / AVE</span>
+              <span id="kpi_costo_ave" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
+          </div>
+      </div>
+
+      <div style="width: 100%; height: 220px; position: relative;">
+          <canvas id="graficaAnalisis"></canvas>
+      </div>
+    </div>
     <div id="conversacion" style="display:none">
       <div id="lectorQR" style="display:none; min-height: 250px; background-color: #000;"></div>
       <input id="respuestaInput" type="text" style="display:none" />

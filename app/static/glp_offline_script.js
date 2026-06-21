@@ -717,7 +717,7 @@ async function obtenerTanquesConFallback(sede) {
 
         if (data.success && data.tanques && data.tanques.length > 0) {
           console.log("✅ Datos obtenidos del servidor.");
-          
+
           // Guardamos la respuesta extendida en la caché local para soportar offline real
           localStorage.setItem(TANQUES_CACHE_PREFIX + sede, JSON.stringify({
             tanques: data.tanques,
@@ -2315,7 +2315,7 @@ function pedirFotoBaucher() {
       return;
     }
 
-    if (btn.disabled) return; 
+    if (btn.disabled) return;
     btn.disabled = true;
     const textoOriginal = btn.textContent;
     btn.textContent = "Procesando...";
@@ -2324,13 +2324,13 @@ function pedirFotoBaucher() {
       const base64 = await comprimirImagenArchivo(f, 800, 0.4);
       tanqueActualDatos.foto_baucher = String(base64 || "");
       registrarTanqueoData.tanques.push(tanqueActualDatos);
-      
+
       btn.disabled = false;
       btn.textContent = textoOriginal;
 
       tanqueActualIndex++;
       preguntarSiTanquearTanqueActual();
-      
+
     } catch (err) {
       btn.disabled = false;
       btn.textContent = textoOriginal;
@@ -2375,7 +2375,7 @@ function enviarTanqueo() {
   };
 
   // Liberamos el candado inmediatamente
-  pedidoPendienteGlobal = null; 
+  pedidoPendienteGlobal = null;
 
   // 3. ENVIAMOS Y DELEGAMOS AL MODAL MODERNO
   sendWithOffline(
@@ -2743,6 +2743,131 @@ async function ejecutarConfirmarArribo() {
     if (typeof flushOfflineQueue === "function") flushOfflineQueue();
   }
 }
+
+// ============================================
+// NUEVO: ANÁLISIS DE LOTE EN TIEMPO REAL
+// ============================================
+let chartAnalisis = null;
+
+async function iniciarAnalisisLote() {
+  // 1. Bloqueo estricto offline: Este panel consulta la historia completa en BD
+  if (!navigator.onLine || (typeof isForceOffline === "function" && isForceOffline())) {
+    alert("📡 MODO OFFLINE DETECTADO\n\nPara generar la gráfica y el análisis histórico de la granja, necesitas tener conexión a internet.");
+    return;
+  }
+
+  try {
+    // 2. Leer QR de la sede
+    const info = await leerQR("Escanea el QR para generar el análisis");
+    sedeQR = info.sede;
+
+    const texto = document.getElementById("preguntaTexto");
+    if (texto) texto.textContent = "Analizando historial en el servidor...";
+
+    // 3. Petición al backend
+    const response = await fetch('/glp/consultar_analisis_lote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sede: sedeQR })
+    });
+
+    const data = await response.json();
+    if (texto) texto.textContent = "";
+
+    if (!data.success) {
+      alert("⚠️ " + data.message);
+      mostrarMenu();
+      return;
+    }
+
+    renderizarPanelAnalisis(data);
+
+  } catch (e) {
+    console.error(e);
+    alert("Operación cancelada o error al leer el QR.");
+    mostrarMenu();
+  }
+}
+
+function renderizarPanelAnalisis(data) {
+  document.getElementById("menuOpciones").style.display = "none";
+  document.getElementById("conversacion").style.display = "none";
+  document.querySelector(".logout").style.display = "none";
+
+  // Inyectar Ubicación y Lote
+  document.getElementById("analisis_sede_nombre").innerText = "📍 " + data.kpis.sede;
+  document.getElementById("analisis_lote_nombre").innerText = "Lote: " + data.kpis.lote;
+
+  // Inyectar KPIs base
+  document.getElementById("kpi_dias").innerText = data.kpis.dias_operacion;
+  document.getElementById("kpi_poblacion").innerText = (data.kpis.poblacion || 0).toLocaleString();
+  document.getElementById("kpi_consumo").innerText = data.kpis.total_consumo_kg + " kg";
+  document.getElementById("kpi_eficiencia").innerText = data.kpis.eficiencia_actual;
+
+  // Formatear Financieros a Moneda
+  const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
+  document.getElementById("kpi_facturado").innerText = formatMoney(data.kpis.total_facturado);
+  document.getElementById("kpi_costo_ave").innerText = formatMoney(data.kpis.costo_por_ave);
+
+  document.getElementById("panelAnalisis").style.display = "block";
+
+  // Destruir instancia anterior
+  if (chartAnalisis) {
+    chartAnalisis.destroy();
+  }
+
+  // Gráfica Lineal Sencilla y Limpia (Fecha vs Kg/Ave Acumulado)
+  const ctx = document.getElementById('graficaAnalisis').getContext('2d');
+  chartAnalisis = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.grafica.labels,
+      datasets: [
+        {
+          label: 'Kg/Ave Acumulado',
+          data: data.grafica.eficiencia,
+          borderColor: '#f57c00', // Naranja corporativo
+          backgroundColor: 'rgba(245, 124, 0, 0.1)',
+          borderWidth: 3,
+          pointRadius: 4,
+          pointBackgroundColor: '#d84315',
+          fill: true,
+          tension: 0.3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          ticks: { font: { size: 10 } }
+        },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Kg / Ave', font: { size: 11, weight: 'bold' } }
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { boxWidth: 15, font: { size: 11, weight: 'bold' } }
+        }
+      }
+    }
+  });
+}
+
+function cerrarAnalisis() {
+  document.getElementById("panelAnalisis").style.display = "none";
+  document.querySelector(".logout").style.display = "block"; // Restaurar botón rojo
+  if (chartAnalisis) {
+    chartAnalisis.destroy();
+    chartAnalisis = null;
+  }
+  mostrarMenu();
+}
+
 // Se ejecuta en todos los estados posibles
 window.addEventListener("load", actualizarBloqueoLogout);
 window.addEventListener("online", actualizarBloqueoLogout);
