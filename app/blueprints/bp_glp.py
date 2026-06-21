@@ -19,8 +19,6 @@ import requests
 import telebot
 
 from flask import abort
-from config import TELEGRAM_BOT_TOKEN  # Asegúrate de tener tu Token en la configuración
-from models import db, Usuario         # Tus modelos de base de datos
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
