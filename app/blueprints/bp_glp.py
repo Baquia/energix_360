@@ -166,6 +166,68 @@ def _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, nivel, codig
         print(f"❌ Error general en multi-envío Telegram: {e}")
         return False
 
+
+def notificar_opglp_telegram(id_empresa, usuario, operacion, sede, fecha, estado="exito"):
+    """
+    Envía la Notificación Maestra de Operaciones GLP a todos los usuarios 
+    vinculados de la empresa correspondiente (Garantiza aislamiento de datos).
+    """
+    TOKEN = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
+    
+    # Mapeo dinámico del Semáforo de Certidumbre solicitado
+    emoji_estado = "ÉXITO ✅"
+    if estado == "fallo":
+        # Formato de colapso en servidor
+        emoji_estado = "FALLO ❌"
+    elif estado == "sync":
+        # Formato para registros subidos desde cola offline PWA
+        emoji_estado = "SYNC 🔄"
+    elif estado == "pendientes":
+        # Formato para el envío forzado manual
+        emoji_estado = "PENDIENTES ⚠️"
+
+    # Construcción exacta según el estándar del documento corporativo
+    mensaje = (
+        f"{emoji_estado}\n\n"
+        f"🏢 *Empresa ID:* {id_empresa}\n"
+        f"📍 *Sede:* {sede}\n"
+        f"👤 *Usuario:* {usuario}\n"
+        f"⚙️ *Operación:* {operacion}\n"
+        f"📅 *Fecha:* {fecha}"
+    )
+
+    try:
+        cur = mysql.connection.cursor()
+        # Filtrado blindado por id_empresa para mantener la privacidad multiusuario
+        cur.execute("""
+            SELECT telegram_id 
+            FROM usuarios 
+            WHERE empresa_id = %s AND telegram_id IS NOT NULL AND telegram_id != ''
+        """, (id_empresa,))
+        usuarios_destino = cur.fetchall()
+        cur.close()
+
+        if not usuarios_destino:
+            print(f"⚠️ Telegram Maestro: No hay usuarios vinculados para la empresa ID {id_empresa}")
+            return False
+
+        # Envío transaccional uno a uno a los supervisores vinculados
+        for row in usuarios_destino:
+            chat_id = row['telegram_id'] if isinstance(row, dict) else row[0]
+            url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+            data = {
+                "chat_id": chat_id,
+                "text": mensaje,
+                "parse_mode": "Markdown"
+            }
+            requests.post(url, data=data, timeout=5)
+            
+        print(f"✅ Notificación Maestra Telegram enviada al grupo corporativo de la Empresa ID {id_empresa}")
+        return True
+    except Exception as e:
+        print(f"❌ Error crítico ejecutando notificar_opglp_telegram: {e}")
+        return False
+    
 # ==============
 # Utilidades base
 # ==============
@@ -1914,6 +1976,10 @@ def registrar_tanqueo():
         check = _verificar_idempotencia(op_id, "tanqueo", ubicacion)
         if check: return check
 
+        # NUEVO: Captura bandera de sincronización para Telegram
+        es_sync = data.get('is_sync', False)
+        estado_notif = "sync" if es_sync else "exito"
+
         empresa    = session.get('empresa') or ''
         usuario    = session.get('nombre') or ''
         id_empresa = session.get('empresa_id') or 0
@@ -2155,6 +2221,9 @@ def registrar_tanqueo():
                 nivel="INFO"
             )
 
+            # 🔊 ADICIÓN: NOTIFICACIÓN MAESTRA DE TELEGRAM PARA TANQUEO EXITOSO
+            notificar_opglp_telegram(id_empresa, usuario, "Registrar Tanqueo", ubicacion, fecha.strftime("%Y-%m-%d"), estado=estado_notif)
+
             mysql.connection.commit()
 
         # Respuesta Exitosa (NUEVO: Confirma el cierre del pedido)
@@ -2206,10 +2275,14 @@ def registrar_tanqueo():
         mysql.connection.rollback()
         print("❌ ERROR CRÍTICO EN REGISTRAR TANQUEO:")
         traceback.print_exc()
+        
+        # 🔊 ADICIÓN: NOTIFICACIÓN MAESTRA DE TELEGRAM PARA FALLO EN TANQUEO
+        notificar_opglp_telegram(id_empresa, usuario, "Registrar Tanqueo", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
+        
         try: registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Sistema Tanqueo", str(e), "CRITICAL")
         except: pass
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
-    
+        
 # ======================
 # Registrar consumo (VERSIÓN ATÓMICA Y BLINDADA)
 # ======================

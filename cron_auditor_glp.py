@@ -87,9 +87,9 @@ def auditar_granjas():
         # 2. Procesar envíos empresa por empresa (Aislamiento de datos)
         for emp_id, datos in alertas_por_empresa.items():
             
-            # Buscamos usuarios supervisores u operadores
+            # Buscamos usuarios supervisores u operadores (Añadido DISTINCT para evitar duplicados)
             cur.execute("""
-                SELECT telegram_id FROM usuarios 
+                SELECT DISTINCT telegram_id FROM usuarios 
                 WHERE empresa_id = %s 
                   AND perfil IN ('supervisor_gas', 'operador_gas') 
                   AND telegram_id IS NOT NULL 
@@ -114,12 +114,19 @@ def auditar_granjas():
 
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
 
+            # Set para llevar el control de a quién ya se le envió en este ciclo
+            enviados = set()
+
             # Enviar a los destinatarios de la base de datos
             for u in usuarios_destino:
-                enviar_telegram(u['telegram_id'], mensaje)
+                chat_id = u['telegram_id']
+                enviar_telegram(chat_id, mensaje)
+                enviados.add(str(chat_id))
             
-            # BYPASS DE SEGURIDAD: Te envía una copia directa a ti sí o sí
-            enviar_telegram("5368207368", mensaje)
+            # BYPASS DE SEGURIDAD: Te envía una copia directa a ti, SOLO si no estabas en la lista anterior
+            bypass_id = "5368207368"
+            if bypass_id not in enviados:
+                enviar_telegram(bypass_id, mensaje)
 
         cur.close()
         conn.close()
