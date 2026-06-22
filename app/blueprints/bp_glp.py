@@ -2889,12 +2889,44 @@ def solicitar_pedido_manual():
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"}), 500
       
 @csrf.exempt
-@bp_glp.route('/admin/obtener_solicitudes_pendientes', methods=['GET'])
+@bp_glp.route('/admin/obtener_solicitudes_pendientes', methods=['GET', 'POST']) # 1. Habilitar POST
 @login_required_custom
 def admin_obtener_solicitudes():
     try:
+        # =========================================================
+        # 2. CAPTURAR EL ID DE LA EMPRESA (El Cerebro Multi/Single-Tenant)
+        # =========================================================
+        empresa_id = None
+        
+        # Prioridad A: Lo que manda el Frontend (Webmaster)
+        if request.is_json:
+            data = request.get_json(silent=True)
+            if data:
+                empresa_id = data.get('empresa_id')
+                
+        # Prioridad B: Lo que dice la Sesión (Supervisor)
+        if not empresa_id:
+            empresa_id = session.get('empresa_id')
+
+        if not empresa_id:
+            return jsonify({"success": False, "message": "ID Empresa no identificado"})
+
         cur = mysql.connection.cursor()
-        # SQL blindado contra errores de Collation y Modo Estricto
+
+        # =========================================================
+        # 3. TRADUCIR NIT A NOMBRE COMERCIAL (La tabla pedidos usa nombre)
+        # =========================================================
+        cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
+        row_emp = cur.fetchone()
+        if not row_emp:
+            cur.close()
+            return jsonify({"success": False, "message": "Empresa no encontrada."})
+            
+        empresa_nombre = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
+
+        # =========================================================
+        # 4. CONSULTA SQL BLINDADA (Filtro por cliente)
+        # =========================================================
         sql = """
             SELECT 
                 p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
@@ -2903,12 +2935,13 @@ def admin_obtener_solicitudes():
                 (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
             FROM pedidos_gas_glp p 
             WHERE p.estatus_flujo = 'pendiente_aprobacion' 
+              AND TRIM(UPPER(p.cliente)) = TRIM(UPPER(%s)) -- <-- EL FILTRO CLAVE
             ORDER BY p.fecha_registro DESC
         """
-        cur.execute(sql)
+        cur.execute(sql, (empresa_nombre,))
         rows = cur.fetchall()
         items = []
-        col_names = [d[0] for d in cur.description]
+        col_names = [d[0] for d in cur.description] if cur.description else []
         
         for r in rows:
             rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
@@ -2932,6 +2965,7 @@ def admin_obtener_solicitudes():
     except Exception as e: 
         print("❌ Error de lectura solicitudes:", e)
         return jsonify({"success": False, "message": str(e)})
+
 # ==========================================
 # RUTAS DE ADMIN Y APROBACIÓN (CORREGIDAS)
 # ==========================================
