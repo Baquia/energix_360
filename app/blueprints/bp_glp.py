@@ -1588,6 +1588,7 @@ def obtener_tanques():
             info_lote = ""
             bloqueado_por_arribo = False
             motivo_bloqueo = ""
+            nom_lote = None
             
             # --- VARIABLES POR DEFECTO PARA EVITAR CRASH (UnboundLocalError) ---
             fecha_lote_dt = datetime.now().date()
@@ -1627,7 +1628,7 @@ def obtener_tanques():
                 FROM tanques_sedes 
                 WHERE TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
                   AND empresa_id = %s
-            """, (sede, id_empresa))
+                """, (sede, id_empresa))
             tks = cur.fetchall()
 
             tanques_list = []
@@ -1673,24 +1674,31 @@ def obtener_tanques():
                     "ultimo_nivel": ultimo_nivel
                 })
 
-           # 3. BÚSQUEDA DE CANDADO / PEDIDOS PENDIENTES
+            # ==============================================================================
+            # 3. BÚSQUEDA DE CANDADO / PEDIDOS PENDIENTES (SOLUCIÓN 1: FILTRADO POR LOTE ACTIVO)
+            # ==============================================================================
             hay_pedido_pendiente = False
             codigo_pedido_pendiente = ""
             
-            cur.execute("""
-                SELECT codigo_pedido 
-                FROM pedidos_gas_glp 
-                WHERE cliente = %s 
-                  AND TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
-                  AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
-                  AND estatus != 'cancelado'
-                ORDER BY id DESC LIMIT 1
-            """, (empresa_nombre, sede))
-            
-            row_ped = cur.fetchone()
-            if row_ped:
-                hay_pedido_pendiente = True
-                codigo_pedido_pendiente = row_ped.get("codigo_pedido") if isinstance(row_ped, dict) else row_ped[0]
+            if lote_activo and nom_lote:
+                cur.execute("""
+                    SELECT codigo_pedido 
+                    FROM pedidos_gas_glp 
+                    WHERE cliente = %s 
+                      AND TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
+                      AND lote = %s
+                      AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
+                      AND estatus != 'cancelado'
+                    ORDER BY id DESC LIMIT 1
+                """, (empresa_nombre, sede, nom_lote))
+                
+                row_ped = cur.fetchone()
+                if row_ped:
+                    hay_pedido_pendiente = True
+                    codigo_pedido_pendiente = row_ped.get("codigo_pedido") if isinstance(row_ped, dict) else row_ped[0]
+            else:
+                hay_pedido_pendiente = False
+            # ==============================================================================
 
             # 4. LÓGICA DE CONTROL DE PEDIDO PENDIENTE (A partir del 15 de Junio de 2026)
             bloqueado_por_pedido = False
@@ -1719,7 +1727,7 @@ def obtener_tanques():
     except Exception as e:
         print(f"Error crítico obtener_tanques: {e}")
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
-
+    
 # ======================
 # Iniciar calefacción (CORREGIDA Y BLINDADA CON NOTIFICACIONES)
 # ======================
