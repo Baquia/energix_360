@@ -1336,6 +1336,13 @@ def gestionar_usuario():
             cur.execute("""INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa, telegram_id, telefono) 
                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                        (d.get('cedula'), d.get('nombre'), pw, d.get('tipo_usuario'), d.get('clase'), d.get('perfil'), d.get('empresa_id'), d.get('empresa_select'), None, d.get('telefono')))
+            msg = "Usuario creado exitosamente."
+            
+        elif d.get('accion') == 'eliminar':
+            cedula = d.get('cedula')
+            cur.execute("DELETE FROM usuarios WHERE cedula=%s", (cedula,))
+            msg = "Usuario eliminado correctamente."
+            
         else:
             cedula = d.get('cedula')
             nuevo_telefono = d.get('telefono')
@@ -1364,9 +1371,10 @@ def gestionar_usuario():
             params.append(cedula)
             
             cur.execute(query, tuple(params))
+            msg = "Usuario actualizado exitosamente."
             
         mysql.connection.commit()
-        return jsonify(success=True, message="Usuario gestionado exitosamente.")
+        return jsonify(success=True, message=msg)
     except Exception as e: 
         return jsonify(success=False, message=str(e))
     finally: 
@@ -1455,11 +1463,14 @@ def obtener_todos_contactos():
 @login_required_custom
 def obtener_todos_perfiles():
     cur = mysql.connection.cursor()
-    cur.execute("SELECT id, empresa, nit, operacion, perfil FROM perfiles")
+    # AGREGAMOS: archivo_destino a la consulta SQL
+    cur.execute("SELECT id, empresa, nit, operacion, perfil, archivo_destino FROM perfiles")
     rows = cur.fetchall()
-    res = [dict(zip(['id','empresa','nit','operacion','perfil'], r)) if not isinstance(r, dict) else r for r in rows]
-    cur.close(); return jsonify(success=True, profiles=res)
-    
+    # Aseguramos el mapeo correcto en la respuesta JSON
+    res = [dict(zip(['id','empresa','nit','operacion','perfil','archivo_destino'], r)) if not isinstance(r, dict) else r for r in rows]
+    cur.close()
+    return jsonify(success=True, profiles=res)
+
 # ==============================================================================
 # REPORTE DE LOTES ACTIVOS SIN FINALIZAR (>15 DÍAS)
 # ==============================================================================

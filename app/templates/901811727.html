@@ -1469,64 +1469,6 @@
       document.getElementById('contenedorCamposMaestro').innerHTML = html;
     }
 
-    function guardarMaestro() {
-      const fd = new FormData();
-      fd.append('accion', document.getElementById('form_accion_maestro').value);
-
-      if (currentMode === 'Empresa') {
-        fd.append('nit', document.getElementById('f_nit').value);
-        fd.append('nombre_comercial', document.getElementById('f_nom').value);
-        fd.append('tipo_empresa', document.getElementById('f_tipo').value);
-      }
-      else if (currentMode === 'Proveedor') {
-        fd.append('id_proveedor', document.getElementById('f_idp').value);
-        fd.append('proveedor', document.getElementById('f_prov').value);
-        fd.append('precio', document.getElementById('f_prec').value);
-        fd.append('email1', document.getElementById('f_e1').value);
-        fd.append('email2', document.getElementById('f_e2').value);
-      }
-      else if (currentMode === 'Usuario') {
-        fd.append('cedula', document.getElementById('f_ced').value);
-        fd.append('nombre', document.getElementById('f_unom').value);
-        fd.append('perfil', document.getElementById('f_perf').value);
-        fd.append('telegram_id', document.getElementById('f_tlg').value);
-        fd.append('telefono', document.getElementById('f_tel').value);
-        fd.append('password', document.getElementById('f_pass').value);
-        fd.append('empresa_id', document.getElementById('f_eid').value);
-        fd.append('empresa_select', document.getElementById('f_enom').value);
-        fd.append('tipo_usuario', document.getElementById('f_tuser').value);
-        fd.append('clase', document.getElementById('f_clase').value);
-      }
-      else if (currentMode === 'Perfil') {
-        fd.append('id', document.getElementById('f_pid').value);
-        fd.append('empresa_select', document.getElementById('f_enom_p').value);
-        fd.append('nit', document.getElementById('f_nit_p').value);
-        fd.append('operacion', document.getElementById('f_op').value);
-        fd.append('perfil', document.getElementById('f_perf_p').value);
-      }
-      else if (currentMode === 'Contacto') {
-        fd.append('id', document.getElementById('f_cid').value);
-        fd.append('empresa_nombre', document.getElementById('f_enom_c').value);
-        fd.append('id_empresa', document.getElementById('f_eid_c').value);
-        fd.append('area_contacto', document.getElementById('f_area').value);
-        fd.append('email', document.getElementById('f_email').value);
-      }
-
-      fetch(currentUrl, { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(d => {
-          alert(d.message);
-          if (d.success) {
-            bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
-            if (currentMode === 'Empresa') location.reload();
-            else if (currentMode === 'Usuario') cargarTablaUsuarios();
-            else if (currentMode === 'Proveedor') cargarTablaProveedores();
-            else if (currentMode === 'Perfil') cargarTablaPerfiles();
-            else if (currentMode === 'Contacto') cargarTablaContactos();
-          }
-        });
-    }
-
     // -------------------------------------------------------------
     // 1. NAVEGACIÓN Y MENÚ MÓVIL
     // -------------------------------------------------------------
@@ -2571,9 +2513,41 @@
         const b = document.getElementById('bodyUsuarios'); b.innerHTML = '';
         d.users.forEach(u => {
           const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(u))));
-          b.innerHTML += `<tr><td>${u.cedula}</td><td class="fw-bold">${u.nombre}</td><td><span class="badge bg-primary">${u.perfil}</span></td><td><small>${u.empresa}</small></td><td>${u.telefono || '-'}</td><td><button class="btn btn-sm btn-warning" onclick="editarRegistro('Usuario', '${dataStr}')">✏️ Editar</button></td></tr>`;
+          b.innerHTML += `<tr>
+                <td>${u.cedula}</td>
+                <td class="fw-bold">${u.nombre}</td>
+                <td><span class="badge bg-primary">${u.perfil}</span></td>
+                <td><small>${u.empresa}</small></td>
+                <td>${u.telefono || '-'}</td>
+                <td>
+                    <button class="btn btn-sm btn-warning" onclick="editarRegistro('Usuario', '${dataStr}')">✏️ Editar</button>
+                    <button class="btn btn-sm btn-danger ms-1" onclick="eliminarUsuario('${u.cedula}')">🗑️ Borrar</button>
+                </td>
+            </tr>`;
         });
       });
+    }
+
+    // NUEVA FUNCION PARA ELIMINAR USUARIO
+    function eliminarUsuario(cedula) {
+      if (confirm("¿Estás seguro de que deseas eliminar permanentemente este usuario?")) {
+        const fd = new FormData();
+        fd.append('accion', 'eliminar');
+        fd.append('cedula', cedula);
+
+        fetch('/gestionar_usuario', { method: 'POST', body: fd })
+          .then(r => r.json())
+          .then(d => {
+            alert(d.message);
+            if (d.success) {
+              cargarTablaUsuarios(); // Recarga la tabla sin refrescar la página entera
+            }
+          })
+          .catch(err => {
+            console.error(err);
+            alert("Error de conexión al intentar eliminar el usuario.");
+          });
+      }
     }
 
     function cargarTablaPerfiles() {
@@ -2719,10 +2693,8 @@
 
       } else if (tipo === 'Perfil') {
         currentUrl = "/gestionar_perfil";
-
         html += `
           <input type="hidden" id="f_pid" value="${data.id || ''}">
-          
           <label class="fw-bold small mt-2">Asignar a Empresa</label>
           <select id="f_enom_p" class="form-select" onchange="document.getElementById('f_nit_p').value = this.options[this.selectedIndex].getAttribute('data-nit');">
             ${optsEmpresas}
@@ -2733,7 +2705,11 @@
           <input type="text" id="f_op" class="form-control" value="${data.operacion || ''}" placeholder="Ej: Gas, Mermas">
           
           <label class="fw-bold small text-success mt-2">Nombre del Perfil</label>
-          <input type="text" id="f_perf_p" class="form-control border-success" value="${data.perfil || ''}">`;
+          <input type="text" id="f_perf_p" class="form-control border-success" value="${data.perfil || ''}">
+          
+          <!-- ¡AQUÍ ESTÁ EL CAMPO QUE HACÍA FALTA! -->
+          <label class="fw-bold small text-danger mt-2">Archivo HTML de Destino (Plantilla Física)</label>
+          <input type="text" id="f_archivo" class="form-control border-danger fw-bold" value="${data.archivo_destino || ''}" placeholder="Ej: glp.html o B_modulo_operador_bodegas.html">`;
 
       } else if (tipo === 'Contacto') {
         currentUrl = "/gestionar_contacto";
@@ -2831,14 +2807,43 @@
           fd.append('modulos[]', chk.value);
         });
       }
-      // ... mantén los otros tipos ...
+      else if (currentMode === 'TipoEmpresa') {
+        fd.append('id', document.getElementById('f_tid') ? document.getElementById('f_tid').value : '');
+        fd.append('tipo', document.getElementById('f_tnom') ? document.getElementById('f_tnom').value : '');
+      }
+      else if (currentMode === 'Proveedor') {
+        fd.append('id_proveedor', document.getElementById('f_idp').value);
+        fd.append('proveedor', document.getElementById('f_prov').value);
+        fd.append('precio', document.getElementById('f_prec').value);
+        fd.append('email1', document.getElementById('f_e1').value);
+        fd.append('email2', document.getElementById('f_e2').value);
+      }
+      else if (currentMode === 'Usuario') {
+        fd.append('cedula', document.getElementById('f_ced').value);
+        fd.append('nombre', document.getElementById('f_unom').value);
+        fd.append('perfil', document.getElementById('f_perf').value);
+        fd.append('telegram_id', document.getElementById('f_tlg').value);
+        fd.append('telefono', document.getElementById('f_tel').value);
+        fd.append('password', document.getElementById('f_pass').value);
+        fd.append('empresa_id', document.getElementById('f_eid').value);
+        fd.append('empresa_select', document.getElementById('f_enom').value);
+        fd.append('tipo_usuario', document.getElementById('f_tuser').value);
+        fd.append('clase', document.getElementById('f_clase').value);
+      }
       else if (currentMode === 'Perfil') {
         fd.append('id', document.getElementById('f_pid').value);
         fd.append('empresa_select', document.getElementById('f_enom_p').value);
         fd.append('nit', document.getElementById('f_nit_p').value);
-        fd.append('operacion', document.getElementById('f_op').value); // Ya no es input, es select
+        fd.append('operacion', document.getElementById('f_op').value);
         fd.append('perfil', document.getElementById('f_perf_p').value);
-        fd.append('archivo_destino', document.getElementById('f_archivo').value); // Nuevo campo
+        fd.append('archivo_destino', document.getElementById('f_archivo').value);
+      }
+      else if (currentMode === 'Contacto') {
+        fd.append('id', document.getElementById('f_cid').value);
+        fd.append('empresa_nombre', document.getElementById('f_enom_c').value);
+        fd.append('id_empresa', document.getElementById('f_eid_c').value);
+        fd.append('area_contacto', document.getElementById('f_area').value);
+        fd.append('email', document.getElementById('f_email').value);
       }
 
       fetch(currentUrl, { method: 'POST', body: fd })
@@ -2848,9 +2853,15 @@
           if (d.success) {
             bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
             if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa') location.reload();
+            else if (currentMode === 'Usuario') cargarTablaUsuarios();
+            else if (currentMode === 'Proveedor') cargarTablaProveedores();
             else if (currentMode === 'Perfil') cargarTablaPerfiles();
-            // ... recarga de otras tablas ...
+            else if (currentMode === 'Contacto') cargarTablaContactos();
           }
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Error de conexión al guardar.");
         });
     }
 
