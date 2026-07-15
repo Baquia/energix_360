@@ -100,15 +100,22 @@
         
         .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
         .badge-gray { background: #f3f4f6; color: #4b5563; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
         
         .btn-icon { background: none; border: none; cursor: pointer; font-size: 16px; margin-left: 10px; transition: 0.2s; }
         .btn-icon.edit:hover { color: #f59e0b; transform: scale(1.1); }
         .btn-icon.delete:hover { color: #ef4444; transform: scale(1.1); }
 
+        /* Filter Bar de Auditoría */
+        .filter-bar { background: var(--surface); padding: 15px; border-radius: 12px; margin-bottom: 20px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); max-width: 1000px;}
+        .filter-bar .form-group { margin-bottom: 0; min-width: 150px; flex: 1; }
+        .filter-btn { background: var(--verde); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; height: 38px; }
+
         /* ================= MODALES ================= */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
         .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
-        .modal-box { background: var(--surface); width: 90%; max-width: 400px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-box { background: var(--surface); width: 90%; max-width: 450px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
         .modal-header h3 { color: var(--verde); font-size: 18px; }
         .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
@@ -178,7 +185,7 @@
             
             <div class="user-info">
                 <span class="user-name">{{ nombre }}</span>
-                <span class="user-role">Gestor de Flota</span>
+                <span class="user-role">Controlador de Flota</span>
             </div>
         </header>
 
@@ -209,8 +216,9 @@
                         <thead>
                             <tr>
                                 <th>Placa</th>
-                                <th>Tipo</th>
-                                <th>Referencia</th>
+                                <th>Tipo de Vehículo</th>
+                                <th>Caja de Carga</th>
+                                <th>Referencia / Ejes</th>
                                 <th>Peso Vacío (kg)</th>
                                 <th>Capacidad</th>
                                 <th>Estatus (App)</th>
@@ -222,18 +230,19 @@
                             <tr>
                                 <td style="font-weight: bold; color: var(--verde);">{{ v.placa }}</td>
                                 <td style="text-transform: capitalize;">{{ v.tipo }}</td>
+                                <td style="text-transform: capitalize;">{{ v.caja_de_carga }}</td>
                                 <td style="text-transform: capitalize;">{{ v.referencia }}</td>
                                 <td>{{ v.peso_vacio }} kg</td>
                                 <td>{{ v['capacidad (kg)'] }} kg</td>
                                 <td><span class="badge badge-gray">{{ v.estatus }}</span></td>
                                 <td>
-                                    <button class="btn-icon edit" title="Editar" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}')">✏️</button>
+                                    <button class="btn-icon edit" title="Editar" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.caja_de_carga }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}')">✏️</button>
                                     <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminar('{{ v.id }}', '{{ v.placa }}')">🗑️</button>
                                 </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay vehículos registrados para esta empresa.</td>
+                                <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay vehículos registrados para esta empresa.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -293,7 +302,7 @@
                         <thead>
                             <tr>
                                 <th>Placa</th>
-                                <th>Tipo</th>
+                                <th>Clasificación</th>
                                 <th>Capacidad</th>
                                 <th>Acción</th>
                             </tr>
@@ -302,7 +311,7 @@
                             {% for v in vehiculos %}
                             <tr>
                                 <td style="font-weight: bold; color: var(--verde);">{{ v.placa }}</td>
-                                <td style="text-transform: capitalize;">{{ v.tipo }} ({{ v.referencia }})</td>
+                                <td style="text-transform: capitalize;">{{ v.tipo }} / {{ v.caja_de_carga }}</td>
                                 <td>{{ v['capacidad (kg)'] }} kg</td>
                                 <td>
                                     <a href="{{ url_for('gestorflota.imprimir_qr_individual', vehiculo_id=v.id) }}" target="_blank" class="btn-icon edit" title="Imprimir QR Individual">🖨️ PDF</a>
@@ -343,7 +352,7 @@
                                 <td>{{ op.cedula }}</td>
                                 <td>
                                     {% if op.perfil == 'operador_transportecarga' %}
-                                        <span class="badge badge-gray" style="background:#d1fae5; color:#065f46;">Conductor</span>
+                                        <span class="badge badge-success">Conductor</span>
                                     {% else %}
                                         <span class="badge badge-gray">Auxiliar</span>
                                     {% endif %}
@@ -356,6 +365,74 @@
                             {% else %}
                             <tr>
                                 <td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay conductores ni auxiliares registrados para esta empresa.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'preoperacionales' %}
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Auditoría de Preoperacionales</h2>
+                    </div>
+                </div>
+
+                <form class="filter-bar" method="GET" action="{{ url_for('gestorflota.historial_preoperacionales') }}">
+                    <div class="form-group">
+                        <label>Desde</label>
+                        <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Hasta</label>
+                        <input type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Placa Vehículo</label>
+                        <select name="placa">
+                            <option value="todas">Todas las placas</option>
+                            {% for vh in vehiculos_historicos %}
+                                <option value="{{ vh.placa }}" {% if filtros.placa == vh.placa %}selected{% endif %}>{{ vh.placa }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="filter-btn">🔍 Filtrar</button>
+                </form>
+
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha / Hora</th>
+                                <th>Consecutivo</th>
+                                <th>Placa</th>
+                                <th>Conductor</th>
+                                <th>Dictamen General</th>
+                                <th>Descargar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for insp in inspecciones %}
+                            <tr>
+                                <td>{{ insp.fecha_inspeccion }} {{ insp.hora_inspeccion }}</td>
+                                <td style="font-weight: bold; color: var(--verde);">{{ insp.consecutivo_anual }}</td>
+                                <td>{{ insp.placa_vehiculo }}</td>
+                                <td>{{ insp.nombre_conductor }}</td>
+                                <td>
+                                    {% if insp.vehiculo_aprobado == 1 %}
+                                        <span class="badge badge-success">✅ Operativo</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">⚠️ Alerta Crítica</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('gestorflota.descargar_preoperacional_pdf', consecutivo=insp.consecutivo_anual) }}" target="_blank" class="btn-icon edit" title="Descargar PDF">📄 PDF</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No se encontraron inspecciones en el rango seleccionado.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -391,33 +468,52 @@
                     <label>Placa</label>
                     <input type="text" name="placa" placeholder="Ej. TGU321" required style="text-transform: uppercase;">
                 </div>
+
                 <div class="form-group">
                     <label>Tipo de Vehículo</label>
                     <select name="tipo" required>
                         <option value="">Seleccione...</option>
-                        <option value="furgon refrigerado">Furgón Refrigerado</option>
-                        <option value="furgon seco">Furgón Seco</option>
-                        <option value="estacas">Estacas</option>
-                        <option value="planchon">Planchón</option>
+                        <option value="camion ligero">Camión Ligero</option>
+                        <option value="camion sencillo">Camión Sencillo</option>
+                        <option value="dobletroque">Dobletroque</option>
+                        <option value="tractomula">Tractomula</option>
                     </select>
                 </div>
+
                 <div class="form-group">
-                    <label>Referencia / Ejes</label>
-                    <select name="referencia" required>
+                    <label>Caja de Carga</label>
+                    <select name="caja_de_carga" required>
                         <option value="">Seleccione...</option>
-                        <option value="NPR / Turbo">NPR / Turbo</option>
-                        <option value="Sencillo">Camión Sencillo</option>
-                        <option value="Dobletroque">Dobletroque</option>
-                        <option value="Tractomula">Tractomula</option>
+                        <option value="furgon">Furgón</option>
+                        <option value="estacas">Estacas</option>
+                        <option value="furgon refrigerado">Furgón Refrigerado</option>
+                        <option value="planchon">Planchón</option>
+                        <option value="planchon y dolly">Planchón y Dolly</option>
                     </select>
                 </div>
+
                 <div class="form-group">
-                    <label>Peso Vacío (Kilogramos)</label>
-                    <input type="number" name="peso_vacio" placeholder="Ej. 2500" required>
+                    <label>Referencia / Marca (Opcional)</label>
+                    <select name="referencia">
+                        <option value="">Seleccione...</option>
+                        <option value="chevrolet NHR">Chevrolet NHR</option>
+                        <option value="chevrolet NPR">Chevrolet NPR</option>
+                        <option value="NPR / Turbo">NPR / Turbo</option>
+                        <option value="sencillo">Sencillo Genérico</option>
+                        <option value="dobletroque">Dobletroque Genérico</option>
+                        <option value="Tractomula">Tractomula Genérica</option>
+                    </select>
                 </div>
-                <div class="form-group">
-                    <label>Capacidad (Kilogramos)</label>
-                    <input type="number" name="capacidad" placeholder="Ej. 5000" required>
+
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label>Peso Vacío (Kg)</label>
+                        <input type="number" name="peso_vacio" placeholder="Ej. 2500" required>
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Capacidad (Kg)</label>
+                        <input type="number" name="capacidad" placeholder="Ej. 5000" required>
+                    </div>
                 </div>
                 
                 <div class="modal-footer">
@@ -443,35 +539,52 @@
                     <label>Placa</label>
                     <input type="text" name="placa" id="edit_placa" required style="text-transform: uppercase;">
                 </div>
+
                 <div class="form-group">
                     <label>Tipo de Vehículo</label>
                     <select name="tipo" id="edit_tipo" required>
                         <option value="">Seleccione...</option>
-                        <option value="furgon refrigerado">Furgón Refrigerado</option>
-                        <option value="furgon seco">Furgón Seco</option>
-                        <option value="estacas">Estacas</option>
-                        <option value="planchon">Planchón</option>
+                        <option value="camion ligero">Camión Ligero</option>
+                        <option value="camion sencillo">Camión Sencillo</option>
+                        <option value="dobletroque">Dobletroque</option>
+                        <option value="tractomula">Tractomula</option>
                     </select>
                 </div>
+
                 <div class="form-group">
-                    <label>Referencia / Ejes</label>
-                    <select name="referencia" id="edit_referencia" required>
+                    <label>Caja de Carga</label>
+                    <select name="caja_de_carga" id="edit_caja_de_carga" required>
+                        <option value="">Seleccione...</option>
+                        <option value="furgon">Furgón</option>
+                        <option value="estacas">Estacas</option>
+                        <option value="furgon refrigerado">Furgón Refrigerado</option>
+                        <option value="planchon">Planchón</option>
+                        <option value="planchon y dolly">Planchón y Dolly</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Referencia / Marca (Opcional)</label>
+                    <select name="referencia" id="edit_referencia">
                         <option value="">Seleccione...</option>
                         <option value="chevrolet NHR">Chevrolet NHR</option>
                         <option value="chevrolet NPR">Chevrolet NPR</option>
                         <option value="NPR / Turbo">NPR / Turbo</option>
-                        <option value="sencillo">Camión Sencillo</option>
-                        <option value="dobletroque">Dobletroque</option>
-                        <option value="Tractomula">Tractomula</option>
+                        <option value="sencillo">Sencillo Genérico</option>
+                        <option value="dobletroque">Dobletroque Genérico</option>
+                        <option value="Tractomula">Tractomula Genérica</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Peso Vacío (Kilogramos)</label>
-                    <input type="number" name="peso_vacio" id="edit_peso_vacio" required>
-                </div>
-                <div class="form-group">
-                    <label>Capacidad (Kilogramos)</label>
-                    <input type="number" name="capacidad" id="edit_capacidad" required>
+
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label>Peso Vacío (Kg)</label>
+                        <input type="number" name="peso_vacio" id="edit_peso_vacio" required>
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Capacidad (Kg)</label>
+                        <input type="number" name="capacidad" id="edit_capacidad" required>
+                    </div>
                 </div>
                 
                 <div class="modal-footer">
@@ -514,24 +627,11 @@
             <form action="{{ url_for('gestorflota.gestion_rutas') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="crear">
-                
-                <div class="form-group">
-                    <label>Nombre de la Ruta</label>
-                    <input type="text" name="nombre_ruta" placeholder="Ej. Norte - Ibagué Calle 60" required>
+                <div class="form-group"><label>Nombre de la Ruta</label><input type="text" name="nombre_ruta" required></div>
+                <div class="form-group"><label>Tipo de Ruta</label>
+                    <select name="tipo_ruta" required><option value="urbana">Urbana</option><option value="viajera">Viajera</option></select>
                 </div>
-                <div class="form-group">
-                    <label>Tipo de Ruta</label>
-                    <select name="tipo_ruta" required>
-                        <option value="">Seleccione...</option>
-                        <option value="urbana">Urbana</option>
-                        <option value="viajera">Viajera</option>
-                    </select>
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalRuta')">Cancelar</button>
-                    <button type="submit" class="btn-primary">Guardar Ruta</button>
-                </div>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalRuta')">Cancelar</button><button type="submit" class="btn-primary">Guardar Ruta</button></div>
             </form>
         </div>
     </div>
@@ -546,24 +646,11 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="editar">
                 <input type="hidden" name="ruta_id" id="edit_ruta_id">
-                
-                <div class="form-group">
-                    <label>Nombre de la Ruta</label>
-                    <input type="text" name="nombre_ruta" id="edit_nombre_ruta" required>
+                <div class="form-group"><label>Nombre de la Ruta</label><input type="text" name="nombre_ruta" id="edit_nombre_ruta" required></div>
+                <div class="form-group"><label>Tipo de Ruta</label>
+                    <select name="tipo_ruta" id="edit_tipo_ruta" required><option value="urbana">Urbana</option><option value="viajera">Viajera</option></select>
                 </div>
-                <div class="form-group">
-                    <label>Tipo de Ruta</label>
-                    <select name="tipo_ruta" id="edit_tipo_ruta" required>
-                        <option value="">Seleccione...</option>
-                        <option value="urbana">Urbana</option>
-                        <option value="viajera">Viajera</option>
-                    </select>
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalEditarRuta')">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="background: #f59e0b;">Guardar Cambios</button>
-                </div>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarRuta')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b;">Guardar Cambios</button></div>
             </form>
         </div>
     </div>
@@ -578,20 +665,12 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="eliminar">
                 <input type="hidden" name="ruta_id" id="delete_ruta_id">
-                
-                <p style="font-size: 14px; color: var(--text); margin-bottom: 20px;">
-                    ¿Estás seguro que deseas eliminar la ruta <b id="delete_nombre_ruta"></b>? Esta acción no se puede deshacer.
-                </p>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalEliminarRuta')">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button>
-                </div>
+                <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro que deseas eliminar la ruta <b id="delete_nombre_ruta"></b>?</p>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarRuta')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL NUEVO OPERADOR (CONDUCTOR / AUXILIAR) -->
     <div id="modalOperador" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
@@ -601,37 +680,20 @@
             <form action="{{ url_for('gestorflota.gestion_operadores') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="crear">
-                
                 <div class="form-group">
                     <label>Perfil Asignado</label>
                     <select name="perfil" id="crear_perfil" required onchange="togglePassword('crear_perfil', 'crear_password_group')">
-                        <option value="">Seleccione...</option>
-                        <option value="operador_transportecarga">Conductor</option>
-                        <option value="auxiliar_transportecarga">Auxiliar</option>
+                        <option value="">Seleccione...</option><option value="operador_transportecarga">Conductor</option><option value="auxiliar_transportecarga">Auxiliar</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Nombre Completo</label>
-                    <input type="text" name="nombre" placeholder="Ej. Juan Pérez" required>
-                </div>
-                <div class="form-group">
-                    <label>Identificación</label>
-                    <input type="text" name="cedula" placeholder="Ej. 100000000" required>
-                </div>
-                <div class="form-group" id="crear_password_group" style="display: none;">
-                    <label>Contraseña (Acceso Aplicativo)</label>
-                    <input type="password" name="password" id="crear_password" placeholder="Contraseña de acceso">
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalOperador')">Cancelar</button>
-                    <button type="submit" class="btn-primary">Guardar Registro</button>
-                </div>
+                <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" required></div>
+                <div class="form-group"><label>Identificación</label><input type="text" name="cedula" required></div>
+                <div class="form-group" id="crear_password_group" style="display: none;"><label>Contraseña</label><input type="password" name="password" id="crear_password"></div>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalOperador')">Cancelar</button><button type="submit" class="btn-primary">Guardar</button></div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL EDITAR OPERADOR -->
     <div id="modalEditarOperador" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
@@ -642,36 +704,20 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="editar">
                 <input type="hidden" name="operador_id" id="edit_operador_id">
-                
                 <div class="form-group">
                     <label>Perfil Asignado</label>
                     <select name="perfil" id="edit_perfil" required onchange="togglePassword('edit_perfil', 'edit_password_group')">
-                        <option value="operador_transportecarga">Conductor</option>
-                        <option value="auxiliar_transportecarga">Auxiliar</option>
+                        <option value="operador_transportecarga">Conductor</option><option value="auxiliar_transportecarga">Auxiliar</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Nombre Completo</label>
-                    <input type="text" name="nombre" id="edit_nombre" required>
-                </div>
-                <div class="form-group">
-                    <label>Identificación</label>
-                    <input type="text" name="cedula" id="edit_cedula" required>
-                </div>
-                <div class="form-group" id="edit_password_group" style="display: none;">
-                    <label>Nueva Contraseña (Opcional)</label>
-                    <input type="password" name="password" id="edit_password" placeholder="Dejar en blanco para no cambiar">
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalEditarOperador')">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="background: #f59e0b;">Guardar Cambios</button>
-                </div>
+                <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" id="edit_nombre" required></div>
+                <div class="form-group"><label>Identificación</label><input type="text" name="cedula" id="edit_cedula" required></div>
+                <div class="form-group" id="edit_password_group" style="display: none;"><label>Nueva Contraseña (Opcional)</label><input type="password" name="password" id="edit_password"></div>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarOperador')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b;">Guardar Cambios</button></div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL ELIMINAR OPERADOR -->
     <div id="modalEliminarOperador" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
@@ -682,15 +728,8 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="eliminar">
                 <input type="hidden" name="operador_id" id="delete_operador_id">
-                
-                <p style="font-size: 14px; color: var(--text); margin-bottom: 20px;">
-                    ¿Estás seguro que deseas eliminar a <b id="delete_nombre_operador"></b>? Esta acción no se puede deshacer y revocará cualquier acceso.
-                </p>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalEliminarOperador')">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button>
-                </div>
+                <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro que deseas eliminar a <b id="delete_nombre_operador"></b>?</p>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarOperador')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
             </form>
         </div>
     </div>
@@ -709,18 +748,17 @@
         overlay.addEventListener('click', toggleSidebar);
 
         // Lógica de Modales General
-        function openModal(id) {
-            document.getElementById(id).classList.add('active');
-        }
-        function closeModal(id) {
-            document.getElementById(id).classList.remove('active');
-        }
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
-        // Lógica Funcional Vehículos
-        function abrirEditarVehiculo(id, placa, tipo, referencia, peso_vacio, capacidad) {
+        // ============================================
+        // LÓGICA DE VEHÍCULOS
+        // ============================================
+        function abrirEditarVehiculo(id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad) {
             document.getElementById('edit_id').value = id;
             document.getElementById('edit_placa').value = placa;
-            document.getElementById('edit_tipo').value = tipo;
+            document.getElementById('edit_tipo').value = tipo.toLowerCase();
+            document.getElementById('edit_caja_de_carga').value = caja_de_carga.toLowerCase();
             document.getElementById('edit_referencia').value = referencia.toLowerCase();
             document.getElementById('edit_peso_vacio').value = peso_vacio;
             document.getElementById('edit_capacidad').value = capacidad;
@@ -734,50 +772,41 @@
             openModal('modalEliminar');
         }
 
-        // Lógica Funcional Rutas
+        // Lógica de Rutas
         function abrirEditarRuta(id, nombre, tipo) {
             document.getElementById('edit_ruta_id').value = id;
             document.getElementById('edit_nombre_ruta').value = nombre;
             document.getElementById('edit_tipo_ruta').value = tipo.toLowerCase();
-            
             openModal('modalEditarRuta');
         }
-
         function confirmarEliminarRuta(id, nombre) {
             document.getElementById('delete_ruta_id').value = id;
             document.getElementById('delete_nombre_ruta').innerText = nombre;
             openModal('modalEliminarRuta');
         }
 
-        // Lógica Funcional Conductores / Auxiliares
+        // Lógica de Operadores
         function togglePassword(selectId, groupId) {
             const select = document.getElementById(selectId);
             const group = document.getElementById(groupId);
             const passwordInput = group.querySelector('input');
-            
             if (select.value === 'operador_transportecarga') {
                 group.style.display = 'block';
-                // La contraseña es obligatoria solo al crear un conductor
-                if (selectId === 'crear_perfil') {
-                    passwordInput.setAttribute('required', 'required');
-                }
+                if (selectId === 'crear_perfil') passwordInput.setAttribute('required', 'required');
             } else {
                 group.style.display = 'none';
                 passwordInput.removeAttribute('required');
                 passwordInput.value = '';
             }
         }
-
         function abrirEditarOperador(id, nombre, cedula, perfil) {
             document.getElementById('edit_operador_id').value = id;
             document.getElementById('edit_nombre').value = nombre;
             document.getElementById('edit_cedula').value = cedula;
             document.getElementById('edit_perfil').value = perfil;
-            
             togglePassword('edit_perfil', 'edit_password_group');
             openModal('modalEditarOperador');
         }
-
         function confirmarEliminarOperador(id, nombre) {
             document.getElementById('delete_operador_id').value = id;
             document.getElementById('delete_nombre_operador').innerText = nombre;

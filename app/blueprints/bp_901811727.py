@@ -12,6 +12,10 @@ import qrcode
 import MySQLdb
 import textwrap
 
+import time
+import psutil # Requiere: pip install psutil
+
+
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -1284,25 +1288,6 @@ def gestionar_tipo_empresa():
     finally: 
         cur.close()
 
-@csrf.exempt
-@bp_901811727.route('/gestionar_empresa', methods=['POST'])
-@login_required_custom
-def gestionar_empresa():
-    d = request.form
-    cur = mysql.connection.cursor()
-    try:
-        if d.get('accion') == 'crear':
-            cur.execute("INSERT INTO empresas (nit, nombre_comercial, tipo_empresa) VALUES (%s, %s, %s)", 
-                       (d.get('nit'), d.get('nombre_comercial'), d.get('tipo_empresa')))
-        else:
-            cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s WHERE nit=%s", 
-                       (d.get('nombre_comercial'), d.get('tipo_empresa'), d.get('nit')))
-        mysql.connection.commit()
-        return jsonify(success=True, message="Empresa procesada correctamente.")
-    except Exception as e: 
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
 
 @csrf.exempt
 @bp_901811727.route('/gestionar_usuario', methods=['GET', 'POST'])
@@ -1373,24 +1358,6 @@ def gestionar_proveedor():
     finally: 
         cur.close()
 
-@csrf.exempt
-@bp_901811727.route('/gestionar_perfil', methods=['POST'])
-@login_required_custom
-def gestionar_perfil():
-    d = request.form
-    cur = mysql.connection.cursor()
-    try:
-        if d.get('accion') == 'crear':
-            cur.execute("INSERT INTO perfiles (empresa, nit, operacion, perfil) VALUES (%s, %s, %s, %s)",
-                       (d.get('empresa_select'), d.get('nit'), d.get('operacion'), d.get('perfil')))
-        else:
-            cur.execute("UPDATE perfiles SET operacion=%s, perfil=%s WHERE id=%s", (d.get('operacion'), d.get('perfil'), d.get('id')))
-        mysql.connection.commit()
-        return jsonify(success=True, message="Perfil procesado.")
-    except Exception as e: 
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
 
 @csrf.exempt
 @bp_901811727.route('/gestionar_contacto', methods=['POST'])
@@ -1888,3 +1855,100 @@ def obtener_alertas_ruptura_validacion():
         return jsonify({"success": True, "items": alertas})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
+    
+# --- NUEVO ENDPOINT: OBTENER MÓDULOS ACTIVOS DE UNA EMPRESA EN TIEMPO REAL ---
+@csrf.exempt
+@bp_901811727.route('/obtener_modulos_empresa', methods=['POST'])
+@login_required_custom
+def obtener_modulos_empresa():
+    nit = request.form.get('nit')
+    if not nit:
+        return jsonify(success=False, modulos=[])
+        
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("SELECT modulo FROM modulos_empresas_autorizadas WHERE id_empresa = %s AND estatus = 'activo'", (nit,))
+        modulos = [row[0] if not isinstance(row, dict) else row['modulo'] for row in cur.fetchall()]
+        return jsonify(success=True, modulos=modulos)
+    except Exception as e:
+        return jsonify(success=False, message=str(e))
+    finally:
+        cur.close()
+
+# --- ACTUALIZACIÓN: GESTIONAR EMPRESA (INCLUYE CHECKBOXES DE MÓDULOS) ---
+@csrf.exempt
+@bp_901811727.route('/gestionar_empresa', methods=['POST'])
+@login_required_custom
+def gestionar_empresa():
+    d = request.form
+    modulos_seleccionados = request.form.getlist('modulos[]') # Recibe el array de checkboxes
+    nit = d.get('nit')
+    
+    cur = mysql.connection.cursor()
+    try:
+        if d.get('accion') == 'crear':
+            cur.execute("INSERT INTO empresas (nit, nombre_comercial, tipo_empresa) VALUES (%s, %s, %s)", 
+                       (nit, d.get('nombre_comercial'), d.get('tipo_empresa')))
+        else:
+            cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s WHERE nit=%s", 
+                       (d.get('nombre_comercial'), d.get('tipo_empresa'), nit))
+                       
+        # Lógica de asignación de módulos planos
+        cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
+        for modulo in modulos_seleccionados:
+            cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, modulo))
+            
+        mysql.connection.commit()
+        return jsonify(success=True, message="Empresa y módulos procesados correctamente.")
+    except Exception as e: 
+        mysql.connection.rollback()
+        return jsonify(success=False, message=str(e))
+    finally: 
+        cur.close()
+
+# --- ACTUALIZACIÓN: GESTIONAR PERFIL (INCLUYE ARCHIVO DESTINO) ---
+@csrf.exempt
+@bp_901811727.route('/gestionar_perfil', methods=['POST'])
+@login_required_custom
+def gestionar_perfil():
+    d = request.form
+    cur = mysql.connection.cursor()
+    try:
+        # Se asume que la base de datos ya tiene la columna 'archivo_destino' en la tabla 'perfiles'
+        if d.get('accion') == 'crear':
+            cur.execute("INSERT INTO perfiles (empresa, nit, operacion, perfil, archivo_destino) VALUES (%s, %s, %s, %s, %s)",
+                       (d.get('empresa_select'), d.get('nit'), d.get('operacion'), d.get('perfil'), d.get('archivo_destino')))
+        else:
+            cur.execute("UPDATE perfiles SET operacion=%s, perfil=%s, archivo_destino=%s WHERE id=%s", 
+                       (d.get('operacion'), d.get('perfil'), d.get('archivo_destino'), d.get('id')))
+        mysql.connection.commit()
+        return jsonify(success=True, message="Perfil y ruteo procesado.")
+    except Exception as e: 
+        return jsonify(success=False, message=str(e))
+    finally: 
+        cur.close()
+        
+
+@bp_901811727.route('/api/health_check', methods=['GET'])
+@login_required_custom
+def health_check():
+    health_data = {
+        "status": "healthy",
+        "database": {"status": "error", "latency_ms": 0},
+        "server": {"cpu_percent": psutil.cpu_percent(), "ram_percent": psutil.virtual_memory().percent},
+        "blueprints_activos": len(current_app.blueprints)
+    }
+    
+    # Ping a BD para medir latencia
+    try:
+        start_time = time.time()
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT 1")
+        cur.fetchone()
+        cur.close()
+        health_data["database"]["latency_ms"] = round((time.time() - start_time) * 1000, 2)
+        health_data["database"]["status"] = "ok"
+    except Exception:
+        health_data["status"] = "degraded"
+        
+    return jsonify(health_data)

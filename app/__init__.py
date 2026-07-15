@@ -36,7 +36,7 @@ def create_app():
         app.config['MYSQL_HOST'] = 'baquiasoft.mysql.pythonanywhere-services.com'
         app.config['MYSQL_USER'] = 'baquiasoft'
         app.config['MYSQL_PASSWORD'] = 'Ataraxia123*/'
-        app.config['MYSQL_DB'] = 'baquiasoft$energix_360'
+        app.config['MYSQL_DB'] = 'baquiasoft$energix_v2'
     else:
         print("DEBUG ENTORNO = LOCAL (desarrollo)")
         app.config['MYSQL_HOST'] = 'localhost'
@@ -55,52 +55,49 @@ def create_app():
     login_manager.login_message = "Por favor inicie sesión."
 
     # =========================================================
-    #  REGISTRO DE BLUEPRINTS (Arquitectura A/B/C)
+    #  REGISTRO DE BLUEPRINTS (Ajustado a los nombres reales)
     # =========================================================
 
     # ---------------------------------------------------------
     #  GRUPO A: CONTROLADORES PRINCIPALES / EMPRESAS
-    #  (Gestionan la lógica de negocio de alto nivel)
     # ---------------------------------------------------------
-    from app.blueprints.A_bp_gestionavicola import gestionavicola_bp  # Gestión Avícola Genérica (Reemplaza a 890707006)
-    from app.blueprints.bp_901811727 import bp_901811727              # Webmaster / Admin
-    from app.blueprints.A_bp_logistica import logistica_bp            # Logística y Distribución
+    from app.blueprints.A_bp_pwa_Avicola import gestionavicola_bp  
+    from app.blueprints.bp_901811727 import bp_901811727              
 
     app.register_blueprint(gestionavicola_bp)
     app.register_blueprint(bp_901811727)
-    app.register_blueprint(logistica_bp)
 
     # ---------------------------------------------------------
     #  GRUPO B: MÓDULOS FUNCIONALES / SERVICIOS
-    #  (Proveen herramientas: Gas, Mermas, Transporte...)
     # ---------------------------------------------------------
-    
-    # --SUBMODULOS PARA EMPRESAS AVICOLAS --#
-    from app.blueprints.bp_glp import bp_glp                               # Modulo de control GLP
-    from app.blueprints.bp_gestion_mermas import bp_gestion_mermas         # Modulo de gestion Mermas
-    from app.blueprints.B_bp_supervisorgas import bp_supervisorgas         # Modulo Supervisor Gas (NUEVO)
-    
-    # --SUBMODULOS PARA VENTAS Y DISTRIBICION --#
-    from app.blueprints.B_bp_bodegas import bp_bodegas                     # Modulo de Bodegas (Dashboard/Carga)
-    from app.blueprints.B_bp_flotacarga import bp_flotacarga               # Modulo de Flota
-    from app.blueprints.B_bp_gestorflotacarga import bp_gestorflota        # Modulo de Gestor de Flota (NUEVO)
+    from app.blueprints.bp_glp import bp_glp                               
+    from app.blueprints.B_bp_gestion_mermas import bp_gestion_mermas         
+    from app.blueprints.B_bp_supervisorgas import bp_supervisorgas         
+    from app.blueprints.B_bp_controlador_bodegas import bp_bodegas                     
+    from app.blueprints.B_bp_controlador_flotacarga import bp_gestorflota
+    from app.blueprints.B_bp_pesaje_carga_avicola import bp_gestion_carga               
    
-    # NUEVO MÓDULO DE PESAJE DE CARGA
-    from app.blueprints.B_bp_gestion_carga import bp_gestion_carga
-    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
-    app.register_blueprint(bp_supervisorgas)                               # Registro del NUEVO blueprint
+    app.register_blueprint(bp_supervisorgas)                               
     app.register_blueprint(bp_bodegas)
-    app.register_blueprint(bp_flotacarga)
-    app.register_blueprint(bp_gestorflota)                                 # Registro del gestor de flota (NUEVO)
+    app.register_blueprint(bp_gestorflota)
     app.register_blueprint(bp_gestion_carga)
+
     # ---------------------------------------------------------
     #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
-    #  (Interfaces ligeras para operarios: Picking, Entregas...)
     # ---------------------------------------------------------
-    from app.blueprints.C_bp_oper_bodegas import bp_oper_bodegas
+    from app.blueprints.B_bp_operador_bodegas import bp_oper_bodegas
+    from app.blueprints.B_bp_verificador_bodegas import bp_verificador_bodegas
+    from app.blueprints.B_bp_operador_flotacarga import bp_flotacarga
+    from app.blueprints.C_bp_combustible_flota import bp_combustible_flota
+    from app.blueprints.C_bp_preoperacional import bp_preoperacional
+    
     app.register_blueprint(bp_oper_bodegas)
+    app.register_blueprint(bp_verificador_bodegas)
+    app.register_blueprint(bp_flotacarga)
+    app.register_blueprint(bp_combustible_flota)
+    app.register_blueprint(bp_preoperacional)
 
     return app
 

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reporte de Combustible - BQA-One</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+    <style>
+        /* PALETA CORPORATIVA BQA-ONE */
+        :root {
+            --verde: #015249;
+            --verde-osc: #003b35;
+            --bg-grad-start: #d7f2ec;
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e0e0e0;
+            --radius: 14px;
+            --shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        body { 
+            background: radial-gradient(circle at top, var(--bg-grad-start) 0, #f6f7f8 45%, #f6f7f8 100%);
+            font-family: Verdana, Geneva, Tahoma, sans-serif; 
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container { max-width: 600px; margin-top: 30px; margin-bottom: 50px; }
+
+        .title-header { color: var(--verde); font-weight: 800; font-size: 24px; text-transform: uppercase; margin-bottom: 5px; }
+        .subtitle-header { color: var(--text-muted); font-size: 14px; margin-bottom: 25px; }
+
+        .card { border-radius: var(--radius); border: none; box-shadow: var(--shadow); margin-bottom: 25px; overflow: hidden; background: var(--surface); }
+        .card-header { background-color: var(--verde); color: white; border-radius: var(--radius) var(--radius) 0 0 !important; font-weight: bold; font-size: 16px; padding: 15px 20px; border-bottom: none; display: flex; align-items: center; gap: 10px;}
+        
+        .form-group label { font-weight: bold; color: var(--text); font-size: 13px; }
+        .form-control { border-radius: 8px; border: 1px solid var(--border); font-size: 15px; padding: 10px 15px; height: auto;}
+        .form-control:focus { border-color: var(--verde); box-shadow: 0 0 0 0.2rem rgba(1, 82, 73, 0.25); }
+
+        .input-group-text { background-color: #f8fafc; border: 1px solid var(--border); color: var(--text-muted); font-weight: bold; }
+
+        /* Botones */
+        .btn-success { background-color: #10b981; border-color: #10b981; border-radius: 10px; font-size: 16px; font-weight: bold; padding: 12px; transition: 0.2s;}
+        .btn-success:hover { background-color: #059669; box-shadow: var(--shadow); }
+        .btn-back { background-color: #f3f4f6; border: 1px solid var(--border); color: var(--text-muted); padding: 12px; border-radius: 10px; font-weight: bold; width: 100%; transition: 0.2s; text-decoration: none; display: inline-block; text-align: center;}
+        .btn-back:hover { background-color: #e5e7eb; color: var(--text); text-decoration: none;}
+
+        .alert { border-radius: 10px; font-size: 14px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="text-center mb-4">
+        <h2 class="title-header">BQA-ONE: COMBUSTIBLE</h2>
+        <div class="subtitle-header">Registro de Tanqueo - {{ empresa }}</div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form action="{{ url_for('combustible_flota.registrar_combustible') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="card">
+            <div class="card-header">
+                <span>⛽</span> Detalles del Vehículo
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label>Vehículo (Placa) <span style="color:#ef4444;">*</span></label>
+                    <select name="placa" class="form-control" required>
+                        <option value="">Seleccione el vehículo...</option>
+                        {% for v in vehiculos %}
+                            <option value="{{ v.placa }}">{{ v.placa }} - {{ v.referencia|capitalize }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Tipo de Combustible <span style="color:#ef4444;">*</span></label>
+                    <select name="tipo_combustible" class="form-control" required>
+                        <option value="">Seleccione el tipo...</option>
+                        <option value="Diesel">Diesel / ACPM</option>
+                        <option value="Gasolina Corriente">Gasolina Corriente</option>
+                        <option value="Gasolina Extra">Gasolina Extra</option>
+                        <option value="Gas Natural">Gas Natural Vehicular</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span>📊</span> Datos del Tanqueo
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label>Fecha de Tanqueo <span style="color:#ef4444;">*</span></label>
+                    <input type="date" name="fecha_tanqueo" class="form-control" value="{{ hoy }}" max="{{ hoy }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Kilometraje Actual (Odómetro) <span style="color:#ef4444;">*</span></label>
+                    <div class="input-group">
+                        <input type="number" name="kilometraje" class="form-control" placeholder="Ej: 145000" min="0" required>
+                        <div class="input-group-append">
+                            <span class="input-group-text">KM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Cantidad (Galones / Metros Cúbicos) <span style="color:#ef4444;">*</span></label>
+                    <div class="input-group">
+                        <input type="number" name="galones" class="form-control" placeholder="Ej: 15.5" step="0.01" min="0.1" required>
+                        <div class="input-group-append">
+                            <span class="input-group-text">GAL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Valor Total Pagado <span style="color:#ef4444;">*</span></label>
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">$</span>
+                        </div>
+                        <input type="number" name="valor_total" class="form-control" placeholder="Ej: 150000" step="0.01" min="1" required>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-4">
+                <a href="{{ url_for('router_universal', modulo='flota') }}" class="btn-back">⬅ Atrás</a>
+            </div>
+            <div class="col-8">
+                <button type="submit" class="btn btn-success btn-block" style="height: 100%;">
+                    Guardar Tanqueo
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+</body>
+</html>

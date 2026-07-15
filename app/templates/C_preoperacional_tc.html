@@ -1,769 +1,692 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Preoperacional de Carga | BQA-ONE</title>
-    <meta name="theme-color" content="#015249">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Inspección Preoperacional - BQA-One</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
     <style>
         :root {
             --verde: #015249;
             --verde-osc: #003b35;
-            --bg: #f4f6f8;
+            --bg-grad-start: #d7f2ec;
             --surface: #ffffff;
-            --text: #1f2937;
-            --muted: #6b7280;
-            --border: #e5e7eb;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e0e0e0;
             --radius: 14px;
-            --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            --shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: system-ui, -apple-system, sans-serif;
-        }
-
-        body {
-            background: var(--bg);
-            color: var(--text);
-            padding-bottom: 40px;
-        }
-
-        .app-header {
-            background: var(--verde);
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .header-title {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        .back-btn {
-            color: white;
-            text-decoration: none;
-            font-size: 13px;
-            background: rgba(255, 255, 255, 0.15);
-            padding: 6px 12px;
-            border-radius: 8px;
-        }
-
-        .container {
-            max-width: 650px;
-            margin: 20px auto;
-            padding: 0 15px;
-        }
-
-        .qr-card {
-            background: var(--surface);
-            border-radius: var(--radius);
-            padding: 25px;
-            box-shadow: var(--shadow);
-            text-align: center;
-            margin-top: 30px;
-        }
-
-        .qr-icon {
-            font-size: 50px;
-            margin-bottom: 15px;
-        }
-
-        #reader {
-            width: 100%;
-            max-width: 350px;
-            margin: 20px auto;
-            border-radius: 12px;
-            overflow: hidden;
-            border: none !important;
-        }
-
-        .alert-error {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            margin-top: 15px;
-            display: none;
-            font-weight: 600;
-        }
-
-        /* --- ESTILOS WIZARD --- */
-        .form-step {
-            display: none;
-            background: var(--surface);
-            border-radius: var(--radius);
-            padding: 20px;
-            box-shadow: var(--shadow);
-            margin-bottom: 20px;
-            border: 1px solid var(--border);
-            animation: fadeIn 0.4s ease-in-out;
-        }
-
-        .form-step.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateX(10px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        .wizard-nav {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .btn-nav {
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-weight: 700;
-            cursor: pointer;
-            border: none;
-            transition: 0.2s;
-            font-size: 14px;
-        }
-
-        .btn-prev {
-            background: #e5e7eb;
+        body { 
+            background: radial-gradient(circle at top, var(--bg-grad-start) 0, #f6f7f8 45%, #f6f7f8 100%);
+            font-family: Verdana, Geneva, Tahoma, sans-serif; 
             color: var(--text);
         }
 
-        .btn-next {
-            background: var(--verde);
-            color: white;
-            flex-grow: 1;
-        }
+        .container { max-width: 800px; margin-top: 30px; margin-bottom: 50px; }
+        .title-header { color: var(--verde); font-weight: 800; font-size: 24px; text-transform: uppercase; margin-bottom: 5px; }
+        .subtitle-header { color: var(--text-muted); font-size: 14px; margin-bottom: 25px; }
 
-        /* --- ESTILOS FORMULARIO --- */
-        .section-title {
-            font-size: 15px;
-            font-weight: 700;
-            color: var(--verde);
-            margin-bottom: 15px;
-            border-bottom: 2px solid #eefcf9;
-            padding-bottom: 6px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .meta-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 15px;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .input-group label {
-            font-size: 12px;
-            color: var(--muted);
-            font-weight: 600;
-        }
-
-        .input-group input,
-        .input-group select,
-        .input-group textarea {
-            padding: 10px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 14px;
-            background: #f9fafb;
-            outline: none;
-        }
-
-        .input-group input:focus, .input-group textarea:focus {
-            border-color: var(--verde);
-            background: #fff;
-        }
-
-        .question-item {
-            display: flex;
-            flex-direction: column;
-            padding: 12px 0;
-            border-bottom: 1px solid #f3f4f6;
-        }
-
-        .question-item:last-child {
-            border-bottom: none;
-        }
-
-        .question-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-        }
-
-        .question-label {
-            font-size: 13px;
-            font-weight: 500;
-            padding-right: 10px;
-            color: #374151;
-        }
-
-        .status-selector {
-            display: flex;
-            gap: 4px;
-            background: #f3f4f6;
-            padding: 3px;
-            border-radius: 8px;
-        }
-
-        .status-btn {
-            border: none;
-            padding: 6px 14px;
-            font-size: 12px;
-            font-weight: 700;
-            border-radius: 6px;
-            cursor: pointer;
-            color: var(--muted);
-            background: transparent;
-            transition: all 0.2s;
-        }
-
-        .status-btn.ok.active { background: #10b981; color: white; }
-        .status-btn.warn.active { background: #f59e0b; color: white; }
-        .status-btn.bad.active { background: #ef4444; color: white; }
-
-        /* --- ESTILOS FECHAS CONDICIONALES --- */
-        .date-wrapper {
-            display: none;
-            margin-top: 8px;
-            padding: 8px 10px;
-            background: #fdfdfd;
-            border-left: 3px solid var(--verde);
-            border-radius: 0 6px 6px 0;
-        }
+        .step-section { display: none; animation: fadeIn 0.4s ease-in-out; }
+        .step-section.active { display: block; }
         
-        .date-wrapper.active {
-            display: block;
-            animation: fadeIn 0.3s;
-        }
+        .progress-container { background: #e5e7eb; border-radius: 10px; height: 10px; margin-bottom: 25px; overflow: hidden; }
+        .progress-bar { background: var(--verde); height: 100%; width: 10%; transition: width 0.4s ease; }
 
-        .date-wrapper input {
-            width: 100%;
-            padding: 6px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 13px;
-            margin-top: 4px;
-        }
+        .card { border-radius: var(--radius); border: none; box-shadow: var(--shadow); margin-bottom: 25px; overflow: hidden; background: var(--surface); }
+        .card-header { background-color: var(--verde); color: white; border-radius: var(--radius) var(--radius) 0 0 !important; font-weight: bold; font-size: 15px; padding: 15px 20px; border-bottom: none; }
+        
+        .form-group label { font-weight: bold; color: var(--text); font-size: 13px; }
+        .form-control { border-radius: 8px; border: 1px solid var(--border); font-size: 14px; }
+        .form-control:focus { border-color: var(--verde); box-shadow: 0 0 0 0.2rem rgba(1, 82, 73, 0.25); }
 
-        .btn-submit {
-            width: 100%;
-            background: var(--verde);
-            color: white;
-            border: none;
-            padding: 15px;
-            border-radius: var(--radius);
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(1, 82, 73, 0.2);
-            transition: background 0.2s;
-            margin-top: 10px;
-        }
+        .radio-group { display: flex; justify-content: space-between; background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .radio-option { display: flex; flex-direction: column; align-items: center; cursor: pointer; margin: 0; width: 33%;}
+        .radio-option input { margin-bottom: 5px; transform: scale(1.3); cursor: pointer; }
+        .text-op { color: #16a34a; font-weight: bold; font-size: 12px; margin-top: 5px;}
+        .text-am { color: #d97706; font-weight: bold; font-size: 12px; margin-top: 5px;}
+        .text-ro { color: #dc2626; font-weight: bold; font-size: 12px; margin-top: 5px;}
 
-        .btn-submit:hover {
-            background: var(--verde-osc);
-        }
+        .btn-next { background-color: var(--verde); border: none; color: white; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; margin-bottom: 15px; transition: 0.2s;}
+        .btn-next:hover { background-color: var(--verde-osc); }
+        .btn-prev { background-color: #f3f4f6; border: 1px solid var(--border); color: var(--text-muted); padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; transition: 0.2s;}
+        .btn-prev:hover { background-color: #e5e7eb; }
+        
+        .btn-success { background-color: #10b981; border-color: #10b981; border-radius: 10px; font-size: 15px;}
+        .btn-success:hover { background-color: #059669; box-shadow: var(--shadow); }
+        .btn-primary { background-color: var(--verde); border-color: var(--verde); border-radius: 8px; }
+        .btn-primary:hover { background-color: var(--verde-osc); border-color: var(--verde-osc); }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.85); z-index: 9999; }
+        .modal-box { background: var(--surface); margin: 15% auto; padding: 30px; width: 90%; max-width: 450px; border-radius: var(--radius); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        #reader { border-radius: 12px; overflow: hidden; background: #fff; margin-bottom: 15px;}
+        
+        #toast-success { position: fixed; top: 20px; right: -350px; background: #10b981; color: white; padding: 15px 25px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: right 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); z-index: 10000; display: flex; align-items: center; gap: 10px;}
+        #toast-success.show { right: 20px; }
 
-        /* --- MODAL CUSTOM --- */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .modal-overlay.active { display: flex; }
-        
-        .modal-box {
-            background: white;
-            padding: 24px;
-            border-radius: 12px;
-            max-width: 90%;
-            width: 320px;
-            text-align: center;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            animation: fadeIn 0.2s;
-        }
-        
-        .modal-icon { font-size: 40px; margin-bottom: 10px; }
-        .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
-        .modal-desc { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.4; }
-        
-        .modal-actions { display: flex; gap: 10px; justify-content: center; }
-        .btn-confirm { background: var(--verde); color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; flex: 1;}
-        .btn-cancel { background: #f3f4f6; color: var(--text); padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; flex: 1;}
-        
-        /* --- ESTILOS ALERTAS FLASH --- */
-        .flash-alert {
-            padding: 15px; margin-bottom: 20px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; 
-            border: 1px solid currentColor;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        .flash-success { background-color: #d1fae5; color: #065f46; }
-        .flash-danger { background-color: #fee2e2; color: #991b1b; }
+        .chasis-wrapper { background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px dashed var(--border); margin-bottom: 20px; text-align: center; }
+        .chasis-container { position: relative; width: 100%; max-width: 280px; margin: 0 auto; padding: 30px 0; background: #e2e8f0; border-radius: 16px; border: 4px solid #cbd5e1; }
+        .eje { width: 100%; display: flex; justify-content: space-between; position: relative; margin-bottom: 50px; padding: 0 15px; }
+        .eje:last-child { margin-bottom: 0; }
+        .eje-barra { position: absolute; top: 50%; left: 30px; right: 30px; height: 8px; background: #64748b; z-index: 1; transform: translateY(-50%); border-radius: 4px; }
+        .llanta-btn { width: 45px; height: 75px; background: #334155; border-radius: 8px; z-index: 2; cursor: pointer; border: 2px solid #0f172a; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .llanta-btn:hover { transform: scale(1.05); }
+        .llanta-pacha { display: flex; gap: 5px; z-index: 2;}
+        .llanta-btn.operativa { background: #10b981; border-color: #047857; }
+        .llanta-btn.baja { background: #f59e0b; border-color: #b45309; }
+        .llanta-btn.lisa { background: #ef4444; border-color: #b91c1c; }
+
+        /* Estilos Autenticación (Selfie y Firma) */
+        .auth-container { border: 2px dashed var(--border); border-radius: 12px; padding: 15px; text-align: center; background: #f9fafb; margin-bottom: 20px; }
+        #video-selfie { width: 100%; max-width: 300px; border-radius: 8px; display: none; margin: 0 auto 10px; }
+        #preview-selfie { width: 100%; max-width: 200px; border-radius: 8px; display: none; margin: 0 auto 10px; border: 2px solid var(--verde); }
+        #canvas-firma { width: 100%; max-width: 400px; height: 150px; background: #fff; border: 2px solid #cbd5e1; border-radius: 8px; cursor: crosshair; touch-action: none; margin-bottom: 10px;}
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .btn-logout, .navbar { display: none !important; }
     </style>
 </head>
-
 <body>
 
-    <header class="app-header">
-        <span class="header-title">{{ empresa }}</span>
-        <a href="/avicola/router/flota" class="back-btn">&larr; Volver</a>
-    </header>
+<div id="toast-success"><span>✅</span> <span id="toast-text">Capítulo completado con éxito</span></div>
 
-    <div class="container">
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash-alert {% if category == 'success' %}flash-success{% else %}flash-danger{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        {% if scanner_mode %}
-        <div class="qr-card">
-            <div class="qr-icon">📷</div>
-            <h3>Escanee el QR del Vehículo</h3>
-            <p style="font-size: 13px; color: var(--muted); margin-top: 5px;">Aproxime el código QR de la cabina para validar acceso.</p>
-
-            <div id="reader"></div>
-            <div id="qr-error" class="alert-error"></div>
-        </div>
-
-        <script>
-            function onScanSuccess(decodedText, decodedResult) {
-                html5QrcodeScanner.clear();
-                let placa = "";
-                let nit = "";
-
-                let cleanText = decodedText
-                    .replace(/&#34;/g, '"')
-                    .replace(/&quot;/g, '"')
-                    .replace(/,,/g, ',')
-                    .replace(/'/g, '"')
-                    .replace(/[\u201C\u201D]/g, '"')
-                    .trim();
-
-                try {
-                    const data = JSON.parse(cleanText);
-                    placa = data.placa || data.PLACA || "";
-                    nit = data.nit || data.NIT || "";
-                } catch (e) {
-                    const matchPlaca = cleanText.match(/placa["'\s:]+([A-Za-z0-9]+)/i);
-                    const matchNit = cleanText.match(/nit["'\s:]+([0-9]+)/i);
-                    if (matchPlaca) placa = matchPlaca[1];
-                    if (matchNit) nit = matchNit[1];
-                }
-
-                placa = String(placa).toUpperCase().trim();
-                nit = String(nit).trim();
-
-                if (!placa || !nit) {
-                    showError("QR inválido. Texto procesado: " + cleanText);
-                    return;
-                }
-
-                const csrfToken = "{{ csrf_token() }}";
-
-                fetch("{{ url_for('flotacarga.validar_qr') }}", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": csrfToken 
-                    },
-                    body: JSON.stringify({ placa: placa, nit: nit })
-                })
-                    .then(response => {
-                        if (!response.ok) throw new Error("Error HTTP del servidor: " + response.status);
-                        return response.json();
-                    })
-                    .then(res => {
-                        if (res.success) {
-                            window.location.reload(); 
-                        } else {
-                            showError(res.message || "Error de validación cruzada.");
-                        }
-                    })
-                    .catch(err => {
-                        console.error("Fallo detallado de conexión:", err);
-                        showError("Error de seguridad o conexión con el servidor.");
-                    });
-            }
-
-            function showError(msg) {
-                const errDiv = document.getElementById('qr-error');
-                errDiv.innerText = msg;
-                errDiv.style.display = 'block';
-                setTimeout(() => { window.location.reload(); }, 4000);
-            }
-
-            const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-            html5QrcodeScanner.render(onScanSuccess);
-        </script>
-
-        {% else %}
-        <form id="wizardForm" action="{{ url_for('flotacarga.guardar_inspeccion') }}" method="POST" style="margin-top: 10px;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-
-            {% macro render_doc_item(id_campo, etiqueta, id_fecha) %}
-            <div class="question-item">
-                <div class="question-header">
-                    <span class="question-label">{{ etiqueta }}</span>
-                    <div class="status-selector">
-                        <button type="button" class="status-btn ok active" onclick="setDocCheck('{{ id_campo }}', 1, this, '{{ id_fecha }}')">Sí</button>
-                        <button type="button" class="status-btn bad" onclick="setDocCheck('{{ id_campo }}', 0, this, '{{ id_fecha }}')">No</button>
-                    </div>
-                    <input type="hidden" id="{{ id_campo }}" name="{{ id_campo }}" value="1">
-                </div>
-                <div class="date-wrapper active" id="wrapper_{{ id_fecha }}">
-                    <label style="font-size: 11px; color: var(--muted); font-weight:bold;">Fecha de Vencimiento:</label>
-                    <input type="date" id="{{ id_fecha }}" name="{{ id_fecha }}" required>
-                </div>
-            </div>
-            {% endmacro %}
-
-            {% macro render_mec_item(id_campo, etiqueta) %}
-            <div class="question-item">
-                <div class="question-header">
-                    <span class="question-label">{{ etiqueta }}</span>
-                    <div class="status-selector">
-                        <button type="button" class="status-btn ok active" onclick="setMecCheck('{{ id_campo }}', 1, this, '{{ etiqueta }}', 'Óptimo')">OK</button>
-                        <button type="button" class="status-btn warn" onclick="setMecCheck('{{ id_campo }}', 2, this, '{{ etiqueta }}', 'Ajustar')">⚠️</button>
-                        <button type="button" class="status-btn bad" onclick="setMecCheck('{{ id_campo }}', 3, this, '{{ etiqueta }}', 'Peligro')">🛑</button>
-                    </div>
-                    <input type="hidden" id="{{ id_campo }}" name="{{ id_campo }}" value="1">
-                </div>
-            </div>
-            {% endmacro %}
-
-            <div class="form-step active">
-                <div class="section-title">📋 Información General (1/6)</div>
-                <div class="meta-grid">
-                    <div class="input-group">
-                        <label>Placa Vehículo</label>
-                        <input type="text" value="{{ vehiculo.placa }}" readonly style="font-weight: 700; color: var(--verde);">
-                    </div>
-                    <div class="input-group">
-                        <label>Tipo (Mapeado)</label>
-                        <input type="text" name="tipo_vehiculo" value="{{ tipo_enum }}" readonly>
-                    </div>
-                </div>
-                <div class="meta-grid">
-                    <div class="input-group">
-                        <label>Kilometraje Inicial</label>
-                        <input type="number" name="kilometraje_inicial" placeholder="Ej. 142050" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Ruta / Destino</label>
-                        <input type="text" name="ruta_destino" placeholder="Ej. Bogota - Norte" required>
-                    </div>
-                </div>
-                <div class="wizard-nav">
-                    <div></div>
-                    <button type="button" class="btn-nav btn-next" onclick="nextStep(0)">Siguiente &rarr;</button>
-                </div>
-            </div>
-
-            <div class="form-step">
-                <div class="section-title">🗂️ Documentos (2/6)</div>
-                {{ render_doc_item('doc_licencia_conduccion', 'Licencia de Conducción', 'fecha_vence_licencia') }}
-                {{ render_doc_item('doc_soat_vigente', 'SOAT', 'fecha_vence_soat') }}
-                {{ render_doc_item('doc_tecnomecanica_vigente', 'Revisión Tecnomecánica', 'fecha_vence_tecnomecanica') }}
-                {{ render_doc_item('doc_tarjeta_operacion', 'Tarjeta de Operación', 'fecha_vence_tarjeta_operacion') }}
-                {{ render_doc_item('doc_manifiesto_carga', 'Manifiesto de Carga', 'fecha_vence_manifiesto') }}
-                <div class="wizard-nav">
-                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(1)">&larr; Atrás</button>
-                    <button type="button" class="btn-nav btn-next" onclick="nextStep(1)">Siguiente &rarr;</button>
-                </div>
-            </div>
-
-            <div class="form-step">
-                <div class="section-title">💧 Motor y Niveles (3/6)</div>
-                {{ render_mec_item('mec_nivel_aceite_motor', 'Nivel de Aceite de Motor') }}
-                {{ render_mec_item('mec_liquido_frenos', 'Nivel Líquido de Frenos') }}
-                {{ render_mec_item('mec_liquido_embrague', 'Nivel Líquido de Embrague / Clutch') }}
-                {{ render_mec_item('mec_nivel_refrigerante', 'Nivel de Líquido Refrigerante') }}
-                {{ render_mec_item('mec_estado_correas', 'Estado de Correas (Alternador/Ventilador)') }}
-                {{ render_mec_item('mec_ausencia_fugas', 'Ausencia de Fugas Visibles de Fluidos') }}
-                <div class="wizard-nav">
-                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(2)">&larr; Atrás</button>
-                    <button type="button" class="btn-nav btn-next" onclick="nextStep(2)">Siguiente &rarr;</button>
-                </div>
-            </div>
-
-            <div class="form-step">
-                <div class="section-title">💡 Sistema de Luces y Llantas (4/6)</div>
-                {{ render_mec_item('luc_altas_bajas', 'Luces Altas y Bajas Frontales') }}
-                {{ render_mec_item('luc_frenos_stop', 'Luces de Frenos y Stop Traseros') }}
-                {{ render_mec_item('luc_direccionales', 'Luces Direccionales (Der / Izq)') }}
-                {{ render_mec_item('luc_parqueo_estacionarias', 'Luces de Parqueo') }}
-                {{ render_mec_item('luc_reversa_alarma', 'Luz de Reversa y Alarma Sonora') }}
-                {{ render_mec_item('luc_delimitadoras_cocuyos', 'Luces Delimitadoras y Cocuyos') }}
-                <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-                {{ render_mec_item('lla_presion_delanteras', 'Presión Llantas Delanteras') }}
-                {{ render_mec_item('lla_presion_traseras_pachas', 'Presión Llantas Traseras / Pachas') }}
-                {{ render_mec_item('lla_profundidad_labrado', 'Profundidad de Labrado Adecuada') }}
-                {{ render_mec_item('lla_tuercas_pernos', 'Ajuste de Tuercas y Pernos de Rines') }}
-                {{ render_mec_item('lla_repuesto_operativa', 'Llanta de Repuesto Operativa') }}
-                {{ render_mec_item('lla_suspension_muelles', 'Estado de Suspensión / Muelles') }}
-                <div class="wizard-nav">
-                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(3)">&larr; Atrás</button>
-                    <button type="button" class="btn-nav btn-next" onclick="nextStep(3)">Siguiente &rarr;</button>
-                </div>
-            </div>
-
-            <div class="form-step">
-                <div class="section-title">🕹️ Cabina, Frenos y Emergencias (5/6)</div>
-                {{ render_mec_item('fre_pedal_firme', 'Pedal de Freno Firme') }}
-                {{ render_mec_item('fre_parqueo_mano', 'Freno de Mano / Parqueo') }}
-                {{ render_mec_item('fre_presion_aire_manometro', 'Presión de Aire (Manómetro)') }}
-                {{ render_mec_item('fre_juego_direccion', 'Dirección Suave (Sin juego excesivo)') }}
-                {{ render_mec_item('fre_limpiaparabrisas_plumillas', 'Limpiaparabrisas / Plumillas') }}
-                {{ render_mec_item('car_estado_estructura', 'Estado General Furgón/Estructura') }}
-                {{ render_mec_item('car_cinturones_seguridad', 'Cinturones de Seguridad Funcionales') }}
-                {{ render_mec_item('car_vidrio_parabrisas', 'Vidrio Parabrisas sin Fisuras') }}
-                <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-                {{ render_mec_item('equ_extintor_10lbs', 'Extintor ABC de 10 Lbs') }}
-                {{ render_mec_item('equ_tacos_bloqueo', 'Tacos de Bloqueo') }}
-                {{ render_mec_item('equ_senales_reflectivas', 'Señales Reflectivas / Conos') }}
-                {{ render_mec_item('equ_gato_hidraulico', 'Gato Hidráulico y Cruceta') }}
-                {{ render_mec_item('equ_botiquin_completo', 'Botiquín Completo') }}
-                <div class="wizard-nav">
-                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(4)">&larr; Atrás</button>
-                    <button type="button" class="btn-nav btn-next" onclick="nextStep(4)">Siguiente &rarr;</button>
-                </div>
-            </div>
-
-            <div class="form-step">
-                <div class="section-title">🔍 Cierre y Firma (6/6)</div>
-                <div class="input-group" style="margin-bottom: 15px;">
-                    <label>Observaciones / Hallazgos Detallados</label>
-                    <textarea name="observaciones_hallazgos" rows="3" placeholder="Describa aquí cualquier detalle adicional..."></textarea>
-                </div>
-
-                <div class="wizard-nav">
-                    <button type="button" class="btn-nav btn-prev" onclick="prevStep(5)">&larr; Atrás</button>
-                </div>
-                <button type="submit" class="btn-submit">🔒 Firmar y Finalizar Inspección</button>
-            </div>
-        </form>
-
-        <div id="custom-modal" class="modal-overlay">
-            <div class="modal-box">
-                <div class="modal-icon" id="modal-icon">⚠️</div>
-                <div class="modal-title" id="modal-title">Confirmar Novedad</div>
-                <div class="modal-desc" id="modal-desc">Detalle</div>
-                <div class="modal-actions">
-                    <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
-                    <button class="btn-confirm" onclick="confirmModal()">Sí, Confirmar</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="response-modal" class="modal-overlay">
-            <div class="modal-box">
-                <div class="modal-icon" id="resp-modal-icon">✅</div>
-                <div class="modal-title" id="resp-modal-title" style="color: #10b981;">¡Inspección Completada!</div>
-                <div class="modal-desc" id="resp-modal-desc">Detalle</div>
-                <div class="modal-actions">
-                    <button id="btn-resp-ok" class="btn-confirm" style="background:#10b981; flex: 1;">Aceptar</button>
-                </div>
-            </div>
-        </div>
-
-        <script>
-            // --- LÓGICA DE DOCUMENTOS (Fechas Dinámicas) ---
-            function setDocCheck(fieldId, value, element, dateId) {
-                document.getElementById(fieldId).value = value;
-                
-                const parent = element.parentElement;
-                parent.querySelectorAll('.status-btn').forEach(btn => btn.classList.remove('active'));
-                element.classList.add('active');
-
-                const dateWrapper = document.getElementById('wrapper_' + dateId);
-                const dateInput = document.getElementById(dateId);
-
-                if (value === 1) { 
-                    dateWrapper.classList.add('active');
-                    dateInput.setAttribute('required', 'required');
-                } else { 
-                    dateWrapper.classList.remove('active');
-                    dateInput.removeAttribute('required');
-                    dateInput.value = ''; 
-                }
-            }
-
-            // --- LÓGICA DE 3 ESTADOS ---
-            let pendingAction = null;
-
-            function setMecCheck(fieldId, value, element, label, statusName) {
-                if(value === 1 || value === 0) {
-                    applyMecCheck(fieldId, value, element);
-                } else { 
-                    pendingAction = () => applyMecCheck(fieldId, value, element);
-                    
-                    const isYellow = value === 2;
-                    document.getElementById('modal-icon').innerText = isYellow ? '⚠️' : '🛑';
-                    document.getElementById('modal-title').innerText = isYellow ? 'Novedad de Ajuste' : 'Novedad Crítica';
-                    document.getElementById('modal-title').style.color = isYellow ? '#f59e0b' : '#ef4444';
-                    document.getElementById('modal-desc').innerHTML = `Has marcado <b>${label}</b> en estado <b>${statusName}</b>.<br><br>¿Estás seguro de reportar esta novedad?`;
-                    
-                    document.getElementById('custom-modal').classList.add('active');
-                }
-            }
-
-            function applyMecCheck(fieldId, value, element) {
-                document.getElementById(fieldId).value = value;
-                const parent = element.parentElement;
-                parent.querySelectorAll('.status-btn').forEach(btn => btn.classList.remove('active'));
-                element.classList.add('active');
-            }
-
-            function confirmModal() {
-                if(pendingAction) pendingAction();
-                closeModal();
-            }
-
-            function closeModal() {
-                document.getElementById('custom-modal').classList.remove('active');
-                pendingAction = null;
-            }
-
-            function closeResponseModal() {
-                document.getElementById('response-modal').classList.remove('active');
-            }
-
-            // --- LÓGICA DEL WIZARD ---
-            const steps = document.querySelectorAll('.form-step');
-
-            function nextStep(currentIndex) {
-                if(!validateStep(currentIndex)) return;
-                steps[currentIndex].classList.remove('active');
-                steps[currentIndex + 1].classList.add('active');
-                window.scrollTo(0, 0);
-            }
-
-            function prevStep(currentIndex) {
-                steps[currentIndex].classList.remove('active');
-                steps[currentIndex - 1].classList.add('active');
-                window.scrollTo(0, 0);
-            }
-
-            function validateStep(index) {
-                const currentStep = steps[index];
-                const requiredInputs = currentStep.querySelectorAll('input[required]');
-                
-                for(let input of requiredInputs) {
-                    if(input.offsetParent !== null && !input.value) {
-                        alert("Por favor, complete todos los campos obligatorios antes de continuar. (Revise las fechas de documentos)");
-                        input.focus();
-                        return false;
-                    }
-                }
-                return true;
-            }
-
-            // --- LÓGICA DE ENVÍO POR AJAX (FETCH) Y MODAL DE RESPUESTA ---
-            document.getElementById('wizardForm').addEventListener('submit', async function(e) {
-                e.preventDefault(); // Evitamos que la pantalla se recargue
-
-                const btn = document.querySelector('.btn-submit');
-                const originalText = btn.innerHTML;
-                
-                btn.innerHTML = '⏳ Procesando y Enviando Alertas...';
-                btn.style.opacity = '0.7';
-                btn.style.pointerEvents = 'none'; 
-
-                try {
-                    const formData = new FormData(this);
-                    
-                    const response = await fetch(this.action, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    const result = await response.json();
-
-                    const modal = document.getElementById('response-modal');
-                    const icon = document.getElementById('resp-modal-icon');
-                    const title = document.getElementById('resp-modal-title');
-                    const desc = document.getElementById('resp-modal-desc');
-                    const btnOk = document.getElementById('btn-resp-ok');
-
-                    if (result.success) {
-                        icon.innerText = '✅';
-                        title.innerText = '¡Inspección Completada!';
-                        title.style.color = '#10b981';
-                        desc.innerHTML = result.message;
-                        btnOk.style.background = '#10b981';
-                        
-                        // Al hacer clic en Aceptar, hacemos el redirect
-                        btnOk.onclick = function() {
-                            window.location.href = result.redirect_url;
-                        };
-                    } else {
-                        // En caso de fallo validado por el servidor
-                        icon.innerText = '❌';
-                        title.innerText = 'Error al Guardar';
-                        title.style.color = '#ef4444';
-                        desc.innerHTML = result.message || 'Ocurrió un problema inesperado.';
-                        btnOk.style.background = '#6b7280';
-                        
-                        // Solo cerramos el modal, devolvemos el botón a la normalidad para reintentar
-                        btnOk.onclick = function() {
-                            closeResponseModal();
-                            btn.innerHTML = originalText;
-                            btn.style.opacity = '1';
-                            btn.style.pointerEvents = 'auto';
-                        };
-                    }
-                    
-                    modal.classList.add('active');
-
-                } catch (error) {
-                    console.error("Fallo de conexión o parseo:", error);
-                    alert("Error crítico de conexión con el servidor. Intente nuevamente.");
-                    
-                    btn.innerHTML = originalText;
-                    btn.style.opacity = '1';
-                    btn.style.pointerEvents = 'auto';
-                }
-            });
-        </script>
-        {% endif %}
-
+<div class="container">
+    <div class="text-center mb-4">
+        <h2 class="title-header">BQA-ONE: FLOTA DE CARGA</h2>
+        <div class="subtitle-header">Diligenciamiento Preoperacional de Seguridad Vial</div>
     </div>
 
+    {% if scanner_mode %}
+    <div class="card">
+        <div class="card-header text-center">🔐 IDENTIFICACIÓN DEL VEHÍCULO</div>
+        <div class="card-body text-center">
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Por favor escanee el código QR ubicado en la cabina del vehículo para desbloquear la inspección.</p>
+            <div id="scanner-container" style="max-width: 400px; margin: 0 auto; border: 2px dashed #cbd5e1; padding: 20px; border-radius: 12px; background: #f8fafc;">
+                <img id="qr-placeholder" src="{{ url_for('static', filename='img/qr_placeholder.png') }}" alt="QR Scanner" style="width: 120px; margin-bottom: 15px;" onerror="this.style.display='none'">
+                <div id="reader" style="width: 100%;"></div>
+                <button id="btnActivarCamara" class="btn btn-primary mt-3 font-weight-bold px-4 py-2" onclick="iniciarEscaner()" style="background: var(--verde); border:none; border-radius:8px; color:white;">📷 Activar Cámara</button>
+            </div>
+            <div id="scanner-status" class="mt-3 font-weight-bold" style="color: var(--verde); display: none;">Procesando vehículo... ⏳</div>
+        </div>
+    </div>
+
+    {% else %}
+    
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form id="formPreoperacional" action="{{ url_for('preoperacional.guardar_inspeccion') }}" method="POST" onsubmit="return prepararEnvio(event);">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="detalles_novedades_json" id="detalles_novedades_json" value="{}">
+        <input type="hidden" name="estado_llantas_json" id="estado_llantas_json" value="{}">
+        
+        <input type="hidden" name="foto_conductor_base64" id="foto_conductor_base64" required>
+        <input type="hidden" name="firma_grafica_base64" id="firma_grafica_base64" required>
+
+        {% macro render_3_state(name, label) %}
+        <div class="form-group">
+            <label>{{ label }} <span style="color:#ef4444;">*</span></label>
+            <div class="radio-group">
+                <label class="radio-option"><input type="radio" name="{{ name }}" value="1" required><span class="text-op">Operativo</span></label>
+                <label class="radio-option"><input type="radio" name="{{ name }}" value="2" required><span class="text-am">Ajuste</span></label>
+                <label class="radio-option"><input type="radio" name="{{ name }}" value="3" required><span class="text-ro">Crítica</span></label>
+            </div>
+        </div>
+        {% endmacro %}
+
+        <div class="step-section active" id="step-1">
+            <div class="card">
+                <div class="card-header">Capítulo 1: Identificación y Viaje</div>
+                <div class="card-body">
+                    <div class="row mb-3" style="font-size: 14px; background:#f8fafc; padding:10px; border-radius:8px;">
+                        <div class="col-6 mb-2"><span style="color: var(--text-muted);">Placa:</span> <br><strong style="font-size: 18px; color: var(--verde);">{{ vehiculo.placa }}</strong></div>
+                        <div class="col-6 mb-2"><span style="color: var(--text-muted);">Ref/Tipo:</span> <br><strong><span id="tipo_vehiculo_label">{{ vehiculo.tipo|title }}</span></strong></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Ruta Destino <span style="color:#ef4444;">*</span></label>
+                        <select name="ruta_destino" class="form-control" required>
+                            <option value="">Seleccione una ruta...</option>
+                            {% for ruta in rutas %}<option value="{{ ruta.nombre_ruta }}">{{ ruta.nombre_ruta }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Kilometraje Inicial <span style="color:#ef4444;">*</span></label>
+                        <input type="number" name="kilometraje" class="form-control" required>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn-next" onclick="nextStep(1)">Continuar ➔</button>
+        </div>
+
+        <div class="step-section" id="step-2">
+            <div class="card">
+                <div class="card-header">Capítulo 2: Control Documental</div>
+                <div class="card-body">
+                    <div class="form-group"><label>Venc. Licencia Conducción <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_licencia" class="form-control" required></div>
+                    <div class="form-group"><label>Venc. SOAT <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_soat" class="form-control" required></div>
+                    <div class="form-group"><label>Venc. Tecnomecánica <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_tecno" class="form-control" required></div>
+                    <div class="form-group"><label>Venc. Tarjeta Operación <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_tarjeta_operacion" class="form-control" required></div>
+                    <div class="form-group"><label>Venc. Manifiesto Carga <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_manifiesto" class="form-control" required></div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(2)">⬅ Atrás</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(2)">Siguiente ➔</button></div>
+            </div>
+        </div>
+
+        <div class="step-section" id="step-3">
+            <div class="card">
+                <div class="card-header">Capítulo 3: Estado Mecánico</div>
+                <div class="card-body">
+                    {{ render_3_state('mec_aceite_motor', 'Nivel Aceite de Motor') }}
+                    {{ render_3_state('mec_liquido_frenos', 'Líquido de Frenos / Embrague') }}
+                    {{ render_3_state('mec_refrigerante', 'Nivel de Refrigerante') }}
+                    {{ render_3_state('mec_correas', 'Estado de Correas') }}
+                    {{ render_3_state('mec_fugas', 'Fugas Visibles (Aceite/Agua/Aire)') }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(3)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(3)">Siguiente ➔</button></div>
+            </div>
+        </div>
+
+        <div class="step-section" id="step-4">
+            <div class="card">
+                <div class="card-header">Capítulo 4: Luces</div>
+                <div class="card-body">
+                    {{ render_3_state('luc_altas', 'Luces Altas') }}
+                    {{ render_3_state('luc_bajas', 'Luces Bajas') }}
+                    {{ render_3_state('luc_frenos', 'Luces de Freno (Stop)') }}
+                    {{ render_3_state('luc_direccionales', 'Luces Direccionales') }}
+                    {{ render_3_state('luc_reversa', 'Luz y Pito de Reversa') }}
+                    {{ render_3_state('luc_cocuyos', 'Cocuyos / Delimitadoras') }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(4)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(4)">Siguiente ➔</button></div>
+            </div>
+        </div>
+
+        <div class="step-section" id="step-5">
+            <div class="card">
+                <div class="card-header">Capítulo 5: Llantas (Esquema Posicional)</div>
+                <div class="card-body">
+                    <p style="font-size: 13px; color: var(--text-muted); text-align: center; margin-bottom: 15px;">Toque cada llanta del esquema para calificar. <strong style="color:var(--verde);">Obligatorio.</strong></p>
+                    <div class="chasis-wrapper"><div class="chasis-container" id="chasis_render"></div></div>
+                    {{ render_3_state('lla_tuercas_pernos', 'Tuercas y Espárragos') }}
+                    {{ render_3_state('lla_repuesto_operativa', 'Llanta de Repuesto') }}
+                    {{ render_3_state('lla_suspension_muelles', 'Suspensión y Muelles') }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(5)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="validarLlantasYContinuar(5)">Siguiente ➔</button></div>
+            </div>
+        </div>
+
+        <div class="step-section" id="step-6">
+            <div class="card">
+                <div class="card-header">Capítulo 6: Frenos y Cabina</div>
+                <div class="card-body">
+                    {{ render_3_state('fre_pedal_firme', 'Firmeza Pedal de Freno') }}
+                    {{ render_3_state('fre_parqueo_mano', 'Freno de Mano') }}
+                    {{ render_3_state('fre_presion_aire_manometro', 'Manómetro Aire') }}
+                    {{ render_3_state('fre_juego_direccion', 'Juego de Dirección') }}
+                    {{ render_3_state('fre_limpiaparabrisas_plumillas', 'Plumillas') }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(6)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(6)">Siguiente ➔</button></div>
+            </div>
+        </div>
+
+        <div class="step-section" id="step-7">
+            <div class="card">
+                <div class="card-header">Capítulo 7: Carrocería</div>
+                <div class="card-body">
+                    {{ render_3_state('car_estado_estructura', 'Compuertas y Seguros') }}
+                    {{ render_3_state('car_compuertas_carpas_amarres', 'Carpas y Amarres') }}
+                    {{ render_3_state('car_cinturones_seguridad', 'Cinturones de Seguridad') }}
+                    {{ render_3_state('car_espejos_retrovisores', 'Espejos Retrovisores') }}
+                    {{ render_3_state('car_vidrio_parabrisas', 'Parabrisas sin Fisuras') }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(7)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(7)">Siguiente ➔</button></div>
+            </div>
+        </div>
+
+        <div class="step-section" id="step-8">
+            <div class="card mb-3">
+                <div class="card-header">Capítulo 8: Prevención</div>
+                <div class="card-body">
+                    {{ render_3_state('equ_extintor_10lbs', 'Extintor Vigente') }}
+                    {{ render_3_state('equ_tacos_bloqueo', 'Tacos / Cuñas') }}
+                    {{ render_3_state('equ_senales_reflectivas', 'Señales Reflectivas') }}
+                    {{ render_3_state('equ_cruceta_herramientas', 'Herramientas Básicas') }}
+                    {{ render_3_state('equ_botiquin_completo', 'Botiquín Primeros Auxilios') }}
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header" style="background:#4b5563;">Observaciones Finales</div>
+                <div class="card-body">
+                    <textarea name="observaciones_hallazgos" class="form-control" rows="3" placeholder="Si tiene algo más que añadir..."></textarea>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(8)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(8)">Firmar Inspección ➔</button></div>
+            </div>
+        </div>
+
+        <div class="step-section" id="step-9">
+            <div class="card mb-3">
+                <div class="card-header" style="background: #0f172a;">Capítulo 9: Autenticación HSEQ</div>
+                <div class="card-body">
+                    
+                    <div class="auth-container">
+                        <label style="color:#0f172a; font-size:14px;">1. Fotografía de Auditoría (Selfie) <span style="color:#ef4444;">*</span></label>
+                        <p style="font-size:11px; color:var(--text-muted);">Encienda la cámara frontal para respaldar la inspección.</p>
+                        
+                        <video id="video-selfie" autoplay playsinline></video>
+                        <canvas id="canvas-foto" style="display:none;"></canvas>
+                        <img id="preview-selfie" alt="Selfie Capturada">
+                        
+                        <div id="btn-group-camara">
+                            <button type="button" class="btn btn-primary btn-sm px-4 font-weight-bold" onclick="iniciarCamaraSelfie()">Encender Cámara</button>
+                        </div>
+                        <div id="btn-group-captura" style="display:none;">
+                            <button type="button" class="btn btn-success btn-sm px-4 font-weight-bold" onclick="tomarSelfie()">Capturar Foto</button>
+                        </div>
+                    </div>
+
+                    <div class="auth-container">
+                        <label style="color:#0f172a; font-size:14px;">2. Firma del Conductor <span style="color:#ef4444;">*</span></label>
+                        <p style="font-size:11px; color:var(--text-muted);">Dibuje su firma con el dedo en el recuadro blanco.</p>
+                        
+                        <canvas id="canvas-firma"></canvas>
+                        <div>
+                            <button type="button" class="btn btn-light btn-sm" onclick="limpiarFirma()" style="border:1px solid #ccc;">Limpiar Firma</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(9)">⬅ Atrás</button></div>
+                <div class="col-8">
+                    <button type="submit" class="btn btn-success btn-lg btn-block" style="font-weight:bold; height: 100%;">
+                        FINALIZAR Y ENVIAR ✅
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </form>
+    {% endif %}
+</div>
+
+<div id="modalNovedad" class="modal-overlay">
+    <div class="modal-box">
+        <h4 id="modalTitulo" style="color:#ef4444; font-weight:bold; border-bottom: 2px solid #fee2e2; padding-bottom:10px;">Registrar Novedad</h4>
+        <div style="background:#f8fafc; padding:12px; border-radius:8px; margin-bottom:15px; border: 1px dashed #cbd5e1;">
+            <strong id="nombreComponenteModal" style="color: var(--verde);"></strong><br><span id="badgeEstado" class="badge mt-2"></span>
+        </div>
+        <textarea id="textoNovedad" class="form-control" rows="4" placeholder="Detalle la novedad..." required></textarea>
+        <div class="row mt-4">
+            <div class="col-6"><button type="button" onclick="cancelarNovedadModal()" class="btn btn-light btn-block">Cancelar</button></div>
+            <div class="col-6"><button type="button" onclick="guardarNovedadModal()" class="btn btn-danger btn-block">Confirmar</button></div>
+        </div>
+    </div>
+</div>
+
+<div id="modalLlantaPosicion" class="modal-overlay">
+    <div class="modal-box">
+        <h4 style="color:var(--verde); font-weight:bold; border-bottom: 2px solid var(--border); padding-bottom:10px;">Inspección de Llanta</h4>
+        <div style="background:#eefcf9; padding:12px; border-radius:8px; margin-bottom:15px; border: 1px dashed var(--verde); text-align:center;">
+            <strong id="nombreLlantaModal" style="font-size:1.1em; color: var(--verde-osc);"></strong>
+        </div>
+        <div class="form-group mt-3">
+            <label>Profundidad de Labrado <span style="color:#ef4444;">*</span></label>
+            <select id="selectLabradoLlanta" class="form-control" required>
+                <option value="" disabled selected>Seleccione estado...</option>
+                <option value="operativa">🟢 Operativa (Buen Labrado)</option>
+                <option value="baja">🟡 Labrado Bajo (Para Cambio Pronto)</option>
+                <option value="lisa">🔴 Lisa (No Apta / Falla Crítica)</option>
+            </select>
+        </div>
+        <div class="form-group mt-3">
+            <label>Novedades (Opcional)</label>
+            <textarea id="textoNovedadLlanta" class="form-control" rows="2" placeholder="Describa daños..."></textarea>
+        </div>
+        <div class="row mt-4">
+            <div class="col-6"><button type="button" onclick="cerrarModalLlanta()" class="btn btn-light btn-block">Cancelar</button></div>
+            <div class="col-6"><button type="button" onclick="guardarLlantaModal()" class="btn btn-primary btn-block">Guardar</button></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const totalSteps = 9; // Se actualizó a 9 capítulos
+    let isSubmitting = false;
+    let streamMedia = null;
+
+    function updateProgress(step) {
+        const percentage = ((step - 1) / totalSteps) * 100;
+        document.getElementById('progressBar').style.width = percentage === 0 ? '10%' : percentage + '%';
+    }
+
+    function showToast() {
+        const toast = document.getElementById('toast-success');
+        toast.classList.add('show');
+        setTimeout(() => { toast.classList.remove('show'); }, 2500);
+    }
+
+    function nextStep(currentStep) {
+        const currentSection = document.getElementById('step-' + currentStep);
+        const inputs = currentSection.querySelectorAll('input, select, textarea');
+        let isValid = true;
+
+        for (let input of inputs) {
+            if (!input.checkValidity()) {
+                input.reportValidity();
+                isValid = false; break;
+            }
+        }
+
+        if (isValid) {
+            if(currentStep === 8) {
+                // Al llegar al paso 9, inicializa el canvas de firma
+                setTimeout(redimensionarCanvasFirma, 300);
+            }
+            showToast();
+            currentSection.classList.remove('active');
+            document.getElementById('step-' + (currentStep + 1)).classList.add('active');
+            updateProgress(currentStep + 1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
+    function prevStep(currentStep) {
+        document.getElementById('step-' + currentStep).classList.remove('active');
+        document.getElementById('step-' + (currentStep - 1)).classList.add('active');
+        updateProgress(currentStep - 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ============================================
+    // LÓGICA DE FOTO Y FIRMA (COMPRESIÓN)
+    // ============================================
+
+    // 1. CÁMARA FRONTAL
+    async function iniciarCamaraSelfie() {
+        const video = document.getElementById('video-selfie');
+        try {
+            streamMedia = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            video.srcObject = streamMedia;
+            video.style.display = 'block';
+            document.getElementById('preview-selfie').style.display = 'none';
+            document.getElementById('btn-group-camara').style.display = 'none';
+            document.getElementById('btn-group-captura').style.display = 'block';
+        } catch (err) {
+            alert("No se pudo acceder a la cámara frontal. Permita el acceso en su navegador.");
+        }
+    }
+
+    function tomarSelfie() {
+        const video = document.getElementById('video-selfie');
+        const canvas = document.getElementById('canvas-foto');
+        const preview = document.getElementById('preview-selfie');
+        
+        // Configurar compresión a 400x400 max
+        canvas.width = 400;
+        canvas.height = (video.videoHeight / video.videoWidth) * 400;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Exportar a JPEG con 60% de calidad para no saturar BD
+        const base64Photo = canvas.toDataURL('image/jpeg', 0.6);
+        document.getElementById('foto_conductor_base64').value = base64Photo;
+        
+        preview.src = base64Photo;
+        preview.style.display = 'block';
+        video.style.display = 'none';
+        
+        // Apagar cámara
+        if(streamMedia) streamMedia.getTracks().forEach(track => track.stop());
+        
+        document.getElementById('btn-group-captura').style.display = 'none';
+        document.getElementById('btn-group-camara').style.display = 'block';
+        document.querySelector('#btn-group-camara button').innerText = "Volver a Tomar";
+    }
+
+    // 2. LIENZO DE FIRMA (CANVAS)
+    const canvasFirma = document.getElementById('canvas-firma');
+    const ctxFirma = canvasFirma.getContext('2d');
+    let dibujando = false;
+    let firmaAlterada = false;
+
+    function redimensionarCanvasFirma() {
+        // Ajusta la resolución del canvas interno para evitar trazos borrosos
+        const rect = canvasFirma.getBoundingClientRect();
+        canvasFirma.width = rect.width;
+        canvasFirma.height = rect.height;
+        ctxFirma.lineWidth = 3;
+        ctxFirma.lineCap = 'round';
+        ctxFirma.strokeStyle = '#015249';
+    }
+
+    function obtenerPosicionCords(evt) {
+        const rect = canvasFirma.getBoundingClientRect();
+        const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
+        const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+    }
+
+    function iniciarTrazo(e) {
+        e.preventDefault();
+        dibujando = true;
+        firmaAlterada = true;
+        const pos = obtenerPosicionCords(e);
+        ctxFirma.beginPath();
+        ctxFirma.moveTo(pos.x, pos.y);
+    }
+
+    function dibujar(e) {
+        if (!dibujando) return;
+        e.preventDefault();
+        const pos = obtenerPosicionCords(e);
+        ctxFirma.lineTo(pos.x, pos.y);
+        ctxFirma.stroke();
+    }
+
+    function detenerTrazo() { dibujando = false; }
+
+    canvasFirma.addEventListener('mousedown', iniciarTrazo);
+    canvasFirma.addEventListener('mousemove', dibujar);
+    canvasFirma.addEventListener('mouseup', detenerTrazo);
+    canvasFirma.addEventListener('mouseout', detenerTrazo);
+
+    canvasFirma.addEventListener('touchstart', iniciarTrazo, {passive: false});
+    canvasFirma.addEventListener('touchmove', dibujar, {passive: false});
+    canvasFirma.addEventListener('touchend', detenerTrazo);
+
+    function limpiarFirma() {
+        ctxFirma.clearRect(0, 0, canvasFirma.width, canvasFirma.height);
+        firmaAlterada = false;
+        document.getElementById('firma_grafica_base64').value = "";
+    }
+
+    function prepararEnvio(e) {
+        // Valida que tomaron foto
+        if(!document.getElementById('foto_conductor_base64').value) {
+            alert("⚠️ Debe capturar la Fotografía de Auditoría para finalizar.");
+            e.preventDefault(); return false;
+        }
+        // Valida que firmaron
+        if(!firmaAlterada) {
+            alert("⚠️ Debe dibujar su firma en el recuadro blanco para finalizar.");
+            e.preventDefault(); return false;
+        }
+        
+        // Guardar firma comprimida en el input hidden
+        document.getElementById('firma_grafica_base64').value = canvasFirma.toDataURL('image/png');
+        
+        isSubmitting = true;
+        localStorage.clear();
+        return true;
+    }
+
+
+    // ============================================
+    // RESTO DE CÓDIGO (CHASIS Y ESTADOS)
+    // ============================================
+    let objetoNovedades = {}; let objetoLlantas = {}; let arrayLlantasRequeridas = [];
+
+    document.addEventListener("DOMContentLoaded", function() {
+        updateProgress(1);
+        const formPreop = document.getElementById('formPreoperacional');
+        if (formPreop) {
+            history.pushState(null, null, location.href);
+            window.addEventListener('popstate', function () { history.pushState(null, null, location.href); });
+            window.addEventListener('beforeunload', function (e) { if (!isSubmitting) { e.preventDefault(); e.returnValue = ''; }});
+
+            const formInputs = document.querySelectorAll('input:not([type="hidden"]), select, textarea');
+            formInputs.forEach(input => {
+                if(input.name && localStorage.getItem('preop_' + input.name)) {
+                    if(input.type === 'radio') { if(input.value === localStorage.getItem('preop_' + input.name)) input.checked = true; } 
+                    else input.value = localStorage.getItem('preop_' + input.name);
+                }
+                input.addEventListener('change', function() { localStorage.setItem('preop_' + input.name, input.value); });
+            });
+
+            if(localStorage.getItem('preop_novedades_json')) { objetoNovedades = JSON.parse(localStorage.getItem('preop_novedades_json')); document.getElementById('detalles_novedades_json').value = JSON.stringify(objetoNovedades); }
+            if(localStorage.getItem('preop_llantas_json')) { objetoLlantas = JSON.parse(localStorage.getItem('preop_llantas_json')); document.getElementById('estado_llantas_json').value = JSON.stringify(objetoLlantas); }
+
+            document.querySelectorAll('input[type="radio"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const estado = parseInt(this.value);
+                    if(estado === 2 || estado === 3) abrirModalNovedad(this.name, estado, this.closest('.form-group').querySelector('label').innerText);
+                    else if (estado === 1 && objetoNovedades[this.name]) {
+                        delete objetoNovedades[this.name]; document.getElementById('detalles_novedades_json').value = JSON.stringify(objetoNovedades); localStorage.setItem('preop_novedades_json', JSON.stringify(objetoNovedades));
+                    }
+                });
+            });
+
+            {% if not scanner_mode %} renderizarChasis('{{ vehiculo.tipo|lower }}'); {% endif %}
+        }
+    });
+
+    function renderizarChasis(tipo) {
+        const container = document.getElementById('chasis_render'); let html = '';
+        html += `<div class="eje"><div class="llanta-btn" id="ll_dir_izq" onclick="abrirModalLlanta('ll_dir_izq', 'Dir. Izquierda')">DIR<br>IZQ</div><div class="eje-barra"></div><div class="llanta-btn" id="ll_dir_der" onclick="abrirModalLlanta('ll_dir_der', 'Dir. Derecha')">DIR<br>DER</div></div>`;
+        arrayLlantasRequeridas.push('ll_dir_izq', 'll_dir_der');
+
+        if (tipo === 'camion ligero') {
+            html += `<div class="eje"><div class="llanta-btn" id="ll_trac_izq" onclick="abrirModalLlanta('ll_trac_izq', 'Trac. Izquierda')">TRAC<br>IZQ</div><div class="eje-barra"></div><div class="llanta-btn" id="ll_trac_der" onclick="abrirModalLlanta('ll_trac_der', 'Trac. Derecha')">TRAC<br>DER</div></div>`;
+            arrayLlantasRequeridas.push('ll_trac_izq', 'll_trac_der');
+        } else if (tipo === 'camion sencillo') {
+            html += `<div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_trac_izq_ext" onclick="abrirModalLlanta('ll_trac_izq_ext', 'Trac. Izq Ext')">EXT<br>IZQ</div><div class="llanta-btn" id="ll_trac_izq_int" onclick="abrirModalLlanta('ll_trac_izq_int', 'Trac. Izq Int')">INT<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_trac_der_int" onclick="abrirModalLlanta('ll_trac_der_int', 'Trac. Der Int')">INT<br>DER</div><div class="llanta-btn" id="ll_trac_der_ext" onclick="abrirModalLlanta('ll_trac_der_ext', 'Trac. Der Ext')">EXT<br>DER</div></div></div>`;
+            arrayLlantasRequeridas.push('ll_trac_izq_ext', 'll_trac_izq_int', 'll_trac_der_int', 'll_trac_der_ext');
+        } else if (tipo === 'dobletroque') {
+            html += `<div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_izq_ext" onclick="abrirModalLlanta('ll_t1_izq_ext', 'Troque 1 Izq Ext')">T1 E<br>IZQ</div><div class="llanta-btn" id="ll_t1_izq_int" onclick="abrirModalLlanta('ll_t1_izq_int', 'Troque 1 Izq Int')">T1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_der_int" onclick="abrirModalLlanta('ll_t1_der_int', 'Troque 1 Der Int')">T1 I<br>DER</div><div class="llanta-btn" id="ll_t1_der_ext" onclick="abrirModalLlanta('ll_t1_der_ext', 'Troque 1 Der Ext')">T1 E<br>DER</div></div></div><div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_izq_ext" onclick="abrirModalLlanta('ll_t2_izq_ext', 'Troque 2 Izq Ext')">T2 E<br>IZQ</div><div class="llanta-btn" id="ll_t2_izq_int" onclick="abrirModalLlanta('ll_t2_izq_int', 'Troque 2 Izq Int')">T2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_der_int" onclick="abrirModalLlanta('ll_t2_der_int', 'Troque 2 Der Int')">T2 I<br>DER</div><div class="llanta-btn" id="ll_t2_der_ext" onclick="abrirModalLlanta('ll_t2_der_ext', 'Troque 2 Der Ext')">T2 E<br>DER</div></div></div>`;
+            arrayLlantasRequeridas.push('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext');
+        }
+        container.innerHTML = html;
+        for (let llantaId in objetoLlantas) { let btn = document.getElementById(llantaId); if(btn) btn.className = "llanta-btn " + objetoLlantas[llantaId].labrado; }
+    }
+
+    let llantaEditandoID = ""; let llantaEditandoNombre = "";
+    function abrirModalLlanta(idLlanta, nombreLegible) {
+        llantaEditandoID = idLlanta; llantaEditandoNombre = nombreLegible;
+        document.getElementById('nombreLlantaModal').innerText = nombreLegible;
+        document.getElementById('selectLabradoLlanta').value = objetoLlantas[idLlanta] ? objetoLlantas[idLlanta].labrado : "";
+        document.getElementById('textoNovedadLlanta').value = objetoLlantas[idLlanta] ? objetoLlantas[idLlanta].novedad : "";
+        document.getElementById('modalLlantaPosicion').style.display = 'block';
+    }
+
+    function cerrarModalLlanta() { document.getElementById('modalLlantaPosicion').style.display = 'none'; }
+
+    function guardarLlantaModal() {
+        let labradoVal = document.getElementById('selectLabradoLlanta').value;
+        if (!labradoVal) { alert("⚠️ Seleccione el labrado."); return; }
+        objetoLlantas[llantaEditandoID] = { nombre_legible: llantaEditandoNombre, labrado: labradoVal, novedad: document.getElementById('textoNovedadLlanta').value.trim() };
+        document.getElementById(llantaEditandoID).className = "llanta-btn " + labradoVal; 
+        document.getElementById('estado_llantas_json').value = JSON.stringify(objetoLlantas);
+        localStorage.setItem('preop_llantas_json', JSON.stringify(objetoLlantas));
+        cerrarModalLlanta();
+    }
+
+    function validarLlantasYContinuar(currentStep) {
+        let faltantes = 0;
+        for (let i = 0; i < arrayLlantasRequeridas.length; i++) { if (!objetoLlantas[arrayLlantasRequeridas[i]]) faltantes++; }
+        if (faltantes > 0) { alert("⚠️ Faltan " + faltantes + " llanta(s) por inspeccionar."); return; }
+        nextStep(currentStep);
+    }
+
+    let componenteActualEnEdicion = ""; let valorActualEnEdicion = 0;
+    function abrirModalNovedad(comp, estado, lbl) {
+        componenteActualEnEdicion = comp; valorActualEnEdicion = estado;
+        document.getElementById('nombreComponenteModal').innerText = lbl;
+        let badge = document.getElementById('badgeEstado');
+        badge.style.backgroundColor = estado === 2 ? "#fef3c7" : "#fee2e2"; badge.style.color = estado === 2 ? "#d97706" : "#dc2626"; badge.innerText = estado === 2 ? "Ajuste" : "Crítica";
+        document.getElementById('textoNovedad').value = objetoNovedades[comp] ? objetoNovedades[comp].detalle : ""; 
+        document.getElementById('modalNovedad').style.display = 'block';
+    }
+
+    function guardarNovedadModal() {
+        const t = document.getElementById('textoNovedad').value.trim();
+        if(t === "") { alert("⚠️ Especifique novedad."); return; }
+        objetoNovedades[componenteActualEnEdicion] = { estado: valorActualEnEdicion, detalle: t };
+        document.getElementById('detalles_novedades_json').value = JSON.stringify(objetoNovedades);
+        localStorage.setItem('preop_novedades_json', JSON.stringify(objetoNovedades));
+        document.getElementById('modalNovedad').style.display = 'none';
+    }
+
+    function cancelarNovedadModal() {
+        let r = document.getElementsByName(componenteActualEnEdicion);
+        for (let i = 0; i < r.length; i++) r[i].checked = false; 
+        document.getElementById('modalNovedad').style.display = 'none';
+    }
+
+    // QR LOGIC
+    function iniciarEscaner() {
+        document.getElementById('qr-placeholder').style.display = 'none';
+        document.getElementById('btnActivarCamara').style.display = 'none';
+        let html5QrcodeScanner = new Html5Qrcode("reader");
+        html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 }, (decodedText) => {
+            html5QrcodeScanner.stop().then(() => {
+                document.getElementById('reader').style.display = 'none'; document.getElementById('scanner-status').style.display = 'block';
+                fetch("{{ url_for('preoperacional.validar_qr') }}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }, body: JSON.stringify(JSON.parse(decodedText)) })
+                .then(async r => { const d = r.headers.get('content-type')?.includes('application/json') ? await r.json() : null; if (!r.ok) throw new Error(d ? d.message : "Error server."); return d; })
+                .then(d => { if (d.success) window.location.reload(); else { alert("⚠️ " + d.message); window.location.reload(); } })
+                .catch(e => { alert("❌ Error: " + e.message); window.location.reload(); });
+            });
+        }, () => {}).catch(() => { alert("❌ Permita cámara."); document.getElementById('btnActivarCamara').style.display = 'inline-block'; });
+    }
+</script>
 </body>
 </html>

@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WMS Verificación</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <style>
+        /* --- RESET Y BASE --- */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            color: #1f2937;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 500px;
+            background: #ffffff;
+            min-height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- COLORES VERIFICADOR --- */
+        :root {
+            --primary: #4338ca;
+            --primary-dark: #312e81;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --bg-light: #f5f3ff;
+            --text-gray: #64748b;
+            --border: #e2e8f0;
+        }
+
+        /* --- HEADER --- */
+        .app-header {
+            background: #ffffff;
+            padding: 15px 25px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .brand-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .logo-img {
+            height: 38px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .logo-divider {
+            width: 1px;
+            height: 28px;
+            background-color: #cbd5e1;
+        }
+
+        /* --- CONTENIDO --- */
+        .content-area {
+            flex: 1;
+            padding: 25px;
+            padding-bottom: 100px;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
+
+        /* --- MENU --- */
+        .menu-welcome {
+            margin-bottom: 35px;
+            margin-top: 10px;
+            border-left: 4px solid var(--primary);
+            padding-left: 15px;
+        }
+
+        .menu-welcome h2 {
+            font-size: 1.8rem;
+            margin: 0;
+            color: var(--primary-dark);
+            font-weight: 800;
+        }
+
+        .menu-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .menu-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+        }
+
+        .menu-card:active {
+            transform: scale(0.98);
+            background: #f1f5f9;
+        }
+
+        .menu-card.opt-picking {
+            border-left: 5px solid var(--primary);
+        }
+
+        .menu-icon {
+            font-size: 2.8rem;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .menu-title {
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: var(--primary-dark);
+            text-transform: uppercase;
+        }
+
+        .btn-logout-menu {
+            margin-top: 40px;
+            width: 100%;
+            padding: 16px;
+            background: white;
+            border: 1px solid #fee2e2;
+            color: #ef4444;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        /* --- LISTAS --- */
+        .nav-back {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-gray);
+            background: none;
+            border: none;
+            font-size: 1rem;
+        }
+
+        .order-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border-left: 5px solid var(--primary);
+        }
+
+        .oc-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .oc-number {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .oc-badge {
+            background: #e0e7ff;
+            color: var(--primary-dark);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+
+        .p-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .p-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), #27ae60);
+            transition: width 0.4s ease;
+        }
+
+        .item-row {
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            gap: 15px;
+            border-left: 3px solid transparent;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        .item-row.active {
+            border-left-color: var(--secondary);
+        }
+
+        .item-row.done {
+            display: none !important;
+        }
+
+        .qty-indicator {
+            min-width: 50px;
+            height: 50px;
+            background: var(--bg-light);
+            color: var(--primary-dark);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 800;
+            border: 1px solid var(--border);
+        }
+
+        .item-details {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .id-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #334155;
+            word-break: break-word;
+        }
+
+        .id-code {
+            font-size: 0.7rem;
+            color: var(--text-gray);
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        /* --- MODAL TRABAJO (VERIFICACIÓN) --- */
+        .modal-wrap {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .picking-sheet {
+            width: 95%;
+            max-width: 400px;
+            height: 95vh;
+            max-height: 850px;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn-close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #f1f5f9;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            font-weight: bold;
+            color: #64748b;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .pick-header {
+            margin-bottom: 15px;
+            padding-right: 30px;
+        }
+
+        .pick-prod {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--primary-dark);
+            line-height: 1.3;
+            margin-bottom: 5px;
+        }
+
+        .pick-code-pill {
+            background: #e0e7ff;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: var(--primary-dark);
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .pick-stats {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            background: #faf5ff;
+        }
+
+        .stat-lbl {
+            font-size: 0.7rem;
+            color: var(--secondary);
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .stat-val {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .camera-container {
+            flex: 1;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-bottom: 15px;
+            min-height: 350px;
+        }
+
+        #embedded-reader {
+            width: 100%;
+            height: 100%;
+        }
+
+        .btn-start-cam {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 30px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            z-index: 5;
+        }
+
+        .btn-start-cam:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .action-area {
+            background: #e0e7ff;
+            border-radius: 16px;
+            padding: 15px;
+            border: 1px solid #c7d2fe;
+            text-align: center;
+        }
+
+        .counter-big {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: var(--primary);
+            line-height: 1;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .counter-lbl {
+            font-size: 0.8rem;
+            color: var(--primary-dark);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-finish {
+            width: 100%;
+            background: var(--success);
+            color: white;
+            padding: 18px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            border: none;
+            margin-top: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+        }
+
+        .btn-finish:active {
+            transform: scale(0.98);
+        }
+
+        .btn-reset {
+            margin-top: 10px;
+            background: transparent;
+            border: 1px solid #ccc;
+            padding: 8px;
+            border-radius: 8px;
+            color: #666;
+            font-size: 0.8rem;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        /* Modal Confirmación Final */
+        .verify-sheet {
+            background: white;
+            width: 85%;
+            max-width: 350px;
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .verify-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-v-cancel {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 10px;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .btn-v-confirm {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: var(--success);
+            border-radius: 10px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-container">
+        <header class="app-header">
+            <div class="brand-area">
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix360" class="logo-img">
+                <div class="logo-divider"></div>
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" alt="Cliente" class="logo-img"
+                    onerror="this.style.display='none'">
+            </div>
+        </header>
+
+        <div id="content-area" class="content-area">
+
+            <div id="view-menu">
+                <div class="menu-welcome">
+                    <h2>Hola: {{ usuario }}</h2>
+                    <p style="color: var(--secondary); font-weight: bold;">Módulo de Verificador de Bodega</p>
+                </div>
+                <div class="menu-grid">
+                    <div class="menu-card opt-picking" onclick="cargarOrdenes()">
+                        <span class="menu-icon">🔍</span>
+                        <span class="menu-title">Auditar Picking</span>
+                    </div>
+                </div>
+                <button class="btn-logout-menu" onclick="location.href='/logout'">Cerrar Sesión</button>
+            </div>
+
+            <div id="view-orders" class="hidden">
+                <button class="nav-back" onclick="volverAlMenu()">⬅ Volver al Menú</button>
+                <h2 style="margin: 5px 0 15px 0; color: var(--primary-dark);">Pedidos Listos (Por Auditar)</h2>
+                <div id="orders-container"></div>
+            </div>
+
+            <div id="view-items" class="hidden">
+                <button class="nav-back" onclick="cargarOrdenes()">⬅ Volver a Órdenes</button>
+
+                <div
+                    style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px;">
+                    <div style="font-size: 0.75rem; opacity: 0.8;">ORDEN A VERIFICAR</div>
+                    <div style="font-size: 2rem; font-weight: 800;" id="lblOrdenTitle">#0000</div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 600;">
+                        <span>Por auditar</span><span id="lblProgress">0/0</span>
+                    </div>
+                    <div class="p-bar">
+                        <div id="header-progress-bar" class="p-fill" style="width: 0%; background: white;"></div>
+                    </div>
+                </div>
+
+                <input type="text" id="searchBox" class="search-bar" placeholder="🔍 Buscar producto a auditar..."
+                    onkeyup="filtrarLista()"
+                    style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px;">
+                <div id="items-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-picking" class="modal-wrap">
+        <div class="picking-sheet">
+            <button class="btn-close-modal" onclick="cerrarModalVerificacion()">✕</button>
+
+            <div class="pick-header">
+                <div id="pk-name" class="pick-prod">Nombre del Producto</div>
+                <span id="pk-code" class="pick-code-pill">CODE123</span>
+            </div>
+
+            <div id="novedad-alert" class="hidden"
+                style="background:#fef2f2; color:#be123c; border:1px solid #fecdd3; padding:10px; border-radius:8px; font-size:0.85rem; font-weight:bold; margin-bottom:15px; text-align:center;">
+                ⚠️ NOVEDAD REPORTADA POR ALISTADOR
+            </div>
+
+            <div class="pick-stats">
+                <div class="stat-box">
+                    <div class="stat-lbl">Entregadas</div>
+                    <div id="pk-req" class="stat-val">0</div>
+                </div>
+            </div>
+
+            <div class="camera-container" id="camera-section">
+                <div id="embedded-reader"></div>
+                <div id="cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraIncrustada()">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                    </svg>
+                    ACTIVAR LECTOR
+                </div>
+            </div>
+
+            <div class="action-area" id="area-conteo-cajas">
+                <span class="counter-lbl" style="color:var(--primary-dark);">📦 CAJAS VERIFICADAS</span>
+                <span id="pk-count-cajas" class="counter-big" style="color:var(--primary);">0</span>
+            </div>
+
+            <div class="action-area hidden" id="area-teclado-fracciones"
+                style="background: #f3e8ff; border-color: #e9d5ff;">
+                <span class="counter-lbl" style="color:#7e22ce;">🍬 UNIDADES VERIFICADAS</span>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 15px;">
+                    <button onclick="cambiarFraccion(-1)"
+                        style="width: 50px; height: 50px; border-radius: 50%; font-size: 2rem; border: none; background: #e9d5ff; color: #581c87; font-weight: bold; cursor: pointer;">-</button>
+                    <span id="pk-count-unidades" class="counter-big"
+                        style="color:#7e22ce; margin: 0; min-width: 60px;">0</span>
+                    <button onclick="cambiarFraccion(1)"
+                        style="width: 50px; height: 50px; border-radius: 50%; font-size: 2rem; border: none; background: #a855f7; color: white; font-weight: bold; cursor: pointer;">+</button>
+                </div>
+            </div>
+
+            <button class="btn-finish" onclick="intentarVerificarItem()">CONFIRMAR AUDITORÍA</button>
+            <button class="btn-reset" onclick="resetearConteo()">🔄 Reiniciar Lectura</button>
+        </div>
+    </div>
+
+    <div id="modal-verify" class="modal-wrap">
+        <div class="verify-sheet">
+            <div style="font-size: 3rem; margin-bottom: 15px;">✅</div>
+            <h3 style="margin:0; color:#1e293b;">¿Sellar Verificación?</h3>
+            <p style="color:#64748b; line-height:1.5;">
+                Auditoría Física: <b id="vf-count" style="color:var(--secondary); font-size:1.2rem;">0</b>
+            </p>
+            <div class="verify-btns">
+                <button class="btn-v-cancel" onclick="cancelarConfirmacion()">Revisar</button>
+                <button class="btn-v-confirm" onclick="ejecutarVerificacionFinal()">SELLAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ordenActual = null, listaItems = [], itemActivo = null, scanner = null;
+        let lastScanTime = 0;
+        let audioCtx = null;
+
+        function initAudio() {
+            try {
+                if (!audioCtx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        audioCtx = new AudioContext();
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        gain.gain.value = 0;
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start();
+                        osc.stop(audioCtx.currentTime + 0.01);
+                    }
+                } else if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            } catch (e) { console.error("Audio init error", e); }
+        }
+
+        function playBeep() {
+            try {
+                if (audioCtx) {
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime); 
+                    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime); 
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.start();
+                    oscillator.stop(audioCtx.currentTime + 0.15); 
+                }
+            } catch (e) { console.log("Audio play error", e); }
+        }
+
+        function mostrarMenu() { toggleView('view-menu'); }
+        function volverAlMenu() { mostrarMenu(); }
+        function toggleView(id) {
+            ['view-menu', 'view-orders', 'view-items'].forEach(v => document.getElementById(v).classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        // =====================================
+        // POLLING EN TIEMPO REAL
+        // =====================================
+        function cargarOrdenesSilencioso() {
+            fetch('/api/verificador/ordenes?v=' + new Date().getTime())
+                .then(r => r.json())
+                .then(d => {
+                    let html = '';
+                    if (d.length === 0) html = '<p style="color:#94a3b8; font-size:0.9rem; text-align:center;">No hay órdenes listas para auditar</p>';
+                    d.forEach(o => {
+                        const p = Math.round((o.items_verificados / o.total_items) * 100);
+                        html += `
+                        <div class="order-card" onclick="abrirOrden('${o.orden}')">
+                            <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona || 'General'}</span></div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;">
+                                <span>Auditado</span><span>${o.items_verificados}/${o.total_items}</span>
+                            </div>
+                            <div class="p-bar"><div class="p-fill" style="width:${p}%"></div></div>
+                        </div>`;
+                    });
+                    const cOrd = document.getElementById('orders-container');
+                    if (cOrd && cOrd.innerHTML !== html) cOrd.innerHTML = html;
+                }).catch(e => console.log(e));
+        }
+
+        function cargarItemsSilencioso() {
+            if (!ordenActual) return;
+            fetch(`/api/verificador/items_orden/${ordenActual}?v=` + new Date().getTime())
+                .then(r => r.json())
+                .then(d => {
+                    if (itemActivo === null) {
+                        listaItems = d.filter(i => i.estado_actividad === 'ALISTADO');
+                        renderizarItems();
+                    }
+                }).catch(e => console.log(e));
+        }
+
+        setInterval(() => {
+            if (!document.getElementById('view-orders').classList.contains('hidden')) {
+                cargarOrdenesSilencioso();
+            } else if (!document.getElementById('view-items').classList.contains('hidden')) {
+                cargarItemsSilencioso();
+            }
+        }, 3000);
+
+
+        function cargarOrdenes() {
+            toggleView('view-orders');
+            const cOrd = document.getElementById('orders-container');
+            cOrd.innerHTML = 'Cargando...';
+            cargarOrdenesSilencioso();
+        }
+
+        function abrirOrden(ord) {
+            ordenActual = ord;
+            document.getElementById('lblOrdenTitle').textContent = '#' + ord;
+            toggleView('view-items');
+            document.getElementById('items-container').innerHTML = '<p style="text-align:center; padding:20px;">Cargando inventario alistado...</p>';
+            cargarItemsSilencioso();
+        }
+
+        function renderizarItems() {
+            const c = document.getElementById('items-container');
+            let htmlInner = '';
+
+            const txt = document.getElementById('searchBox').value.toLowerCase();
+            document.getElementById('lblProgress').textContent = `Por auditar: ${listaItems.length}`;
+
+            if (listaItems.length === 0) {
+                c.innerHTML = `
+            <div style="text-align:center; padding:50px 20px;">
+                <div style="font-size:4rem;">✅</div>
+                <h3 style="color:#10b981;">¡Orden Auditada!</h3>
+                <p>Todos los ítems han sido verificados.</p>
+                <button onclick="cargarOrdenes()" style="padding:15px; background:var(--primary); color:white; border:none; border-radius:10px; margin-top:20px; font-weight:bold;">Volver a Mis Órdenes</button>
+            </div>`;
+                document.getElementById('header-progress-bar').style.width = '100%';
+                return;
+            }
+
+            const visibles = listaItems.filter(i =>
+                (i.descripcion_producto || '').toLowerCase().includes(txt) ||
+                (i.codigo_producto || '').toLowerCase().includes(txt)
+            );
+
+            if (visibles.length === 0) {
+                c.innerHTML = '<p style="text-align:center; padding:20px; color:gray;">No se encontraron productos.</p>';
+                return;
+            }
+
+            visibles.forEach(i => {
+                let nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
+                let badgeHtml = '';
+
+                if (i.novedad_alistamiento) {
+                    badgeHtml += `<div style="display:inline-block; background-color:#fee2e2; color:#b91c1c; font-size:0.65rem; padding:3px 8px; border-radius:6px; font-weight:800; margin-bottom:5px; border:1px solid #fecaca;">
+                                    ⚠️ NOVEDAD: ${i.novedad_alistamiento.replace('_', ' ')}
+                                 </div><br>`;
+                }
+
+                let htmlCantidades = '';
+                if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.9rem;">📦 ${i.req_cajas}</div>`;
+                if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.9rem; color: var(--secondary);">🍬 ${i.req_unidades}</div>`;
+                if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.9rem;">0</div>`;
+
+                htmlInner += `
+            <div id="card_${i.id}" class="item-row active" onclick="abrirModalVerificarId(${i.id})">
+                <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 10px; width: auto; font-size: 0.85rem;">
+                    ${htmlCantidades}
+                </div>
+                <div class="item-details" style="overflow: hidden;">
+                    <div class="id-code">${i.codigo_producto || 'S/C'}</div>
+                    <div class="id-name" style="word-break: break-word;">${badgeHtml}${nombre}</div>
+                </div>
+            </div>`;
+            });
+            c.innerHTML = htmlInner;
+        }
+
+        function filtrarLista() { renderizarItems(); }
+
+        function abrirModalVerificarId(id) {
+            const item = listaItems.find(i => i.id === id);
+            if (!item) return;
+
+            itemActivo = item;
+            lastScanTime = 0;
+
+            document.getElementById('pk-name').textContent = (item.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
+            document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
+
+            // Para el verificador, lo "solicitado" es lo que el operador "entregó" en sistema
+            itemActivo.req_cajas = parseInt(item.req_cajas) || 0;
+            itemActivo.req_unidades = parseInt(item.req_unidades) || 0;
+
+            // Cantidades verificadas
+            itemActivo.act_cajas = 0;
+            itemActivo.act_unidades = 0;
+
+            let htmlReqModal = '';
+            if (itemActivo.req_cajas > 0) htmlReqModal += `📦 ${itemActivo.req_cajas} CAJAS<br>`;
+            if (itemActivo.req_unidades > 0) htmlReqModal += `🍬 ${itemActivo.req_unidades} UNIDADES`;
+            document.getElementById('pk-req').innerHTML = htmlReqModal || '0';
+
+            document.getElementById('pk-count-cajas').textContent = "0";
+            document.getElementById('pk-count-unidades').textContent = "0";
+
+            // Mostrar Novedad si existe
+            const novAlert = document.getElementById('novedad-alert');
+            if (item.novedad_alistamiento) {
+                novAlert.textContent = `⚠️ NOVEDAD DEL OPERADOR: ${item.novedad_alistamiento.replace('_', ' ')}`;
+                novAlert.classList.remove('hidden');
+
+                if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS' || item.novedad_alistamiento === 'SIN_EAN') {
+                    document.getElementById('embedded-reader').style.opacity = '0.3';
+                    document.getElementById('cam-overlay-btn').style.display = 'none';
+
+                    if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS') {
+                        itemActivo.act_cajas = 0;
+                        itemActivo.act_unidades = 0;
+                    } else {
+                        itemActivo.act_cajas = itemActivo.req_cajas;
+                        itemActivo.act_unidades = itemActivo.req_unidades;
+                    }
+
+                    document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+                    document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+                }
+            } else {
+                novAlert.classList.add('hidden');
+                document.getElementById('cam-overlay-btn').style.display = 'flex';
+                document.getElementById('embedded-reader').style.opacity = '1';
+            }
+
+            if (itemActivo.req_cajas > 0) document.getElementById('area-conteo-cajas').classList.remove('hidden');
+            else document.getElementById('area-conteo-cajas').classList.add('hidden');
+
+            if (itemActivo.req_unidades > 0) document.getElementById('area-teclado-fracciones').classList.remove('hidden');
+            else document.getElementById('area-teclado-fracciones').classList.add('hidden');
+
+            evaluarBotonTerminar();
+            document.getElementById('modal-picking').style.display = 'flex';
+        }
+
+        function cerrarModalVerificacion() {
+            detenerCamara();
+            document.getElementById('modal-picking').style.display = 'none';
+            itemActivo = null;
+        }
+
+        function resetearConteo() {
+            if (itemActivo) {
+                itemActivo.act_cajas = 0;
+                itemActivo.act_unidades = 0;
+                document.getElementById('pk-count-cajas').textContent = "0";
+                document.getElementById('pk-count-unidades').textContent = "0";
+                evaluarBotonTerminar();
+                if (scanner) {
+                    try {
+                        scanner.resume(); 
+                        document.getElementById('embedded-reader').style.opacity = '1';
+                    } catch(e) {}
+                }
+            }
+        }
+
+        function cambiarFraccion(valor) {
+            if (!itemActivo) return;
+            let actual = itemActivo.act_unidades;
+            let nuevo = actual + valor;
+
+            if (nuevo >= 0 && nuevo <= itemActivo.req_unidades) {
+                itemActivo.act_unidades = nuevo;
+                document.getElementById('pk-count-unidades').textContent = nuevo;
+                playBeep();
+                evaluarBotonTerminar();
+
+                if (scanner) {
+                    try {
+                        if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
+                            scanner.pause(true);
+                            document.getElementById('embedded-reader').style.opacity = '0.5';
+                        } else {
+                            scanner.resume();
+                            document.getElementById('embedded-reader').style.opacity = '1';
+                        }
+                    } catch(e) {}
+                }
+            }
+        }
+
+        function evaluarBotonTerminar() {
+            const btn = document.querySelector('.btn-finish');
+            if (itemActivo.act_cajas === itemActivo.req_cajas && itemActivo.act_unidades === itemActivo.req_unidades) {
+                btn.style.background = '#10b981';
+                btn.textContent = 'CONFIRMAR AUDITORÍA ✓';
+            } else {
+                btn.style.background = '#374151';
+                btn.textContent = 'HAY DISCREPANCIA (GUARDAR ASÍ)';
+            }
+        }
+
+        function iniciarCamaraIncrustada() {
+            if (!itemActivo) return;
+            document.getElementById('cam-overlay-btn').style.display = 'none';
+
+            // Desbloquear audio
+            initAudio();
+
+            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
+                alert("⚠️ Este ítem ya está completo. Presiona 'Terminar Ítem'.");
+                return;
+            }
+
+            const configScanner = {
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.ITF
+                ]
+            };
+
+            scanner = new Html5Qrcode("embedded-reader", configScanner);
+            scanner.start(
+                { facingMode: "environment" },
+                { 
+                    fps: 30, 
+                    qrbox: { width: 300, height: 100 }
+                },
+                (decodedText) => {
+                    const now = Date.now();
+                    if (now - lastScanTime < 1500) return; 
+
+                    const scanned = decodedText.trim().toUpperCase();
+                    const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
+
+                    if (target && scanned === target) {
+                        lastScanTime = now;
+                        playBeep();
+
+                        if (itemActivo.req_cajas > 0 && itemActivo.act_cajas < itemActivo.req_cajas) {
+                            itemActivo.act_cajas++;
+                            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+                            
+                            document.getElementById('pk-count-cajas').style.color = '#10b981';
+                            setTimeout(() => document.getElementById('pk-count-cajas').style.color = 'var(--primary)', 300);
+
+                            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
+                                document.getElementById('embedded-reader').style.opacity = '0.5';
+                                detenerCamara();
+                            }
+                        } else if (itemActivo.req_unidades > 0 && itemActivo.act_unidades < itemActivo.req_unidades) {
+                            itemActivo.act_unidades++;
+                            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+
+                            document.getElementById('pk-count-unidades').style.color = '#10b981';
+                            setTimeout(() => document.getElementById('pk-count-unidades').style.color = '#7e22ce', 300);
+
+                            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
+                                document.getElementById('embedded-reader').style.opacity = '0.5';
+                                detenerCamara();
+                            }
+                        }
+
+                        evaluarBotonTerminar();
+                    } else {
+                        lastScanTime = now;
+                        alert(`❌ Código incorrecto. Esperado: ${itemActivo.codigo_producto}`);
+                    }
+                },
+                (err) => { }
+            ).catch(err => {
+                console.error(err);
+                alert("Error cámara. Verifica permisos.");
+                document.getElementById('cam-overlay-btn').style.display = 'flex';
+            });
+        }
+
+        function detenerCamara() {
+            if (scanner) {
+                scanner.stop().catch(e => console.log(e));
+                scanner = null;
+            }
+        }
+
+        function intentarVerificarItem() {
+            if (!itemActivo) return;
+            document.getElementById('vf-count').innerHTML = `📦 ${itemActivo.act_cajas} | 🍬 ${itemActivo.act_unidades}`;
+            document.getElementById('modal-verify').style.display = 'flex';
+        }
+
+        function cancelarConfirmacion() {
+            document.getElementById('modal-verify').style.display = 'none';
+        }
+
+        function ejecutarVerificacionFinal() {
+            const btn = document.querySelector('.btn-v-confirm');
+            btn.textContent = 'Sellando...';
+            btn.disabled = true;
+
+            const idParaBorrar = itemActivo.id;
+
+            fetch('/api/verificador/confirmar_item', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id_row: idParaBorrar,
+                    cajas_verificadas: itemActivo.act_cajas,
+                    unidades_verificadas: itemActivo.act_unidades
+                })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.status === 'ok') {
+                        cancelarConfirmacion();
+                        cerrarModalVerificacion();
+                        listaItems = listaItems.filter(i => i.id !== idParaBorrar);
+                        itemActivo = null;
+                        renderizarItems();
+                        playBeep();
+                    } else {
+                        alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
+                    }
+                })
+                .catch(e => alert("❌ Error de Conexión."))
+                .finally(() => {
+                    btn.textContent = 'SELLAR';
+                    btn.disabled = false;
+                });
+        }
+    </script>
+</body>
+
+</html>

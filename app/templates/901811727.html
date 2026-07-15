@@ -598,6 +598,9 @@
       </div>
 
       <div class="collapse show" id="seccionAdmin">
+        <button class="nav-item" onclick="ejecutarHealthCheck()">
+          <span class="icon-spacer">🩺</span> Diagnóstico Sistema
+        </button>
         <button class="nav-item" onclick="abrirAuditLog()">
           <span class="icon-spacer">👁️</span> Audit Log
         </button>
@@ -2644,7 +2647,12 @@
           <input type="text" id="f_nom" class="form-control" value="${data.nombre_comercial || ''}">
           
           <label class="fw-bold small mt-2">Tipo de Empresa</label>
-          <select id="f_tipo" class="form-select">${optsTipos}</select>`;
+          <select id="f_tipo" class="form-select">${optsTipos}</select>
+          
+          <label class="fw-bold small mt-4 mb-2 text-success">Módulos Autorizados (Auto-detectados)</label>
+          <div id="contenedor_switches_modulos" class="row g-2">
+              <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando módulos disponibles...</span>
+          </div>`;
 
       } else if (tipo === 'TipoEmpresa') {
         currentUrl = "/gestionar_tipo_empresa";
@@ -2746,29 +2754,104 @@
           <input type="email" id="f_email" class="form-control border-danger" value="${data.email || ''}">`;
       }
 
+      // 1. Inyectamos el HTML principal en el DOM
       document.getElementById('contenedorCamposMaestro').innerHTML = html;
+
+      // 2. Tareas asíncronas POST-Renderizado (Cargar switches dinámicos)
+      if (tipo === 'Empresa') {
+        fetch('/api/modulos_sistema_disponibles')
+          .then(r => r.json())
+          .then(res => {
+            const contenedor = document.getElementById('contenedor_switches_modulos');
+            if (contenedor && res.success) {
+              contenedor.innerHTML = '';
+              // Array temporal hasta que lo traigas por BD. Maneja casos de edición y creación.
+              const modulosActivos = data.modulos_activos || [];
+
+              res.modulos.forEach(mod => {
+                const isChecked = modulosActivos.includes(mod) ? 'checked' : '';
+                contenedor.innerHTML += `
+                  <div class="col-6">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input chk-modulo" type="checkbox" value="${mod}" id="mod_${mod}" ${isChecked}>
+                      <label class="form-check-label text-capitalize" for="mod_${mod}">${mod}</label>
+                    </div>
+                  </div>`;
+              });
+            }
+          })
+          .catch(err => {
+            const contenedor = document.getElementById('contenedor_switches_modulos');
+            if (contenedor) {
+              contenedor.innerHTML = '<span class="text-danger small">Error al conectar con el escáner del sistema.</span>';
+            }
+          });
+      }
+    }
+
+    // --- NUEVA FUNCIÓN PARA EL SELECT EN CASCADA ---
+    function cargarModulosEmpresaSelect(selectElement, valorSeleccionadoPreviamente = '') {
+      const nit = selectElement.options[selectElement.selectedIndex].getAttribute('data-nit');
+      document.getElementById('f_nit_p').value = nit;
+
+      const selectOperacion = document.getElementById('f_op');
+      selectOperacion.innerHTML = '<option value="">Cargando módulos...</option>';
+
+      if (!nit) return;
+
+      const fd = new FormData();
+      fd.append('nit', nit);
+
+      fetch('/obtener_modulos_empresa', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+          selectOperacion.innerHTML = '<option value="">Seleccione el módulo...</option>';
+          if (d.success && d.modulos.length > 0) {
+            d.modulos.forEach(mod => {
+              let sel = (valorSeleccionadoPreviamente === mod) ? 'selected' : '';
+              selectOperacion.innerHTML += `<option value="${mod}" ${sel}>${mod.toUpperCase()}</option>`;
+            });
+          } else {
+            selectOperacion.innerHTML = '<option value="">Esta empresa no tiene módulos activos</option>';
+          }
+        });
     }
 
     function guardarMaestro() {
-      const fd = new FormData(); fd.append('accion', document.getElementById('form_accion_maestro').value);
-      if (currentMode === 'Empresa') { fd.append('nit', document.getElementById('f_nit').value); fd.append('nombre_comercial', document.getElementById('f_nom').value); fd.append('tipo_empresa', document.getElementById('f_tipo').value); }
-      else if (currentMode === 'TipoEmpresa') { fd.append('id', document.getElementById('f_tid').value); fd.append('tipo', document.getElementById('f_tnom').value); }
-      else if (currentMode === 'Proveedor') { fd.append('id_proveedor', document.getElementById('f_idp').value); fd.append('proveedor', document.getElementById('f_prov').value); fd.append('precio', document.getElementById('f_prec').value); fd.append('email1', document.getElementById('f_e1').value); fd.append('email2', document.getElementById('f_e2').value); }
-      else if (currentMode === 'Usuario') { fd.append('cedula', document.getElementById('f_ced').value); fd.append('nombre', document.getElementById('f_unom').value); fd.append('perfil', document.getElementById('f_perf').value); fd.append('telegram_id', document.getElementById('f_tlg').value); fd.append('telefono', document.getElementById('f_tel').value); fd.append('password', document.getElementById('f_pass').value); fd.append('empresa_id', document.getElementById('f_eid').value); fd.append('empresa_select', document.getElementById('f_enom').value); fd.append('tipo_usuario', document.getElementById('f_tuser').value); fd.append('clase', document.getElementById('f_clase').value); }
-      else if (currentMode === 'Perfil') { fd.append('id', document.getElementById('f_pid').value); fd.append('empresa_select', document.getElementById('f_enom_p').value); fd.append('nit', document.getElementById('f_nit_p').value); fd.append('operacion', document.getElementById('f_op').value); fd.append('perfil', document.getElementById('f_perf_p').value); }
-      else if (currentMode === 'Contacto') { fd.append('id', document.getElementById('f_cid').value); fd.append('empresa_nombre', document.getElementById('f_enom_c').value); fd.append('id_empresa', document.getElementById('f_eid_c').value); fd.append('area_contacto', document.getElementById('f_area').value); fd.append('email', document.getElementById('f_email').value); }
+      const fd = new FormData();
+      fd.append('accion', document.getElementById('form_accion_maestro').value);
 
-      fetch(currentUrl, { method: 'POST', body: fd }).then(r => r.json()).then(d => {
-        alert(d.message);
-        if (d.success) {
-          bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
-          if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa') location.reload();
-          else if (currentMode === 'Usuario') cargarTablaUsuarios();
-          else if (currentMode === 'Proveedor') cargarTablaProveedores();
-          else if (currentMode === 'Perfil') cargarTablaPerfiles();
-          else if (currentMode === 'Contacto') cargarTablaContactos();
-        }
-      });
+      if (currentMode === 'Empresa') {
+        fd.append('nit', document.getElementById('f_nit').value);
+        fd.append('nombre_comercial', document.getElementById('f_nom').value);
+        fd.append('tipo_empresa', document.getElementById('f_tipo').value);
+
+        // Recolectar checkboxes marcados
+        document.querySelectorAll('.chk-modulo:checked').forEach(chk => {
+          fd.append('modulos[]', chk.value);
+        });
+      }
+      // ... mantén los otros tipos ...
+      else if (currentMode === 'Perfil') {
+        fd.append('id', document.getElementById('f_pid').value);
+        fd.append('empresa_select', document.getElementById('f_enom_p').value);
+        fd.append('nit', document.getElementById('f_nit_p').value);
+        fd.append('operacion', document.getElementById('f_op').value); // Ya no es input, es select
+        fd.append('perfil', document.getElementById('f_perf_p').value);
+        fd.append('archivo_destino', document.getElementById('f_archivo').value); // Nuevo campo
+      }
+
+      fetch(currentUrl, { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+          alert(d.message);
+          if (d.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
+            if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa') location.reload();
+            else if (currentMode === 'Perfil') cargarTablaPerfiles();
+            // ... recarga de otras tablas ...
+          }
+        });
     }
 
     function descargarPdfQR(empresaId, modo, ubicacion) {
@@ -3580,6 +3663,44 @@
       resDiv.className = `mt-3`;
       resDiv.style.display = 'block';
       document.getElementById('diagVeredicto').innerHTML = htmlVeredicto;
+    }
+
+    function ejecutarHealthCheck() {
+      const loader = document.createElement('div');
+      loader.className = 'pregunta-overlay';
+      loader.innerHTML = `<div class="pregunta-card text-center"><div class="spinner-border text-primary mb-3"></div><h5 class="fw-bold">Auditando Sistema...</h5></div>`;
+      document.body.appendChild(loader);
+
+      fetch('/api/health_check').then(r => r.json()).then(data => {
+        loader.remove();
+        let dbColor = data.database.latency_ms < 50 ? 'success' : (data.database.latency_ms < 150 ? 'warning' : 'danger');
+        let ramColor = data.server.ram_percent < 80 ? 'success' : 'danger';
+
+        const html = `
+            <div class="pregunta-overlay" style="z-index:99999;">
+                <div class="pregunta-card">
+                    <h5 class="fw-bold mb-3 text-center">📊 Health Check BQA-ONE</h5>
+                    
+                    <div class="mb-2"><strong>Base de Datos:</strong> 
+                        <span class="badge bg-${dbColor}">${data.database.status.toUpperCase()} (${data.database.latency_ms} ms)</span>
+                    </div>
+                    
+                    <div class="mb-2"><strong>Servidor (RAM):</strong> 
+                        <span class="badge bg-${ramColor}">${data.server.ram_percent}% Uso</span>
+                    </div>
+                    
+                    <div class="mb-3"><strong>Módulos en Memoria:</strong> 
+                        <span class="badge bg-info text-dark">${data.blueprints_activos} Blueprints</span>
+                    </div>
+                    
+                    <button class="btn btn-primary w-100 fw-bold" onclick="this.closest('.pregunta-overlay').remove()">Cerrar Diagnóstico</button>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+      }).catch(err => {
+        loader.remove();
+        alert("Error de conexión al servidor.");
+      });
     }
   </script>
 

@@ -243,6 +243,11 @@
             display: none !important;
         }
 
+        .item-row.completed {
+            border-left-color: var(--success);
+            opacity: 0.7;
+        }
+
         .qty-indicator {
             min-width: 50px;
             height: 50px;
@@ -296,7 +301,6 @@
             max-width: 400px;
             height: 95vh;
             max-height: 850px;
-            /* Un poco más alto para que quepa la cámara grande */
             background: white;
             border-radius: 20px;
             padding: 20px;
@@ -386,7 +390,6 @@
             justify-content: center;
             margin-bottom: 15px;
             min-height: 350px;
-            /* AUMENTADO PARA ALOJAR EL CUADRO DE 300PX */
         }
 
         #embedded-reader {
@@ -516,8 +519,6 @@
 
 <body>
 
-    <audio id="snd-beep" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
-
     <div class="app-container">
         <header class="app-header">
             <div class="brand-area">
@@ -646,7 +647,7 @@
             <button class="btn-reset" onclick="resetearConteo()">🔄 Reiniciar Conteo</button>
             <div style="display: flex; gap: 10px; margin-top: 15px;">
                 <button onclick="declararFaltaExistencias()" style="flex:1; background:#ef4444; color:white; padding:12px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; font-size: 0.85rem;">🚫 Faltan Existencias</button>
-                <button onclick="abrirAuthSupervisor()" style="flex:1; background:#f59e0b; color:white; padding:12px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; font-size: 0.85rem;">⚠️ Alistar sin EAN</button>
+                <button onclick="declararSinEAN()" style="flex:1; background:#f59e0b; color:white; padding:12px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; font-size: 0.85rem;">⚠️ Alistar sin EAN</button>
             </div>
         </div>
     </div>
@@ -665,33 +666,56 @@
             </div>
         </div>
     </div>
-    <div id="modal-auth-supervisor" class="modal-wrap">
-        <div class="verify-sheet">
-            <div style="font-size: 3rem; margin-bottom: 10px;">🔐</div>
-            <h3 style="margin:0; color:#1e293b; font-size:1.3rem;">Autorización Supervisor</h3>
-            <p style="color:#64748b; font-size:0.85rem; margin-bottom:15px;">Ingresa tus credenciales para autorizar el alistamiento manual sin código de barras.</p>
-            
-            <input type="text" id="auth-cedula" placeholder="Cédula del Supervisor" style="width:100%; padding:12px; border-radius:8px; border:1px solid #cbd5e1; margin-bottom:10px; box-sizing:border-box; font-size:1rem;">
-            <input type="password" id="auth-clave" placeholder="Contraseña" style="width:100%; padding:12px; border-radius:8px; border:1px solid #cbd5e1; margin-bottom:15px; box-sizing:border-box; font-size:1rem;">
-            
-            <div class="verify-btns">
-                <button class="btn-v-cancel" onclick="cerrarAuthSupervisor()">Cancelar</button>
-                <button class="btn-v-confirm" onclick="validarSupervisor()">Autorizar</button>
-            </div>
-        </div>
-    </div>
 
     <script>
 
-        // VARIABLES GLOBALES (Añadir al principio del script)
+        // VARIABLES GLOBALES
         let novedadPendiente = null;
         let idSupervisorAutorizado = null;
 
+        let ordenActual = null, isLoteMode = false, listaItems = [], itemActivo = null, scanner = null;
+        let lastScanTime = 0; // Throttle para la cámara
+        let audioCtx = null;
 
-        let ordenActual = null, listaItems = [], itemActivo = null, scanner = null;
+        function initAudio() {
+            try {
+                if (!audioCtx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        audioCtx = new AudioContext();
+                        // Desbloqueo del contexto en móvil reproduciendo un tono silencioso
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        gain.gain.value = 0;
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start();
+                        osc.stop(audioCtx.currentTime + 0.01);
+                    }
+                } else if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            } catch (e) { console.error("Audio init error", e); }
+        }
+
+        function playBeep() {
+            try {
+                if (audioCtx) {
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime); // Tono agudo y rápido
+                    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime); // Volumen
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.start();
+                    oscillator.stop(audioCtx.currentTime + 0.15); // Duración de 150ms
+                }
+            } catch (e) { console.log("Audio play error", e); }
+        }
 
         function abrirMarca(marca) {
-            ordenActual = null; // No es una orden, es una marca
+            ordenActual = null;
             document.getElementById('lblOrdenTitle').textContent = 'Lote: ' + marca;
             toggleView('view-items');
 
@@ -702,20 +726,6 @@
                 listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
                 renderizarItems();
             });
-        }
-
-        // Helper seguro para sonido
-        function playBeep() {
-            try {
-                const s = document.getElementById('snd-beep');
-                if (s) {
-                    s.currentTime = 0;
-                    const p = s.play();
-                    if (p !== undefined) {
-                        p.catch(error => { console.log("Audio play blocked (normal on mobile)", error); });
-                    }
-                }
-            } catch (e) { console.log("Audio error", e); }
         }
 
         window.onload = mostrarMenu;
@@ -730,6 +740,72 @@
 
         // --- DATA ---
 
+        // =====================================
+        // POLLING EN TIEMPO REAL
+        // =====================================
+        function cargarOrdenesSilencioso() {
+            const t = new Date().getTime();
+            fetch('/api/operario/mis_marcas?v=' + t).then(r => r.json()).then(d => {
+                let html = '';
+                if (d.length === 0) html = '<p style="color:#94a3b8; font-size:0.9rem;">Sin lotes asignados</p>';
+                d.forEach(m => {
+                    const p = m.total_items > 0 ? Math.round((m.items_listos / m.total_items) * 100) : 0;
+                    html += `
+                    <div class="order-card" style="border-left-color: var(--secondary);" onclick="abrirMarca('${m.marca}')">
+                        <div class="oc-top">
+                            <span class="oc-number" style="font-size:1.1rem;">LOTE: ${m.marca}</span>
+                            <span class="oc-badge" style="background:#fef3c7; color:#b45309;">${m.total_ordenes} Pedidos</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;">
+                            <span>Avance</span><span>${m.items_listos}/${m.total_items}</span>
+                        </div>
+                        <div class="p-bar"><div class="p-fill" style="width:${p}%; background: var(--secondary);"></div></div>
+                    </div>`;
+                });
+                const cMar = document.getElementById('marcas-container');
+                if (cMar && cMar.innerHTML !== html) cMar.innerHTML = html;
+            }).catch(e => console.log(e));
+
+            fetch('/api/operario/mis_ordenes?v=' + t).then(r => r.json()).then(d => {
+                let html = '';
+                if (d.length === 0) html = '<p style="color:#94a3b8; font-size:0.9rem;">Sin órdenes asignadas</p>';
+                d.forEach(o => {
+                    const p = o.total_items > 0 ? Math.round((o.items_listos / o.total_items) * 100) : 0;
+                    html += `
+                    <div class="order-card" onclick="abrirOrden('${o.orden}')">
+                        <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona || 'General'}</span></div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;">
+                            <span>Avance</span><span>${o.items_listos}/${o.total_items}</span>
+                        </div>
+                        <div class="p-bar"><div class="p-fill" style="width:${p}%"></div></div>
+                    </div>`;
+                });
+                const cOrd = document.getElementById('orders-container');
+                if (cOrd && cOrd.innerHTML !== html) cOrd.innerHTML = html;
+            }).catch(e => console.log(e));
+        }
+
+        function cargarItemsSilencioso() {
+            if (!ordenActual) return;
+            const url = isLoteMode ? `/api/operario/items_lote/${ordenActual}` : `/api/operario/items_orden/${ordenActual}`;
+            
+            fetch(url + '?v=' + new Date().getTime()).then(r => r.json()).then(d => {
+                // Solo refrescamos visualmente si el operario NO está dentro del modal para evitar interrupciones
+                if (itemActivo === null) {
+                    listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
+                    renderizarItems();
+                }
+            }).catch(e => console.log(e));
+        }
+
+        setInterval(() => {
+            if (!document.getElementById('view-orders').classList.contains('hidden')) {
+                cargarOrdenesSilencioso();
+            } else if (!document.getElementById('view-items').classList.contains('hidden')) {
+                cargarItemsSilencioso();
+            }
+        }, 3000);
+
         function cargarOrdenes() {
             toggleView('view-orders');
             const cOrd = document.getElementById('orders-container');
@@ -743,7 +819,7 @@
                 cMar.innerHTML = '';
                 if (d.length === 0) cMar.innerHTML = '<p style="color:#94a3b8; font-size:0.9rem;">Sin lotes asignados</p>';
                 d.forEach(m => {
-                    const p = Math.round((m.items_listos / m.total_items) * 100);
+                    const p = m.total_items > 0 ? Math.round((m.items_listos / m.total_items) * 100) : 0;
                     cMar.innerHTML += `
                     <div class="order-card" style="border-left-color: var(--secondary);" onclick="abrirMarca('${m.marca}')">
                         <div class="oc-top">
@@ -763,7 +839,7 @@
                 cOrd.innerHTML = '';
                 if (d.length === 0) cOrd.innerHTML = '<p style="color:#94a3b8; font-size:0.9rem;">Sin órdenes asignadas</p>';
                 d.forEach(o => {
-                    const p = Math.round((o.items_listos / o.total_items) * 100);
+                    const p = o.total_items > 0 ? Math.round((o.items_listos / o.total_items) * 100) : 0;
                     cOrd.innerHTML += `
                     <div class="order-card" onclick="abrirOrden('${o.orden}')">
                         <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona || 'General'}</span></div>
@@ -776,8 +852,24 @@
             });
         }
 
+        function abrirMarca(marca) {
+            ordenActual = marca;
+            isLoteMode = true;
+            document.getElementById('lblOrdenTitle').textContent = 'Lote: ' + marca;
+            toggleView('view-items');
+
+            const c = document.getElementById('items-container');
+            c.innerHTML = '<p style="text-align:center; padding:20px;">Cargando lote...</p>';
+
+            fetch(`/api/operario/items_lote/${marca}?v=` + new Date().getTime()).then(r => r.json()).then(d => {
+                listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
+                renderizarItems();
+            });
+        }
+
         function abrirOrden(ord) {
             ordenActual = ord;
+            isLoteMode = false;
             document.getElementById('lblOrdenTitle').textContent = '#' + ord;
             toggleView('view-items');
             cargarItems();
@@ -794,28 +886,35 @@
 
         function renderizarItems() {
             const c = document.getElementById('items-container');
-            c.innerHTML = ''; // Limpieza total
+            let htmlInner = ''; 
 
             const txt = document.getElementById('searchBox').value.toLowerCase();
+            
+            // Calculamos el progreso para la barra superior
+            let listosCount = 0;
+            let totalCount = listaItems.length;
 
-            // Progreso basado en el tamaño actual vs original (opcional, simplificado aquí para pendientes)
-            // Si quieres mantener el total original, necesitarías una variable global `totalItemsOriginales`
-            document.getElementById('lblProgress').textContent = `Pendientes: ${listaItems.length}`;
+            listaItems.forEach(i => {
+                if (i.estado_actividad === 'ALISTADO' || i.estado_actividad === 'VERIFICADO' || i.estado_actividad === 'DESPACHADO' || i.estado_actividad === 'FINALIZADO') {
+                    listosCount++;
+                }
+            });
 
-            // Si la lista está vacía, mostrar mensaje de éxito final
-            if (listaItems.length === 0) {
+            document.getElementById('lblProgress').textContent = `${listosCount}/${totalCount}`;
+            let progressPercent = totalCount > 0 ? Math.round((listosCount / totalCount) * 100) : 0;
+            document.getElementById('header-progress-bar').style.width = `${progressPercent}%`;
+
+            if (listaItems.length === 0 || listosCount === totalCount) {
                 c.innerHTML = `
             <div style="text-align:center; padding:50px 20px;">
                 <div style="font-size:4rem;">🎉</div>
-                <h3 style="color:#10b981;">¡Orden Completada!</h3>
-                <p>No quedan ítems pendientes.</p>
-                <button onclick="cargarOrdenes()" style="padding:15px; background:#004e92; color:white; border:none; border-radius:10px; margin-top:20px;">Volver a Mis Órdenes</button>
+                <h3 style="color:#10b981;">¡Alistamiento Completado!</h3>
+                <p>No quedan ítems pendientes en este grupo.</p>
+                <button onclick="cargarOrdenes()" style="padding:15px; background:#004e92; color:white; border:none; border-radius:10px; margin-top:20px;">Volver a Mis Tareas</button>
             </div>`;
-                document.getElementById('header-progress-bar').style.width = '100%';
                 return;
             }
 
-            // Filtrar por búsqueda
             const visibles = listaItems.filter(i =>
                 (i.descripcion_producto || '').toLowerCase().includes(txt) ||
                 (i.codigo_producto || '').toLowerCase().includes(txt)
@@ -826,35 +925,29 @@
                 return;
             }
 
-            // Dibujar
             visibles.forEach(i => {
                 let nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
                 let badgeHtml = '';
 
-                // DETECTAR SI ES PROMOCIÓN (Busca el texto "(Kit: ...)")
                 const matchPromo = nombre.match(/\(Kit:\s*(.*?)\)/i);
                 if (matchPromo) {
-                    const nombrePromo = matchPromo[1]; // Extrae el nombre de la promo
-                    nombre = nombre.replace(/\(Kit:\s*.*?\)/i, '').trim(); // Quita el texto del nombre principal
+                    const nombrePromo = matchPromo[1]; 
+                    nombre = nombre.replace(/\(Kit:\s*.*?\)/i, '').trim(); 
 
-                    // Crea la etiqueta visual
                     badgeHtml = `<div style="display:inline-block; background-color:#fef08a; color:#92400e; font-size:0.65rem; padding:3px 8px; border-radius:6px; font-weight:800; margin-bottom:5px; border:1px solid #fde68a; letter-spacing:0.5px;">
                                     🎁 KIT: ${nombrePromo}
                                  </div><br>`;
                 }
 
-                // INYECCIÓN DE BADGES DE RUTA Y ORDEN
                 let extraBadges = '';
                 if (i.numero_orden_origen) {
                     extraBadges += `<span style="display:inline-block; background:#e0f2fe; color:#0369a1; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-right:5px; margin-top:5px;">📦 Ord: #${i.numero_orden_origen}</span>`;
                 }
 
-                // AQUÍ ESTÁ EL CAMBIO PARA MOSTRAR EL MUELLE/PUERTA
                 if (i.puerta_asignada) {
                     extraBadges += `<span style="display:inline-block; background:#fce7f3; color:#be185d; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-top:5px;">🚚 Muelle/Puerta: ${i.puerta_asignada}</span>`;
                 }
 
-                // Petición 1: Extraccion de embalaje dinámico
                 let embalaje = (i.unidad_embalaje && i.unidad_embalaje.trim() !== '') ? i.unidad_embalaje.toUpperCase() : 'UNIDADES';
                 if (embalaje === 'UND') embalaje = 'UNIDADES';
 
@@ -863,39 +956,43 @@
                 if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.9rem; color: var(--secondary);">🍬 ${i.req_unidades} ${embalaje}</div>`;
                 if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.9rem;">📦 0</div>`;
 
-                c.innerHTML += `
-            <div id="card_${i.id}" class="item-row active" onclick="abrirModalPickingId(${i.id})">
+                let isDone = (i.estado_actividad === 'ALISTADO' || i.estado_actividad === 'VERIFICADO' || i.estado_actividad === 'DESPACHADO' || i.estado_actividad === 'FINALIZADO');
+                let rowClass = isDone ? "item-row completed" : "item-row active";
+                let onclickAction = isDone ? "" : `onclick="abrirModalPickingId(${i.id})"`;
+
+                htmlInner += `
+            <div id="card_${i.id}" class="${rowClass}" ${onclickAction}>
                 <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 10px; width: auto; font-size: 0.85rem;">
-                    ${htmlCantidades}
+                    ${isDone ? '✅' : htmlCantidades}
                 </div>
                 <div class="item-details" style="overflow: hidden;">
                     <div class="id-code">${i.codigo_producto || 'S/C'}</div>
-                    <div class="id-name" style="word-break: break-word;">${badgeHtml}${nombre}</div>
+                    <div class="id-name" style="word-break: break-word; ${isDone ? 'text-decoration: line-through; color: #94a3b8;' : ''}">${badgeHtml}${nombre}</div>
                     <div>${extraBadges}</div>
                 </div>
             </div>`;
             });
+            c.innerHTML = htmlInner;
         }
 
         function filtrarLista() { renderizarItems(); }
 
         // --- TARJETA DE TRABAJO (MODAL Y MÁQUINA DE ESTADOS) ---
-        let faseAlistamiento = ''; // Puede ser: 'CAJAS', 'LLAVE' o 'MANUAL'
+        let faseAlistamiento = '';
 
         function abrirModalPickingId(id) {
             const item = listaItems.find(i => i.id === id);
-            if (!item || item.estado_actividad === 'FINALIZADO') return;
+            if (!item || item.estado_actividad === 'FINALIZADO' || item.estado_actividad === 'ALISTADO' || item.estado_actividad === 'VERIFICADO') return;
 
             itemActivo = item;
+            lastScanTime = 0; // Reiniciar throttle
 
             const nombre = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
             document.getElementById('pk-name').textContent = nombre;
             document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
 
-            // Inyectamos la puerta asignada por el supervisor
             document.getElementById('pk-loc').textContent = "Muelle " + (item.puerta_asignada || 'S/A');
 
-            // Requeridos vs Actuales
             itemActivo.req_cajas = parseInt(item.req_cajas) || 0;
             itemActivo.req_unidades = parseInt(item.req_unidades) || 0;
             itemActivo.act_cajas = parseInt(item.act_cajas) || 0;
@@ -913,10 +1010,9 @@
             document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
             document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
 
-            // Mostrar Cámara y TODAS las herramientas (Sin bloqueos)
             document.getElementById('cam-overlay-btn').style.display = 'flex';
+            document.getElementById('embedded-reader').style.opacity = '1';
 
-            // Solo mostrar las áreas si el producto las requiere
             if (itemActivo.req_cajas > 0) {
                 document.getElementById('area-conteo-cajas').classList.remove('hidden');
             } else {
@@ -925,25 +1021,23 @@
 
             if (itemActivo.req_unidades > 0) {
                 document.getElementById('area-teclado-fracciones').classList.remove('hidden');
-                // Quitamos el texto de "Validado con llave EAN" del HTML dinámicamente si existe
                 const smallText = document.querySelector('#area-teclado-fracciones small');
                 if (smallText) smallText.style.display = 'none';
             } else {
                 document.getElementById('area-teclado-fracciones').classList.add('hidden');
             }
 
-            evaluarBotonTerminar(); // Revisa si ya está completo al abrir
+            evaluarBotonTerminar();
             document.getElementById('modal-picking').style.display = 'flex';
         }
 
-        // Modifica la función cerrarModalPicking para limpiar las variables
         function cerrarModalPicking() {
             detenerCamara();
             document.getElementById('modal-picking').style.display = 'none';
             itemActivo = null;
             faseAlistamiento = '';
-            novedadPendiente = null; // NUEVO
-            idSupervisorAutorizado = null; // NUEVO
+            novedadPendiente = null;
+            idSupervisorAutorizado = null;
         }
 
         function resetearConteo() {
@@ -953,10 +1047,11 @@
                 document.getElementById('pk-count-cajas').textContent = "0";
                 document.getElementById('pk-count-unidades').textContent = "0";
 
-                // Reiniciar la máquina de estados simulando que lo volvemos a abrir
                 abrirModalPickingId(itemActivo.id);
 
-                if (scanner) scanner.resume();
+                if (scanner) {
+                    try{ scanner.resume(); document.getElementById('embedded-reader').style.opacity = '1'; } catch(e){}
+                }
             }
         }
 
@@ -965,12 +1060,19 @@
             let actual = itemActivo.act_unidades;
             let nuevo = actual + valor;
 
-            // Limitar el contador para que no baje de 0 ni supere lo requerido en el Excel
             if (nuevo >= 0 && nuevo <= itemActivo.req_unidades) {
                 itemActivo.act_unidades = nuevo;
                 document.getElementById('pk-count-unidades').textContent = nuevo;
                 playBeep();
-                evaluarBotonTerminar(); // Revisa y enciende el botón verde si ya se completó el ítem
+                evaluarBotonTerminar();
+
+                // Manejo de la ui del scanner en base a manual click
+                if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
+                    document.getElementById('embedded-reader').style.opacity = '0.5';
+                    detenerCamara();
+                } else {
+                    document.getElementById('embedded-reader').style.opacity = '1';
+                }
             }
         }
 
@@ -987,58 +1089,78 @@
             }
         }
 
-        // --- CÁMARA MEJORADA (CON FASES E INTELIGENCIA) ---
+        // --- CÁMARA MEJORADA ---
 
         function iniciarCamaraIncrustada() {
             if (!itemActivo) return;
             document.getElementById('cam-overlay-btn').style.display = 'none';
+
+            // Desbloquear audio
+            initAudio();
 
             if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
                 alert("⚠️ Este ítem ya está completo. Presiona 'Terminar Ítem'.");
                 return;
             }
 
-            scanner = new Html5Qrcode("embedded-reader");
+            const configScanner = {
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.ITF
+                ]
+            };
+
+            scanner = new Html5Qrcode("embedded-reader", configScanner);
             scanner.start(
                 { facingMode: "environment" },
-                { fps: 15, qrbox: { width: 300, height: 300 } },
+                { 
+                    fps: 30, 
+                    qrbox: { width: 300, height: 100 } 
+                },
                 (decodedText) => {
+                    const now = Date.now();
+                    if (now - lastScanTime < 1500) return; // Enfriamiento de 1.5 seg
+
                     const scanned = decodedText.trim().toUpperCase();
                     const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
 
                     if (target && scanned === target) {
+                        lastScanTime = now;
                         playBeep();
 
-                        // Solo sumamos cajas si faltan
-                        if (itemActivo.act_cajas < itemActivo.req_cajas) {
+                        if (itemActivo.req_cajas > 0 && itemActivo.act_cajas < itemActivo.req_cajas) {
                             itemActivo.act_cajas++;
                             document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
 
-                            // Efecto visual rápido
                             document.getElementById('pk-count-cajas').style.color = '#10b981';
                             setTimeout(() => document.getElementById('pk-count-cajas').style.color = '#0284c7', 300);
 
-                            // ¿Alcanzó la meta de cajas?
-                            if (itemActivo.act_cajas >= itemActivo.req_cajas) {
-                                scanner.pause(true); // Apagamos la cámara sin molestar
+                            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
                                 document.getElementById('embedded-reader').style.opacity = '0.5';
-                            } else {
-                                // Faltan cajas: Pausa de 1 segundo anti-doble-lectura
-                                scanner.pause(true);
-                                setTimeout(() => { if (scanner) scanner.resume(); }, 1000);
+                                detenerCamara();
                             }
-                        } else {
-                            // Si ya terminó cajas y escanea de nuevo, o si es un ítem solo de fracciones
-                            scanner.pause(true);
-                            document.getElementById('embedded-reader').style.opacity = '0.5';
+                        } else if (itemActivo.req_unidades > 0 && itemActivo.act_unidades < itemActivo.req_unidades) {
+                            itemActivo.act_unidades++;
+                            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+                            
+                            document.getElementById('pk-count-unidades').style.color = '#10b981';
+                            setTimeout(() => document.getElementById('pk-count-unidades').style.color = '#be185d', 300);
+
+                            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
+                                document.getElementById('embedded-reader').style.opacity = '0.5';
+                                detenerCamara();
+                            }
                         }
 
                         evaluarBotonTerminar();
                     } else {
-                        // Código incorrecto
-                        scanner.pause(true);
+                        lastScanTime = now;
                         alert(`❌ Código incorrecto. Esperado: ${itemActivo.codigo_producto}`);
-                        setTimeout(() => { if (scanner) scanner.resume(); }, 500);
                     }
                 },
                 (err) => { }
@@ -1060,7 +1182,6 @@
         function intentarTerminarItem() {
             if (!itemActivo) return;
 
-            // Actualizamos la vista del modal de verificación para que muestre ambas cosas
             document.getElementById('vf-count').innerHTML = `📦 ${itemActivo.act_cajas} | 🍬 ${itemActivo.act_unidades}`;
             document.getElementById('vf-req').innerHTML = `📦 ${itemActivo.req_cajas} | 🍬 ${itemActivo.req_unidades}`;
 
@@ -1071,7 +1192,39 @@
             document.getElementById('modal-verify').style.display = 'none';
         }
 
-        / Reemplaza tu función confirmarVerificacion() actual por esta:
+        // ==========================================
+        // FUNCIONES DE NOVEDADES OPERATIVAS
+        // ==========================================
+        function declararFaltaExistencias() {
+            if (!itemActivo) return;
+            if (confirm("⚠️ ¿Seguro que este producto NO se encuentra físicamente? Se registrará la novedad y se cerrará con cantidades en CERO (0).")) {
+                itemActivo.act_cajas = 0;
+                itemActivo.act_unidades = 0;
+                novedadPendiente = 'FALTA_EXISTENCIAS';
+                idSupervisorAutorizado = null; 
+                intentarTerminarItem(); 
+            }
+        }
+
+        function declararSinEAN() {
+            if (!itemActivo) return;
+            if (confirm("⚠️ ¿Deseas alistar este ítem manualmente sin lectura de código de barras? El ítem se marcará como alistado y pasará a auditoría del verificador.")) {
+                novedadPendiente = 'SIN_EAN';
+                idSupervisorAutorizado = null; 
+                
+                detenerCamara();
+                document.getElementById('cam-overlay-btn').style.display = 'none';
+                document.getElementById('embedded-reader').style.opacity = '0.3';
+
+                itemActivo.act_cajas = itemActivo.req_cajas;
+                itemActivo.act_unidades = itemActivo.req_unidades;
+                document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+                document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+
+                evaluarBotonTerminar();
+            }
+        }
+
         function confirmarVerificacion() {
             const btn = document.querySelector('.btn-v-confirm');
             const textoOriginal = btn.textContent;
@@ -1079,100 +1232,51 @@
             btn.disabled = true;
 
             const idParaBorrar = itemActivo.id;
+            const cajasGuardar = itemActivo.act_cajas;
+            const unidadesGuardar = itemActivo.act_unidades;
 
             fetch('/api/operario/confirmar_item', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id_row: idParaBorrar,
-                    cajas_alistadas: itemActivo.act_cajas,
-                    unidades_alistadas: itemActivo.act_unidades,
-                    novedad: novedadPendiente,          // NUEVO DATO ENVIADO
-                    id_supervisor: idSupervisorAutorizado // NUEVO DATO ENVIADO
+                    cajas_alistadas: cajasGuardar,
+                    unidades_alistadas: unidadesGuardar,
+                    novedad: novedadPendiente,          
+                    id_supervisor: idSupervisorAutorizado 
                 })
             })
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) throw new Error("Error en servidor");
+                return r.json();
+            })
             .then(d => {
                 if (d.status === 'ok') {
                     cancelarVerificacion();
                     cerrarModalPicking();
-                    listaItems = listaItems.filter(i => i.id !== idParaBorrar);
-                    itemActivo = null;
+                    
+                    // Modificamos el item internamente en lugar de borrarlo para que se marque visualmente
+                    const idx = listaItems.findIndex(i => i.id === idParaBorrar);
+                    if (idx > -1) {
+                        listaItems[idx].estado_actividad = d.message && d.message.includes('parcial') ? 'EN_PROCESO' : 'ALISTADO';
+                        listaItems[idx].act_cajas = cajasGuardar;
+                        listaItems[idx].act_unidades = unidadesGuardar;
+                    }
+                    
                     renderizarItems();
                     playBeep();
                 } else {
                     alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
                 }
             })
-            .catch(e => alert("❌ Error de Conexión."))
+            .catch(e => {
+                console.error(e);
+                alert("❌ Error de Conexión.");
+            })
             .finally(() => {
                 btn.textContent = textoOriginal;
                 btn.disabled = false;
             });
-        }
-
-        // ==========================================
-        // NUEVAS FUNCIONES DE NOVEDADES
-        // ==========================================
-        function declararFaltaExistencias() {
-            if (!itemActivo) return;
-            if (confirm("⚠️ ¿Seguro que este producto NO se encuentra físicamente? Se cerrará con cantidades en CERO (0).")) {
-                itemActivo.act_cajas = 0;
-                itemActivo.act_unidades = 0;
-                novedadPendiente = 'FALTA_EXISTENCIAS';
-                idSupervisorAutorizado = null; // No requiere auth por ahora, o podrías forzarlo igual si deseas.
-                intentarTerminarItem(); 
-            }
-        }
-
-        function abrirAuthSupervisor() {
-            if (!itemActivo) return;
-            document.getElementById('auth-cedula').value = '';
-            document.getElementById('auth-clave').value = '';
-            document.getElementById('modal-auth-supervisor').style.display = 'flex';
-        }
-
-        function cerrarAuthSupervisor() {
-            document.getElementById('modal-auth-supervisor').style.display = 'none';
-        }
-
-        function validarSupervisor() {
-            const cedula = document.getElementById('auth-cedula').value;
-            const clave = document.getElementById('auth-clave').value;
-            if (!cedula || !clave) return alert("⚠️ Debes ingresar usuario y contraseña.");
-
-            const btn = document.querySelector('#modal-auth-supervisor .btn-v-confirm');
-            btn.textContent = 'Validando...';
-            btn.disabled = true;
-
-            fetch('/api/operario/validar_supervisor', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cedula: cedula, clave: clave })
-            }).then(r => r.json()).then(d => {
-                if (d.status === 'ok') {
-                    alert(`✅ Acción autorizada por: ${d.nombre}`);
-                    idSupervisorAutorizado = d.id_supervisor;
-                    novedadPendiente = 'SIN_EAN';
-                    cerrarAuthSupervisor();
-                    
-                    // Detenemos la cámara obligatoria
-                    detenerCamara();
-                    document.getElementById('cam-overlay-btn').style.display = 'none';
-                    document.getElementById('embedded-reader').style.opacity = '0.3';
-
-                    // Llenamos las cantidades al 100% para que el operario no deba digitar todo
-                    itemActivo.act_cajas = itemActivo.req_cajas;
-                    itemActivo.act_unidades = itemActivo.req_unidades;
-                    document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
-                    document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
-
-                    evaluarBotonTerminar();
-                } else {
-                    alert("❌ " + (d.error || 'Error de autorización'));
-                }
-            }).catch(e => alert("Error de conexión"))
-              .finally(() => { btn.textContent = 'Autorizar'; btn.disabled = false; });
         }
     </script>
 

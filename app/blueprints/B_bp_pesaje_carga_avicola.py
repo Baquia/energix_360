@@ -217,7 +217,7 @@ def procesar_pesaje_avicola():
         cur.close()
 
 # ========================================================
-# RUTA 4: REPORTES Y MÉTRICAS (ACTUALIZADO CON EFICIENCIA)
+# RUTA 4: REPORTES Y MÉTRICAS (ACTUALIZADO CON CAJA_DE_CARGA)
 # ========================================================
 @bp_gestion_carga.route('/reportes', methods=['GET'])
 @login_required_custom
@@ -262,9 +262,9 @@ def reportes_bascula():
     cur.execute(query, tuple(params))
     viajes = cur.fetchall()
 
-    # 3. Consulta de Eficiencia de Carga (SOLO FLOTA PROPIA)
+    # 3. Consulta de Eficiencia de Carga (SOLO FLOTA PROPIA, CORREGIDO A caja_de_carga)
     query_ef = """
-        SELECT p.placa, v.tipo, AVG(p.capacidad_usada) as prom_cap_usada
+        SELECT p.placa, v.caja_de_carga, AVG(p.capacidad_usada) as prom_cap_usada
         FROM pesajes_producto_avicola p
         JOIN vehiculos v ON p.placa = v.placa AND p.id_empresa = v.id_empresa
         WHERE p.id_empresa = %s AND p.tipo_registro = 'cierre_pesaje' AND p.tipo_vehiculo = 'propio'
@@ -278,7 +278,7 @@ def reportes_bascula():
         query_ef += " AND p.placa = %s"
         params_ef.append(placa_filtro)
         
-    query_ef += " GROUP BY p.placa, v.tipo ORDER BY prom_cap_usada DESC"
+    query_ef += " GROUP BY p.placa, v.caja_de_carga ORDER BY prom_cap_usada DESC"
     cur.execute(query_ef, tuple(params_ef))
     data_eficiencia = cur.fetchall()
     cur.close()
@@ -314,7 +314,7 @@ def reportes_bascula():
         
         for e in data_eficiencia:
             promedio_placa = float(e['prom_cap_usada'] or 0)
-            tipo_veh = str(e['tipo']).capitalize()
+            tipo_veh = str(e['caja_de_carga']).capitalize()
             
             # Ranking por Placa
             eficiencia['por_placa'].append({'placa': e['placa'], 'promedio': promedio_placa, 'tipo': tipo_veh})
@@ -424,7 +424,7 @@ def generar_manifiesto_pdf(consecutivo):
     return send_file(buffer, as_attachment=True, download_name=f"Manifiesto_{consecutivo}.pdf", mimetype='application/pdf')
 
 # ========================================================
-# RUTA 6: GENERAR REPORTE GLOBAL EN PDF
+# RUTA 6: GENERAR REPORTE GLOBAL EN PDF (ACTUALIZADO CON CAJA_DE_CARGA)
 # ========================================================
 @bp_gestion_carga.route('/descargar_reporte_pdf', methods=['GET'])
 @login_required_custom
@@ -468,7 +468,7 @@ def descargar_reporte_pdf():
     data_eficiencia = []
     if tipo_flota in ['todas', 'propio']:
         query_ef = """
-            SELECT p.placa, v.tipo, AVG(p.capacidad_usada) as prom_cap_usada
+            SELECT p.placa, v.caja_de_carga, AVG(p.capacidad_usada) as prom_cap_usada
             FROM pesajes_producto_avicola p
             JOIN vehiculos v ON p.placa = v.placa AND p.id_empresa = v.id_empresa
             WHERE p.id_empresa = %s AND p.tipo_registro = 'cierre_pesaje' AND p.tipo_vehiculo = 'propio'
@@ -482,7 +482,7 @@ def descargar_reporte_pdf():
             query_ef += " AND p.placa = %s"
             params_ef.append(placa_filtro)
             
-        query_ef += " GROUP BY p.placa, v.tipo ORDER BY prom_cap_usada DESC"
+        query_ef += " GROUP BY p.placa, v.caja_de_carga ORDER BY prom_cap_usada DESC"
         cur.execute(query_ef, tuple(params_ef))
         data_eficiencia = cur.fetchall()
 
@@ -508,7 +508,7 @@ def descargar_reporte_pdf():
         story.append(Spacer(1, 5))
         eff_data = [["Placa", "Tipo Vehículo", "Promedio Capacidad Usada (%)"]]
         for e in data_eficiencia:
-            eff_data.append([e['placa'], str(e['tipo']).capitalize(), f"{float(e['prom_cap_usada'] or 0):.1f}%"])
+            eff_data.append([e['placa'], str(e['caja_de_carga']).capitalize(), f"{float(e['prom_cap_usada'] or 0):.1f}%"])
         
         t_eff = Table(eff_data, colWidths=[100, 150, 150])
         t_eff.setStyle(TableStyle([
@@ -555,7 +555,7 @@ def descargar_reporte_pdf():
     return send_file(buffer, as_attachment=True, download_name=f"Reporte_Bascula_{fecha_inicio}_al_{fecha_fin}.pdf", mimetype='application/pdf')
 
 # ========================================================
-# RUTA 7: CRON - REPORTE DIARIO 8:00 AM (AUTOMATIZADO)
+# RUTA 7: CRON - REPORTE DIARIO 8:00 AM (ACTUALIZADO CON CAJA_DE_CARGA)
 # ========================================================
 @bp_gestion_carga.route('/cron/reporte_diario_logistica', methods=['GET'])
 @csrf.exempt
@@ -583,11 +583,11 @@ def cron_reporte_diario_logistica():
 
         # 2. Calcular eficiencia por placa de ESE día para ESA empresa
         cur.execute("""
-            SELECT p.placa, v.tipo, AVG(p.capacidad_usada) as prom_cap_usada, COUNT(*) as total_viajes
+            SELECT p.placa, v.caja_de_carga, AVG(p.capacidad_usada) as prom_cap_usada, COUNT(*) as total_viajes
             FROM pesajes_producto_avicola p
             JOIN vehiculos v ON p.placa = v.placa AND p.id_empresa = v.id_empresa
             WHERE p.id_empresa = %s AND DATE(p.fecha_hora) = %s AND p.tipo_vehiculo = 'propio' AND p.tipo_registro = 'cierre_pesaje'
-            GROUP BY p.placa, v.tipo
+            GROUP BY p.placa, v.caja_de_carga
             ORDER BY prom_cap_usada DESC
         """, (id_empresa, fecha_ayer_str))
         resultados = cur.fetchall()
@@ -611,7 +611,7 @@ def cron_reporte_diario_logistica():
             color = "#16a34a" if eff >= 80 else ("#f59e0b" if eff >= 60 else "#dc2626")
             filas_html += f"""
                 <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px;"><strong>{r['placa']}</strong> <span style="color:#666; font-size:11px;">({str(r['tipo']).capitalize()})</span></td>
+                    <td style="padding: 10px;"><strong>{r['placa']}</strong> <span style="color:#666; font-size:11px;">({str(r['caja_de_carga']).capitalize()})</span></td>
                     <td style="padding: 10px; text-align:center;">{r['total_viajes']}</td>
                     <td style="padding: 10px; text-align:right; font-weight:bold; color:{color};">{eff:.1f}%</td>
                 </tr>
