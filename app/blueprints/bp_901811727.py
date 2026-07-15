@@ -45,17 +45,52 @@ def panel_webmaster():
     try:
         cur = mysql.connection.cursor()
         
-        # 1. Obtener empresas incluyendo tipo_empresa
-        cur.execute("SELECT nit, nombre_comercial, tipo_empresa FROM empresas")
+        # 1. Corregimos la consulta: hacemos un LEFT JOIN con la tabla de autorizaciones
+        # y agrupamos los módulos activos usando GROUP_CONCAT en una sola cadena.
+        cur.execute("""
+            SELECT e.nit, e.nombre_comercial, e.tipo_empresa, 
+                   GROUP_CONCAT(m.modulo) as modulos
+            FROM empresas e
+            LEFT JOIN modulos_empresas_autorizadas m ON e.nit = m.id_empresa AND m.estatus = 'activo'
+            GROUP BY e.nit, e.nombre_comercial, e.tipo_empresa
+        """)
         data_empresas = cur.fetchall()
+        
+        # Diccionario de normalización idéntico al de la API.
+        # Sirve para que si la BD tiene 'glp', la UI lo traduzca a 'gas' y encienda el switch.
+        mapa_normalizacion = {
+            'glp': 'gas', 
+            'supervisorgas': 'gas',
+            'flotacarga': 'flota', 
+            'combustible_flota': 'flota', 
+            'gestorflota': 'flota', 
+            'preoperacional': 'flota',
+            'gestion_carga': 'carga', 
+            'gestionavicola_bp': 'carga',
+            'gestion_mermas': 'mermas'
+        }
+
         empresas = []
         if data_empresas:
+            # Procesamiento compatible tanto si el cursor devuelve diccionarios o tuplas
             if isinstance(data_empresas[0], dict):
-                empresas = data_empresas
+                for row in data_empresas:
+                    mods_raw = row['modulos'].split(',') if row['modulos'] else []
+                    # Traducimos a nombres V2 y eliminamos duplicados con set()
+                    row['modulos_activos'] = list(set([mapa_normalizacion.get(m, m) for m in mods_raw]))
+                    empresas.append(row)
             else:
-                empresas = [{'nit': row[0], 'nombre_comercial': row[1], 'tipo_empresa': row[2] if len(row)>2 else 'general'} for row in data_empresas]
+                for row in data_empresas:
+                    mods_raw = row[3].split(',') if (len(row) > 3 and row[3]) else []
+                    mods_v2 = list(set([mapa_normalizacion.get(m, m) for m in mods_raw]))
+                    empresas.append({
+                        'nit': row[0], 
+                        'nombre_comercial': row[1], 
+                        'tipo_empresa': row[2] if row[2] else 'general',
+                        'modulos_activos': mods_v2
+                    })
 
-        # 2. Obtener la nueva lista de tipos de empresa
+        # 2. El resto del código de la función se mantiene exactamente igual
         cur.execute("SELECT tipo FROM tipos_empresa")
         data_tipos = cur.fetchall()
         tipos_empresa = [r['tipo'] if isinstance(r, dict) else r[0] for r in data_tipos]
@@ -65,7 +100,6 @@ def panel_webmaster():
         
         cur.close()
         
-        # Pasamos la variable tipos_empresa al render_template
         return render_template('901811727.html', 
                                nombre=session.get('nombre'), 
                                empresa=session.get('empresa'), 
@@ -76,7 +110,8 @@ def panel_webmaster():
     except Exception as e:
         print("Error panel:", e)
         return "Error cargando panel", 500
-
+    
+    
 @csrf.exempt
 @bp_901811727.route('/registrar_empresa', methods=['POST'])
 @login_required_custom

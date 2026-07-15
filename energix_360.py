@@ -242,9 +242,31 @@ def logout():
 def api_modulos_sistema_disponibles():
     from flask import current_app
     excluir = ['static', 'bp_901811727', 'main_router']
-    modulos = list(set([name.replace('bp_', '').replace('B_bp_', '').replace('B_modulo_', '') 
+    
+    # 1. Escaneo en bruto de los nombres de los blueprints en memoria
+    modulos_raw = list(set([name.replace('bp_', '').replace('B_bp_', '').replace('B_modulo_', '') 
                         for name in current_app.blueprints.keys() if name not in excluir]))
-    return jsonify(success=True, modulos=sorted(modulos))
+    
+    # 2. Diccionario Traductor para consolidar la V1 en la V2
+    mapa_normalizacion = {
+        'glp': 'gas', 
+        'supervisorgas': 'gas',
+        'flotacarga': 'flota', 
+        'combustible_flota': 'flota', 
+        'gestorflota': 'flota', 
+        'preoperacional': 'flota',
+        'gestion_carga': 'carga', 
+        'gestionavicola_bp': 'carga',
+        'gestion_mermas': 'mermas'
+    }
+    
+    # 3. Homologamos hacia los 4 nombres estándar del Dashboard V2
+    modulos_v2 = set()
+    for mod in modulos_raw:
+        nombre_limpio = mapa_normalizacion.get(mod, mod)
+        modulos_v2.add(nombre_limpio)
+        
+    return jsonify(success=True, modulos=sorted(list(modulos_v2)))
 
 # ==============================================================================
 # 10. BLOQUE DE EJECUCIÓN LOCAL
