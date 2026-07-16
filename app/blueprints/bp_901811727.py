@@ -348,16 +348,12 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
     math_dinero_total = 0.0 
 
     series = { 
-        'fechas': [], 
-        'kg_pollito': [], 
-        'velocidad_consumo': [],  
-        'saldo_inicial': [], 
-        'saldo_final': [], 
-        'ingresos': [] 
+        'fechas': [], 'kg_pollito': [], 'velocidad_consumo': [],  
+        'saldo_inicial': [], 'saldo_final': [], 'ingresos': [] 
     }
     
     granjas_data = {}
-    lotes_agrupados = {} # NUEVO: Diccionario para agrupar lotes
+    lotes_info = {} # NUEVO: Diccionario para benchmarking cíclico
 
     resultados.sort(key=lambda x: str(x.get('fecha')))
 
@@ -379,27 +375,27 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
         if clase in ['egreso', 'consumo'] and neto_gast <= 0:
             continue
 
-        # --- NUEVO: Agrupación en caliente de Lotes ---
-        if lote_id not in lotes_agrupados:
-            lotes_agrupados[lote_id] = {
-                'lote': lote_id,
-                'estatus_lote': str(row.get('estatus_lote')).upper(),
-                'consumo_total': 0.0,
+        # --- NUEVO: Recolección de data para Benchmarking Cíclico ---
+        if lote_id not in lotes_info:
+            lotes_info[lote_id] = {
+                'estatus': str(row.get('estatus_lote', '')).upper(),
+                'consumo': 0.0,
                 'pollitos': pollitos_reales,
-                'fecha_inicio': fecha_str,
-                'fecha_fin': fecha_str,
+                'fecha_fin': fecha_str[:10],
+                'ultimo_saldo': 0.0
             }
-        
-        if clase in ['egreso', 'consumo'] and neto_gast > 0:
-            lotes_agrupados[lote_id]['consumo_total'] += neto_gast
             
-        if fecha_str > lotes_agrupados[lote_id]['fecha_fin']:
-            lotes_agrupados[lote_id]['fecha_fin'] = fecha_str
-        
-        # Si detectamos que en el histórico se marcó INACTIVO, actualizamos el estatus final
-        if str(row.get('estatus_lote')).upper() == 'INACTIVO':
-            lotes_agrupados[lote_id]['estatus_lote'] = 'INACTIVO'
-        # ---------------------------------------------
+        if str(row.get('estatus_lote', '')).upper() == 'INACTIVO':
+            lotes_info[lote_id]['estatus'] = 'INACTIVO'
+            
+        if clase in ['egreso', 'consumo'] and neto_gast > 0:
+            lotes_info[lote_id]['consumo'] += neto_gast
+            
+        if fecha_str[:10] >= lotes_info[lote_id]['fecha_fin']:
+            lotes_info[lote_id]['fecha_fin'] = fecha_str[:10]
+            if saldo_kg > 0 or clase == 'saldo final':
+                lotes_info[lote_id]['ultimo_saldo'] = val_kg_saldo
+        # -------------------------------------------------------------
 
         val_precio = safe_float(row.get('precio_total')) 
         kg_pollo  = safe_float(row.get('kg_pollito'))
@@ -408,11 +404,8 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
         math_consumo_real_acumulado += neto_gast
         math_dinero_total += val_precio
 
-        if clase == 'saldo inicial':
-            math_saldo_inicial_kg_global += val_kg_saldo
-
-        if clase == 'ingreso':
-            math_ingresos_kg += masa_fact
+        if clase == 'saldo inicial': math_saldo_inicial_kg_global += val_kg_saldo
+        if clase == 'ingreso': math_ingresos_kg += masa_fact
 
         series['fechas'].append(fecha_str)
         series['kg_pollito'].append(kg_pollo)
@@ -429,14 +422,57 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
         
         d = granjas_data[ubicacion]
         d['consumo_real'] += neto_gast
-        
         if clase == 'saldo inicial': d['inicial'] += val_kg_saldo
         elif clase == 'ingreso': d['ingresos'] += masa_fact
         
         if lote_id and lote_id not in d['lotes']:
-            if pollitos_reales > 0:
-                d['pollitos'] += pollitos_reales
+            if pollitos_reales > 0: d['pollitos'] += pollitos_reales
             d['lotes'].add(lote_id)
+
+    # --- NUEVO: Motor de Agrupación Dinámica (Meses vs Lotes) ---
+    grupos = {}
+    from datetime import datetime as dt
+    meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    
+    for l_id, data in lotes_info.items():
+        es_activo = (data['estatus'] == 'ACTIVO')
+        
+        if tipo_informe in ['general', 'zona']:
+            if es_activo:
+                key = "ACTIVOS"
+                label = "Activos (Mes Actual)"
+                orden = "9999-99" 
+            else:
+                try:
+                    d_fin = dt.strptime(data['fecha_fin'], '%Y-%m-%d')
+                    key = d_fin.strftime('%Y-%m')
+                    label = f"{meses[d_fin.month - 1]} {d_fin.year}"
+                    orden = key
+                except:
+                    key = "Desconocido"
+                    label = "Desconocido"
+                    orden = "0000-00"
+        else: # granja
+            key = l_id
+            label = f"{l_id} (Act)" if es_activo else l_id
+            orden = data['fecha_fin']
+            
+        if key not in grupos:
+            grupos[key] = {'orden': orden, 'label': label, 'consumo': 0.0, 'pollitos': 0, 'saldo': 0.0}
+            
+        grupos[key]['consumo'] += data['consumo']
+        grupos[key]['pollitos'] += data['pollitos']
+        grupos[key]['saldo'] += data['ultimo_saldo']
+
+    grupos_ordenados = sorted(grupos.values(), key=lambda x: x['orden'])
+    
+    grafico_ciclos = {
+        'labels': [g['label'] for g in grupos_ordenados],
+        'consumos': [g['consumo'] for g in grupos_ordenados],
+        'eficiencias': [(g['consumo'] / g['pollitos']) if g['pollitos'] > 0 else 0.0 for g in grupos_ordenados],
+        'saldos': [g['saldo'] for g in grupos_ordenados]
+    }
+    # -------------------------------------------------------------
 
     tabla_resumen = []
     lista_rendimientos = []
@@ -469,24 +505,17 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
         rendimiento = total_consumo_final / total_pollitos_global
     
     kpis = {
-        "card1_label": "Saldo Inicial (kg)",
-        "card1_value": math_saldo_inicial_kg_global,
-        "card2_label": "Pedidos Gas (kg)",
-        "card2_value": math_ingresos_kg,
-        "card3_label": "Consumo Real (kg)",
-        "card3_value": total_consumo_final,
-        "card4_label": "Eficiencia (kg/ave)", 
-        "card4_value": rendimiento,
-        "card5_label": "Pollitos",
-        "card5_value": total_pollitos_global,
-        "card6_label": "Inversión Total ($)",
-        "card6_value": math_dinero_total
+        "card1_label": "Saldo Inicial (kg)", "card1_value": math_saldo_inicial_kg_global,
+        "card2_label": "Pedidos Gas (kg)", "card2_value": math_ingresos_kg,
+        "card3_label": "Consumo Real (kg)", "card3_value": total_consumo_final,
+        "card4_label": "Eficiencia (kg/ave)", "card4_value": rendimiento,
+        "card5_label": "Pollitos", "card5_value": total_pollitos_global,
+        "card6_label": "Inversión Total ($)", "card6_value": math_dinero_total
     }
 
     media = 0.0
     desviacion = 0.0
     n = len(lista_rendimientos) 
-    
     if n > 0:
         media = sum(lista_rendimientos) / n
         if n > 1:
@@ -494,49 +523,17 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
             varianza = sum((x - media) ** 2 for x in lista_rendimientos) / (n - 1)
             desviacion = math.sqrt(varianza)
 
-    # --- NUEVO: Lógica Matemática Comparativa y Ranking ---
-    from datetime import datetime as dt
-    for l_id, l_data in lotes_agrupados.items():
-        if l_data['pollitos'] > 0:
-            l_data['kg_ave'] = l_data['consumo_total'] / l_data['pollitos']
-        else:
-            l_data['kg_ave'] = 0.0
-        
-        try:
-            d1 = dt.strptime(l_data['fecha_inicio'][:10], '%Y-%m-%d')
-            d2 = dt.strptime(l_data['fecha_fin'][:10], '%Y-%m-%d')
-            l_data['dias_operacion'] = (d2 - d1).days + 1
-        except:
-            l_data['dias_operacion'] = 0
-
-    lista_lotes = list(lotes_agrupados.values())
-    lista_lotes.sort(key=lambda x: x['fecha_fin'], reverse=True)
-
-    lotes_activos = [l for l in lista_lotes if l['estatus_lote'] == 'ACTIVO']
-    lotes_inactivos = [l for l in lista_lotes if l['estatus_lote'] == 'INACTIVO'][:5]
-
-    comparativa_lotes = lotes_inactivos + lotes_activos
-    comparativa_lotes.sort(key=lambda x: x['fecha_fin'])
-
-    ranking_activos = sorted(lotes_activos, key=lambda x: x['kg_ave'], reverse=True)
-    # ----------------------------------------------------
-
     nota_informativa = "Nota: Estadísticas ajustadas. Se omiten granjas sin consumo en el periodo."
 
     return {
         "kpis": kpis,
         "series": series,
         "tabla_resumen": tabla_resumen,
-        "comparativa_lotes": comparativa_lotes, # Añadido
-        "ranking_activos": ranking_activos,     # Añadido
-        "estadisticas": { 
-            "media": media, 
-            "desviacion": desviacion,
-            "n_muestras": n
-        },
+        "grafico_ciclos": grafico_ciclos, # Inyección del nuevo objeto JSON
+        "estadisticas": { "media": media, "desviacion": desviacion, "n_muestras": n },
         "periodo_tipo": periodo,
         "nota_metodologica": nota_informativa
-    }    
+    }
     
 @csrf.exempt
 @bp_901811727.route('/generar_informe', methods=['POST'])
