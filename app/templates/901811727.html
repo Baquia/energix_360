@@ -1018,6 +1018,8 @@
                 onclick="cambiarVistaGrafico('rendimiento')">Rendimiento</button>
               <button type="button" class="btn btn-outline-primary btn-sm"
                 onclick="cambiarVistaGrafico('saldos')">Saldos</button>
+              <button type="button" class="btn btn-outline-primary btn-sm"
+                onclick="cambiarVistaGrafico('comparativa')">Comparativa Lotes</button>
             </div>
           </div>
           <div style="height: 320px; width: 100%;">
@@ -2046,37 +2048,146 @@
 
     function cambiarVistaGrafico(vista) {
       if (!datosGlobales) return;
+
+      // Control de estilos en los botones del grupo
+      const btnGroup = document.querySelector('#cardGrafico .btn-group');
+      if (btnGroup) {
+        btnGroup.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        if (vista === 'rendimiento') btnGroup.children[0].classList.add('active');
+        else if (vista === 'saldos') btnGroup.children[1].classList.add('active');
+        else if (vista === 'comparativa') btnGroup.children[2].classList.add('active');
+      }
+
       const ctx = document.getElementById('graficoConsumo').getContext('2d');
       if (chartInstancia) chartInstancia.destroy();
 
-      const s = datosGlobales.series;
-      const d = vista === 'rendimiento'
-        ? [{ label: 'Rendimiento', data: s.kg_pollito, borderColor: '#6366f1', fill: true, backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 }]
-        : [{ label: 'Saldos', data: s.saldo_inicial, borderColor: '#3b82f6' }];
+      // DOM: Ocultar/Mostrar tabla original vs ranking
+      const tablaConsumo = document.getElementById('tablaConsumo').closest('.card');
+      let tablaRanking = document.getElementById('cardRankingLotes');
 
-      chartInstancia = new Chart(ctx, {
-        type: 'line',
-        data: { labels: s.fechas, datasets: d },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          // --- NUEVO: INTERACTIVIDAD PARA DIAGNÓSTICO INTELIGENTE ---
-          onClick: (e, activeEls) => {
-            if (activeEls.length > 0 && vista === 'rendimiento') {
-              const index = activeEls[0].index;
-              abrirAsistenteDiagnostico(index);
-            }
+      // Construcción dinámica de la tarjeta del Ranking para no romper el HTML estático
+      if (!tablaRanking) {
+        tablaRanking = document.createElement('div');
+        tablaRanking.id = 'cardRankingLotes';
+        tablaRanking.className = 'card p-3 shadow-sm border-0 mb-4';
+        tablaRanking.style.display = 'none';
+        tablaRanking.innerHTML = `
+            <h5 class="card-title mb-3 fs-6 text-primary">🏆 Ranking Lotes Activos (Eficiencia por Días)</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered table-sm text-center mb-0">
+                    <thead class="table-light">
+                        <tr><th>Lote Activo</th><th>Días Operación</th><th>Población</th><th>Total Gastado (kg)</th><th>Eficiencia (Kg/Ave)</th></tr>
+                    </thead>
+                    <tbody id="bodyRankingLotes"></tbody>
+                </table>
+            </div>
+        `;
+        // Insertarlo debajo de la tabla de consumos estándar
+        tablaConsumo.parentNode.insertBefore(tablaRanking, tablaConsumo.nextSibling);
+      }
+
+      if (vista === 'comparativa') {
+        tablaConsumo.style.display = 'none';
+        tablaRanking.style.display = 'block';
+
+        // Llenar tabla de ranking de mayor a menor consumo (Kg/Ave)
+        const tbody = document.getElementById('bodyRankingLotes');
+        tbody.innerHTML = '';
+        if (datosGlobales.ranking_activos && datosGlobales.ranking_activos.length > 0) {
+          datosGlobales.ranking_activos.forEach(l => {
+            tbody.innerHTML += `<tr>
+                    <td class="fw-bold text-primary">${l.lote}</td>
+                    <td><span class="badge bg-secondary">${l.dias_operacion} Días</span></td>
+                    <td>${l.pollitos.toLocaleString()}</td>
+                    <td>${l.consumo_total.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                    <td class="fw-bold text-danger">${l.kg_ave.toFixed(4)}</td>
+                </tr>`;
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-muted p-4">No hay lotes activos para el ranking en este filtro.</td></tr>';
+        }
+
+        // Configuración Gráfico Mixto (Doble Eje Y)
+        const comp = datosGlobales.comparativa_lotes || [];
+        const labels = comp.map(l => l.lote + (l.estatus_lote === 'ACTIVO' ? ' (Act)' : ''));
+        const dataKg = comp.map(l => l.consumo_total);
+        const dataEf = comp.map(l => l.kg_ave);
+
+        chartInstancia = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Consumo Total (kg)',
+                data: dataKg,
+                type: 'bar',
+                backgroundColor: 'rgba(1, 82, 73, 0.7)',
+                yAxisID: 'y'
+              },
+              {
+                label: 'Eficiencia (Kg/Ave)',
+                data: dataEf,
+                type: 'line',
+                borderColor: '#dc3545',
+                backgroundColor: '#dc3545',
+                borderWidth: 2.5,
+                pointRadius: 4,
+                yAxisID: 'y1'
+              }
+            ]
           },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                footer: function () { return "\n👆 Clic aquí para Diagnóstico Inteligente"; }
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                type: 'linear',
+                position: 'left',
+                title: { display: true, text: 'KG Totales' }
+              },
+              y1: {
+                type: 'linear',
+                position: 'right',
+                title: { display: true, text: 'Indicador Kg/Ave' },
+                grid: { drawOnChartArea: false }
               }
             }
           }
-          // -----------------------------------------------------------
-        }
-      });
+        });
+
+      } else {
+        // Modo Rendimiento / Saldos estándar
+        tablaConsumo.style.display = 'block';
+        tablaRanking.style.display = 'none';
+
+        const s = datosGlobales.series;
+        const d = vista === 'rendimiento'
+          ? [{ label: 'Rendimiento', data: s.kg_pollito, borderColor: '#6366f1', fill: true, backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.3 }]
+          : [{ label: 'Saldos', data: s.saldo_inicial, borderColor: '#3b82f6' }];
+
+        chartInstancia = new Chart(ctx, {
+          type: 'line',
+          data: { labels: s.fechas, datasets: d },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            onClick: (e, activeEls) => {
+              if (activeEls.length > 0 && vista === 'rendimiento') {
+                const index = activeEls[0].index;
+                abrirAsistenteDiagnostico(index);
+              }
+            },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  footer: function () { return "\n👆 Clic aquí para Diagnóstico Inteligente"; }
+                }
+              }
+            }
+          }
+        });
+      }
     }
 
     // PDF

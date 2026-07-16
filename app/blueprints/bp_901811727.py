@@ -357,16 +357,14 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
     }
     
     granjas_data = {}
+    lotes_agrupados = {} # NUEVO: Diccionario para agrupar lotes
 
     resultados.sort(key=lambda x: str(x.get('fecha')))
 
     for row in resultados:
         lote_id = row.get('lote')
-        
-        # 1. RESCATE DE POBLACIÓN (El puente del Lote)
-        pollitos_reales = mapa_poblacion_rescatada.get(lote_id, 0)
+        pollitos_reales = mapa_poblacion_rescatada.get(lote_id, 0) if lote_id else 0
 
-        # CRITERIO DE EXCLUSIÓN 1: Si el lote no tiene población registrada en la historia, se ignora
         if pollitos_reales <= 0:
             continue
 
@@ -378,9 +376,30 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
         masa_fact = safe_float(row.get('masa_kg_facturada'))
         neto_gast = safe_float(row.get('neto_gastado'))
         
-        # CRITERIO DE EXCLUSIÓN 2: Si el registro es un egreso/consumo pero el valor es 0, es ruido
         if clase in ['egreso', 'consumo'] and neto_gast <= 0:
             continue
+
+        # --- NUEVO: Agrupación en caliente de Lotes ---
+        if lote_id not in lotes_agrupados:
+            lotes_agrupados[lote_id] = {
+                'lote': lote_id,
+                'estatus_lote': str(row.get('estatus_lote')).upper(),
+                'consumo_total': 0.0,
+                'pollitos': pollitos_reales,
+                'fecha_inicio': fecha_str,
+                'fecha_fin': fecha_str,
+            }
+        
+        if clase in ['egreso', 'consumo'] and neto_gast > 0:
+            lotes_agrupados[lote_id]['consumo_total'] += neto_gast
+            
+        if fecha_str > lotes_agrupados[lote_id]['fecha_fin']:
+            lotes_agrupados[lote_id]['fecha_fin'] = fecha_str
+        
+        # Si detectamos que en el histórico se marcó INACTIVO, actualizamos el estatus final
+        if str(row.get('estatus_lote')).upper() == 'INACTIVO':
+            lotes_agrupados[lote_id]['estatus_lote'] = 'INACTIVO'
+        # ---------------------------------------------
 
         val_precio = safe_float(row.get('precio_total')) 
         kg_pollo  = safe_float(row.get('kg_pollito'))
@@ -419,7 +438,6 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
                 d['pollitos'] += pollitos_reales
             d['lotes'].add(lote_id)
 
-    # 2. FILTRADO FINAL Y CÁLCULO DE EFICIENCIA
     tabla_resumen = []
     lista_rendimientos = []
     total_pollitos_global = 0
@@ -427,8 +445,6 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
 
     for nombre_granja, datos in granjas_data.items():
         consumo_granja = datos['consumo_real']
-        
-        # REGLA MAESTRA: Eliminar granjas con consumo cero del reporte
         if consumo_granja <= 0.0001:
             continue
 
@@ -474,8 +490,36 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
     if n > 0:
         media = sum(lista_rendimientos) / n
         if n > 1:
+            import math
             varianza = sum((x - media) ** 2 for x in lista_rendimientos) / (n - 1)
             desviacion = math.sqrt(varianza)
+
+    # --- NUEVO: Lógica Matemática Comparativa y Ranking ---
+    from datetime import datetime as dt
+    for l_id, l_data in lotes_agrupados.items():
+        if l_data['pollitos'] > 0:
+            l_data['kg_ave'] = l_data['consumo_total'] / l_data['pollitos']
+        else:
+            l_data['kg_ave'] = 0.0
+        
+        try:
+            d1 = dt.strptime(l_data['fecha_inicio'][:10], '%Y-%m-%d')
+            d2 = dt.strptime(l_data['fecha_fin'][:10], '%Y-%m-%d')
+            l_data['dias_operacion'] = (d2 - d1).days + 1
+        except:
+            l_data['dias_operacion'] = 0
+
+    lista_lotes = list(lotes_agrupados.values())
+    lista_lotes.sort(key=lambda x: x['fecha_fin'], reverse=True)
+
+    lotes_activos = [l for l in lista_lotes if l['estatus_lote'] == 'ACTIVO']
+    lotes_inactivos = [l for l in lista_lotes if l['estatus_lote'] == 'INACTIVO'][:5]
+
+    comparativa_lotes = lotes_inactivos + lotes_activos
+    comparativa_lotes.sort(key=lambda x: x['fecha_fin'])
+
+    ranking_activos = sorted(lotes_activos, key=lambda x: x['kg_ave'], reverse=True)
+    # ----------------------------------------------------
 
     nota_informativa = "Nota: Estadísticas ajustadas. Se omiten granjas sin consumo en el periodo."
 
@@ -483,6 +527,8 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
         "kpis": kpis,
         "series": series,
         "tabla_resumen": tabla_resumen,
+        "comparativa_lotes": comparativa_lotes, # Añadido
+        "ranking_activos": ranking_activos,     # Añadido
         "estadisticas": { 
             "media": media, 
             "desviacion": desviacion,
@@ -490,7 +536,7 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
         },
         "periodo_tipo": periodo,
         "nota_metodologica": nota_informativa
-    }
+    }    }
     
 @csrf.exempt
 @bp_901811727.route('/generar_informe', methods=['POST'])
