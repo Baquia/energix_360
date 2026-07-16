@@ -536,7 +536,7 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
         },
         "periodo_tipo": periodo,
         "nota_metodologica": nota_informativa
-    }    }
+    }    
     
 @csrf.exempt
 @bp_901811727.route('/generar_informe', methods=['POST'])
