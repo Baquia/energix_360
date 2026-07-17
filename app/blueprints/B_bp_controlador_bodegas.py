@@ -43,12 +43,14 @@ def control_logistica():
         'items_finalizados': 0, 
         'pedidos_pendientes_reales': 0,
         'velocidad_promedio': 0.0,
-        'requiere_alias': 0
+        'requiere_alias': 0,
+        'backlog_verificacion': 0
     }
     
     ordenes_sin_asignar = [] 
     ordenes_procesadas = []
     operarios_marcas = [] 
+    verificadores_kpis = []
     marcas_huerfanas = []
     alertas_criticas = []
 
@@ -97,22 +99,74 @@ def control_logistica():
         """, (empresa_id,))
         ordenes_sin_asignar = cur.fetchall()
 
-        # 4. Operarios y Marcas Asignadas (Sección 2 rediseñada)
+        # 4. Operarios y KPIs Enriquecidos
         cur.execute("""
             SELECT 
                 u.id as id_operario,
                 u.nombre as nombre_operario,
-                GROUP_CONCAT(fp.marca SEPARATOR ', ') as marcas_asignadas,
-                COUNT(fp.marca) as total_marcas
+                GROUP_CONCAT(DISTINCT fp.marca SEPARATOR ', ') as marcas_asignadas,
+                COUNT(DISTINCT fp.marca) as total_marcas,
+                COUNT(p.id) as total_asignados,
+                SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_completados,
+                SUM(CASE WHEN p.novedad_alistamiento IS NOT NULL THEN 1 ELSE 0 END) as novedades,
+                SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL 
+                         THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM usuarios u
             LEFT JOIN fabricantes_proveedores fp ON u.id = fp.operador_asignado AND fp.id_empresa = %s
+            LEFT JOIN picking_importacion_raw p ON p.marca = fp.marca AND p.id_empresa = %s AND p.puerta_asignada IS NOT NULL AND (p.estado_actividad != 'TERMINADO' OR p.estado_actividad IS NULL)
             WHERE u.empresa_id = %s AND u.perfil = 'operador_logistica'
             GROUP BY u.id, u.nombre
             ORDER BY u.nombre ASC
-        """, (empresa_id, empresa_id))
-        operarios_marcas = cur.fetchall()
+        """, (empresa_id, empresa_id, empresa_id))
+        operarios_marcas_raw = cur.fetchall()
 
-        # 4.1 Marcas Huérfanas (Sin operador asignado)
+        for op in operarios_marcas_raw:
+            op_dict = dict(op)
+            asignados = int(op_dict['total_asignados'] or 0)
+            completados = int(op_dict['items_completados'] or 0)
+            novedades = int(op_dict['novedades'] or 0)
+            mins = float(op_dict['minutos_totales'] or 0)
+            
+            op_dict['avance_porcentaje'] = round((completados / asignados) * 100) if asignados > 0 else 0
+            op_dict['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
+            op_dict['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
+            
+            operarios_marcas.append(op_dict)
+
+        # 4.1 KPIs Verificadores
+        cur.execute("""
+            SELECT 
+                u.id as id_verificador,
+                u.nombre as nombre_verificador,
+                COUNT(p.id) as items_verificados,
+                SUM(CASE WHEN p.cajas_alistadas != p.cajas_verificadas OR p.unidades_alistadas != p.unidades_verificadas THEN 1 ELSE 0 END) as discrepancias
+            FROM usuarios u
+            LEFT JOIN picking_importacion_raw p ON p.id_verificador = u.id AND p.id_empresa = %s AND DATE(p.fecha_verificacion) = CURDATE()
+            WHERE u.empresa_id = %s AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
+            GROUP BY u.id, u.nombre
+            HAVING items_verificados > 0
+            ORDER BY items_verificados DESC
+        """, (empresa_id, empresa_id))
+        verificadores_raw = cur.fetchall()
+
+        for v in verificadores_raw:
+            v_dict = dict(v)
+            verificados = int(v_dict['items_verificados'] or 0)
+            discrepancias = int(v_dict['discrepancias'] or 0)
+            v_dict['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
+            verificadores_kpis.append(v_dict)
+
+        # 4.2 Backlog de Verificación
+        cur.execute("""
+            SELECT COUNT(id) as total_backlog 
+            FROM picking_importacion_raw 
+            WHERE id_empresa = %s AND estado_actividad = 'ALISTADO'
+        """, (empresa_id,))
+        row_backlog = cur.fetchone()
+        if row_backlog:
+            kpis['backlog_verificacion'] = int(row_backlog['total_backlog'])
+
+        # 4.3 Marcas Huérfanas (Sin operador asignado)
         cur.execute("""
             SELECT p.marca, COUNT(*) as total_items
             FROM picking_importacion_raw p
@@ -241,6 +295,7 @@ def control_logistica():
                            kpis=kpis, 
                            ordenes_pendientes=ordenes_sin_asignar, 
                            operarios_marcas=operarios_marcas,
+                           verificadores_kpis=verificadores_kpis,
                            marcas_huerfanas=marcas_huerfanas,
                            ordenes_asignadas=ordenes_procesadas,
                            alertas_criticas=alertas_criticas)
@@ -260,9 +315,13 @@ def monitoreo_realtime():
         'items_finalizados': 0, 
         'pedidos_pendientes_reales': 0,
         'velocidad_promedio': 0.0,
-        'requiere_alias': 0
+        'requiere_alias': 0,
+        'backlog_verificacion': 0
     }
     
+    operarios_marcas = []
+    verificadores_kpis = []
+
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
@@ -297,19 +356,72 @@ def monitoreo_realtime():
         for o in ordenes_sin_asignar:
             if isinstance(o['fecha'], datetime): o['fecha'] = o['fecha'].strftime('%Y-%m-%d %H:%M:%S')
 
+        # KPIs Operarios
         cur.execute("""
             SELECT 
                 u.id as id_operario,
                 u.nombre as nombre_operario,
-                GROUP_CONCAT(fp.marca SEPARATOR ', ') as marcas_asignadas,
-                COUNT(fp.marca) as total_marcas
+                GROUP_CONCAT(DISTINCT fp.marca SEPARATOR ', ') as marcas_asignadas,
+                COUNT(DISTINCT fp.marca) as total_marcas,
+                COUNT(p.id) as total_asignados,
+                SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_completados,
+                SUM(CASE WHEN p.novedad_alistamiento IS NOT NULL THEN 1 ELSE 0 END) as novedades,
+                SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL 
+                         THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM usuarios u
             LEFT JOIN fabricantes_proveedores fp ON u.id = fp.operador_asignado AND fp.id_empresa = %s
+            LEFT JOIN picking_importacion_raw p ON p.marca = fp.marca AND p.id_empresa = %s AND p.puerta_asignada IS NOT NULL AND (p.estado_actividad != 'TERMINADO' OR p.estado_actividad IS NULL)
             WHERE u.empresa_id = %s AND u.perfil = 'operador_logistica'
             GROUP BY u.id, u.nombre
             ORDER BY u.nombre ASC
+        """, (empresa_id, empresa_id, empresa_id))
+        operarios_marcas_raw = cur.fetchall()
+
+        for op in operarios_marcas_raw:
+            op_dict = dict(op)
+            asignados = int(op_dict['total_asignados'] or 0)
+            completados = int(op_dict['items_completados'] or 0)
+            novedades = int(op_dict['novedades'] or 0)
+            mins = float(op_dict['minutos_totales'] or 0)
+            
+            op_dict['avance_porcentaje'] = round((completados / asignados) * 100) if asignados > 0 else 0
+            op_dict['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
+            op_dict['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
+            
+            operarios_marcas.append(op_dict)
+
+        # KPIs Verificadores
+        cur.execute("""
+            SELECT 
+                u.id as id_verificador,
+                u.nombre as nombre_verificador,
+                COUNT(p.id) as items_verificados,
+                SUM(CASE WHEN p.cajas_alistadas != p.cajas_verificadas OR p.unidades_alistadas != p.unidades_verificadas THEN 1 ELSE 0 END) as discrepancias
+            FROM usuarios u
+            LEFT JOIN picking_importacion_raw p ON p.id_verificador = u.id AND p.id_empresa = %s AND DATE(p.fecha_verificacion) = CURDATE()
+            WHERE u.empresa_id = %s AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
+            GROUP BY u.id, u.nombre
+            HAVING items_verificados > 0
+            ORDER BY items_verificados DESC
         """, (empresa_id, empresa_id))
-        operarios_marcas = list(cur.fetchall())
+        verificadores_raw = cur.fetchall()
+
+        for v in verificadores_raw:
+            v_dict = dict(v)
+            verificados = int(v_dict['items_verificados'] or 0)
+            discrepancias = int(v_dict['discrepancias'] or 0)
+            v_dict['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
+            verificadores_kpis.append(v_dict)
+
+        # Backlog Verificación
+        cur.execute("""
+            SELECT COUNT(id) as total_backlog 
+            FROM picking_importacion_raw 
+            WHERE id_empresa = %s AND estado_actividad = 'ALISTADO'
+        """, (empresa_id,))
+        row_backlog = cur.fetchone()
+        if row_backlog:
+            kpis['backlog_verificacion'] = int(row_backlog['total_backlog'])
 
         cur.execute("""
             SELECT p.marca, COUNT(*) as total_items
@@ -445,6 +557,7 @@ def monitoreo_realtime():
             'kpis': kpis,
             'ordenes_pendientes': ordenes_sin_asignar,
             'operarios_marcas': operarios_marcas,
+            'verificadores_kpis': verificadores_kpis,
             'marcas_huerfanas': marcas_huerfanas,
             'ordenes_asignadas': ordenes_procesadas
         })
@@ -1557,3 +1670,132 @@ def guardar_secuencia_zona():
         cur.close()
         return jsonify({'message': 'Zona y orden de secuencia actualizados correctamente.'})
     except Exception as e: return jsonify({'error': str(e)}), 500
+
+@bp_bodegas.route('/api/bodegas/reportes/kpis_historico')
+def kpis_historico():
+    if 'usuario_id' not in session: return jsonify([])
+    empresa_id = session.get('empresa_id')
+    lapso = request.args.get('lapso', 'hoy')
+    
+    hoy = datetime.now()
+    
+    if lapso == 'hoy':
+        fecha_inicio = hoy.date()
+        fecha_fin = hoy.date()
+        formato_grupo = '%Y-%m-%d %H:00'
+    elif lapso == 'ayer':
+        ayer = hoy - timedelta(days=1)
+        fecha_inicio = ayer.date()
+        fecha_fin = ayer.date()
+        formato_grupo = '%Y-%m-%d %H:00'
+    elif lapso == 'mes_anterior':
+        primer_dia_este_mes = hoy.replace(day=1)
+        ultimo_dia_mes_anterior = primer_dia_este_mes - timedelta(days=1)
+        fecha_inicio = ultimo_dia_mes_anterior.replace(day=1).date()
+        fecha_fin = ultimo_dia_mes_anterior.date()
+        formato_grupo = '%Y-%m-%d'
+    elif lapso == 'trimestre_anterior':
+        trimestre_actual = (hoy.month - 1) // 3 + 1
+        trimestre_anterior = trimestre_actual - 1 if trimestre_actual > 1 else 4
+        ano_trimestre = hoy.year if trimestre_actual > 1 else hoy.year - 1
+        mes_inicio = (trimestre_anterior - 1) * 3 + 1
+        
+        fecha_inicio = datetime(ano_trimestre, mes_inicio, 1).date()
+        
+        if trimestre_anterior == 1: mes_fin, dia_fin = 3, 31
+        elif trimestre_anterior == 2: mes_fin, dia_fin = 6, 30
+        elif trimestre_anterior == 3: mes_fin, dia_fin = 9, 30
+        else: mes_fin, dia_fin = 12, 31
+        
+        fecha_fin = datetime(ano_trimestre, mes_fin, dia_fin).date()
+        formato_grupo = '%Y-%m'
+    else:
+        fecha_inicio = hoy.date()
+        fecha_fin = hoy.date()
+        formato_grupo = '%Y-%m-%d'
+
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # 1. Global (Línea de tiempo)
+        query_global = """
+            SELECT 
+                DATE_FORMAT(fecha_creacion_orden, %s) as etiqueta,
+                COUNT(DISTINCT numero_orden_origen) as total_pedidos,
+                SUM(CASE WHEN estado_actividad IN ('VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_listos,
+                COUNT(*) as total_items,
+                AVG(CASE WHEN fecha_inicio_alistamiento IS NOT NULL AND fecha_fin_alistamiento IS NOT NULL 
+                         THEN TIMESTAMPDIFF(MINUTE, fecha_inicio_alistamiento, fecha_fin_alistamiento) ELSE NULL END) as tiempo_promedio_min
+            FROM picking_importacion_raw
+            WHERE id_empresa = %s 
+              AND DATE(fecha_creacion_orden) BETWEEN %s AND %s
+            GROUP BY etiqueta
+            ORDER BY etiqueta ASC
+        """
+        cur.execute(query_global, (formato_grupo, empresa_id, fecha_inicio, fecha_fin))
+        datos_globales = list(cur.fetchall())
+        
+        # 2. Operarios Histórico
+        query_operarios = """
+            SELECT 
+                nombre_auxiliar_asignado as operario,
+                COUNT(id) as items_completados,
+                SUM(CASE WHEN novedad_alistamiento IS NOT NULL THEN 1 ELSE 0 END) as novedades,
+                SUM(CASE WHEN fecha_inicio_alistamiento IS NOT NULL AND fecha_fin_alistamiento IS NOT NULL 
+                         THEN TIMESTAMPDIFF(MINUTE, fecha_inicio_alistamiento, fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
+            FROM picking_importacion_raw
+            WHERE id_empresa = %s 
+              AND nombre_auxiliar_asignado IS NOT NULL
+              AND estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO')
+              AND DATE(fecha_fin_alistamiento) BETWEEN %s AND %s
+            GROUP BY nombre_auxiliar_asignado
+            ORDER BY items_completados DESC
+        """
+        cur.execute(query_operarios, (empresa_id, fecha_inicio, fecha_fin))
+        ops_raw = cur.fetchall()
+        
+        operarios_kpis = []
+        for op in ops_raw:
+            op_d = dict(op)
+            completados = int(op_d['items_completados'] or 0)
+            novedades = int(op_d['novedades'] or 0)
+            mins = float(op_d['minutos_totales'] or 0)
+            
+            op_d['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
+            op_d['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
+            operarios_kpis.append(op_d)
+            
+        # 3. Verificadores Histórico
+        query_verificadores = """
+            SELECT 
+                u.nombre as verificador,
+                COUNT(p.id) as items_verificados,
+                SUM(CASE WHEN p.cajas_alistadas != p.cajas_verificadas OR p.unidades_alistadas != p.unidades_verificadas THEN 1 ELSE 0 END) as discrepancias
+            FROM picking_importacion_raw p
+            INNER JOIN usuarios u ON p.id_verificador = u.id
+            WHERE p.id_empresa = %s 
+              AND DATE(p.fecha_verificacion) BETWEEN %s AND %s
+            GROUP BY u.nombre
+            ORDER BY items_verificados DESC
+        """
+        cur.execute(query_verificadores, (empresa_id, fecha_inicio, fecha_fin))
+        verif_raw = cur.fetchall()
+        
+        verificadores_kpis = []
+        for v in verif_raw:
+            v_d = dict(v)
+            verificados = int(v_d['items_verificados'] or 0)
+            discrepancias = int(v_d['discrepancias'] or 0)
+            v_d['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
+            verificadores_kpis.append(v_d)
+
+        cur.close()
+        
+        return jsonify({
+            'global': datos_globales,
+            'operarios': operarios_kpis,
+            'verificadores': verificadores_kpis
+        })
+    except Exception as e:
+        print(f"Error reportes kpis historico: {e}")
+        return jsonify({'global': [], 'operarios': [], 'verificadores': []})

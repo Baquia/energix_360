@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>WMS Verificación</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
@@ -29,12 +29,16 @@
 
         .app-container {
             width: 100%;
-            max-width: 500px;
+            max-width: 100%;
             background: #ffffff;
             min-height: 100vh;
             position: relative;
             display: flex;
             flex-direction: column;
+        }
+
+        @media (min-width: 768px) {
+            .app-container { max-width: 600px; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
         }
 
         /* --- COLORES VERIFICADOR --- */
@@ -70,438 +74,197 @@
             width: 100%;
         }
 
-        .logo-img {
-            height: 38px;
-            width: auto;
-            object-fit: contain;
-        }
-
-        .logo-divider {
-            width: 1px;
-            height: 28px;
-            background-color: #cbd5e1;
-        }
+        .logo-img { height: 38px; width: auto; object-fit: contain; }
+        .logo-divider { width: 1px; height: 28px; background-color: #cbd5e1; }
 
         /* --- CONTENIDO --- */
         .content-area {
             flex: 1;
-            padding: 25px;
-            padding-bottom: 100px;
+            padding: 20px;
+            padding-bottom: max(100px, env(safe-area-inset-bottom));
             overflow-y: auto;
             background: #f8fafc;
+            display: flex;
+            flex-direction: column;
         }
 
         /* --- MENU --- */
         .menu-welcome {
-            margin-bottom: 35px;
+            margin-bottom: 30px;
             margin-top: 10px;
             border-left: 4px solid var(--primary);
             padding-left: 15px;
         }
 
-        .menu-welcome h2 {
-            font-size: 1.8rem;
-            margin: 0;
-            color: var(--primary-dark);
-            font-weight: 800;
-        }
+        .menu-welcome h2 { font-size: 1.6rem; margin: 0; color: var(--primary-dark); font-weight: 800; }
 
-        .menu-grid {
-            display: grid;
-            gap: 20px;
-        }
+        .menu-grid { display: grid; gap: 15px; }
 
         .menu-card {
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 30px 20px;
-            text-align: center;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+            background: white; border: 1px solid var(--border); border-radius: 12px;
+            padding: 25px 20px; text-align: center; cursor: pointer; position: relative;
+            overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+            transition: 0.2s;
         }
 
-        .menu-card:active {
-            transform: scale(0.98);
-            background: #f1f5f9;
-        }
+        .menu-card:active { transform: scale(0.98); background: #f1f5f9; }
+        .menu-card.opt-picking { border-left: 5px solid var(--primary); }
 
-        .menu-card.opt-picking {
-            border-left: 5px solid var(--primary);
-        }
-
-        .menu-icon {
-            font-size: 2.8rem;
-            display: block;
-            margin-bottom: 10px;
-        }
-
-        .menu-title {
-            font-size: 1.1rem;
-            font-weight: 900;
-            color: var(--primary-dark);
-            text-transform: uppercase;
-        }
+        .menu-icon { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+        .menu-title { font-size: 1.1rem; font-weight: 900; color: var(--primary-dark); text-transform: uppercase; }
 
         .btn-logout-menu {
-            margin-top: 40px;
-            width: 100%;
-            padding: 16px;
-            background: white;
-            border: 1px solid #fee2e2;
-            color: #ef4444;
-            font-weight: 600;
-            border-radius: 12px;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            gap: 8px;
+            margin-top: 40px; width: 100%; padding: 16px; background: white; border: 1px solid #fee2e2;
+            color: #ef4444; font-weight: 700; border-radius: 12px; cursor: pointer; display: flex; justify-content: center; gap: 8px;
         }
 
         /* --- LISTAS --- */
         .nav-back {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 25px;
-            cursor: pointer;
-            font-weight: 600;
-            color: var(--text-gray);
-            background: none;
-            border: none;
-            font-size: 1rem;
+            display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; cursor: pointer;
+            font-weight: 700; color: var(--text-gray); background: none; border: none; font-size: 1rem; padding: 10px 0;
+        }
+
+        /* Responsive Grid para listas (Landscape Mobile) */
+        .responsive-grid {
+            display: grid; grid-template-columns: 1fr; gap: 15px;
+        }
+        @media (orientation: landscape) and (max-height: 600px) {
+            .responsive-grid { grid-template-columns: 1fr 1fr; }
         }
 
         .order-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-            border-left: 5px solid var(--primary);
+            background: white; border-radius: 12px; padding: 20px; margin-bottom: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); border-left: 5px solid var(--primary);
+            cursor: pointer; transition: 0.2s;
         }
+        .order-card:active { transform: scale(0.98); background:#f8fafc; }
 
-        .oc-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
+        .oc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .oc-number { font-size: 1.25rem; font-weight: 800; color: #1e293b; }
+        .oc-badge { background: #e0e7ff; color: var(--primary-dark); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
 
-        .oc-number {
-            font-size: 1.3rem;
-            font-weight: 800;
-            color: #1e293b;
-        }
-
-        .oc-badge {
-            background: #e0e7ff;
-            color: var(--primary-dark);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 0.75rem;
-        }
-
-        .p-bar {
-            height: 8px;
-            background: #e2e8f0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 5px;
-        }
-
-        .p-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--success), #27ae60);
-            transition: width 0.4s ease;
-        }
+        .p-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+        .p-fill { height: 100%; background: linear-gradient(90deg, var(--success), #27ae60); transition: width 0.4s ease; }
 
         .item-row {
-            display: flex;
-            align-items: center;
-            background: white;
-            padding: 16px;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            gap: 15px;
-            border-left: 3px solid transparent;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            display: flex; align-items: center; background: white; padding: 15px; border-radius: 12px;
+            gap: 15px; border-left: 4px solid transparent; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            cursor: pointer;
         }
-
-        .item-row.active {
-            border-left-color: var(--secondary);
-        }
-
-        .item-row.done {
-            display: none !important;
-        }
+        .item-row:active { background: #f8fafc; }
+        .item-row.active { border-left-color: var(--secondary); }
+        .item-row.done { display: none !important; }
 
         .qty-indicator {
-            min-width: 50px;
-            height: 50px;
-            background: var(--bg-light);
-            color: var(--primary-dark);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            font-weight: 800;
-            border: 1px solid var(--border);
+            min-width: 55px; height: 55px; background: var(--bg-light); color: var(--primary-dark);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; font-weight: 900; border: 1px solid var(--border); flex-shrink: 0;
         }
 
-        .item-details {
-            flex: 1;
-            overflow: hidden;
-        }
+        .item-details { flex: 1; overflow: hidden; }
+        .id-name { font-size: 0.95rem; font-weight: 700; color: #334155; word-break: break-word; line-height: 1.2; }
+        .id-code { font-size: 0.75rem; color: var(--text-gray); font-weight: 600; margin-bottom: 4px; }
 
-        .id-name {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: #334155;
-            word-break: break-word;
-        }
-
-        .id-code {
-            font-size: 0.7rem;
-            color: var(--text-gray);
-            font-weight: 600;
-            margin-bottom: 3px;
-        }
-
-        /* --- MODAL TRABAJO (VERIFICACIÓN) --- */
+        /* --- MODAL TRABAJO (VERIFICACIÓN) THUMB-ZONE OPTIMIZED --- */
         .modal-wrap {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.95);
-            z-index: 100;
-            display: none;
-            justify-content: center;
-            align-items: center;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.98); z-index: 100; display: none;
+            justify-content: center; align-items: flex-end;
             backdrop-filter: blur(5px);
         }
 
         .picking-sheet {
-            width: 95%;
-            max-width: 400px;
-            height: 95vh;
-            max-height: 850px;
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            width: 100%; max-width: 600px; height: 100vh; background: white;
+            display: flex; flex-direction: column; position: relative;
+            animation: slideUp 0.3s ease-out;
         }
+
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
         .btn-close-modal {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: #f1f5f9;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: none;
-            font-weight: bold;
-            color: #64748b;
-            font-size: 1.2rem;
-            cursor: pointer;
-            z-index: 10;
+            position: absolute; top: 15px; right: 15px; background: #f1f5f9; width: 36px; height: 36px;
+            border-radius: 50%; border: none; font-weight: bold; color: #64748b; font-size: 1.3rem;
+            cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center;
         }
 
-        .pick-header {
-            margin-bottom: 15px;
-            padding-right: 30px;
+        .picking-scroll-area {
+            flex: 1; overflow-y: auto; padding: 20px; padding-top: 25px; display: flex; flex-direction: column;
         }
 
-        .pick-prod {
-            font-size: 1.1rem;
-            font-weight: 800;
-            color: var(--primary-dark);
-            line-height: 1.3;
-            margin-bottom: 5px;
+        .picking-bottom-actions {
+            background: white; padding: 15px 20px; padding-bottom: max(15px, env(safe-area-inset-bottom));
+            border-top: 1px solid var(--border); box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
         }
 
-        .pick-code-pill {
-            background: #e0e7ff;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-family: monospace;
-            color: var(--primary-dark);
-            font-size: 0.85rem;
-            font-weight: bold;
-        }
+        .pick-header { margin-bottom: 15px; padding-right: 35px; }
+        .pick-prod { font-size: 1.2rem; font-weight: 900; color: var(--primary-dark); line-height: 1.2; margin-bottom: 8px; }
+        .pick-code-pill { background: #f1f5f9; padding: 4px 10px; border-radius: 6px; font-family: monospace; color: var(--text-gray); font-size: 0.9rem; font-weight: 700; }
 
-        .pick-stats {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .stat-box {
-            flex: 1;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 8px;
-            text-align: center;
-            background: #faf5ff;
-        }
-
-        .stat-lbl {
-            font-size: 0.7rem;
-            color: var(--secondary);
-            font-weight: 800;
-            text-transform: uppercase;
-        }
-
-        .stat-val {
-            font-size: 1.1rem;
-            font-weight: 800;
-            color: #1e293b;
-        }
+        .pick-stats { display: flex; gap: 10px; margin-bottom: 15px; }
+        .stat-box { flex: 1; border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; background: #faf5ff;}
+        .stat-lbl { font-size: 0.7rem; color: var(--secondary); font-weight: 800; text-transform: uppercase; }
+        .stat-val { font-size: 1.2rem; font-weight: 900; color: #1e293b; }
 
         .camera-container {
-            flex: 1;
-            background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            margin-bottom: 15px;
-            min-height: 350px;
+            flex: 1; background: #000; border-radius: 12px; overflow: hidden; position: relative;
+            display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
+            min-height: 250px;
         }
 
-        #embedded-reader {
-            width: 100%;
-            height: 100%;
-        }
+        #embedded-reader { width: 100%; height: 100%; }
 
         .btn-start-cam {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid white;
-            color: white;
-            padding: 15px 25px;
-            border-radius: 30px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            backdrop-filter: blur(4px);
-            z-index: 5;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white;
+            padding: 15px 25px; border-radius: 30px; font-weight: 800; font-size:1.1rem;
+            display: flex; align-items: center; gap: 10px; cursor: pointer; backdrop-filter: blur(4px); z-index: 5;
         }
+        .btn-start-cam:active { background: rgba(255, 255, 255, 0.4); }
 
-        .btn-start-cam:active {
-            background: rgba(255, 255, 255, 0.4);
-        }
-
-        .action-area {
-            background: #e0e7ff;
-            border-radius: 16px;
-            padding: 15px;
-            border: 1px solid #c7d2fe;
-            text-align: center;
-        }
-
-        .counter-big {
-            font-size: 3.5rem;
-            font-weight: 900;
-            color: var(--primary);
-            line-height: 1;
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        .counter-lbl {
-            font-size: 0.8rem;
-            color: var(--primary-dark);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+        .action-area { background: #eef2ff; border-radius: 16px; padding: 15px; border: 1px solid #e0e7ff; text-align: center; margin-bottom: 15px; flex-shrink: 0; }
+        .counter-big { font-size: 3.5rem; font-weight: 900; color: var(--primary); line-height: 1; display: block; margin-bottom: 5px; }
+        .counter-lbl { font-size: 0.85rem; color: var(--primary-dark); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
 
         .btn-finish {
-            width: 100%;
-            background: var(--success);
-            color: white;
-            padding: 18px;
-            border-radius: 12px;
-            font-weight: 800;
-            font-size: 1.1rem;
-            border: none;
-            margin-top: 15px;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+            width: 100%; background: var(--success); color: white; padding: 18px; border-radius: 12px;
+            font-weight: 900; font-size: 1.1rem; border: none; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3); transition: 0.2s;
         }
-
-        .btn-finish:active {
-            transform: scale(0.98);
-        }
+        .btn-finish:active { transform: scale(0.98); }
 
         .btn-reset {
-            margin-top: 10px;
-            background: transparent;
-            border: 1px solid #ccc;
-            padding: 8px;
-            border-radius: 8px;
-            color: #666;
-            font-size: 0.8rem;
-            cursor: pointer;
-            width: 100%;
+            margin-top: 10px; background: #f1f5f9; border: 1px solid #cbd5e1; padding: 12px; border-radius: 10px;
+            color: #475569; font-size: 0.95rem; font-weight: 700; cursor: pointer; width: 100%;
         }
 
-        /* Modal Confirmación Final */
-        .verify-sheet {
-            background: white;
-            width: 85%;
-            max-width: 350px;
-            border-radius: 20px;
-            padding: 30px 20px;
-            text-align: center;
-        }
+        /* Modal Verificación Final */
+        .verify-sheet { background: white; width: 90%; max-width: 350px; border-radius: 20px; padding: 30px 20px; text-align: center; margin: auto; }
+        .verify-btns { display: flex; gap: 10px; margin-top: 25px; }
+        .btn-v-cancel { flex: 1; padding: 15px; border: 1px solid var(--border); background: white; border-radius: 12px; font-weight: 800; color: #64748b; font-size:1rem;}
+        .btn-v-confirm { flex: 1; padding: 15px; border: none; background: var(--success); border-radius: 12px; font-weight: 800; color: white; font-size:1rem;}
 
-        .verify-btns {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
+        .hidden { display: none !important; }
 
-        .btn-v-cancel {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid var(--border);
-            background: white;
-            border-radius: 10px;
-            font-weight: 700;
-            color: #64748b;
-        }
-
-        .btn-v-confirm {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            background: var(--success);
-            border-radius: 10px;
-            font-weight: 700;
-            color: white;
-        }
-
-        .hidden {
-            display: none !important;
+        /* =======================================================
+           LANDSCAPE OPTIMIZATION FOR BARCODE SCANNING
+           ======================================================= */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .picking-sheet {
+                flex-direction: row; flex-wrap: wrap; height: 100vh; overflow: hidden; padding: 0;
+            }
+            .picking-scroll-area {
+                flex: 1; height: 100vh; padding: 15px;
+            }
+            .camera-container {
+                position: absolute; top: 0; left: 0; width: 50%; height: 100vh; margin: 0; border-radius: 0; z-index: 1;
+            }
+            .picking-scroll-area {
+                margin-left: 50%; width: 50%; padding-bottom: 90px;
+            }
+            .picking-bottom-actions {
+                position: absolute; bottom: 0; right: 0; width: 50%; z-index: 2; padding: 10px 15px;
+            }
+            .btn-close-modal { top: 10px; right: 10px; }
         }
     </style>
 </head>
@@ -523,9 +286,9 @@
             <div id="view-menu">
                 <div class="menu-welcome">
                     <h2>Hola: {{ usuario }}</h2>
-                    <p style="color: var(--secondary); font-weight: bold;">Módulo de Verificador de Bodega</p>
+                    <p style="color: var(--secondary); font-weight: 700; margin-top:5px;">Módulo de Verificador de Bodega</p>
                 </div>
-                <div class="menu-grid">
+                <div class="menu-grid responsive-grid">
                     <div class="menu-card opt-picking" onclick="cargarOrdenes()">
                         <span class="menu-icon">🔍</span>
                         <span class="menu-title">Auditar Picking</span>
@@ -535,55 +298,46 @@
             </div>
 
             <div id="view-orders" class="hidden">
-                <button class="nav-back" onclick="volverAlMenu()">⬅ Volver al Menú</button>
+                <button class="nav-back" onclick="volverAlMenu()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver al Menú
+                </button>
                 <h2 style="margin: 5px 0 15px 0; color: var(--primary-dark);">Pedidos Listos (Por Auditar)</h2>
-                <div id="orders-container"></div>
+                <div id="orders-container" class="responsive-grid"></div>
             </div>
 
             <div id="view-items" class="hidden">
-                <button class="nav-back" onclick="cargarOrdenes()">⬅ Volver a Órdenes</button>
+                <button class="nav-back" onclick="cargarOrdenes()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Órdenes
+                </button>
 
-                <div
-                    style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px;">
-                    <div style="font-size: 0.75rem; opacity: 0.8;">ORDEN A VERIFICAR</div>
-                    <div style="font-size: 2rem; font-weight: 800;" id="lblOrdenTitle">#0000</div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 600;">
+                <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">ORDEN A VERIFICAR</div>
+                    <div style="font-size: 2.2rem; font-weight: 900; margin-bottom: 5px;" id="lblOrdenTitle">#0000</div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 700; font-size:1.1rem;">
                         <span>Por auditar</span><span id="lblProgress">0/0</span>
                     </div>
-                    <div class="p-bar">
-                        <div id="header-progress-bar" class="p-fill" style="width: 0%; background: white;"></div>
+                    <div class="p-bar" style="height: 10px; background: rgba(255,255,255,0.2);">
+                        <div id="header-progress-bar" class="p-fill" style="width: 0%; background: #2ecc71;"></div>
                     </div>
                 </div>
 
-                <input type="text" id="searchBox" class="search-bar" placeholder="🔍 Buscar producto a auditar..."
-                    onkeyup="filtrarLista()"
-                    style="width: 100%; padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px;">
-                <div id="items-container"></div>
+                <div style="position: sticky; top: 70px; z-index: 40; background: #f8fafc; padding-bottom: 10px;">
+                    <input type="text" id="searchBox" placeholder="🔍 Buscar producto a auditar..." onkeyup="filtrarLista()"
+                        style="width: 100%; padding: 16px; border-radius: 12px; border: 2px solid var(--border); font-size: 1.05rem; font-weight:500; outline:none; transition: 0.2s;">
+                </div>
+                <div id="items-container" class="responsive-grid"></div>
             </div>
         </div>
     </div>
 
+    <!-- MODAL PRINCIPAL DE TRABAJO (DIVIDIDO EN SCROLL Y THUMB ZONE) -->
     <div id="modal-picking" class="modal-wrap">
         <div class="picking-sheet">
             <button class="btn-close-modal" onclick="cerrarModalVerificacion()">✕</button>
 
-            <div class="pick-header">
-                <div id="pk-name" class="pick-prod">Nombre del Producto</div>
-                <span id="pk-code" class="pick-code-pill">CODE123</span>
-            </div>
-
-            <div id="novedad-alert" class="hidden"
-                style="background:#fef2f2; color:#be123c; border:1px solid #fecdd3; padding:10px; border-radius:8px; font-size:0.85rem; font-weight:bold; margin-bottom:15px; text-align:center;">
-                ⚠️ NOVEDAD REPORTADA POR ALISTADOR
-            </div>
-
-            <div class="pick-stats">
-                <div class="stat-box">
-                    <div class="stat-lbl">Entregadas</div>
-                    <div id="pk-req" class="stat-val">0</div>
-                </div>
-            </div>
-
+            <!-- Zona Escáner y Datos (Scrollable en Portrait, Mitad Izq/Der en Landscape) -->
             <div class="camera-container" id="camera-section">
                 <div id="embedded-reader"></div>
                 <div id="cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraIncrustada()">
@@ -595,38 +349,56 @@
                 </div>
             </div>
 
-            <div class="action-area" id="area-conteo-cajas">
-                <span class="counter-lbl" style="color:var(--primary-dark);">📦 CAJAS VERIFICADAS</span>
-                <span id="pk-count-cajas" class="counter-big" style="color:var(--primary);">0</span>
-            </div>
+            <div class="picking-scroll-area">
+                <div class="pick-header">
+                    <div id="pk-name" class="pick-prod">Nombre del Producto Completo</div>
+                    <span id="pk-code" class="pick-code-pill">EAN / SKU</span>
+                </div>
 
-            <div class="action-area hidden" id="area-teclado-fracciones"
-                style="background: #f3e8ff; border-color: #e9d5ff;">
-                <span class="counter-lbl" style="color:#7e22ce;">🍬 UNIDADES VERIFICADAS</span>
-                <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 15px;">
-                    <button onclick="cambiarFraccion(-1)"
-                        style="width: 50px; height: 50px; border-radius: 50%; font-size: 2rem; border: none; background: #e9d5ff; color: #581c87; font-weight: bold; cursor: pointer;">-</button>
-                    <span id="pk-count-unidades" class="counter-big"
-                        style="color:#7e22ce; margin: 0; min-width: 60px;">0</span>
-                    <button onclick="cambiarFraccion(1)"
-                        style="width: 50px; height: 50px; border-radius: 50%; font-size: 2rem; border: none; background: #a855f7; color: white; font-weight: bold; cursor: pointer;">+</button>
+                <div id="novedad-alert" class="hidden"
+                    style="background:#fef2f2; color:#be123c; border:1px solid #fecdd3; padding:12px; border-radius:10px; font-size:0.95rem; font-weight:800; margin-bottom:15px; text-align:center;">
+                    ⚠️ NOVEDAD REPORTADA POR ALISTADOR
+                </div>
+
+                <div class="pick-stats">
+                    <div class="stat-box">
+                        <div class="stat-lbl">Cantidades Entregadas</div>
+                        <div id="pk-req" class="stat-val" style="font-size:1.4rem;">0</div>
+                    </div>
+                </div>
+
+                <div class="action-area" id="area-conteo-cajas">
+                    <span class="counter-lbl" style="color:var(--primary-dark);">📦 CAJAS VERIFICADAS</span>
+                    <span id="pk-count-cajas" class="counter-big" style="color:var(--primary);">0</span>
+                </div>
+
+                <div class="action-area hidden" id="area-teclado-fracciones" style="background: #f3e8ff; border-color: #e9d5ff;">
+                    <span class="counter-lbl" style="color:#7e22ce;">🍬 UNIDADES VERIFICADAS</span>
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 15px;">
+                        <button onclick="cambiarFraccion(-1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #e9d5ff; color: #581c87; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
+                        <span id="pk-count-unidades" class="counter-big" style="color:#7e22ce; margin: 0; min-width: 70px;">0</span>
+                        <button onclick="cambiarFraccion(1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #a855f7; color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
+                    </div>
                 </div>
             </div>
 
-            <button class="btn-finish" onclick="intentarVerificarItem()">CONFIRMAR AUDITORÍA</button>
-            <button class="btn-reset" onclick="resetearConteo()">🔄 Reiniciar Lectura</button>
+            <!-- Zona del Pulgar (Thumb Zone - Acciones) -->
+            <div class="picking-bottom-actions">
+                <button class="btn-finish" onclick="intentarVerificarItem()">CONFIRMAR AUDITORÍA</button>
+                <button class="btn-reset" onclick="resetearConteo()">🔄 Reiniciar Lectura</button>
+            </div>
         </div>
     </div>
 
     <div id="modal-verify" class="modal-wrap">
         <div class="verify-sheet">
-            <div style="font-size: 3rem; margin-bottom: 15px;">✅</div>
-            <h3 style="margin:0; color:#1e293b;">¿Sellar Verificación?</h3>
-            <p style="color:#64748b; line-height:1.5;">
-                Auditoría Física: <b id="vf-count" style="color:var(--secondary); font-size:1.2rem;">0</b>
+            <div style="font-size: 3.5rem; margin-bottom: 10px;">✅</div>
+            <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">¿Sellar Verificación?</h3>
+            <p style="color:#475569; line-height:1.5; font-size:1.05rem;">
+                Auditoría Física: <b id="vf-count" style="color:var(--secondary); font-size:1.3rem;">0</b>
             </p>
             <div class="verify-btns">
-                <button class="btn-v-cancel" onclick="cancelarConfirmacion()">Revisar</button>
+                <button class="btn-v-cancel" onclick="cancelarConfirmacion()">Volver</button>
                 <button class="btn-v-confirm" onclick="ejecutarVerificacionFinal()">SELLAR</button>
             </div>
         </div>
@@ -663,12 +435,12 @@
                     const oscillator = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
                     oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime); 
-                    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime); 
+                    oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); 
+                    gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime); 
                     oscillator.connect(gainNode);
                     gainNode.connect(audioCtx.destination);
                     oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + 0.15); 
+                    oscillator.stop(audioCtx.currentTime + 0.12); 
                 }
             } catch (e) { console.log("Audio play error", e); }
         }
@@ -688,13 +460,13 @@
                 .then(r => r.json())
                 .then(d => {
                     let html = '';
-                    if (d.length === 0) html = '<p style="color:#94a3b8; font-size:0.9rem; text-align:center;">No hay órdenes listas para auditar</p>';
+                    if (d.length === 0) html = '<div style="grid-column: 1 / -1; text-align:center; color:#94a3b8; font-weight:600; padding:20px;">No hay órdenes listas para auditar</div>';
                     d.forEach(o => {
                         const p = Math.round((o.items_verificados / o.total_items) * 100);
                         html += `
                         <div class="order-card" onclick="abrirOrden('${o.orden}')">
                             <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona || 'General'}</span></div>
-                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#64748b;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#64748b; font-weight:700;">
                                 <span>Auditado</span><span>${o.items_verificados}/${o.total_items}</span>
                             </div>
                             <div class="p-bar"><div class="p-fill" style="width:${p}%"></div></div>
@@ -729,15 +501,16 @@
         function cargarOrdenes() {
             toggleView('view-orders');
             const cOrd = document.getElementById('orders-container');
-            cOrd.innerHTML = 'Cargando...';
+            cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>';
             cargarOrdenesSilencioso();
         }
 
         function abrirOrden(ord) {
             ordenActual = ord;
             document.getElementById('lblOrdenTitle').textContent = '#' + ord;
+            document.getElementById('searchBox').value = '';
             toggleView('view-items');
-            document.getElementById('items-container').innerHTML = '<p style="text-align:center; padding:20px;">Cargando inventario alistado...</p>';
+            document.getElementById('items-container').innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando inventario alistado...</div>';
             cargarItemsSilencioso();
         }
 
@@ -750,11 +523,11 @@
 
             if (listaItems.length === 0) {
                 c.innerHTML = `
-            <div style="text-align:center; padding:50px 20px;">
-                <div style="font-size:4rem;">✅</div>
-                <h3 style="color:#10b981;">¡Orden Auditada!</h3>
-                <p>Todos los ítems han sido verificados.</p>
-                <button onclick="cargarOrdenes()" style="padding:15px; background:var(--primary); color:white; border:none; border-radius:10px; margin-top:20px; font-weight:bold;">Volver a Mis Órdenes</button>
+            <div style="grid-column: 1/-1; text-align:center; padding:40px 20px; background: white; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                <div style="font-size:5rem; margin-bottom:10px;">✅</div>
+                <h3 style="color:#10b981; font-size:1.5rem; margin:0 0 10px 0;">¡Orden Auditada!</h3>
+                <p style="color:#64748b; font-size:1.1rem; font-weight:500;">Todos los ítems han sido verificados.</p>
+                <button onclick="cargarOrdenes()" style="padding:18px 30px; background:var(--primary); color:white; border:none; border-radius:12px; margin-top:20px; font-weight:900; font-size:1.1rem; width:100%; box-shadow: 0 4px 10px rgba(67, 56, 202, 0.3);">Volver a Mis Órdenes</button>
             </div>`;
                 document.getElementById('header-progress-bar').style.width = '100%';
                 return;
@@ -766,7 +539,7 @@
             );
 
             if (visibles.length === 0) {
-                c.innerHTML = '<p style="text-align:center; padding:20px; color:gray;">No se encontraron productos.</p>';
+                c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:#94a3b8; font-weight:600;">No se encontraron productos.</div>';
                 return;
             }
 
@@ -775,24 +548,24 @@
                 let badgeHtml = '';
 
                 if (i.novedad_alistamiento) {
-                    badgeHtml += `<div style="display:inline-block; background-color:#fee2e2; color:#b91c1c; font-size:0.65rem; padding:3px 8px; border-radius:6px; font-weight:800; margin-bottom:5px; border:1px solid #fecaca;">
+                    badgeHtml += `<div style="display:inline-block; background-color:#fee2e2; color:#b91c1c; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fecaca;">
                                     ⚠️ NOVEDAD: ${i.novedad_alistamiento.replace('_', ' ')}
                                  </div><br>`;
                 }
 
                 let htmlCantidades = '';
-                if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.9rem;">📦 ${i.req_cajas}</div>`;
-                if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.9rem; color: var(--secondary);">🍬 ${i.req_unidades}</div>`;
-                if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.9rem;">0</div>`;
+                if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.95rem;">📦 ${i.req_cajas}</div>`;
+                if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.95rem; color: var(--secondary);">🍬 ${i.req_unidades}</div>`;
+                if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.95rem;">0</div>`;
 
                 htmlInner += `
             <div id="card_${i.id}" class="item-row active" onclick="abrirModalVerificarId(${i.id})">
-                <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 10px; width: auto; font-size: 0.85rem;">
+                <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 10px; width: auto; font-size: 0.95rem;">
                     ${htmlCantidades}
                 </div>
                 <div class="item-details" style="overflow: hidden;">
                     <div class="id-code">${i.codigo_producto || 'S/C'}</div>
-                    <div class="id-name" style="word-break: break-word;">${badgeHtml}${nombre}</div>
+                    <div class="id-name" style="word-break: break-word; line-height: 1.2;">${badgeHtml}${nombre}</div>
                 </div>
             </div>`;
             });
@@ -820,8 +593,8 @@
             itemActivo.act_unidades = 0;
 
             let htmlReqModal = '';
-            if (itemActivo.req_cajas > 0) htmlReqModal += `📦 ${itemActivo.req_cajas} CAJAS<br>`;
-            if (itemActivo.req_unidades > 0) htmlReqModal += `🍬 ${itemActivo.req_unidades} UNIDADES`;
+            if (itemActivo.req_cajas > 0) htmlReqModal += `<span style="display:inline-block; margin-right:15px;">📦 ${itemActivo.req_cajas} CAJAS</span>`;
+            if (itemActivo.req_unidades > 0) htmlReqModal += `<span style="display:inline-block;">🍬 ${itemActivo.req_unidades} UNIDADES</span>`;
             document.getElementById('pk-req').innerHTML = htmlReqModal || '0';
 
             document.getElementById('pk-count-cajas').textContent = "0";
@@ -916,9 +689,11 @@
             if (itemActivo.act_cajas === itemActivo.req_cajas && itemActivo.act_unidades === itemActivo.req_unidades) {
                 btn.style.background = '#10b981';
                 btn.textContent = 'CONFIRMAR AUDITORÍA ✓';
+                btn.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.3)';
             } else {
                 btn.style.background = '#374151';
                 btn.textContent = 'HAY DISCREPANCIA (GUARDAR ASÍ)';
+                btn.style.boxShadow = 'none';
             }
         }
 
@@ -930,7 +705,7 @@
             initAudio();
 
             if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
-                alert("⚠️ Este ítem ya está completo. Presiona 'Terminar Ítem'.");
+                alert("⚠️ Este ítem ya está completo. Presiona 'Confirmar Auditoría'.");
                 return;
             }
 

@@ -10,11 +10,58 @@ bp_oper_bodegas = Blueprint('oper_bodegas', __name__)
 @bp_oper_bodegas.route('/B_modulo_operador_bodegas.html')
 def bodega_operativa():
     if 'usuario_id' not in session: return redirect('/')
-    nit = str(session.get('empresa_id', ''))
+    
+    uid = session.get('usuario_id')
+    empresa_id = str(session.get('empresa_id', ''))
+    
+    kpis = {
+        'avance_porcentaje': 0,
+        'items_completados': 0,
+        'total_asignados': 0,
+        'indice_novedades': 0.0,
+        'velocidad_picking': 0.0
+    }
+    
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # Cálculo de KPIs del Operario en base a sus marcas asignadas
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total_items,
+                SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) as completados,
+                SUM(CASE WHEN p.novedad_alistamiento IS NOT NULL THEN 1 ELSE 0 END) as novedades,
+                SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL 
+                         THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
+            FROM picking_importacion_raw p
+            INNER JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            WHERE p.id_empresa = %s AND fp.operador_asignado = %s AND p.puerta_asignada IS NOT NULL
+        """, (empresa_id, uid))
+        
+        row = cur.fetchone()
+        if row and row['total_items']:
+            kpis['total_asignados'] = int(row['total_items'])
+            kpis['items_completados'] = int(row['completados'] or 0)
+            novedades = int(row['novedades'] or 0)
+            mins = float(row['minutos_totales'] or 0)
+            
+            if kpis['total_asignados'] > 0:
+                kpis['avance_porcentaje'] = round((kpis['items_completados'] / kpis['total_asignados']) * 100)
+                
+            if kpis['items_completados'] > 0:
+                kpis['indice_novedades'] = round((novedades / kpis['items_completados']) * 100, 1)
+                if mins > 0:
+                    kpis['velocidad_picking'] = round(kpis['items_completados'] / mins, 2)
+                    
+        cur.close()
+    except Exception as e:
+        print(f"Error cargando KPIs Operador: {e}")
+
     return render_template('B_modulo_operador_bodegas.html', 
                            usuario=session.get('nombre'),
                            empresa=session.get('empresa'),
-                           nit=nit)
+                           nit=empresa_id,
+                           kpis=kpis)
 
 # ==============================================================================
 # APIs DE OPERACIÓN (MIS ÓRDENES Y LOTES)
@@ -33,13 +80,13 @@ def operario_mis_ordenes():
                 MAX(p.zona) as zona, 
                 MAX(p.secuencia_alistamiento) as secuencia,
                 COUNT(*) as total_items, 
-                CAST(SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO') THEN 1 ELSE 0 END) AS SIGNED) as items_listos
+                CAST(SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) AS SIGNED) as items_listos
             FROM picking_importacion_raw p
             INNER JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
             WHERE p.id_empresa=%s 
               AND fp.operador_asignado=%s 
               AND p.puerta_asignada IS NOT NULL
-              AND (p.estado_actividad IS NULL OR p.estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'FINALIZADO_TOTAL'))
+              AND (p.estado_actividad IS NULL OR p.estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'FINALIZADO_TOTAL', 'TERMINADO'))
             GROUP BY p.numero_orden_origen
             HAVING items_listos < total_items
             ORDER BY secuencia ASC, orden ASC
@@ -158,13 +205,13 @@ def operario_mis_marcas():
                 MAX(p.secuencia_alistamiento) as secuencia,
                 COUNT(DISTINCT p.numero_orden_origen) as total_ordenes,
                 COUNT(*) as total_items, 
-                CAST(SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO') THEN 1 ELSE 0 END) AS SIGNED) as items_listos
+                CAST(SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) AS SIGNED) as items_listos
             FROM picking_importacion_raw p
             INNER JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
             WHERE p.id_empresa=%s 
               AND fp.operador_asignado=%s 
               AND p.puerta_asignada IS NOT NULL
-              AND (p.estado_actividad IS NULL OR p.estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'FINALIZADO_TOTAL'))
+              AND (p.estado_actividad IS NULL OR p.estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'FINALIZADO_TOTAL', 'TERMINADO'))
             GROUP BY p.marca
             HAVING items_listos < total_items
             ORDER BY secuencia ASC, p.marca ASC
