@@ -744,12 +744,13 @@ def operarios_asignacion():
         cur.execute("SELECT id, nombre FROM usuarios WHERE empresa_id = %s AND perfil = 'operador_logistica' ORDER BY nombre ASC", (empresa_id,))
         operarios = cur.fetchall()
 
+        # Se envuelve fabricante y marca con UPPER() para agrupar las variaciones de mayúsculas/minúsculas
         cur.execute("""
             SELECT DISTINCT m.marca, m.nombre_marca, fp.operador_asignado
             FROM (
-                SELECT fabricante as marca, fabricante as nombre_marca FROM productos WHERE id_empresa = %s AND fabricante IS NOT NULL AND fabricante != ''
+                SELECT UPPER(fabricante) as marca, UPPER(fabricante) as nombre_marca FROM productos WHERE id_empresa = %s AND fabricante IS NOT NULL AND fabricante != ''
                 UNION
-                SELECT marca, marca as nombre_marca FROM picking_importacion_raw WHERE id_empresa = %s AND marca IS NOT NULL AND marca != ''
+                SELECT UPPER(marca) as marca, UPPER(marca) as nombre_marca FROM picking_importacion_raw WHERE id_empresa = %s AND marca IS NOT NULL AND marca != ''
             ) m
             LEFT JOIN fabricantes_proveedores fp ON m.marca = fp.marca AND fp.id_empresa = %s
             ORDER BY m.nombre_marca ASC
@@ -995,8 +996,10 @@ def get_marcas():
     try:
         empresa_id = session.get('empresa_id')
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # Se envuelve el fabricante en UPPER()
         cur.execute("""
-            SELECT DISTINCT IF(fabricante IS NULL OR fabricante = '', 'SIN MARCA', fabricante) as fabricante 
+            SELECT DISTINCT IF(fabricante IS NULL OR fabricante = '', 'SIN MARCA', UPPER(fabricante)) as fabricante 
             FROM productos 
             WHERE id_empresa = %s
             ORDER BY fabricante ASC
@@ -1021,10 +1024,11 @@ def get_productos_por_marca(marca):
                 ORDER BY producto ASC
             """, (empresa_id,))
         else:
+            # Se compara convirtiendo ambos lados a UPPER() para evitar errores si en la base de datos están en minúsculas
             cur.execute("""
                 SELECT ean, producto, fabricante, unidad_embalaje 
                 FROM productos 
-                WHERE id_empresa = %s AND fabricante = %s 
+                WHERE id_empresa = %s AND UPPER(fabricante) = UPPER(%s) 
                 ORDER BY producto ASC
             """, (empresa_id, marca))
             
@@ -1092,8 +1096,11 @@ def eliminar_marca():
         if not fabricante: return jsonify({'status': 'error', 'message': 'Marca obligatoria'})
 
         cur = mysql.connection.cursor()
-        if fabricante == 'SIN MARCA': cur.execute("DELETE FROM productos WHERE (fabricante IS NULL OR fabricante = '') AND id_empresa = %s", (empresa_id,))
-        else: cur.execute("DELETE FROM productos WHERE fabricante = %s AND id_empresa = %s", (fabricante, empresa_id))
+        if fabricante == 'SIN MARCA': 
+            cur.execute("DELETE FROM productos WHERE (fabricante IS NULL OR fabricante = '') AND id_empresa = %s", (empresa_id,))
+        else: 
+            # Modificado para usar UPPER() en el caso de la eliminación masiva
+            cur.execute("DELETE FROM productos WHERE UPPER(fabricante) = UPPER(%s) AND id_empresa = %s", (fabricante, empresa_id))
         
         filas_afectadas = cur.rowcount
         mysql.connection.commit()
