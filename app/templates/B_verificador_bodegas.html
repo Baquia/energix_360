@@ -434,9 +434,9 @@
                 if (audioCtx) {
                     const oscillator = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
-                    oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); 
-                    gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime); 
+                    oscillator.type = 'square';
+                    oscillator.frequency.setValueAtTime(1500, audioCtx.currentTime); 
+                    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); 
                     oscillator.connect(gainNode);
                     gainNode.connect(audioCtx.destination);
                     oscillator.start();
@@ -547,6 +547,15 @@
                 let nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
                 let badgeHtml = '';
 
+                const matchPromo = nombre.match(/\(Kit:\s*(.*?)\)/i);
+                if (matchPromo) {
+                    const nombrePromo = matchPromo[1];
+                    nombre = nombre.replace(/\(Kit:\s*.*?\)/i, '').trim();
+                    badgeHtml += `<div style="display:inline-block; background-color:#fef08a; color:#92400e; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fde68a;">
+                                    🎁 KIT: ${nombrePromo}
+                                 </div><br>`;
+                }
+
                 if (i.novedad_alistamiento) {
                     badgeHtml += `<div style="display:inline-block; background-color:#fee2e2; color:#b91c1c; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fecaca;">
                                     ⚠️ NOVEDAD: ${i.novedad_alistamiento.replace('_', ' ')}
@@ -581,7 +590,24 @@
             itemActivo = item;
             lastScanTime = 0;
 
-            document.getElementById('pk-name').textContent = (item.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
+            const pickHeader = document.querySelector('.pick-header');
+            const oldAlert = document.getElementById('kit-alert-msg');
+            if (oldAlert) oldAlert.remove();
+
+            let nombreDisplay = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
+            const matchPromo = (item.descripcion_producto || '').match(/\(Kit:\s*(.*?)\)/i);
+            
+            if (matchPromo) {
+                const nombrePromo = matchPromo[1];
+                nombreDisplay = nombreDisplay.replace(/\(Kit:\s*.*?\)/i, '').trim();
+                
+                const alertHtml = `<div id="kit-alert-msg" style="background:#fef08a; color:#92400e; border:1px solid #fde68a; padding:12px; border-radius:10px; font-size:0.95rem; font-weight:800; margin-top:10px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                    🎁 ESTE PRODUCTO ES PARTE DEL KIT:<br><span style="font-size:1.1rem; display:block; margin-top:5px; color:#713f12;">${nombrePromo}</span>
+                </div>`;
+                pickHeader.insertAdjacentHTML('beforeend', alertHtml);
+            }
+
+            document.getElementById('pk-name').textContent = nombreDisplay;
             document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
 
             // Para el verificador, lo "solicitado" es lo que el operador "entregó" en sistema
@@ -709,6 +735,11 @@
                 return;
             }
 
+            const isPortrait = window.innerHeight > window.innerWidth;
+            const screenWidth = window.innerWidth;
+            const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
+            const targetHeight = Math.floor(targetWidth * 0.45);
+
             const configScanner = {
                 formatsToSupport: [
                     Html5QrcodeSupportedFormats.EAN_13,
@@ -726,7 +757,7 @@
                 { facingMode: "environment" },
                 { 
                     fps: 30, 
-                    qrbox: { width: 300, height: 100 }
+                    qrbox: { width: targetWidth, height: targetHeight }
                 },
                 (decodedText) => {
                     const now = Date.now();

@@ -25,7 +25,6 @@ def bodega_operativa():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # Cálculo de KPIs del Operario en base a sus marcas asignadas
         cur.execute("""
             SELECT 
                 COUNT(*) as total_items,
@@ -55,7 +54,7 @@ def bodega_operativa():
                     
         cur.close()
     except Exception as e:
-        print(f"Error cargando KPIs Operador: {e}")
+        pass
 
     return render_template('B_modulo_operador_bodegas.html', 
                            usuario=session.get('nombre'),
@@ -73,7 +72,6 @@ def operario_mis_ordenes():
     empresa_id = session.get('empresa_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Solo trae las órdenes que tienen puerta asignada Y que tienen items de las marcas de este operador
         cur.execute("""
             SELECT 
                 p.numero_orden_origen as orden, 
@@ -95,7 +93,6 @@ def operario_mis_ordenes():
         cur.close()
         return jsonify(data)
     except Exception as e:
-        print(f"Error mis ordenes: {e}")
         return jsonify([])
     
 @bp_oper_bodegas.route('/api/operario/items_orden/<orden>')
@@ -103,13 +100,13 @@ def operario_items_orden(orden):
     if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Filtra exclusivamente los items de la orden cuya marca esté asignada a este operador
         cur.execute("""
             SELECT 
                 p.id, p.codigo_producto, p.descripcion_producto, 
                 p.cajas_calculadas as req_cajas, p.unidades_calculadas as req_unidades,
                 p.cajas_alistadas as act_cajas, p.unidades_alistadas as act_unidades, 
                 p.estado_actividad, p.puerta_asignada, p.marca, p.novedad_alistamiento,
+                p.autorizacion_alistamiento,
                 IFNULL(prod.unidad_embalaje, 'UND') as unidad_embalaje,
                 CASE 
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 'Caso A'
@@ -154,7 +151,6 @@ def operario_confirmar_item():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # Consultar las cantidades originales para validar si el operador terminó realmente
         cur.execute("SELECT cajas_calculadas, unidades_calculadas FROM picking_importacion_raw WHERE id=%s AND id_empresa=%s", (id_row, session.get('empresa_id')))
         row = cur.fetchone()
         
@@ -164,7 +160,6 @@ def operario_confirmar_item():
             
         estado_final = 'ALISTADO'
         
-        # Si no se reportó novedad y las cantidades son menores a lo solicitado, es un guardado parcial
         if not novedad and (act_cajas < row['cajas_calculadas'] or act_unidades < row['unidades_calculadas']):
             estado_final = 'EN_PROCESO'
             
@@ -232,6 +227,7 @@ def operario_items_lote(marca):
                 p.cajas_calculadas as req_cajas, p.unidades_calculadas as req_unidades,
                 p.cajas_alistadas as act_cajas, p.unidades_alistadas as act_unidades, 
                 p.estado_actividad, p.puerta_asignada, p.novedad_alistamiento,
+                p.autorizacion_alistamiento,
                 IFNULL(prod.unidad_embalaje, 'UND') as unidad_embalaje,
                 CASE 
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 'Caso A'

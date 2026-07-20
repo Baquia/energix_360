@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timedelta
 import MySQLdb.cursors
 import unicodedata
-import difflib
+import math
 
 bp_bodegas = Blueprint('bodegas', __name__)
 
@@ -20,7 +20,6 @@ def control_logistica():
     
     empresa_id = session.get('empresa_id')
 
-    # 1. Asegurar que existe la tabla de asignación de proveedores/marcas
     try:
         cur = mysql.connection.cursor()
         cur.execute("""
@@ -57,7 +56,7 @@ def control_logistica():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # 1. KPIs Generales
+        # KPIs Generales
         cur.execute("""
             SELECT 
                 COUNT(DISTINCT numero_orden_origen) as total,
@@ -72,7 +71,17 @@ def control_logistica():
             kpis['items_pendientes'] = int(row['pendientes'] or 0)
             kpis['items_finalizados'] = int(row['listos'] or 0)
 
-        # 2. Alertas Críticas (Novedades recientes no despachadas)
+        # KPIs Alias (Excepciones IA)
+        cur.execute("""
+            SELECT COUNT(*) as requiere_alias 
+            FROM picking_importacion_raw 
+            WHERE id_empresa = %s AND autorizacion_alistamiento = FALSE AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
+        """, (empresa_id,))
+        row_alias = cur.fetchone()
+        if row_alias:
+            kpis['requiere_alias'] = int(row_alias['requiere_alias'])
+
+        # Alertas Críticas 
         cur.execute("""
             SELECT 
                 numero_orden_origen as orden, codigo_producto, descripcion_producto,
@@ -83,7 +92,7 @@ def control_logistica():
         """, (empresa_id,))
         alertas_criticas = cur.fetchall()
 
-        # 3. Órdenes SIN ASIGNAR PUERTA
+        # Órdenes SIN ASIGNAR PUERTA
         cur.execute("""
             SELECT 
                 numero_orden_origen as orden,
@@ -93,13 +102,13 @@ def control_logistica():
                 COUNT(*) as total_items,
                 MAX(fecha_carga) as fecha
             FROM picking_importacion_raw
-            WHERE id_empresa = %s AND puerta_asignada IS NULL AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
+            WHERE id_empresa = %s AND puerta_asignada IS NULL AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL) AND autorizacion_alistamiento = TRUE
             GROUP BY numero_orden_origen
             ORDER BY MAX(secuencia_alistamiento) ASC, MAX(fecha_carga) DESC
         """, (empresa_id,))
         ordenes_sin_asignar = cur.fetchall()
 
-        # 4. Operarios y KPIs Enriquecidos
+        # Operarios y KPIs
         cur.execute("""
             SELECT 
                 u.id as id_operario,
@@ -113,7 +122,7 @@ def control_logistica():
                          THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM usuarios u
             LEFT JOIN fabricantes_proveedores fp ON u.id = fp.operador_asignado AND fp.id_empresa = %s
-            LEFT JOIN picking_importacion_raw p ON p.marca = fp.marca AND p.id_empresa = %s AND p.puerta_asignada IS NOT NULL AND (p.estado_actividad != 'TERMINADO' OR p.estado_actividad IS NULL)
+            LEFT JOIN picking_importacion_raw p ON p.marca = fp.marca AND p.id_empresa = %s AND p.puerta_asignada IS NOT NULL AND (p.estado_actividad != 'TERMINADO' OR p.estado_actividad IS NULL) AND p.autorizacion_alistamiento = TRUE
             WHERE u.empresa_id = %s AND u.perfil = 'operador_logistica'
             GROUP BY u.id, u.nombre
             ORDER BY u.nombre ASC
@@ -133,7 +142,7 @@ def control_logistica():
             
             operarios_marcas.append(op_dict)
 
-        # 4.1 KPIs Verificadores
+        # KPIs Verificadores
         cur.execute("""
             SELECT 
                 u.id as id_verificador,
@@ -156,28 +165,28 @@ def control_logistica():
             v_dict['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
             verificadores_kpis.append(v_dict)
 
-        # 4.2 Backlog de Verificación
+        # Backlog de Verificación
         cur.execute("""
             SELECT COUNT(id) as total_backlog 
             FROM picking_importacion_raw 
-            WHERE id_empresa = %s AND estado_actividad = 'ALISTADO'
+            WHERE id_empresa = %s AND estado_actividad = 'ALISTADO' AND autorizacion_alistamiento = TRUE
         """, (empresa_id,))
         row_backlog = cur.fetchone()
         if row_backlog:
             kpis['backlog_verificacion'] = int(row_backlog['total_backlog'])
 
-        # 4.3 Marcas Huérfanas (Sin operador asignado)
+        # Marcas Huérfanas
         cur.execute("""
             SELECT p.marca, COUNT(*) as total_items
             FROM picking_importacion_raw p
             LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
-            WHERE p.id_empresa = %s AND fp.operador_asignado IS NULL AND (p.estado_actividad = 'PENDIENTE' OR p.estado_actividad IS NULL)
+            WHERE p.id_empresa = %s AND fp.operador_asignado IS NULL AND (p.estado_actividad = 'PENDIENTE' OR p.estado_actividad IS NULL) AND p.autorizacion_alistamiento = TRUE
             GROUP BY p.marca
             ORDER BY total_items DESC
         """, (empresa_id,))
         marcas_huerfanas = cur.fetchall()
 
-        # 5. Órdenes ACTIVAS (Tienen puerta) 
+        # Órdenes ACTIVAS 
         cur.execute("""
             SELECT 
                 numero_orden_origen as orden,
@@ -193,7 +202,7 @@ def control_logistica():
                 MAX(fecha_fin_alistamiento) as fin,
                 SUM(CASE WHEN fecha_inicio_alistamiento IS NOT NULL AND fecha_fin_alistamiento IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, fecha_inicio_alistamiento, fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM picking_importacion_raw
-            WHERE id_empresa = %s AND puerta_asignada IS NOT NULL
+            WHERE id_empresa = %s AND puerta_asignada IS NOT NULL AND autorizacion_alistamiento = TRUE
             GROUP BY numero_orden_origen
             HAVING SUM(CASE WHEN estado_actividad IN ('ASIGNADO', 'EN_PROCESO', 'ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) > 0
         """, (empresa_id,))
@@ -338,6 +347,16 @@ def monitoreo_realtime():
             kpis['pedidos_totales'] = row['total'] or 0
             kpis['items_pendientes'] = int(row['pendientes'] or 0)
             kpis['items_finalizados'] = int(row['listos'] or 0)
+            
+        # Alias Exception
+        cur.execute("""
+            SELECT COUNT(*) as requiere_alias 
+            FROM picking_importacion_raw 
+            WHERE id_empresa = %s AND autorizacion_alistamiento = FALSE AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
+        """, (empresa_id,))
+        row_alias = cur.fetchone()
+        if row_alias:
+            kpis['requiere_alias'] = int(row_alias['requiere_alias'])
 
         cur.execute("""
             SELECT 
@@ -348,7 +367,7 @@ def monitoreo_realtime():
                 COUNT(*) as total_items,
                 MAX(fecha_carga) as fecha
             FROM picking_importacion_raw
-            WHERE id_empresa = %s AND puerta_asignada IS NULL AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
+            WHERE id_empresa = %s AND puerta_asignada IS NULL AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL) AND autorizacion_alistamiento = TRUE
             GROUP BY numero_orden_origen
             ORDER BY MAX(secuencia_alistamiento) ASC, MAX(fecha_carga) DESC
         """, (empresa_id,))
@@ -370,7 +389,7 @@ def monitoreo_realtime():
                          THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM usuarios u
             LEFT JOIN fabricantes_proveedores fp ON u.id = fp.operador_asignado AND fp.id_empresa = %s
-            LEFT JOIN picking_importacion_raw p ON p.marca = fp.marca AND p.id_empresa = %s AND p.puerta_asignada IS NOT NULL AND (p.estado_actividad != 'TERMINADO' OR p.estado_actividad IS NULL)
+            LEFT JOIN picking_importacion_raw p ON p.marca = fp.marca AND p.id_empresa = %s AND p.puerta_asignada IS NOT NULL AND (p.estado_actividad != 'TERMINADO' OR p.estado_actividad IS NULL) AND p.autorizacion_alistamiento = TRUE
             WHERE u.empresa_id = %s AND u.perfil = 'operador_logistica'
             GROUP BY u.id, u.nombre
             ORDER BY u.nombre ASC
@@ -417,7 +436,7 @@ def monitoreo_realtime():
         cur.execute("""
             SELECT COUNT(id) as total_backlog 
             FROM picking_importacion_raw 
-            WHERE id_empresa = %s AND estado_actividad = 'ALISTADO'
+            WHERE id_empresa = %s AND estado_actividad = 'ALISTADO' AND autorizacion_alistamiento = TRUE
         """, (empresa_id,))
         row_backlog = cur.fetchone()
         if row_backlog:
@@ -427,7 +446,7 @@ def monitoreo_realtime():
             SELECT p.marca, COUNT(*) as total_items
             FROM picking_importacion_raw p
             LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
-            WHERE p.id_empresa = %s AND fp.operador_asignado IS NULL AND (p.estado_actividad = 'PENDIENTE' OR p.estado_actividad IS NULL)
+            WHERE p.id_empresa = %s AND fp.operador_asignado IS NULL AND (p.estado_actividad = 'PENDIENTE' OR p.estado_actividad IS NULL) AND p.autorizacion_alistamiento = TRUE
             GROUP BY p.marca
             ORDER BY total_items DESC
         """, (empresa_id,))
@@ -448,7 +467,7 @@ def monitoreo_realtime():
                 MAX(fecha_fin_alistamiento) as fin,
                 SUM(CASE WHEN fecha_inicio_alistamiento IS NOT NULL AND fecha_fin_alistamiento IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, fecha_inicio_alistamiento, fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM picking_importacion_raw
-            WHERE id_empresa = %s AND puerta_asignada IS NOT NULL
+            WHERE id_empresa = %s AND puerta_asignada IS NOT NULL AND autorizacion_alistamiento = TRUE
             GROUP BY numero_orden_origen
             HAVING SUM(CASE WHEN estado_actividad IN ('ASIGNADO', 'EN_PROCESO', 'ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) > 0
         """, (empresa_id,))
@@ -568,7 +587,151 @@ def monitoreo_realtime():
 
 
 # ==============================================================================
-# ASIGNACIONES MASIVAS Y CRUD DE MARCAS (NUEVA LÓGICA)
+# ALIAS Y EXCEPCIONES IA
+# ==============================================================================
+@bp_bodegas.route('/api/bodegas/alias/pendientes', methods=['GET'])
+def alias_pendientes():
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT id, descripcion_producto as descripcion_origen, ean_leido, COUNT(*) as cantidad_veces
+            FROM picking_importacion_raw
+            WHERE id_empresa = %s AND autorizacion_alistamiento = FALSE AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
+            GROUP BY descripcion_producto
+            ORDER BY cantidad_veces DESC
+        """, (session.get('empresa_id'),))
+        data = cur.fetchall()
+        cur.close()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify([])
+
+@bp_bodegas.route('/api/bodegas/alias/catalogo', methods=['GET'])
+def alias_catalogo():
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT ean, producto, fabricante 
+            FROM productos 
+            WHERE id_empresa = %s AND ean IS NOT NULL AND ean != ''
+            ORDER BY producto ASC
+        """, (session.get('empresa_id'),))
+        data = cur.fetchall()
+        cur.close()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify([])
+
+@bp_bodegas.route('/api/bodegas/alias/guardar', methods=['POST'])
+@csrf.exempt
+def alias_guardar():
+    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
+    data = request.json
+    desc_origen = data.get('descripcion_origen')
+    ean_correcto = data.get('ean_correcto')
+    
+    if not desc_origen or not ean_correcto: return jsonify({'status': 'error', 'message': 'Faltan datos'})
+
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        cur.execute("SELECT producto, fabricante FROM productos WHERE id_empresa = %s AND ean = %s", (session.get('empresa_id'), ean_correcto))
+        prod_db = cur.fetchone()
+        
+        if not prod_db: return jsonify({'status': 'error', 'message': 'Producto no encontrado en catálogo'})
+        
+        cur.execute("""
+            UPDATE picking_importacion_raw 
+            SET codigo_producto = %s, descripcion_producto = %s, marca = %s, autorizacion_alistamiento = TRUE
+            WHERE id_empresa = %s AND descripcion_producto = %s AND autorizacion_alistamiento = FALSE
+        """, (ean_correcto, prod_db['producto'], prod_db['fabricante'], session.get('empresa_id'), desc_origen))
+        
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'status': 'success', 'message': 'Alias guardado y pedidos liberados.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@bp_bodegas.route('/api/bodegas/alias/permitir', methods=['POST'])
+@csrf.exempt
+def alias_permitir():
+    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
+    data = request.json
+    desc_origen = data.get('descripcion_origen')
+    
+    if not desc_origen: return jsonify({'status': 'error', 'message': 'Faltan datos'})
+
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            UPDATE picking_importacion_raw 
+            SET autorizacion_alistamiento = TRUE
+            WHERE id_empresa = %s AND descripcion_producto = %s AND autorizacion_alistamiento = FALSE
+        """, (session.get('empresa_id'), desc_origen))
+        
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'status': 'success', 'message': 'Bypass exitoso. Item liberado.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+# ==============================================================================
+# REPORTES Y EXPORTACIONES
+# ==============================================================================
+
+
+@bp_bodegas.route('/api/bodegas/reportes/novedades')
+def reporte_novedades():
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT 
+                p.numero_orden_origen as orden, p.codigo_producto, p.descripcion_producto,
+                p.novedad_alistamiento, p.nombre_auxiliar_asignado as operario,
+                IFNULL(s.nombre, 'Sin Auth') as supervisor, p.fecha_fin_alistamiento as fecha
+            FROM picking_importacion_raw p
+            LEFT JOIN usuarios s ON p.id_supervisor_novedad = s.id
+            WHERE p.id_empresa = %s AND p.novedad_alistamiento IS NOT NULL
+            ORDER BY p.fecha_fin_alistamiento DESC LIMIT 100
+        """, (session.get('empresa_id'),))
+        data = cur.fetchall()
+        cur.close()
+        return jsonify(data)
+    except: return jsonify([])
+
+@bp_bodegas.route('/api/bodegas/historial_actas')
+def historial_actas():
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT 
+                a.numero_orden, 
+                a.placa_vehiculo, 
+                IFNULL(u.nombre, 'Sin Auth') as supervisor, 
+                a.fecha_generacion
+            FROM actas_despacho_flotacarga a
+            LEFT JOIN usuarios u ON a.id_supervisor_despacho = u.id
+            WHERE a.id_empresa = %s
+            ORDER BY a.fecha_generacion DESC LIMIT 100
+        """, (session.get('empresa_id'),))
+        data = cur.fetchall()
+        cur.close()
+        
+        for row in data:
+            if isinstance(row['fecha_generacion'], datetime):
+                row['fecha_generacion'] = row['fecha_generacion'].strftime('%Y-%m-%d %H:%M:%S')
+                
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error historial actas: {e}")
+        return jsonify([])
+
+# ==============================================================================
+# RESTO DE APIS MULTIEMPRESA (MANTENIDAS AL 100%)
 # ==============================================================================
 
 @bp_bodegas.route('/api/bodegas/operarios_asignacion', methods=['GET'])
@@ -578,12 +741,7 @@ def operarios_asignacion():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        cur.execute("""
-            SELECT id, nombre 
-            FROM usuarios 
-            WHERE empresa_id = %s AND perfil = 'operador_logistica'
-            ORDER BY nombre ASC
-        """, (empresa_id,))
+        cur.execute("SELECT id, nombre FROM usuarios WHERE empresa_id = %s AND perfil = 'operador_logistica' ORDER BY nombre ASC", (empresa_id,))
         operarios = cur.fetchall()
 
         cur.execute("""
@@ -601,9 +759,7 @@ def operarios_asignacion():
         cur.close()
         return jsonify({'operarios': operarios, 'marcas': marcas})
     except Exception as e:
-        print(f"Error operarios_asignacion: {e}")
         return jsonify({'operarios': [], 'marcas': []})
-
 
 @bp_bodegas.route('/api/bodegas/guardar_asignacion_marcas', methods=['POST'])
 @csrf.exempt
@@ -618,11 +774,8 @@ def guardar_asignacion_marcas():
 
     try:
         cur = mysql.connection.cursor()
-        
-        # 1. Borrar asignaciones previas DE ESTE OPERARIO
         cur.execute("DELETE FROM fabricantes_proveedores WHERE id_empresa = %s AND operador_asignado = %s", (empresa_id, id_operario))
         
-        # 2. Insertar nuevas (con ON DUPLICATE KEY UPDATE por si la marca estaba asignada a otro se robe la asignación)
         if marcas:
             data_to_insert = [(empresa_id, m, id_operario) for m in marcas]
             cur.executemany("""
@@ -635,9 +788,7 @@ def guardar_asignacion_marcas():
         cur.close()
         return jsonify({'status': 'success', 'message': 'Asignación guardada correctamente.'})
     except Exception as e:
-        print(f"Error guardar asignacion: {e}")
         return jsonify({'status': 'error', 'message': str(e)})
-
 
 @bp_bodegas.route('/bodegas/asignar_puerta', methods=['POST'])
 @csrf.exempt
@@ -659,7 +810,6 @@ def asignar_puerta():
         cur.close()
         return jsonify({'message': 'Muelle y configuración asignada correctamente.'})
     except Exception as e: return jsonify({'error': str(e)}), 500
-
 
 @bp_bodegas.route('/bodegas/api/items_orden/<orden>')
 def get_items_orden(orden):
@@ -698,333 +848,6 @@ def get_empleados():
         return jsonify(cur.fetchall())
     except: return jsonify([])
 
-
-def normalizar_codigo(valor):
-    if pd.isna(valor) or str(valor).strip() == '': return ''
-    val_str = str(valor).strip()
-    if 'E' in val_str.upper():
-        try: return str(int(float(valor)))
-        except: pass
-    if val_str.endswith('.0'): return val_str[:-2]
-    return val_str
-
-def limpiar_texto(texto):
-    if pd.isna(texto) or texto is None: return ""
-    texto = str(texto).upper().strip()
-    texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
-    texto = texto.replace(".", "")
-    texto = re.sub(r'\s+', ' ', texto)
-    return texto
-
-@bp_bodegas.route('/bodegas/upload_excel', methods=['POST'])
-@csrf.exempt 
-def upload_excel():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
-    empresa_id = str(session.get('empresa_id'))
-    
-    archivos = request.files.getlist('file')
-    if not archivos or all(f.filename == '' for f in archivos): 
-        return jsonify({'error': 'No se recibieron archivos'}), 400
-
-    try:
-        cur = mysql.connection.cursor()
-        
-        cur.execute("SELECT sku, ean, producto, fabricante, factor_conversion FROM productos WHERE id_empresa = %s", (empresa_id,))
-        db_products = cur.fetchall()
-        
-        maestra_productos_ean = {}
-        maestra_productos_nombre = {}
-        mapa_marcas_conocidas = {} 
-
-        for row in db_products:
-            sku_val = normalizar_codigo(row[0])
-            ean_val = normalizar_codigo(row[1])
-            desc_original = str(row[2]).strip() if row[2] else ""
-            desc_limpia = limpiar_texto(desc_original)
-            marca_original = str(row[3]).strip() if row[3] and str(row[3]).upper() != 'NAN' else "GENERICO"
-            marca_limpia = limpiar_texto(marca_original)
-            factor_conversion = int(row[4]) if len(row) > 4 and row[4] else 1
-            
-            item_data = {'desc': desc_original, 'marca': marca_original, 'ean': ean_val or sku_val, 'factor_conversion': factor_conversion}
-
-            if ean_val: maestra_productos_ean[ean_val] = item_data
-            if sku_val: maestra_productos_ean[sku_val] = item_data
-            if desc_limpia: maestra_productos_nombre[desc_limpia] = item_data
-            if marca_limpia and marca_limpia != 'GENERICO': 
-                mapa_marcas_conocidas[marca_limpia] = marca_original
-
-        lista_marcas_limpias = list(mapa_marcas_conocidas.keys())
-
-        cur.execute("SELECT ean_promo, nombre_promo, ean_componente, cajas_componente, fracciones_componente FROM promociones_clientes WHERE id_empresa = %s AND estado = 'ACTIVO'", (empresa_id,))
-        db_promos = cur.fetchall()
-        cur.close()
-        
-        diccionario_promos = {}
-        maestra_promos_nombre = {} 
-        
-        for row in db_promos:
-            p_padre = normalizar_codigo(row[0]).upper() 
-            p_nombre = str(row[1]).strip() if row[1] else "PROMO"
-            p_hijo = normalizar_codigo(row[2]).upper()
-            p_cajas = int(row[3]) if row[3] is not None else 0
-            p_fracc = int(row[4]) if row[4] is not None else 0
-            
-            if p_padre not in diccionario_promos: 
-                diccionario_promos[p_padre] = {'nombre': p_nombre, 'componentes': []}
-                nombre_promo_limpio = limpiar_texto(p_nombre)
-                if nombre_promo_limpio:
-                    maestra_promos_nombre[nombre_promo_limpio] = p_padre
-                    
-            diccionario_promos[p_padre]['componentes'].append({'ean': p_hijo, 'cajas': p_cajas, 'fracciones': p_fracc})
-
-        resultados_exito = []
-        resultados_error = []
-        total_items_insertados = 0
-
-        for file in archivos:
-            if file.filename == '': continue
-            filename = file.filename
-            
-            try:
-                if file.filename.lower().endswith('.csv'):
-                    df_raw = pd.read_csv(file, header=None, sep=None, engine='python')
-                else:
-                    df_raw = pd.read_excel(file, header=None)
-                
-                meta_planilla = filename.split('.')[0].replace('_', ' ').strip()
-                found_orden = False
-                keywords_orden = ['PLANILA', 'PLANILLA', 'REMISION', 'ENTREGA', 'PEDIDO', 'ORDEN', 'DOC']
-                max_r = min(20, len(df_raw)); max_c = min(30, len(df_raw.columns))
-                
-                for r in range(max_r):
-                    for c in range(max_c):
-                        val_celda = str(df_raw.iloc[r, c]).upper().strip()
-                        if any(k in val_celda for k in keywords_orden):
-                            candidatos = []
-                            for offset in range(1, 8): 
-                                if c + offset < len(df_raw.columns):
-                                    cand = str(df_raw.iloc[r, c + offset]).strip()
-                                    if cand and cand.upper() != 'NAN': candidatos.append(cand)
-                            if r + 1 < len(df_raw):
-                                for offset in range(0, 5): 
-                                    if c + offset < len(df_raw.columns):
-                                        cand = str(df_raw.iloc[r + 1, c + offset]).strip()
-                                        if cand and cand.upper() != 'NAN': candidatos.append(cand)
-                            for cand in candidatos:
-                                cand_clean = cand.replace(' ', '').upper()
-                                if cand.upper() in ['NAT', 'NAN', 'NONE', 'NULL']: continue
-                                if '-' in cand and any(x.isdigit() for x in cand): continue
-                                if empresa_id in cand_clean: continue
-                                if len(cand) > 20: continue 
-                                if any(k in cand.upper() for k in keywords_orden): continue
-                                meta_planilla = cand; found_orden = True; break
-                        if found_orden: break
-                    if found_orden: break
-
-                raw_head = [str(x).strip().upper() for x in df_raw.head(20).values.flatten() if pd.notna(x)]
-                text_dump = " ".join(raw_head)
-                meta_zona = 'GENERAL'
-                match_zona = re.search(r'(ZONA|RUTA|UBICACION|DESTINO)\s*[:#]?\s*(\w+)', text_dump)
-                if match_zona: meta_zona = match_zona.group(2)
-                meta_fecha = datetime.now().strftime('%Y-%m-%d')
-                match_fecha = re.search(r'(\d{2,4}[-/]\d{2}[-/]\d{2,4})', text_dump)
-                if match_fecha: meta_fecha = match_fecha.group(1)
-
-                start_row = 0; header_map = {}; found_table = False
-                keywords_cols = {
-                    'CODIGO': ['CODIGO', 'EAN', 'ITEM', 'SKU', 'REF', 'MATERIAL', 'ARTICULO'],
-                    'DESCRIPCION': ['DESCRIPCION', 'DESCRIPCIÓN', 'PRODUCTO', 'NOMBRE', 'DETALLE', 'TEXTO', 'MATERIAL', 'ARTICULO'],
-                    'CAJAS': ['CAJA', 'CJ', 'BULTOS', 'EMPAQUE'],
-                    'UNIDADES': ['UNIDADES', 'CANTIDAD', 'CANT', 'UND', 'FRACCIONES', 'FRACCION', 'SUELTAS']
-                }
-                
-                for i, row in df_raw.iterrows():
-                    row_str = [limpiar_texto(val) for val in row.values]
-                    matches = 0; temp_map = {}
-                    for col_idx, cell_val in enumerate(row_str):
-                        for key, words in keywords_cols.items():
-                            if any(limpiar_texto(w) in cell_val for w in words):
-                                if key not in temp_map: temp_map[key] = col_idx; matches += 1
-                    
-                    if ('CAJAS' in temp_map or 'UNIDADES' in temp_map) and matches >= 2:
-                        start_row = i + 1; header_map = temp_map; found_table = True; break
-                        
-                if not found_table:
-                    for j in range(len(df_raw)):
-                        row_fallback = df_raw.iloc[j]
-                        row_str = [str(x) for x in row_fallback.values]
-                        col_code = None
-                        col_desc = None
-                        col_cant1 = None
-                        col_cant2 = None
-                        
-                        for col_idx, val in enumerate(row_str):
-                            val_clean = val.strip()
-                            if val_clean.upper() in ['NAN', '']: continue
-                            
-                            if col_code is None and re.match(r'^\d{3,20}$', val_clean):
-                                col_code = col_idx
-                            elif col_desc is None and len(val_clean) > 5 and any(c.isalpha() for c in val_clean):
-                                col_desc = col_idx
-                            elif col_cant1 is None and re.match(r'^\d+(\.\d+)?$', val_clean) and float(val_clean) < 10000:
-                                col_cant1 = col_idx
-                            elif col_cant2 is None and re.match(r'^\d+(\.\d+)?$', val_clean) and float(val_clean) < 10000:
-                                col_cant2 = col_idx
-                        
-                        if col_code is not None and col_desc is not None and (col_cant1 is not None or col_cant2 is not None):
-                            header_map = {'CODIGO': col_code, 'DESCRIPCION': col_desc}
-                            if col_cant1 is not None: header_map['CAJAS'] = col_cant1
-                            if col_cant2 is not None: header_map['UNIDADES'] = col_cant2
-                            start_row = j
-                            found_table = True
-                            break
-
-                if not found_table: 
-                    resultados_error.append(f"❌ {filename}: No se detectaron columnas válidas ni patrones de datos.")
-                    continue 
-
-                data_to_insert = []
-                zona_actual = meta_zona
-                fecha_creacion = datetime.now()
-
-                for i in range(start_row, len(df_raw)):
-                    row = df_raw.iloc[i]
-                    
-                    idx_desc = header_map.get('DESCRIPCION')
-                    idx_code = header_map.get('CODIGO')
-                    
-                    raw_desc = str(row[idx_desc]).strip() if idx_desc is not None and pd.notna(row[idx_desc]) else ""
-                    if raw_desc.upper() == 'NAN': raw_desc = ""
-                    
-                    raw_code = str(row[idx_code]).strip() if idx_code is not None and pd.notna(row[idx_code]) else ""
-                    if raw_code.upper() == 'NAN': raw_code = ""
-
-                    if not raw_desc and not raw_code:
-                        continue
-                        
-                    if 'TOTAL' in raw_desc.upper() and not normalizar_codigo(raw_code):
-                        continue
-                    
-                    try:
-                        idx_cajas = header_map.get('CAJAS')
-                        val_cajas = row[idx_cajas] if idx_cajas is not None else 0
-                        cajas = int(float(val_cajas)) if pd.notna(val_cajas) and str(val_cajas).strip()!='' else 0
-                    except: cajas = 0
-
-                    try:
-                        idx_unid = header_map.get('UNIDADES')
-                        val_unid = row[idx_unid] if idx_unid is not None else 0
-                        unidades = int(float(val_unid)) if pd.notna(val_unid) and str(val_unid).strip()!='' else 0
-                    except: unidades = 0
-
-                    if cajas <= 0 and unidades <= 0:
-                        for celda in row.values:
-                            if pd.notna(celda) and str(celda).strip() != '':
-                                celda_str = str(celda).strip()
-                                celda_upper = celda_str.upper()
-                                if 'ZONA' in celda_upper or 'RUTA' in celda_upper:
-                                    zona_actual = celda_str
-                                    break
-                        continue
-
-                    if cajas > 0 or unidades > 0:
-                        val_desc = raw_desc if raw_desc.upper() != 'NAN' else ""
-                        val_code = normalizar_codigo(raw_code)
-
-                        final_code = val_code.upper() if val_code else ''
-                        final_desc = val_desc
-                        final_marca = 'GENERICO'
-
-                        if not final_code:
-                            for celda in row.values:
-                                celda_str = normalizar_codigo(celda)
-                                if re.match(r'^\d{10,14}$', celda_str):
-                                    final_code = celda_str; break
-
-                        es_promo = False
-                        desc_limpia = limpiar_texto(final_desc)
-                        match_encontrado = False
-
-                        if final_code:
-                            if final_code in diccionario_promos:
-                                es_promo = True
-                                match_encontrado = True
-                            elif final_code in maestra_productos_ean:
-                                prod_db = maestra_productos_ean[final_code]
-                                final_desc = prod_db['desc']
-                                final_marca = prod_db['marca']
-                                match_encontrado = True
-
-                        if not match_encontrado and desc_limpia:
-                            if desc_limpia in maestra_promos_nombre:
-                                final_code = maestra_promos_nombre[desc_limpia]
-                                es_promo = True
-                                match_encontrado = True
-                            elif desc_limpia in maestra_productos_nombre:
-                                prod_db = maestra_productos_nombre[desc_limpia]
-                                final_code = prod_db['ean']
-                                final_desc = prod_db['desc']
-                                final_marca = prod_db['marca']
-                                match_encontrado = True
-
-                        if not match_encontrado:
-                            final_marca = 'NO EN BASE DE DATOS'
-
-                        if not final_code: final_code = 'SIN_CODIGO'
-                        if not final_desc: final_desc = f"ITEM SIN NOMBRE ({final_code})"
-
-                        if es_promo:
-                            promo_info = diccionario_promos[final_code]
-                            nombre_promo = promo_info['nombre']
-                            
-                            factor_promo = 1
-                            if final_code in maestra_productos_ean:
-                                factor_promo = maestra_productos_ean[final_code].get('factor_conversion', 1)
-                            
-                            total_promos_pedidas = (cajas * factor_promo) + unidades 
-                            
-                            for comp in promo_info['componentes']:
-                                hijo_code = comp['ean']
-                                hijo_cajas_total = total_promos_pedidas * comp['cajas'] 
-                                hijo_unid_total = total_promos_pedidas * comp['fracciones'] 
-                                hijo_desc = f"ITEM SIN NOMBRE ({hijo_code})"
-                                hijo_marca = 'GENERICO'
-                                
-                                if hijo_code in maestra_productos_ean:
-                                    hijo_desc = maestra_productos_ean[hijo_code]['desc']
-                                    hijo_marca = maestra_productos_ean[hijo_code]['marca']
-                                
-                                hijo_desc_visual = f"{hijo_desc} (Kit: {nombre_promo})"
-                                
-                                if hijo_cajas_total > 0 or hijo_unid_total > 0:
-                                    data_to_insert.append((empresa_id, meta_planilla, zona_actual, hijo_code, hijo_desc_visual, hijo_marca, hijo_cajas_total, 0, hijo_unid_total, 0, 'PENDIENTE', fecha_creacion, meta_fecha))
-                        else:
-                            data_to_insert.append((empresa_id, meta_planilla, zona_actual, final_code, final_desc, final_marca, cajas, 0, unidades, 0, 'PENDIENTE', fecha_creacion, meta_fecha))
-
-                if data_to_insert:
-                    cur = mysql.connection.cursor()
-                    query = """INSERT INTO picking_importacion_raw (id_empresa, numero_orden_origen, zona, codigo_producto, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                    cur.executemany(query, data_to_insert)
-                    mysql.connection.commit()
-                    cur.close()
-                    
-                    resultados_exito.append(f"✅ {meta_planilla} ({len(data_to_insert)} items)")
-                    total_items_insertados += len(data_to_insert)
-                else:
-                    resultados_error.append(f"❌ {filename}: Sin items válidos para insertar.")
-
-            except Exception as e:
-                resultados_error.append(f"❌ {filename}: Error de lectura ({str(e)})")
-
-        mensaje_alerta = f"📊 Reporte de Carga:\nArchivos exitosos: {len(resultados_exito)}\nErrores: {len(resultados_error)}\nTotal items generados: {total_items_insertados}\n\n"
-        if resultados_exito: mensaje_alerta += "ÓRDENES SUBIDAS:\n" + "\n".join(resultados_exito) + "\n\n"
-        if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
-
-        return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
-
-    except Exception as e:
-        return jsonify({'error': f'Error crítico procesando carga: {str(e)}'}), 500
-    
 @bp_bodegas.route('/api/bodegas/stats')
 def bodegas_stats():
     if 'usuario_id' not in session: return jsonify({})
@@ -1212,27 +1035,19 @@ def get_productos_por_marca(marca):
 
 @bp_bodegas.route('/api/bodegas/editar_producto', methods=['POST'])
 def editar_producto():
-    if 'usuario_id' not in session:
-        return jsonify({'status': 'error', 'message': 'Sesión expirada'})
+    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
         
     try:
         empresa_id = session.get('empresa_id')
         data = request.get_json()
-        
         ean = data.get('ean')
         nuevo_nombre = data.get('producto')
         nuevo_embalaje = data.get('unidad_embalaje')
         
-        if not ean or not nuevo_nombre:
-            return jsonify({'status': 'error', 'message': 'Faltan datos'})
+        if not ean or not nuevo_nombre: return jsonify({'status': 'error', 'message': 'Faltan datos'})
 
         cur = mysql.connection.cursor()
-        cur.execute("""
-            UPDATE productos 
-            SET producto = %s, unidad_embalaje = %s 
-            WHERE ean = %s AND id_empresa = %s
-        """, (nuevo_nombre, nuevo_embalaje, ean, empresa_id))
-        
+        cur.execute("UPDATE productos SET producto = %s, unidad_embalaje = %s WHERE ean = %s AND id_empresa = %s", (nuevo_nombre, nuevo_embalaje, ean, empresa_id))
         mysql.connection.commit()
         cur.close()
         
@@ -1259,11 +1074,8 @@ def eliminar_producto():
         mysql.connection.commit()
         cur.close()
         
-        if filas_afectadas > 0:
-            return jsonify({'status': 'success', 'message': 'Producto eliminado'})
-        else:
-            return jsonify({'status': 'error', 'message': 'No se encontró'})
-            
+        if filas_afectadas > 0: return jsonify({'status': 'success', 'message': 'Producto eliminado'})
+        else: return jsonify({'status': 'error', 'message': 'No se encontró'})
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': 'Error interno'})
@@ -1280,19 +1092,15 @@ def eliminar_marca():
         if not fabricante: return jsonify({'status': 'error', 'message': 'Marca obligatoria'})
 
         cur = mysql.connection.cursor()
-        if fabricante == 'SIN MARCA':
-            cur.execute("DELETE FROM productos WHERE (fabricante IS NULL OR fabricante = '') AND id_empresa = %s", (empresa_id,))
-        else:
-            cur.execute("DELETE FROM productos WHERE fabricante = %s AND id_empresa = %s", (fabricante, empresa_id))
+        if fabricante == 'SIN MARCA': cur.execute("DELETE FROM productos WHERE (fabricante IS NULL OR fabricante = '') AND id_empresa = %s", (empresa_id,))
+        else: cur.execute("DELETE FROM productos WHERE fabricante = %s AND id_empresa = %s", (fabricante, empresa_id))
         
         filas_afectadas = cur.rowcount
         mysql.connection.commit()
         cur.close()
         
-        if filas_afectadas > 0:
-            return jsonify({'status': 'success', 'message': f'Eliminados {filas_afectadas}'})
-        else:
-            return jsonify({'status': 'error', 'message': 'No hay productos'})
+        if filas_afectadas > 0: return jsonify({'status': 'success', 'message': f'Eliminados {filas_afectadas}'})
+        else: return jsonify({'status': 'error', 'message': 'No hay productos'})
             
     except Exception as e:
         mysql.connection.rollback()
@@ -1412,7 +1220,6 @@ def get_vehiculos():
         cur.close()
         return jsonify(data)
     except Exception as e: 
-        print(f"Error cargando vehículos: {e}")
         return jsonify([])
     
 @bp_bodegas.route('/bodegas/despachar_orden', methods=['POST'])
@@ -1583,54 +1390,6 @@ def imprimir_acta(orden):
     except Exception as e:
         return str(e), 500
 
-@bp_bodegas.route('/api/bodegas/reportes/novedades')
-def reporte_novedades():
-    if 'usuario_id' not in session: return jsonify([])
-    try:
-        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cur.execute("""
-            SELECT 
-                p.numero_orden_origen as orden, p.codigo_producto, p.descripcion_producto,
-                p.novedad_alistamiento, p.nombre_auxiliar_asignado as operario,
-                IFNULL(s.nombre, 'Sin Auth') as supervisor, p.fecha_fin_alistamiento as fecha
-            FROM picking_importacion_raw p
-            LEFT JOIN usuarios s ON p.id_supervisor_novedad = s.id
-            WHERE p.id_empresa = %s AND p.novedad_alistamiento IS NOT NULL
-            ORDER BY p.fecha_fin_alistamiento DESC LIMIT 100
-        """, (session.get('empresa_id'),))
-        data = cur.fetchall()
-        cur.close()
-        return jsonify(data)
-    except: return jsonify([])
-
-@bp_bodegas.route('/api/bodegas/historial_actas')
-def historial_actas():
-    if 'usuario_id' not in session: return jsonify([])
-    try:
-        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cur.execute("""
-            SELECT 
-                a.numero_orden, 
-                a.placa_vehiculo, 
-                IFNULL(u.nombre, 'Sin Auth') as supervisor, 
-                a.fecha_generacion
-            FROM actas_despacho_flotacarga a
-            LEFT JOIN usuarios u ON a.id_supervisor_despacho = u.id
-            WHERE a.id_empresa = %s
-            ORDER BY a.fecha_generacion DESC LIMIT 100
-        """, (session.get('empresa_id'),))
-        data = cur.fetchall()
-        cur.close()
-        
-        for row in data:
-            if isinstance(row['fecha_generacion'], datetime):
-                row['fecha_generacion'] = row['fecha_generacion'].strftime('%Y-%m-%d %H:%M:%S')
-                
-        return jsonify(data)
-    except Exception as e:
-        print(f"Error historial actas: {e}")
-        return jsonify([])
-
 @bp_bodegas.route('/bodegas/api/ordenes_sin_secuencia')
 def ordenes_sin_secuencia():
     if 'usuario_id' not in session: return jsonify([])
@@ -1799,3 +1558,409 @@ def kpis_historico():
     except Exception as e:
         print(f"Error reportes kpis historico: {e}")
         return jsonify({'global': [], 'operarios': [], 'verificadores': []})
+
+# ==============================================================================
+# LECTURA DE EXCEL IA (ALGORITMO INTELIGENTE CORREGIDO CON REGLAS ESTRICTAS)
+# ==============================================================================
+def normalizar_codigo(valor):
+    if pd.isna(valor) or str(valor).strip() == '': return ''
+    val_str = str(valor).strip()
+    if 'E' in val_str.upper():
+        try: return str(int(float(valor)))
+        except: pass
+    if val_str.endswith('.0'): return val_str[:-2]
+    return val_str
+
+def es_cadena_numerica(valor):
+    if pd.isna(valor): return False
+    v = str(valor).strip()
+    if v.endswith('.0'): v = v[:-2]
+    return v.isdigit()
+
+def limpiar_texto(texto):
+    if pd.isna(texto) or texto is None: return ""
+    texto = str(texto).upper().strip()
+    texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
+    texto = texto.replace(".", "")
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    return texto
+
+def match_keyword(celda_val, keywords):
+    celda_clean = celda_val.replace('.', ' ').replace('_', ' ')
+    words_in_cell = set(celda_clean.split())
+    for k in keywords:
+        if k == celda_val or k in words_in_cell:
+            return True
+    return False
+
+@bp_bodegas.route('/bodegas/upload_excel', methods=['POST'])
+@csrf.exempt 
+def upload_excel():
+    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
+    empresa_id = str(session.get('empresa_id'))
+    
+    archivos = request.files.getlist('file')
+    if not archivos or all(f.filename == '' for f in archivos): 
+        return jsonify({'error': 'No se recibieron archivos'}), 400
+
+    try:
+        cur = mysql.connection.cursor()
+        
+        cur.execute("SELECT sku, ean, producto, fabricante, factor_conversion, unidad_embalaje FROM productos WHERE id_empresa = %s", (empresa_id,))
+        db_products = cur.fetchall()
+        
+        maestra_productos_ean = {}
+        maestra_productos_nombre = {}
+
+        for row in db_products:
+            sku_val = normalizar_codigo(row[0])
+            ean_val = normalizar_codigo(row[1])
+            desc_original = str(row[2]).strip() if row[2] else ""
+            desc_limpia = limpiar_texto(desc_original)
+            marca_original = str(row[3]).strip() if row[3] and str(row[3]).upper() != 'NAN' else "GENERICO"
+            factor_conversion = int(row[4]) if len(row) > 4 and row[4] else 1
+            unidad_embalaje = str(row[5]).strip().upper() if len(row) > 5 and row[5] else 'UND'
+            
+            item_data = {'desc': desc_original, 'marca': marca_original, 'ean': ean_val or sku_val, 'factor_conversion': factor_conversion, 'unidad_embalaje': unidad_embalaje}
+
+            if ean_val: maestra_productos_ean[ean_val] = item_data
+            if sku_val: maestra_productos_ean[sku_val] = item_data
+            if desc_limpia: maestra_productos_nombre[desc_limpia] = item_data
+
+        cur.execute("SELECT ean_promo, nombre_promo, ean_componente, cajas_componente, fracciones_componente FROM promociones_clientes WHERE id_empresa = %s AND estado = 'ACTIVO'", (empresa_id,))
+        db_promos = cur.fetchall()
+        cur.close()
+        
+        diccionario_promos = {}
+        maestra_promos_nombre = {} 
+
+        for row in db_promos:
+            p_padre = normalizar_codigo(row[0]).upper() 
+            p_nombre = str(row[1]).strip() if row[1] else "PROMO"
+            p_hijo = normalizar_codigo(row[2]).upper()
+            p_cajas = int(row[3]) if row[3] is not None else 0
+            p_fracc = int(row[4]) if row[4] is not None else 0
+            
+            if p_padre not in diccionario_promos: 
+                diccionario_promos[p_padre] = {'nombre': p_nombre, 'componentes': []}
+                nombre_promo_limpio = limpiar_texto(p_nombre)
+                if nombre_promo_limpio:
+                    maestra_promos_nombre[nombre_promo_limpio] = p_padre
+                    
+            diccionario_promos[p_padre]['componentes'].append({'ean': p_hijo, 'cajas': p_cajas, 'fracciones': p_fracc})
+
+        resultados_exito = []
+        resultados_error = []
+        total_items_insertados = 0
+
+        for file in archivos:
+            if file.filename == '': continue
+            filename = file.filename
+            
+            try:
+                if file.filename.lower().endswith('.csv'):
+                    df_raw = pd.read_csv(file, header=None, sep=None, engine='python')
+                else:
+                    df_raw = pd.read_excel(file, header=None)
+                
+                df_raw = df_raw.fillna('')
+
+                # 1. Detectar Meta-Data (Planilla y Zona combinando Regex robusto y búsqueda posicional)
+                meta_zona = 'GENERAL'
+                meta_orden = filename.split('.')[0].replace('_', ' ').strip()
+                
+                raw_head = [str(x).strip().upper() for x in df_raw.head(20).values.flatten() if pd.notna(x)]
+                text_dump = " ".join(raw_head)
+                
+                match_zona = re.search(r'(ZONA|RUTA|UBICACION|DESTINO)\s*[:#]?\s*(\w+)', text_dump)
+                if match_zona: meta_zona = match_zona.group(2)
+                
+                meta_fecha = datetime.now().strftime('%Y-%m-%d')
+                match_fecha = re.search(r'(\d{2,4}[-/]\d{2}[-/]\d{2,4})', text_dump)
+                if match_fecha: meta_fecha = match_fecha.group(1)
+                
+                pedidos_keywords = ['PEDIDO N°', 'ORDEN NUMERO', 'PEDIDO NUMERO', 'ORDEN N°', 'PEDIDO', 'ORDEN', 'PLANILLA', 'REMISION', 'ENTREGA', 'DOC']
+                
+                for r in range(min(30, len(df_raw))):
+                    for c in range(min(30, len(df_raw.columns))):
+                        celda_val = str(df_raw.iloc[r, c]).strip().upper()
+                        if not celda_val or celda_val in ['NAN', 'NULL', 'NONE']: continue
+                        
+                        # Buscar Zona (Respaldo por si el regex falló)
+                        if meta_zona == 'GENERAL':
+                            if celda_val == 'ZONA' or celda_val == 'RUTA':
+                                if c + 1 < len(df_raw.columns) and str(df_raw.iloc[r, c+1]).strip() and str(df_raw.iloc[r, c+1]).strip().upper() != 'NAN':
+                                    meta_zona = str(df_raw.iloc[r, c+1]).strip()
+                                elif r + 1 < len(df_raw) and str(df_raw.iloc[r+1, c]).strip() and str(df_raw.iloc[r+1, c]).strip().upper() != 'NAN':
+                                    meta_zona = str(df_raw.iloc[r+1, c]).strip()
+                                
+                        # Buscar Pedido (Derecha y luego Abajo)
+                        if any(k == celda_val for k in pedidos_keywords) or any(k in celda_val for k in pedidos_keywords):
+                            if c + 1 < len(df_raw.columns) and str(df_raw.iloc[r, c+1]).strip() and str(df_raw.iloc[r, c+1]).strip().upper() != 'NAN':
+                                meta_orden = str(df_raw.iloc[r, c+1]).strip()
+                            elif r + 1 < len(df_raw) and str(df_raw.iloc[r+1, c]).strip() and str(df_raw.iloc[r+1, c]).strip().upper() != 'NAN':
+                                meta_orden = str(df_raw.iloc[r+1, c]).strip()
+
+                # 2. Identificar Columnas Estratégicamente (Fuzzy Matching)
+                col_ean = col_prod = col_cant = col_und_med = col_cajas = col_unidades = None
+                
+                keywords_cols = {
+                    'CODIGO': ['CODIGO', 'EAN', 'ITEM', 'SKU', 'REF', 'MATERIAL', 'BARCODE'],
+                    'DESCRIPCION': ['DESCRIPCION', 'DESCRIPCIÓN', 'PRODUCTO', 'NOMBRE', 'DETALLE', 'TEXTO', 'MERCANCIA', 'ARTICULO', 'ART.', 'ART'],
+                    'CANTIDAD': ['CANTIDAD', 'CANT', 'QTY', 'QUANTITY', 'SOLICITADO', 'PZS', 'PIEZAS'],
+                    'UNIDAD_MEDIDA': ['UNIDAD', 'UND', 'UM', 'U.M.', 'MEDIDA', 'EMPAQUE', 'PRESENTACION', 'TIPO'],
+                    'CAJAS': ['CAJAS', 'CAJA', 'CJ', 'CJS', 'BULTOS', 'BTO', 'PACAS', 'CARTON', 'EMP'],
+                    'UNIDADES': ['UNIDADES', 'UND', 'UNDS', 'FRACCIONES', 'FRACC', 'SUELTAS', 'PAQUETES', 'PQT']
+                }
+
+                start_row = 0
+                header_map = {}
+                found_table = False
+
+                for r in range(min(30, len(df_raw))):
+                    temp_map = {}
+                    for c in range(len(df_raw.columns)):
+                        val_raw = str(df_raw.iloc[r, c]).strip()
+                        if not val_raw: continue
+                        val_clean = limpiar_texto(val_raw)
+                        
+                        for key, words in keywords_cols.items():
+                            if match_keyword(val_clean, words):
+                                if key not in temp_map: temp_map[key] = c
+                                break
+                    
+                    if ('DESCRIPCION' in temp_map) and (('CAJAS' in temp_map or 'UNIDADES' in temp_map) or ('CANTIDAD' in temp_map)):
+                        start_row = r + 1; header_map = temp_map; found_table = True; break
+
+                # Fallback por inspección estructural si no se detectó por encabezados directos
+                if not found_table:
+                    for j in range(len(df_raw)):
+                        row_fallback = df_raw.iloc[j]
+                        row_str = [str(x) for x in row_fallback.values]
+                        col_code = None; col_desc = None; col_cant1 = None; col_cant2 = None
+                        
+                        for col_idx, val in enumerate(row_str):
+                            val_clean = val.strip()
+                            if val_clean.upper() in ['NAN', '']: continue
+                            
+                            if col_code is None and re.match(r'^\d{3,20}$', val_clean): col_code = col_idx
+                            elif col_desc is None and len(val_clean) > 5 and any(c.isalpha() for c in val_clean): col_desc = col_idx
+                            elif col_cant1 is None and re.match(r'^\d+(\.\d+)?$', val_clean) and float(val_clean) < 10000: col_cant1 = col_idx
+                            elif col_cant2 is None and re.match(r'^\d+(\.\d+)?$', val_clean) and float(val_clean) < 10000: col_cant2 = col_idx
+                        
+                        if col_desc is not None and (col_cant1 is not None or col_cant2 is not None):
+                            header_map = {'CODIGO': col_code, 'DESCRIPCION': col_desc}
+                            if col_cant1 is not None: header_map['CAJAS'] = col_cant1
+                            if col_cant2 is not None: header_map['UNIDADES'] = col_cant2
+                            start_row = j
+                            found_table = True
+                            break
+
+                if not found_table: 
+                    resultados_error.append(f"❌ {filename}: No se detectaron columnas válidas ni patrones de datos.")
+                    continue 
+
+                # 3. Procesamiento y Comparación Fila por Fila
+                data_to_insert = []
+                fecha_creacion = datetime.now()
+                
+                cálculo_total_cajas = 0
+                cálculo_total_unidades = 0
+                cálculo_marcas_presentes = set()
+                
+                lineas_detectadas = 0
+                lineas_ignoradas = 0
+                sub_items_generados = 0
+
+                for i in range(start_row, len(df_raw)):
+                    row = df_raw.iloc[i]
+                    
+                    idx_desc = header_map.get('DESCRIPCION')
+                    idx_code = header_map.get('CODIGO')
+                    
+                    # REGLA ESTRICTA DE FILA VACÍA: Si la descripción está vacía, se salta TODA la fila contigua de inmediato
+                    raw_desc = str(row[idx_desc]).strip() if idx_desc is not None and pd.notna(row[idx_desc]) else ""
+                    if raw_desc.upper() in ['NAN', 'NULL', 'NONE', '']: 
+                        continue
+                    
+                    lineas_detectadas += 1
+                    
+                    # Devorar dinámicamente cualquier cantidad de puntos suspensivos de relleno contable al final
+                    raw_desc = re.sub(r'[\.\s]+$', '', raw_desc).strip()
+                    
+                    raw_code = str(row[idx_code]).strip() if idx_code is not None and pd.notna(row[idx_code]) else ""
+                    if raw_code.upper() in ['NAN', 'NULL', 'NONE']: raw_code = ""
+                    raw_code = normalizar_codigo(raw_code)
+
+                    cajas = 0
+                    unidades = 0
+                    
+                    # Jerarquía Estricta: Prioridad Caso 1 (Cantidad/Unidad) sobre Caso 2 (Pivote)
+                    if 'CANTIDAD' in header_map and 'UNIDAD_MEDIDA' in header_map:
+                        val_cant = row[header_map['CANTIDAD']]
+                        if str(val_cant).strip() and es_cadena_numerica(val_cant):
+                            cant_num = int(float(val_cant))
+                            str_unidad = str(row[header_map['UNIDAD_MEDIDA']]).strip().upper()
+                            
+                            if str_unidad in ['CAJA', 'CJ', 'CAJAS', 'BTO', 'BULTOS']: cajas = cant_num
+                            else: unidades = cant_num
+                    else:
+                        if 'CAJAS' in header_map:
+                            val = row[header_map['CAJAS']]
+                            if str(val).strip() and es_cadena_numerica(val): cajas = int(float(val))
+                        if 'UNIDADES' in header_map:
+                            val = row[header_map['UNIDADES']]
+                            if str(val).strip() and es_cadena_numerica(val): unidades = int(float(val))
+                            
+                    if cajas <= 0 and unidades <= 0: 
+                        lineas_ignoradas += 1
+                        continue
+
+                    final_ean = raw_code
+                    final_desc = raw_desc
+                    final_marca = 'GENERICO'
+                    auth = False 
+
+                    match_encontrado = False
+                    es_promo = False
+
+                    # 1. Comparar por EAN (Prioridad)
+                    if final_ean:
+                        if final_ean in diccionario_promos:
+                            es_promo = True
+                            match_encontrado = True
+                        elif final_ean in maestra_productos_ean:
+                            prod_db = maestra_productos_ean[final_ean]
+                            final_desc = prod_db['desc']
+                            final_marca = prod_db['marca']
+                            match_encontrado = True
+                            
+                            if prod_db['unidad_embalaje'] in ['CAJA', 'CJ', 'CAJAS'] and unidades > 0 and cajas == 0:
+                                cajas = unidades; unidades = 0
+                            elif prod_db['unidad_embalaje'] not in ['CAJA', 'CJ', 'CAJAS'] and cajas > 0 and unidades == 0:
+                                unidades = cajas; cajas = 0
+
+                    # 2. Comparar por Descripción EXACTA (Sin tolerancias)
+                    if not match_encontrado and final_desc:
+                        desc_limpia = limpiar_texto(final_desc)
+                        
+                        if desc_limpia in maestra_promos_nombre:
+                            final_ean = maestra_promos_nombre[desc_limpia]
+                            es_promo = True
+                            match_encontrado = True
+                        elif desc_limpia in maestra_productos_nombre:
+                            prod_db = maestra_productos_nombre[desc_limpia]
+                            final_ean = prod_db['ean']
+                            final_desc = prod_db['desc']
+                            final_marca = prod_db['marca']
+                            match_encontrado = True
+                            
+                            if prod_db['unidad_embalaje'] in ['CAJA', 'CJ', 'CAJAS'] and unidades > 0 and cajas == 0:
+                                cajas = unidades; unidades = 0
+                            elif prod_db['unidad_embalaje'] not in ['CAJA', 'CJ', 'CAJAS'] and cajas > 0 and unidades == 0:
+                                unidades = cajas; cajas = 0
+
+                    if match_encontrado:
+                        auth = True 
+                    else:
+                        final_marca = 'NO EN BASE DE DATOS'
+                        if not final_ean: final_ean = 'SIN_CODIGO'
+
+                    if es_promo:
+                        promo_info = diccionario_promos[final_ean]
+                        nombre_promo = promo_info['nombre']
+                        
+                        factor_promo = 1
+                        if final_ean in maestra_productos_ean:
+                            factor_promo = maestra_productos_ean[final_ean].get('factor_conversion', 1)
+                        
+                        total_promos_pedidas = (cajas * factor_promo) + unidades 
+                        
+                        for comp in promo_info['componentes']:
+                            hijo_code = comp['ean']
+                            hijo_cajas_total = total_promos_pedidas * comp['cajas'] 
+                            hijo_unid_total = total_promos_pedidas * comp['fracciones'] 
+                            hijo_desc = f"ITEM SIN NOMBRE ({hijo_code})"
+                            hijo_marca = 'GENERICO'
+                            
+                            if hijo_code in maestra_productos_ean:
+                                hijo_desc = maestra_productos_ean[hijo_code]['desc']
+                                hijo_marca = maestra_productos_ean[hijo_code]['marca']
+                            
+                            hijo_desc_visual = f"{hijo_desc} (Kit: {nombre_promo})"
+                            
+                            if hijo_cajas_total > 0 or hijo_unid_total > 0:
+                                data_to_insert.append((empresa_id, meta_orden, meta_zona, hijo_code, raw_code, hijo_desc_visual, hijo_marca, hijo_cajas_total, 0, hijo_unid_total, 0, 'PENDIENTE', fecha_creacion, meta_fecha, auth))
+                                cálculo_total_cajas += hijo_cajas_total
+                                cálculo_total_unidades += hijo_unid_total
+                                cálculo_marcas_presentes.add(hijo_marca)
+                                sub_items_generados += 1
+                    else:
+                        # Nunca consolidar. Insertar la fila individualmente exactamente como llegó en origen
+                        data_to_insert.append((empresa_id, meta_orden, meta_zona, final_ean, raw_code, final_desc, final_marca, cajas, 0, unidades, 0, 'PENDIENTE', fecha_creacion, meta_fecha, auth))
+                        cálculo_total_cajas += cajas
+                        cálculo_total_unidades += unidades
+                        cálculo_marcas_presentes.add(final_marca)
+
+                if data_to_insert:
+                    cur = mysql.connection.cursor()
+                    query = """INSERT INTO picking_importacion_raw 
+                    (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                    cur.executemany(query, data_to_insert)
+                    mysql.connection.commit()
+                    cur.close()
+                    
+                    resultados_exito.append(
+                        f"✅ {meta_orden}\n"
+                        f"📊 Reporte de Carga Transparente:\n"
+                        f"• Líneas detectadas en Excel: {lineas_detectadas}\n"
+                        f"• Líneas ignoradas (Cantidades en cero): {lineas_ignoradas}\n"
+                        f"• Kits/Promociones desarmadas: +{sub_items_generados} sub-ítems generados\n"
+                        f"• Total final de líneas a preparar en Bodega: {len(data_to_insert)}\n"
+                        f"• Auditoría Final: {cálculo_total_cajas} Cajas y {cálculo_total_unidades} Unidades."
+                    )
+                    total_items_insertados += len(data_to_insert)
+                else:
+                    resultados_error.append(f"❌ {filename}: Sin items válidos para insertar.")
+
+            except Exception as e:
+                resultados_error.append(f"❌ {filename}: Error de lectura ({str(e)})")
+
+        mensaje_alerta = ""
+        if resultados_exito: mensaje_alerta += "\n\n".join(resultados_exito) + "\n\n"
+        if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
+
+        return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
+
+    except Exception as e:
+        return jsonify({'error': f'Error crítico procesando carga: {str(e)}'}), 500
+    
+@bp_bodegas.route('/api/bodegas/reportes/importacion')
+def reporte_importacion():
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT 
+                numero_orden_origen as orden, 
+                MAX(zona) as zona,
+                COUNT(*) as total_items,
+                SUM(CASE WHEN estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_procesados,
+                MAX(fecha_carga) as fecha_carga
+            FROM picking_importacion_raw
+            WHERE id_empresa = %s
+            GROUP BY numero_orden_origen
+            ORDER BY MAX(fecha_carga) DESC LIMIT 100
+        """, (session.get('empresa_id'),))
+        data = cur.fetchall()
+        cur.close()
+        
+        for row in data:
+            if isinstance(row['fecha_carga'], datetime):
+                row['fecha_carga'] = row['fecha_carga'].strftime('%Y-%m-%d %H:%M:%S')
+                
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error reporte importacion: {e}")
+        return jsonify([])

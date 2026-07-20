@@ -545,9 +545,9 @@
                 if (audioCtx) {
                     const oscillator = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
-                    oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); 
-                    gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime); 
+                    oscillator.type = 'square';
+                    oscillator.frequency.setValueAtTime(1500, audioCtx.currentTime); 
+                    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); 
                     oscillator.connect(gainNode);
                     gainNode.connect(audioCtx.destination);
                     oscillator.start();
@@ -580,9 +580,6 @@
             document.getElementById(id).classList.remove('hidden');
         }
 
-        // =====================================
-        // POLLING EN TIEMPO REAL
-        // =====================================
         function cargarOrdenesSilencioso() {
             const t = new Date().getTime();
             fetch('/api/operario/mis_marcas?v=' + t).then(r => r.json()).then(d => {
@@ -655,7 +652,7 @@
             cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>'; 
             cMar.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>';
 
-            cargarOrdenesSilencioso(); // Usa la misma lógica optimizada
+            cargarOrdenesSilencioso(); 
         }
 
         function abrirMarca(marca) {
@@ -782,7 +779,6 @@
 
         function filtrarLista() { renderizarItems(); }
 
-        // --- TARJETA DE TRABAJO (MODAL Y MÁQUINA DE ESTADOS) ---
         let faseAlistamiento = '';
 
         function abrirModalPickingId(id) {
@@ -901,6 +897,11 @@
                 return;
             }
 
+            const isPortrait = window.innerHeight > window.innerWidth;
+            const screenWidth = window.innerWidth;
+            const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
+            const targetHeight = Math.floor(targetWidth * 0.45);
+
             const configScanner = {
                 formatsToSupport: [
                     Html5QrcodeSupportedFormats.EAN_13,
@@ -916,7 +917,7 @@
             scanner = new Html5Qrcode("embedded-reader", configScanner);
             scanner.start(
                 { facingMode: "environment" },
-                { fps: 30, qrbox: { width: 300, height: 100 } },
+                { fps: 30, qrbox: { width: targetWidth, height: targetHeight } },
                 (decodedText) => {
                     const now = Date.now();
                     if (now - lastScanTime < 1500) return; 

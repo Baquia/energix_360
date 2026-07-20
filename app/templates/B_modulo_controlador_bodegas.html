@@ -599,7 +599,7 @@
                 <button onclick="openAlistamientoModal(); if(window.innerWidth<=768) toggleSidebar();" class="menu-item" style="background: #eef2ff; color: #4338ca;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 11l3 3L22 4"></path>
-                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1 2-2V5a2 2 0 0 1 2-2h11"></path>
                     </svg>
                     Alistamiento en Vivo
                 </button>
@@ -698,16 +698,6 @@
                 </svg>
             </div>
             <div id="menu-rutas" class="menu-items-container collapsed">
-                <button onclick="alert('Módulo de Flotas en construcción 🛠️'); if(window.innerWidth<=768) toggleSidebar();" class="menu-item" style="background: #fff7ed; color: #ea580c;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M5 18H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3"></path>
-                        <polyline points="9 18 12 18 15 18"></polyline>
-                        <path d="M19 18h2a2 2 0 0 0 2-2v-5l-3-4h-5v11"></path>
-                        <circle cx="7" cy="18" r="2"></circle>
-                        <circle cx="17" cy="18" r="2"></circle>
-                    </svg>
-                    Flota y Rutas
-                </button>
                 <button onclick="abrirModalHistorialActas(); if(window.innerWidth<=768) toggleSidebar();" class="menu-item" style="background: #fff7ed; color: #ea580c;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -759,7 +749,7 @@
                     </svg>
                     Alertas / Novedades
                 </button>
-                <button onclick="window.location.href='/bodegas/informe_novedades_importacion'" class="menu-item" style="background: #fef2f2; color: #be123c;">
+                <button onclick="abrirModalImportacion(); if(window.innerWidth<=768) toggleSidebar();" class="menu-item" style="background: #fef2f2; color: #be123c;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="7 10 12 15 17 10"></polyline>
@@ -946,7 +936,7 @@
     <!-- ============================================== -->
     <!-- MODAL DE ASIGNACIÓN MASIVA DE MARCAS (CRUD) -->
     <!-- ============================================== -->
-    <div id="modalAsignacionMarcas" class="modal-overlay">
+    <div id="modalAsignacionMarcas" class="modal-overlay" style="z-index: 3100;">
         <div class="modal-card">
             <div class="modal-header">
                 <h3>🛠️ Asignar Marcas</h3>
@@ -1619,7 +1609,12 @@
                 <button class="btn-cancel" onclick="cerrarModalNovedades()" style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
             </div>
             <div class="modal-body" style="background: #f9fafb;">
-                <div class="section-box" style="border:none; box-shadow:none; background:transparent;">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                    <button onclick="exportarNovedadesPDF()" class="btn-confirm" style="background: #dc2626; display: flex; align-items: center; gap: 8px;">
+                        📄 Exportar a PDF
+                    </button>
+                </div>
+                <div class="section-box" id="pdf-novedades-content" style="border:none; box-shadow:none; background:transparent;">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -1633,6 +1628,39 @@
                         </thead>
                         <tbody id="tbl-novedades-body">
                             <tr><td colspan="6" style="text-align:center; padding:2rem;">Cargando novedades...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NUEVO MODAL DE IMPORTACIÓN -->
+    <div id="modalImportacion" class="modal-overlay">
+        <div class="modal-large">
+            <div class="modal-header">
+                <h3>📥 Informe de Importación</h3>
+                <button class="btn-cancel" onclick="cerrarModalImportacion()" style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
+            </div>
+            <div class="modal-body" style="background: #f9fafb;">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                    <button onclick="exportarImportacionPDF()" class="btn-confirm" style="background: #dc2626; display: flex; align-items: center; gap: 8px;">
+                        📄 Exportar a PDF
+                    </button>
+                </div>
+                <div class="section-box" id="pdf-importacion-content" style="border:none; box-shadow:none; background:transparent;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Orden</th>
+                                <th>Zona</th>
+                                <th>Total Ítems</th>
+                                <th>Ítems Procesados</th>
+                                <th>Fecha de Carga</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-importacion-body">
+                            <tr><td colspan="5" style="text-align:center; padding:2rem;">Cargando informe...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1675,9 +1703,6 @@
             }
         }
 
-        // ==========================================
-        // KPIs Y PRODUCTIVIDAD
-        // ==========================================
         function abrirModalKPIs() {
             document.getElementById('modalKPIs').style.display = 'flex';
             cargarDatosKPIs();
@@ -1717,7 +1742,6 @@
                         return;
                     }
 
-                    // 1. GLOBAL
                     tbodyGlobal.innerHTML = '';
                     let labels = [];
                     let pedidosData = [];
@@ -1753,7 +1777,6 @@
                         options: { responsive: true, maintainAspectRatio: false }
                     });
 
-                    // 2. OPERARIOS
                     tbodyOps.innerHTML = '';
                     if (!data.operarios || data.operarios.length === 0) {
                         tbodyOps.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay registros de operarios en este periodo.</td></tr>';
@@ -1770,7 +1793,6 @@
                         });
                     }
 
-                    // 3. VERIFICADORES
                     tbodyVerifs.innerHTML = '';
                     if (!data.verificadores || data.verificadores.length === 0) {
                         tbodyVerifs.innerHTML = '<tr><td colspan="3" style="text-align:center;">No hay registros de verificadores en este periodo.</td></tr>';
@@ -1804,7 +1826,6 @@
             html2pdf().set(opt).from(element).save();
         }
 
-        // -- 1. ALISTAMIENTO EN VIVO --
         function openAlistamientoModal() { 
             sessionStorage.setItem('reabrirAlistamiento', 'true'); 
             document.getElementById('modalAlistamiento').style.display = 'flex';
@@ -1835,7 +1856,6 @@
                     document.getElementById('kpi-backlog-dash').textContent = data.kpis.backlog_verificacion;
                 }
 
-                // 1. Asignación Muelles
                 const tbMuelles = document.getElementById('tbody-ordenes-pendientes');
                 const activeElement = document.activeElement;
                 const isInputFocused = activeElement && (activeElement.tagName === 'INPUT');
@@ -1863,7 +1883,6 @@
                 }
                 if (!isInputFocused) tbMuelles.innerHTML = htmlMuelles;
 
-                // 2. Operarios
                 const tbOperarios = document.getElementById('tbody-operarios-marcas');
                 let htmlOp = '';
                 if(data.operarios_marcas.length === 0) {
@@ -1890,7 +1909,6 @@
                 }
                 tbOperarios.innerHTML = htmlOp;
                 
-                // 2.1 Verificadores
                 const tbVerif = document.getElementById('tbody-verificadores');
                 let htmlVerif = '';
                 if(data.verificadores_kpis && data.verificadores_kpis.length === 0) {
@@ -1907,7 +1925,6 @@
                 }
                 if(tbVerif) tbVerif.innerHTML = htmlVerif;
 
-                // 2.2 Marcas Huerfanas
                 const tbHuerfanas = document.getElementById('tbody-marcas-huerfanas');
                 let htmlHuerf = '';
                 if(data.marcas_huerfanas.length === 0) {
@@ -1919,7 +1936,6 @@
                 }
                 tbHuerfanas.innerHTML = htmlHuerf;
 
-                // 3. Realtime Activos
                 const tbPedidos = document.getElementById('tbody-pedidos-realtime');
                 let htmlPedidos = '';
                 if(data.ordenes_asignadas.length === 0) {
@@ -1975,9 +1991,6 @@
             });
         }
 
-        // ==========================================
-        // HISTORIAL ACTAS
-        // ==========================================
         function abrirModalHistorialActas() {
             document.getElementById('modalHistorialActas').style.display = 'flex';
             const tbody = document.getElementById('tbl-historial-actas-body');
@@ -2011,10 +2024,6 @@
         }
         function cerrarModalHistorialActas() { document.getElementById('modalHistorialActas').style.display = 'none'; }
 
-
-        // ==========================================
-        // ASIGNACION MARCAS CRUD
-        // ==========================================
         function abrirModalAsignacionMarcas() {
             document.getElementById('modalAsignacionMarcas').style.display = 'flex';
             const selectOp = document.getElementById('crud-select-operario');
@@ -2086,10 +2095,6 @@
         }
         function cerrarModalAsignacionMarcas() { document.getElementById('modalAsignacionMarcas').style.display = 'none'; }
 
-
-        // ==========================================
-        // DETALLES ORDEN
-        // ==========================================
         function verDetalleOrden(orden) {
             document.getElementById('lblOrdenDetalle').textContent = orden;
             document.getElementById('modalDetalleOrden').style.display = 'flex';
@@ -2165,9 +2170,6 @@
                 }).catch(err => console.error(err));
         }
 
-        // ==========================================
-        // CARGA EXCEL/CSV
-        // ==========================================
         function openUploadModal() { document.getElementById('modalUpload').style.display = 'flex'; }
         function closeUpload() { document.getElementById('modalUpload').style.display = 'none'; }
         
@@ -2196,14 +2198,6 @@
                 .catch(e => alert('Error crítico de red o servidor.'))
                 .finally(() => { btnSubir.textContent = 'Subir Archivos'; btnSubir.disabled = false; });
         }
-
-        // ==========================================
-        // ASIGNAR PUERTA
-        // ==========================================
-        let curOrden = null;
-        let curFilaDOM = null;
-        window.curZona = 'GENERAL';
-        window.curSecuencia = 0;
 
         function abrirAsignar(orden, btn) {
             curOrden = orden;
@@ -2255,9 +2249,6 @@
                 .finally(() => { btn.textContent = 'Confirmar Asignación'; btn.disabled = false; });
         }
 
-        // ==========================================
-        // DESPACHOS Y VEHICULOS
-        // ==========================================
         let ordenParaDespacho = null;
         let fotoComprimidaBase64 = null;
         let streamEvidencia = null;
@@ -2399,9 +2390,6 @@
                 .finally(() => { btn.disabled = false; btn.textContent = 'Confirmar Despacho 🚀'; });
         }
 
-        // ==========================================
-        // CRONOMETRO EN VIVO
-        // ==========================================
         document.addEventListener("DOMContentLoaded", function () {
             if (sessionStorage.getItem('reabrirAlistamiento') === 'true') {
                 if (typeof openAlistamientoModal === "function") openAlistamientoModal();
@@ -2434,9 +2422,6 @@
         }
         setInterval(actualizarCronometros, 1000);
 
-        // ==========================================
-        // PRODUCTOS MANUAL Y MASIVO
-        // ==========================================
         function openProductosModal() { document.getElementById('modalProductos').style.display = 'flex'; }
         function closeProductosModal() { document.getElementById('modalProductos').style.display = 'none'; }
 
@@ -2490,9 +2475,6 @@
                 .finally(() => { btn.textContent = '🚀 Subir Archivo'; btn.disabled = false; });
         }
 
-        // ==========================================
-        // EDICIÓN DE PRODUCTOS
-        // ==========================================
         let productosEdicionCache = []; 
 
         function abrirModalEditar() {
@@ -2577,9 +2559,6 @@
                 .catch(err => alert("❌ Error de conexión al guardar."));
         }
 
-        // ==========================================
-        // ELIMINACIÓN DE PRODUCTOS
-        // ==========================================
         let modoEliminacionActual = '';
 
         function abrirModalEliminar() {
@@ -2697,9 +2676,6 @@
                 });
         }
 
-        // ==========================================
-        // GESTIÓN DE PROMOCIONES (KITS)
-        // ==========================================
         let kitActual = []; 
 
         function abrirModalPromociones() {
@@ -2884,9 +2860,6 @@
                 });
         }
 
-        // ==========================================
-        // NOVEDADES
-        // ==========================================
         function abrirModalNovedades() {
             document.getElementById('modalNovedades').style.display = 'flex';
             const tbody = document.getElementById('tbl-novedades-body');
@@ -2923,9 +2896,18 @@
         }
         function cerrarModalNovedades() { document.getElementById('modalNovedades').style.display = 'none'; }
 
-        // ==========================================
-        // CONSOLA ALIAS
-        // ==========================================
+        function exportarNovedadesPDF() {
+            const element = document.getElementById('pdf-novedades-content');
+            const opt = {
+                margin:       10,
+                filename:     'Reporte_Novedades.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+
         let listaCatalogoAlias = [];
 
         function abrirModalConsolaAprendizaje() {
@@ -2967,7 +2949,10 @@
                                 ${htmlSelect}
                             </td>
                             <td data-label="Acción" style="text-align:center; padding: 15px;">
-                                <button onclick="guardarAliasAprendizaje('${item.descripcion_origen}', 'alias-select-${index}')" style="background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; width:100%; font-size:1rem;">Asignar 🔗</button>
+                                <div style="display: flex; gap: 5px;">
+                                    <button onclick="guardarAliasAprendizaje('${item.descripcion_origen}', 'alias-select-${index}')" style="background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; width:100%; font-size:0.9rem;">Asignar 🔗</button>
+                                    <button onclick="permitirAlistarBypass('${item.descripcion_origen}')" style="background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; width:100%; font-size:0.9rem;">Bypass ⚠️</button>
+                                </div>
                             </td>
                         </tr>`;
                     });
@@ -2998,6 +2983,68 @@
                     else alert("❌ Error: " + res.message);
                 })
                 .catch(e => alert("Error de conexión."));
+        }
+
+        function permitirAlistarBypass(descOrigen) {
+            if (!confirm(`¿Estás seguro de enviar "${descOrigen}" a piso sin código de barras? El operario tendrá que confirmarlo manualmente.`)) return;
+
+            fetch('/api/bodegas/alias/permitir', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ descripcion_origen: descOrigen })
+            })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status === 'success') { alert(res.message); cargarPendientesAlias(); } 
+                    else alert("❌ Error: " + res.message);
+                })
+                .catch(e => alert("Error de conexión."));
+        }
+
+        function abrirModalImportacion() {
+            document.getElementById('modalImportacion').style.display = 'flex';
+            const tbody = document.getElementById('tbl-importacion-body');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem;">Cargando informe...</td></tr>';
+
+            fetch('/api/bodegas/reportes/importacion')
+                .then(r => r.json())
+                .then(data => {
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem; color:#10b981; font-weight:600;">No hay importaciones registradas.</td></tr>';
+                        return;
+                    }
+
+                    data.forEach(n => {
+                        let progreso = Math.round((n.items_procesados / n.total_items) * 100);
+                        let colorBadge = progreso === 100 ? 'badge-green' : (progreso > 0 ? 'badge-blue' : 'badge-yellow');
+                        tbody.innerHTML += `
+                        <tr style="background:white; border-bottom: 1px solid #f3f4f6;">
+                            <td data-label="Orden" style="font-weight:700; font-size:1.05rem; color:var(--color-primary);">${n.orden}</td>
+                            <td data-label="Zona" style="font-weight:600;">${n.zona || 'GENERAL'}</td>
+                            <td data-label="Total Ítems"><span class="badge" style="background:#f1f5f9; color:#475569;">${n.total_items}</span></td>
+                            <td data-label="Ítems Procesados"><span class="badge ${colorBadge}">${n.items_procesados} (${progreso}%)</span></td>
+                            <td data-label="Fecha Carga" style="font-size:0.85rem; color:#6b7280;">${n.fecha_carga}</td>
+                        </tr>`;
+                    });
+                })
+                .catch(e => tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Error cargando informe.</td></tr>');
+        }
+
+        function cerrarModalImportacion() {
+            document.getElementById('modalImportacion').style.display = 'none';
+        }
+
+        function exportarImportacionPDF() {
+            const element = document.getElementById('pdf-importacion-content');
+            const opt = {
+                margin:       10,
+                filename:     'Informe_Importacion.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
         }
     </script>
 </body>
