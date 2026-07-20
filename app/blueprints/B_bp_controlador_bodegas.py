@@ -677,6 +677,79 @@ def alias_permitir():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
+
+@bp_bodegas.route('/api/bodegas/resolver_promo_huerfana', methods=['POST'])
+@csrf.exempt
+def resolver_promo_huerfana():
+    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
+    try:
+        data = request.get_json()
+        id_row = data.get('id_row')
+        empresa_id = session.get('empresa_id')
+
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        cur.execute("SELECT * FROM picking_importacion_raw WHERE id = %s AND id_empresa = %s AND estado_actividad = 'PROMO_HUERFANA'", (id_row, empresa_id))
+        orphan = cur.fetchone()
+        if not orphan:
+            return jsonify({'status': 'error', 'message': 'No se encontró la promoción huérfana en la orden.'})
+
+        ean_promo = orphan['codigo_producto']
+        cur.execute("SELECT * FROM promociones_clientes WHERE ean_promo = %s AND id_empresa = %s AND estado = 'ACTIVO'", (ean_promo, empresa_id))
+        componentes = cur.fetchall()
+
+        if not componentes:
+            cur.execute("SELECT * FROM promociones_clientes WHERE nombre_promo = %s AND id_empresa = %s AND estado = 'ACTIVO'", (orphan['descripcion_producto'], empresa_id))
+            componentes = cur.fetchall()
+            if componentes: ean_promo = componentes[0]['ean_promo']
+
+        if not componentes:
+            return jsonify({'status': 'error', 'message': 'El combo aún no existe en el módulo de Promociones. Configúralo primero y luego presiona este botón.'})
+
+        nombre_promo = componentes[0]['nombre_promo']
+        
+        cur.execute("SELECT factor_conversion FROM productos WHERE (ean = %s OR sku = %s) AND id_empresa = %s", (ean_promo, ean_promo, empresa_id))
+        prod_info = cur.fetchone()
+        factor = prod_info['factor_conversion'] if prod_info and prod_info['factor_conversion'] else 1
+        
+        total_promos_pedidas = (orphan['cajas_calculadas'] * factor) + orphan['unidades_calculadas']
+        
+        data_to_insert = []
+        for comp in componentes:
+            hijo_code = comp['ean_componente']
+            hijo_cajas_total = total_promos_pedidas * comp['cajas_componente']
+            hijo_unid_total = total_promos_pedidas * comp['fracciones_componente']
+            
+            cur.execute("SELECT producto, fabricante FROM productos WHERE (ean = %s OR sku = %s) AND id_empresa = %s", (hijo_code, hijo_code, empresa_id))
+            hijo_info = cur.fetchone()
+            hijo_desc = hijo_info['producto'] if hijo_info else f"ITEM SIN NOMBRE ({hijo_code})"
+            hijo_marca = hijo_info['fabricante'] if hijo_info else 'GENERICO'
+            
+            hijo_desc_visual = f"{hijo_desc} (Kit: {nombre_promo})"
+            
+            if hijo_cajas_total > 0 or hijo_unid_total > 0:
+                data_to_insert.append((
+                    empresa_id, orphan['numero_orden_origen'], orphan['zona'], hijo_code, orphan['ean_leido'], 
+                    hijo_desc_visual, hijo_marca, hijo_cajas_total, 0, hijo_unid_total, 0, 'PENDIENTE', 
+                    orphan['fecha_creacion_orden'], orphan['fecha_entrega_orden'], True
+                ))
+
+        if data_to_insert:
+            query = """INSERT INTO picking_importacion_raw 
+            (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+            cur.executemany(query, data_to_insert)
+
+        cur.execute("DELETE FROM picking_importacion_raw WHERE id = %s", (id_row,))
+        mysql.connection.commit()
+        cur.close()
+
+        return jsonify({'status': 'success', 'message': 'Promoción resuelta. Los componentes han sido liberados a la bodega.'})
+    
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
 # ==============================================================================
 # REPORTES Y EXPORTACIONES
 # ==============================================================================
@@ -744,7 +817,7 @@ def operarios_asignacion():
         cur.execute("SELECT id, nombre FROM usuarios WHERE empresa_id = %s AND perfil = 'operador_logistica' ORDER BY nombre ASC", (empresa_id,))
         operarios = cur.fetchall()
 
-        # Se envuelve fabricante y marca con UPPER() para agrupar las variaciones de mayúsculas/minúsculas
+        # UPPER() añadido para prevenir errores de case sensitivity en el cruce 
         cur.execute("""
             SELECT DISTINCT m.marca, m.nombre_marca, fp.operador_asignado
             FROM (
@@ -778,7 +851,7 @@ def guardar_asignacion_marcas():
         cur.execute("DELETE FROM fabricantes_proveedores WHERE id_empresa = %s AND operador_asignado = %s", (empresa_id, id_operario))
         
         if marcas:
-            data_to_insert = [(empresa_id, m, id_operario) for m in marcas]
+            data_to_insert = [(empresa_id, str(m).upper(), id_operario) for m in marcas]
             cur.executemany("""
                 INSERT INTO fabricantes_proveedores (id_empresa, marca, operador_asignado)
                 VALUES (%s, %s, %s)
@@ -996,8 +1069,6 @@ def get_marcas():
     try:
         empresa_id = session.get('empresa_id')
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
-        # Se envuelve el fabricante en UPPER()
         cur.execute("""
             SELECT DISTINCT IF(fabricante IS NULL OR fabricante = '', 'SIN MARCA', UPPER(fabricante)) as fabricante 
             FROM productos 
@@ -1024,7 +1095,6 @@ def get_productos_por_marca(marca):
                 ORDER BY producto ASC
             """, (empresa_id,))
         else:
-            # Se compara convirtiendo ambos lados a UPPER() para evitar errores si en la base de datos están en minúsculas
             cur.execute("""
                 SELECT ean, producto, fabricante, unidad_embalaje 
                 FROM productos 
@@ -1096,11 +1166,8 @@ def eliminar_marca():
         if not fabricante: return jsonify({'status': 'error', 'message': 'Marca obligatoria'})
 
         cur = mysql.connection.cursor()
-        if fabricante == 'SIN MARCA': 
-            cur.execute("DELETE FROM productos WHERE (fabricante IS NULL OR fabricante = '') AND id_empresa = %s", (empresa_id,))
-        else: 
-            # Modificado para usar UPPER() en el caso de la eliminación masiva
-            cur.execute("DELETE FROM productos WHERE UPPER(fabricante) = UPPER(%s) AND id_empresa = %s", (fabricante, empresa_id))
+        if fabricante == 'SIN MARCA': cur.execute("DELETE FROM productos WHERE (fabricante IS NULL OR fabricante = '') AND id_empresa = %s", (empresa_id,))
+        else: cur.execute("DELETE FROM productos WHERE UPPER(fabricante) = UPPER(%s) AND id_empresa = %s", (fabricante, empresa_id))
         
         filas_afectadas = cur.rowcount
         mysql.connection.commit()
@@ -1903,8 +1970,15 @@ def upload_excel():
                                 cálculo_marcas_presentes.add(hijo_marca)
                                 sub_items_generados += 1
                     else:
-                        # Nunca consolidar. Insertar la fila individualmente exactamente como llegó en origen
-                        data_to_insert.append((empresa_id, meta_orden, meta_zona, final_ean, raw_code, final_desc, final_marca, cajas, 0, unidades, 0, 'PENDIENTE', fecha_creacion, meta_fecha, auth))
+                        # Detectar promociones huérfanas
+                        palabras_clave_promo = ['OFE ', 'OFERTA', 'PROMO', 'KIT ', 'COMBO', 'PAGUE ']
+                        desc_upper = str(final_desc).upper() if final_desc else ""
+                        es_huerfana = any(k in desc_upper for k in palabras_clave_promo)
+                        
+                        estado_insert = 'PROMO_HUERFANA' if es_huerfana else 'PENDIENTE'
+                        auth_insert = False if es_huerfana else auth
+
+                        data_to_insert.append((empresa_id, meta_orden, meta_zona, final_ean, raw_code, final_desc, final_marca, cajas, 0, unidades, 0, estado_insert, fecha_creacion, meta_fecha, auth_insert))
                         cálculo_total_cajas += cajas
                         cálculo_total_unidades += unidades
                         cálculo_marcas_presentes.add(final_marca)

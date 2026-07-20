@@ -1528,42 +1528,58 @@
                 <button class="btn-cancel" onclick="cerrarModalDetalle()" style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
             </div>
 
-            <div class="modal-body split-view" style="padding: 1rem; background:#f3f4f6;">
-                <div style="flex: 1; display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #ea580c; overflow: hidden; min-height:40vh;">
-                    <div style="padding: 15px; border-bottom: 1px solid #f3f4f6; background: #fff7ed; display:flex; justify-content:space-between; align-items:center;">
-                        <h4 style="margin:0; color: #c2410c; font-size:1.1rem;">⚠️ Faltantes</h4>
-                        <span id="countPendientes" style="background: #ea580c; color: white; padding: 4px 10px; border-radius: 12px; font-weight:700;">0</span>
+            <div class="modal-body" style="padding: 1rem; background:#f3f4f6; overflow-y: auto;">
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                    <!-- Faltantes -->
+                    <div style="display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #ea580c; overflow: hidden; min-height:40vh; max-height:45vh;">
+                        <div style="padding: 15px; border-bottom: 1px solid #f3f4f6; background: #fff7ed; display:flex; justify-content:space-between; align-items:center;">
+                            <h4 style="margin:0; color: #c2410c; font-size:1.1rem;">⚠️ Faltantes</h4>
+                            <span id="countPendientes" style="background: #ea580c; color: white; padding: 4px 10px; border-radius: 12px; font-weight:700;">0</span>
+                        </div>
+                        <div style="flex: 1; overflow-y: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                                <thead style="position: sticky; top: 0; background: white; z-index: 10;">
+                                    <tr>
+                                        <th style="text-align:left; padding:12px; background:#f9fafb; font-weight:700; color:var(--color-muted);">PRODUCTO</th>
+                                        <th style="text-align:center; width:90px; padding:12px; background:#f9fafb; font-weight:700; color:var(--color-muted);">CANTIDAD</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tblPendientesBody"></tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div style="flex: 1; overflow-y: auto;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                            <thead style="position: sticky; top: 0; background: white; z-index: 10;">
-                                <tr>
-                                    <th style="text-align:left; padding:12px; background:#f9fafb; font-weight:700; color:var(--color-muted);">PRODUCTO</th>
-                                    <th style="text-align:center; width:90px; padding:12px; background:#f9fafb; font-weight:700; color:var(--color-muted);">CANTIDAD</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tblPendientesBody"></tbody>
-                        </table>
+
+                    <!-- Listos -->
+                    <div style="display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #10b981; overflow: hidden; min-height:40vh; max-height:45vh;">
+                        <div style="padding: 15px; border-bottom: 1px solid #f3f4f6; background: #ecfdf5; display:flex; justify-content:space-between; align-items:center;">
+                            <h4 style="margin:0; color: #047857; font-size:1.1rem;">✅ Listos</h4>
+                            <span id="countListos" style="background: #10b981; color: white; padding: 4px 10px; border-radius: 12px; font-weight:700;">0</span>
+                        </div>
+                        <div style="flex: 1; overflow-y: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                                <thead style="position: sticky; top: 0; background: white; z-index: 10;">
+                                    <tr>
+                                        <th style="text-align:left; padding:12px; background:#f9fafb; font-weight:700; color:var(--color-muted);">PRODUCTO</th>
+                                        <th style="text-align:center; width:90px; padding:12px; background:#f9fafb; font-weight:700; color:var(--color-muted);">CANTIDAD</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tblListosBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
-                <div style="flex: 1; display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #10b981; overflow: hidden; min-height:40vh;">
-                    <div style="padding: 15px; border-bottom: 1px solid #f3f4f6; background: #ecfdf5; display:flex; justify-content:space-between; align-items:center;">
-                        <h4 style="margin:0; color: #047857; font-size:1.1rem;">✅ Listos</h4>
-                        <span id="countListos" style="background: #10b981; color: white; padding: 4px 10px; border-radius: 12px; font-weight:700;">0</span>
+                <!-- Promociones y Kits -->
+                <div style="display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #8b5cf6; overflow: hidden; margin-top: 15px;">
+                    <div style="padding: 15px; border-bottom: 1px solid #f3f4f6; background: #f5f3ff; display:flex; justify-content:space-between; align-items:center;">
+                        <h4 style="margin:0; color: #6d28d9; font-size:1.1rem;">🎁 Avance de Promociones (Kits)</h4>
                     </div>
-                    <div style="flex: 1; overflow-y: auto;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                            <thead style="position: sticky; top: 0; background: white; z-index: 10;">
-                                <tr>
-                                    <th style="text-align:left; padding:12px; background:#f9fafb; font-weight:700; color:var(--color-muted);">PRODUCTO</th>
-                                    <th style="text-align:center; width:90px; padding:12px; background:#f9fafb; font-weight:700; color:var(--color-muted);">CANTIDAD</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tblListosBody"></tbody>
-                        </table>
+                    <div id="contenedor-promociones" style="padding: 15px; display: grid; gap: 15px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+                        <!-- Cajas Dinamicas de Kits -->
                     </div>
                 </div>
+
             </div>
             <div class="modal-footer" style="display:none;"></div>
         </div>
@@ -2110,12 +2126,15 @@
         function cargarDatosDetalle(orden) {
             const tbPend = document.getElementById('tblPendientesBody');
             const tbList = document.getElementById('tblListosBody');
+            const contPromos = document.getElementById('contenedor-promociones');
 
             fetch(`/bodegas/api/items_orden/${orden}?t=${Date.now()}`)
                 .then(r => r.json())
                 .then(items => {
-                    tbPend.innerHTML = ''; tbList.innerHTML = '';
+                    tbPend.innerHTML = ''; tbList.innerHTML = ''; contPromos.innerHTML = '';
                     let pendientes = []; let alistados = [];
+                    let kits = {}; 
+                    let huerfanas = [];
 
                     items.forEach(i => {
                         let reqCajas = parseFloat(i.cajas_calculadas) || 0;
@@ -2127,11 +2146,35 @@
                         let faltUnid = Math.max(0, reqUnid - pickUnid);
                         let estado = (i.estado_actividad || '').toUpperCase();
 
-                        if (estado === 'FINALIZADO') {
-                            alistados.push({ ...i, mostrarCajas: pickCajas, mostrarUnid: pickUnid });
-                        } else {
-                            if (faltCajas > 0 || faltUnid > 0) pendientes.push({ ...i, mostrarCajas: faltCajas, mostrarUnid: faltUnid });
-                            if (pickCajas > 0 || pickUnid > 0) alistados.push({ ...i, mostrarCajas: pickCajas, mostrarUnid: pickUnid });
+                        // Detectar Promo Huerfana
+                        if (estado === 'PROMO_HUERFANA' || (!i.autorizacion_alistamiento && estado === 'PENDIENTE')) {
+                            huerfanas.push(i);
+                            return; 
+                        }
+
+                        // Detectar Kits
+                        let desc = i.descripcion_producto || '';
+                        const matchPromo = desc.match(/\(Kit:\s*(.*?)\)/i);
+                        let isKit = false;
+                        let nombrePromo = '';
+
+                        if (matchPromo) {
+                            isKit = true;
+                            nombrePromo = matchPromo[1].trim();
+                            if (!kits[nombrePromo]) kits[nombrePromo] = [];
+                            
+                            let itemLimpio = { ...i, descLimpia: desc.replace(/\(Kit:\s*.*?\)/i, '').trim(), reqCajas, pickCajas, reqUnid, pickUnid, faltCajas, faltUnid, estado };
+                            kits[nombrePromo].push(itemLimpio);
+                        }
+
+                        // Normales
+                        if (!isKit) {
+                            if (estado === 'FINALIZADO' || estado === 'VERIFICADO' || estado === 'DESPACHADO' || estado === 'TERMINADO') {
+                                alistados.push({ ...i, mostrarCajas: pickCajas, mostrarUnid: pickUnid });
+                            } else {
+                                if (faltCajas > 0 || faltUnid > 0) pendientes.push({ ...i, mostrarCajas: faltCajas, mostrarUnid: faltUnid });
+                                if (pickCajas > 0 || pickUnid > 0) alistados.push({ ...i, mostrarCajas: pickCajas, mostrarUnid: pickUnid });
+                            }
                         }
                     });
 
@@ -2140,13 +2183,6 @@
 
                     const crearFila = (item, color, esPar) => {
                         let desc = item.descripcion_producto || '';
-                        let badge = '';
-                        const matchPromo = desc.match(/\(Kit:\s*(.*?)\)/i);
-                        if (matchPromo) {
-                            desc = desc.replace(/\(Kit:\s*.*?\)/i, '').trim();
-                            badge = `<span style="background:#fef08a; color:#92400e; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:8px; border:1px solid #fde68a;">🎁 KIT: ${matchPromo[1]}</span>`;
-                        }
-
                         let strCantidades = '';
                         if (item.mostrarCajas > 0) strCantidades += `<div style="margin-bottom:2px;">${item.mostrarCajas} <small style="font-size:0.65rem; color:#6b7280;">CAJA</small></div>`;
                         if (item.mostrarUnid > 0) strCantidades += `<div>${item.mostrarUnid} <small style="font-size:0.65rem; color:#6b7280;">${item.embalaje}</small></div>`;
@@ -2155,7 +2191,7 @@
                         return `
                         <tr style="background-color: ${esPar ? '#f9fafb' : '#ffffff'}; border-bottom: 1px solid #f3f4f6;">
                             <td style="padding: 15px 12px; color: #374151;">
-                                <div style="font-weight:600; display:flex; align-items:center; flex-wrap:wrap; gap:4px; font-size:0.95rem;">${desc} ${badge}</div>
+                                <div style="font-weight:600; display:flex; align-items:center; flex-wrap:wrap; gap:4px; font-size:0.95rem;">${desc}</div>
                                 <div style="font-size:0.75rem; color:#6b7280; margin-top:4px;">${item.codigo_producto}</div>
                             </td>
                             <td style="padding: 15px 10px; text-align: center; font-weight: 800; color: ${color}; font-size:1.1rem; min-width:90px;">${strCantidades}</td>
@@ -2167,6 +2203,68 @@
 
                     if (alistados.length === 0) tbList.innerHTML = '<tr><td colspan="2" style="padding:2rem; text-align:center; color:#9ca3af; font-weight:500;">⏳ Esperando avance...</td></tr>';
                     else alistados.forEach((i, x) => tbList.innerHTML += crearFila(i, '#10b981', x % 2 === 0));
+
+                    // Huerfanas
+                    let htmlPromos = '';
+                    huerfanas.forEach(h => {
+                        htmlPromos += `
+                        <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 15px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <h5 style="margin:0; color:#be123c; font-size:1.05rem;">🚨 PROMO NO CONFIGURADA</h5>
+                            </div>
+                            <p style="margin:0 0 10px 0; color:#881337; font-weight:600; font-size:0.95rem;">${h.descripcion_producto}</p>
+                            <p style="margin:0 0 15px 0; color:#f43f5e; font-size:0.85rem;">EAN: ${h.codigo_producto}</p>
+                            <button onclick="abrirModalPromociones(); cerrarModalDetalle();" class="btn-confirm" style="width:100%; background:#e11d48; display:flex; justify-content:center; align-items:center; gap:5px;">
+                                ⚙️ Configurar Combo
+                            </button>
+                        </div>`;
+                    });
+
+                    // Kits en curso
+                    for (let kit in kits) {
+                        let componentes = kits[kit];
+                        let reqTotal = 0; let pickTotal = 0;
+                        let htmlComp = '';
+                        
+                        componentes.forEach(c => {
+                            let totalReqCmp = c.reqCajas + c.reqUnid; 
+                            let totalPickCmp = c.pickCajas + c.pickUnid;
+                            reqTotal += totalReqCmp;
+                            pickTotal += totalPickCmp;
+                            
+                            let pCmp = totalReqCmp > 0 ? Math.round((totalPickCmp/totalReqCmp)*100) : 0;
+                            let colorTxt = pCmp === 100 ? '#10b981' : '#f59e0b';
+                            
+                            htmlComp += `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed #e2e8f0;">
+                                <div style="font-size:0.85rem; color:#475569; width:65%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.descLimpia}</div>
+                                <div style="font-size:0.85rem; font-weight:bold; color:${colorTxt};">${pCmp}%</div>
+                            </div>`;
+                        });
+
+                        let pGlobal = reqTotal > 0 ? Math.round((pickTotal/reqTotal)*100) : 0;
+                        
+                        htmlPromos += `
+                        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <h5 style="margin:0; color:#6d28d9; font-size:1.05rem;">📦 ${kit}</h5>
+                                <span style="background:#f5f3ff; color:#7e22ce; padding:2px 8px; border-radius:12px; font-weight:bold; font-size:0.8rem;">${pGlobal}%</span>
+                            </div>
+                            <div class="p-bar" style="height:6px; margin-bottom:10px;">
+                                <div class="p-fill" style="width:${pGlobal}%; background: ${pGlobal === 100 ? '#10b981' : '#a855f7'};"></div>
+                            </div>
+                            <div style="margin-top:10px;">
+                                ${htmlComp}
+                            </div>
+                        </div>`;
+                    }
+
+                    if (htmlPromos === '') {
+                        contPromos.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:15px; color:#9ca3af;">No hay promociones en esta orden.</div>';
+                    } else {
+                        contPromos.innerHTML = htmlPromos;
+                    }
+
                 }).catch(err => console.error(err));
         }
 

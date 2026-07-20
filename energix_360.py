@@ -1,11 +1,12 @@
 # energix_360.py
 import os
+import uuid
 from flask import render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory
 from app import create_app, mysql, csrf, bcrypt
 from app.forms import LoginForm
 from functools import wraps
 import MySQLdb.cursors
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # ==============================================================================
 # 1. CONFIGURACIÓN DE RUTAS FÍSICAS E INICIALIZACIÓN (App Factory)
@@ -34,6 +35,52 @@ def login_required_custom(f):
         if 'usuario_id' not in session:
             flash('Debe iniciar sesión para acceder a esta página.', 'warning')
             return redirect(url_for('index'))
+            
+        # --- LÓGICA DE CADUCIDAD DIARIA (4:00 A.M. HORA COLOMBIA) ---
+        ahora_utc = datetime.now(timezone.utc)
+        ahora_colombia = ahora_utc - timedelta(hours=5)
+        corte_hoy = ahora_colombia.replace(hour=4, minute=0, second=0, microsecond=0)
+        
+        # Determinar cuál fue el último corte de las 4:00 AM que ya pasó
+        if ahora_colombia >= corte_hoy:
+            limite_corte_timestamp = corte_hoy.timestamp()
+        else:
+            limite_corte_timestamp = (corte_hoy - timedelta(days=1)).timestamp()
+            
+        login_time = session.get('login_time')
+        
+        # Si no tiene registro de tiempo o inició sesión antes del último corte de las 4 AM, lo expulsamos
+        if not login_time or login_time < limite_corte_timestamp:
+            session.clear()
+            flash('Tu sesión ha expirado por cambio de turno (4:00 a.m.). Por favor, ingresa nuevamente.', 'warning')
+            return redirect(url_for('index'))
+        # -----------------------------------------------------------
+        
+        # --- LÓGICA DE CONTROL DE SESIONES ÚNICAS ---
+        perfil = str(session.get('perfil', '')).strip().lower()
+        # NUEVA REGLA: Sólo estos perfiles pueden tener múltiples sesiones abiertas a la vez
+        perfiles_multi_sesion = ['operador_logistica', 'webmaster_admin', 'supervisor_gas', 'gestor_flotacarga']
+        
+        if perfil not in perfiles_multi_sesion:
+            token_sesion_actual = session.get('token_sesion')
+            usuario_id = session.get('usuario_id')
+            
+            if token_sesion_actual and usuario_id:
+                try:
+                    cur = mysql.connection.cursor()
+                    cur.execute("SELECT token_sesion FROM usuarios WHERE id = %s", (usuario_id,))
+                    row = cur.fetchone()
+                    cur.close()
+                    
+                    # Si el token en BD es distinto, significa que inició sesión en otro dispositivo
+                    if row and row[0] != token_sesion_actual:
+                        session.clear()
+                        flash('Tu sesión fue cerrada porque ingresaste desde otro dispositivo.', 'danger')
+                        return redirect(url_for('index'))
+                except Exception as e:
+                    print(f"Error validando token de sesión única: {e}")
+        # ---------------------------------------------
+        
         return f(*args, **kwargs)
     return decorated_function
 
@@ -132,6 +179,19 @@ def login():
         cur.close()
         return jsonify(success=False, message="El usuario no pertenece a la empresa seleccionada.")
 
+    # --- GENERACIÓN DE TOKEN DE SESIÓN Y TIMESTAMP (HORA COLOMBIA) ---
+    token_sesion = str(uuid.uuid4())
+    ahora_utc = datetime.now(timezone.utc)
+    ahora_colombia = ahora_utc - timedelta(hours=5)
+    login_timestamp = ahora_colombia.timestamp()
+    
+    try:
+        cur.execute("UPDATE usuarios SET token_sesion = %s WHERE id = %s", (token_sesion, usuario['id']))
+        mysql.connection.commit()
+    except Exception as e:
+        print(f"Error al guardar token de sesión: {e}")
+    # ------------------------------------------------------------------
+
     modulos_activos = []
     try:
         cur.execute("""
@@ -153,7 +213,9 @@ def login():
         'nit': usuario['empresa_id'],
         'tipo_empresa': tipo_empresa,
         'perfil': str(usuario.get('perfil') or '').strip().lower(),
-        'modulos_activos': modulos_activos
+        'modulos_activos': modulos_activos,
+        'token_sesion': token_sesion,
+        'login_time': login_timestamp
     })
 
     print(f"[{datetime.now()}] Login Exitoso - CC: {session['cedula']} | NIT: {session['empresa_id']} | Perfil: {session['perfil']} | Modulos: {session['modulos_activos']}")
@@ -163,10 +225,6 @@ def login():
         html="panel_principal.html", 
         usuario={"id": usuario["id"], "nombre": usuario["nombre"]}
     )
-
-# ==============================================================================
-# 8. ENRUTADOR MAESTRO UNIVERSAL (DINÁMICO POR BD CON IDENTIFICADORES PLANOS)
-# ==============================================================================
 
 # ==============================================================================
 # 8. ENRUTADOR MAESTRO UNIVERSAL (DINÁMICO POR BD CON CAPA DE TRADUCCIÓN)
@@ -229,6 +287,7 @@ def router_universal(modulo):
         return redirect(url_for(archivo_destino))
     else:
         return render_template(archivo_destino, nombre=session.get('nombre'), empresa=session.get('empresa'), perfil=perfil_usuario, nit=nit_empresa, tipo_empresa=session.get('tipo_empresa'))
+
 # ==============================================================================
 # 9. CIERRE DE SESIÓN
 # ==============================================================================
