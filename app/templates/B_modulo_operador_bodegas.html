@@ -244,6 +244,7 @@
         }
         
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes pulseAlert { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
 
         .btn-close-modal {
             position: absolute; top: 15px; right: 15px; background: #f1f5f9; width: 36px; height: 36px;
@@ -274,6 +275,26 @@
             flex: 1; background: #000; border-radius: 12px; overflow: hidden; position: relative;
             display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
             min-height: 250px;
+        }
+
+        /* --- RESTAURACIÓN DE LA MIRA Y DESTELLO --- */
+        .scanner-mira {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 4px solid rgba(255,255,255,0.6);
+            border-radius: 12px;
+            z-index: 10;
+            pointer-events: none;
+            display: none;
+            transition: all 0.1s ease-in-out;
+        }
+        .scanner-mira.success {
+            border-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.4);
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
         }
 
         #embedded-reader { width: 100%; height: 100%; }
@@ -357,17 +378,17 @@
                 <!-- KPIs Operador -->
                 <div class="kpi-container">
                     <div class="kpi-box tooltip">
-                        <div class="kpi-val" style="color: #0284c7;">{{ kpis.avance_porcentaje }}%</div>
+                        <div class="kpi-val" style="color: #0284c7;" id="kpi-avance">{{ kpis.avance_porcentaje }}%</div>
                         <div class="kpi-lbl">Avance</div>
-                        <span class="tooltiptext">Mide tu progreso de hoy. Has completado {{ kpis.items_completados }} de {{ kpis.total_asignados }} ítems asignados a tus marcas.</span>
+                        <span class="tooltiptext">Mide tu progreso de hoy.</span>
                     </div>
                     <div class="kpi-box tooltip">
-                        <div class="kpi-val" style="color: #10b981;">{{ kpis.velocidad_picking }}</div>
+                        <div class="kpi-val" style="color: #10b981;" id="kpi-velocidad">{{ kpis.velocidad_picking }}</div>
                         <div class="kpi-lbl">Ítems/Min</div>
                         <span class="tooltiptext">Velocidad de alistamiento. Indica cuántos ítems alcanzas a confirmar correctamente por cada minuto trabajado.</span>
                     </div>
                     <div class="kpi-box tooltip">
-                        <div class="kpi-val" style="color: #e11d48;">{{ kpis.indice_novedades }}%</div>
+                        <div class="kpi-val" style="color: #e11d48;" id="kpi-novedades">{{ kpis.indice_novedades }}%</div>
                         <div class="kpi-lbl">Novedades</div>
                         <span class="tooltiptext">Porcentaje de error/ausencia. Muestra cuántos ítems tuviste que marcar sin stock o sin código.</span>
                     </div>
@@ -383,7 +404,7 @@
                         <span class="menu-title">Conteo de Inventario</span>
                     </div>
                 </div>
-                <button class="btn-logout-menu" onclick="location.href='/logout'">Cerrar Sesión</button>
+                <button class="btn-logout-menu" onclick="cerrarSesionInstantanea(event)">Cerrar Sesión</button>
             </div>
 
             <div id="view-orders" class="hidden">
@@ -440,9 +461,10 @@
         <div class="picking-sheet">
             <button class="btn-close-modal" onclick="cerrarModalPicking()">✕</button>
 
-            <!-- Zona Escáner y Datos (Scrollable en Portrait, Mitad Izq/Der en Landscape) -->
+            <!-- Zona Escáner y Datos -->
             <div class="camera-container">
                 <div id="embedded-reader"></div>
+                <div id="scanner-mira" class="scanner-mira"></div> <!-- LA MIRA VISUAL -->
                 <div id="cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraIncrustada()">
                     <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -471,7 +493,11 @@
 
                 <div class="action-area" id="area-conteo-cajas">
                     <span class="counter-lbl" style="color:#0369a1;">📦 CAJAS COMPLETAS</span>
-                    <span id="pk-count-cajas" class="counter-big" style="color:#0284c7;">0</span>
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 10px;">
+                        <button id="btn-minus-cajas" onclick="cambiarCajas(-1)" class="hidden" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #bae6fd; color: #0369a1; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
+                        <span id="pk-count-cajas" class="counter-big" style="color:#0284c7; margin: 0; min-width: 70px;">0</span>
+                        <button id="btn-plus-cajas" onclick="cambiarCajas(1)" class="hidden" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #0284c7; color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
+                    </div>
                 </div>
 
                 <div class="action-area hidden" id="area-teclado-fracciones" style="background: #fdf2f8; border-color: #fbcfe8;">
@@ -481,23 +507,25 @@
                         <span id="pk-count-unidades" class="counter-big" style="color:#be185d; margin: 0; min-width: 70px;">0</span>
                         <button onclick="cambiarFraccion(1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #f472b6; color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
                     </div>
-                    <small style="color:#9d174d; display:block; margin-top:12px; font-weight:600;">Lectura validada con EAN 🔑</small>
+                    <small id="lbl-val-ean" style="color:#9d174d; display:block; margin-top:12px; font-weight:600;">Lectura validada con EAN 🔑</small>
                 </div>
             </div>
 
             <!-- Zona del Pulgar (Thumb Zone - Acciones) -->
             <div class="picking-bottom-actions">
                 <button class="btn-finish" onclick="intentarTerminarItem()">TERMINAR ITEM</button>
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <div style="display: flex; gap: 10px; margin-top: 10px;" id="btns-novedades">
                     <button onclick="declararFaltaExistencias()" style="flex:1; background:#fee2e2; color:#b91c1c; padding:12px; border-radius:10px; border:1px solid #fecaca; font-weight:800; cursor:pointer; font-size: 0.9rem;">🚫 Sin Stock</button>
                     <button onclick="declararSinEAN()" style="flex:1; background:#fef3c7; color:#b45309; padding:12px; border-radius:10px; border:1px solid #fde68a; font-weight:800; cursor:pointer; font-size: 0.9rem;">⚠️ Sin EAN</button>
+                    <button id="btn-no-bd" onclick="declararNoEnBD()" class="hidden" style="flex:1; background:#f1f5f9; color:#475569; padding:12px; border-radius:10px; border:1px solid #cbd5e1; font-weight:800; cursor:pointer; font-size: 0.9rem;">⚠️ NO EN BD</button>
                 </div>
-                <button class="btn-reset" onclick="resetearConteo()">🔄 Reiniciar Escaneo</button>
+                <button class="btn-reset" id="btn-reset-lectura" onclick="resetearConteo()">🔄 Reiniciar Escaneo</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-verify" class="modal-wrap">
+    <!-- Modal Verificación Final -->
+    <div id="modal-verify" class="modal-wrap" style="z-index: 105;">
         <div class="verify-sheet">
             <div style="font-size: 3.5rem; margin-bottom: 10px;">🤔</div>
             <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">¿Confirmar Cantidades?</h3>
@@ -511,6 +539,31 @@
         </div>
     </div>
 
+    <!-- Modal Confirmación Sin Stock -->
+    <div id="modal-confirm-stock" class="modal-wrap" style="z-index: 110;">
+        <div class="verify-sheet">
+            <div style="font-size: 3.5rem; margin-bottom: 10px;">🚫</div>
+            <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">¿Confirmar Agotado?</h3>
+            <p style="color:#475569; line-height:1.5; font-size:1.05rem;">
+                ¿Está seguro de que no hay unidades del producto en stock?
+            </p>
+            <div class="verify-btns">
+                <button class="btn-v-cancel" onclick="cerrarConfirmacionStock()">No</button>
+                <button class="btn-v-confirm" style="background: #e11d48;" onclick="ejecutarFaltaExistencias()">Sí, No hay</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAY BLOQUEO ANDON (PANTALLA CONGELADA) -->
+    <div id="overlay-bloqueo-andon" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.95); z-index:9999; display:none; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px; backdrop-filter:blur(8px);">
+        <div style="font-size:5rem; margin-bottom:20px; animation: pulseAlert 1.5s infinite;">🚨</div>
+        <h2 style="color:#f87171; font-size:2rem; margin:0 0 15px 0;">OPERACIÓN DETENIDA</h2>
+        <p style="color:#cbd5e1; font-size:1.2rem; line-height:1.5;">Has reportado una novedad.<br>Tu pantalla está bloqueada temporalmente.</p>
+        <div style="margin-top:30px; padding:15px; background:#1e293b; border-radius:12px; border:1px solid #334155; max-width:400px;">
+            <p style="color:#94a3b8; font-size:1rem; margin:0;">El Controlador de Bodega ha sido notificado y está resolviendo el problema. <b>No cierres esta pantalla.</b></p>
+        </div>
+    </div>
+
     <script>
         // VARIABLES GLOBALES
         let novedadPendiente = null;
@@ -519,6 +572,13 @@
         let ordenActual = null, isLoteMode = false, listaItems = [], itemActivo = null, scanner = null;
         let lastScanTime = 0; 
         let audioCtx = null;
+
+        function cerrarSesionInstantanea(e) {
+            if (e) e.preventDefault();
+            fetch('/api/bodegas/offline', { method: 'POST' })
+            .then(() => { window.location.href = '/logout'; })
+            .catch(() => { window.location.href = '/logout'; });
+        }
 
         function initAudio() {
             try {
@@ -540,34 +600,27 @@
             } catch (e) { console.error("Audio init error", e); }
         }
 
+        // BEEP FUERTE Y VIBRACIÓN INCORPORADA
         function playBeep() {
             try {
+                // 1. Vibración intensa y breve
+                if (navigator.vibrate) {
+                    navigator.vibrate(150); 
+                }
+                
+                // 2. Audio más fuerte y agudo
                 if (audioCtx) {
                     const oscillator = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
                     oscillator.type = 'square';
-                    oscillator.frequency.setValueAtTime(1500, audioCtx.currentTime); 
+                    oscillator.frequency.setValueAtTime(1800, audioCtx.currentTime); 
                     gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); 
                     oscillator.connect(gainNode);
                     gainNode.connect(audioCtx.destination);
                     oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + 0.12); 
+                    oscillator.stop(audioCtx.currentTime + 0.2); 
                 }
             } catch (e) { console.log("Audio play error", e); }
-        }
-
-        function abrirMarca(marca) {
-            ordenActual = null;
-            document.getElementById('lblOrdenTitle').textContent = 'Lote: ' + marca;
-            toggleView('view-items');
-
-            const c = document.getElementById('items-container');
-            c.innerHTML = '<p style="text-align:center; padding:20px; font-weight:600;">Cargando inventario del lote...</p>';
-
-            fetch(`/api/operario/items_lote/${marca}?v=` + new Date().getTime()).then(r => r.json()).then(d => {
-                listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
-                renderizarItems();
-            });
         }
 
         window.onload = mostrarMenu;
@@ -624,21 +677,62 @@
                 if (cOrd && cOrd.innerHTML !== html) cOrd.innerHTML = html;
             }).catch(e => console.log(e));
         }
+        
+        function cargarKPIsOperador() {
+            fetch('/api/operario/mis_kpis?t=' + Date.now())
+                .then(r => r.json())
+                .then(d => {
+                    if(document.getElementById('kpi-avance')) document.getElementById('kpi-avance').textContent = d.avance_porcentaje + '%';
+                    if(document.getElementById('kpi-velocidad')) document.getElementById('kpi-velocidad').textContent = d.velocidad_picking;
+                    if(document.getElementById('kpi-novedades')) document.getElementById('kpi-novedades').textContent = d.indice_novedades + '%';
+                })
+                .catch(e => console.log(e));
+        }
 
+        // POLLING PRINCIPAL DE ITEMS (Escucha resolución del Controlador)
         function cargarItemsSilencioso() {
             if (!ordenActual) return;
             const url = isLoteMode ? `/api/operario/items_lote/${ordenActual}` : `/api/operario/items_orden/${ordenActual}`;
             
             fetch(url + '?v=' + new Date().getTime()).then(r => r.json()).then(d => {
-                if (itemActivo === null) {
-                    listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
+                listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
+                
+                // Si la pantalla de bloqueo está activa, buscamos si el controlador ya resolvió
+                if (itemActivo !== null && document.getElementById('overlay-bloqueo-andon').style.display === 'flex') {
+                    const itemActualizado = listaItems.find(i => i.id === itemActivo.id);
+                    if (itemActualizado) {
+                        // Caso A: El controlador confirmó el agotado o lo saltó (pasa a VERIFICADO o ALISTADO sin novedad)
+                        if (itemActualizado.estado_actividad === 'VERIFICADO' || itemActualizado.estado_actividad === 'ALISTADO') {
+                            document.getElementById('overlay-bloqueo-andon').style.display = 'none';
+                            alert("✅ Novedad resuelta por el Controlador. Ítem cerrado.");
+                            cerrarModalPicking();
+                            renderizarItems();
+                        } 
+                        // Caso B: El controlador Autorizó a ciegas
+                        else if (itemActualizado.novedad_alistamiento === 'AUTORIZADO_CIEGAS') {
+                            document.getElementById('overlay-bloqueo-andon').style.display = 'none';
+                            alert("✅ El Controlador autorizó el ingreso manual a ciegas. Por favor cuenta las cantidades físicas manualmente.");
+                            cerrarModalPicking();
+                            abrirModalPickingId(itemActualizado.id);
+                        }
+                        // Caso C: El controlador inyectó el EAN (la novedad se limpió y vuelve a PENDIENTE)
+                        else if (!itemActualizado.novedad_alistamiento && novedadPendiente) {
+                            document.getElementById('overlay-bloqueo-andon').style.display = 'none';
+                            alert("✅ ¡Éxito! El Controlador ha formalizado el producto. Ya puedes escanear el código.");
+                            cerrarModalPicking();
+                            abrirModalPickingId(itemActualizado.id);
+                        }
+                    }
+                } else {
                     renderizarItems();
                 }
             }).catch(e => console.log(e));
         }
 
         setInterval(() => {
-            if (!document.getElementById('view-orders').classList.contains('hidden')) {
+            if (!document.getElementById('view-menu').classList.contains('hidden')) {
+                cargarKPIsOperador();
+            } else if (!document.getElementById('view-orders').classList.contains('hidden')) {
                 cargarOrdenesSilencioso();
             } else if (!document.getElementById('view-items').classList.contains('hidden')) {
                 cargarItemsSilencioso();
@@ -651,7 +745,6 @@
             const cMar = document.getElementById('marcas-container');
             cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>'; 
             cMar.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>';
-
             cargarOrdenesSilencioso(); 
         }
 
@@ -750,6 +843,13 @@
                     extraBadges += `<span style="display:inline-block; background:#fce7f3; color:#be185d; font-size:0.7rem; padding:3px 6px; border-radius:6px; font-weight:800; margin-top:5px;">🚚 Muelle: ${i.puerta_asignada}</span>`;
                 }
 
+                // SI LA NOVEDAD ESTÁ BLOQUEADA (NO EN BD) o AUTORIZADA visualmente en lista
+                if (i.novedad_alistamiento === 'NO_EN_BD') {
+                    extraBadges += `<br><span style="display:inline-block; background:#fff1f2; color:#e11d48; font-size:0.75rem; padding:4px 8px; border-radius:6px; font-weight:800; margin-top:5px; border:1px solid #fecdd3;">⚠️ ESPERANDO SOLUCIÓN DE CONTROLADOR</span>`;
+                } else if (i.novedad_alistamiento === 'AUTORIZADO_CIEGAS') {
+                    extraBadges += `<br><span style="display:inline-block; background:#fffbeb; color:#d97706; font-size:0.75rem; padding:4px 8px; border-radius:6px; font-weight:800; margin-top:5px; border:1px solid #fde68a;">⚠️ INGRESO MANUAL AUTORIZADO</span>`;
+                }
+
                 let embalaje = (i.unidad_embalaje && i.unidad_embalaje.trim() !== '') ? i.unidad_embalaje.toUpperCase() : 'UNIDADES';
                 if (embalaje === 'UND') embalaje = 'UNIDADES';
 
@@ -759,11 +859,19 @@
                 if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.95rem;">📦 0</div>`;
 
                 let isDone = (i.estado_actividad === 'ALISTADO' || i.estado_actividad === 'VERIFICADO' || i.estado_actividad === 'DESPACHADO' || i.estado_actividad === 'FINALIZADO');
-                let rowClass = isDone ? "item-row completed" : "item-row active";
+                let isLocked = (i.novedad_alistamiento === 'NO_EN_BD');
+                
+                let rowClass = "item-row active";
+                if (isDone) rowClass = "item-row completed";
+                if (isLocked && !isDone) rowClass = "item-row active"; 
+
                 let onclickAction = isDone ? "" : `onclick="abrirModalPickingId(${i.id})"`;
 
+                // Estilo especial para los bloqueados
+                let bgBorder = isLocked ? 'border-left: 5px solid #e11d48; background: #fff1f2;' : '';
+
                 htmlInner += `
-            <div id="card_${i.id}" class="${rowClass}" ${onclickAction}>
+            <div id="card_${i.id}" class="${rowClass}" style="${bgBorder}" ${onclickAction}>
                 <div class="qty-indicator" style="flex-direction: column; gap: 2px; padding: 5px; width: 60px;">
                     ${isDone ? '<span style="font-size:1.8rem; color:#2ecc71;">✓</span>' : htmlCantidades}
                 </div>
@@ -779,14 +887,13 @@
 
         function filtrarLista() { renderizarItems(); }
 
-        let faseAlistamiento = '';
-
         function abrirModalPickingId(id) {
             const item = listaItems.find(i => i.id === id);
             if (!item || item.estado_actividad === 'FINALIZADO' || item.estado_actividad === 'ALISTADO' || item.estado_actividad === 'VERIFICADO') return;
 
             itemActivo = item;
             lastScanTime = 0; 
+            novedadPendiente = null;
 
             const nombre = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
             document.getElementById('pk-name').textContent = nombre;
@@ -806,12 +913,49 @@
             if (itemActivo.req_unidades > 0) htmlReqModal += `🍬 ${itemActivo.req_unidades} ${embalajeModal}`;
 
             document.getElementById('pk-req').innerHTML = htmlReqModal || '0';
-
             document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
             document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
 
-            document.getElementById('cam-overlay-btn').style.display = 'flex';
-            document.getElementById('embedded-reader').style.opacity = '1';
+            // Restablecer interfaz visual
+            const btnFinish = document.querySelector('.btn-finish');
+
+            if (item.marca === 'NO EN BASE DE DATOS') {
+                document.getElementById('btn-no-bd').classList.remove('hidden');
+            } else {
+                document.getElementById('btn-no-bd').classList.add('hidden');
+            }
+
+            const esCiegas = (item.novedad_alistamiento === 'AUTORIZADO_CIEGAS');
+
+            if (esCiegas) {
+                document.querySelector('.camera-container').style.display = 'none';
+                document.getElementById('btn-minus-cajas').classList.remove('hidden');
+                document.getElementById('btn-plus-cajas').classList.remove('hidden');
+                document.getElementById('btns-novedades').style.display = 'none';
+                document.getElementById('btn-reset-lectura').style.display = 'none';
+                
+                const lblVal = document.getElementById('lbl-val-ean');
+                if (lblVal) {
+                    lblVal.textContent = 'Ingreso Manual Autorizado 🔓';
+                    lblVal.style.color = '#d97706';
+                }
+            } else {
+                document.querySelector('.camera-container').style.display = 'flex';
+                document.getElementById('cam-overlay-btn').style.display = 'flex';
+                document.getElementById('embedded-reader').style.opacity = '1';
+                document.getElementById('btn-minus-cajas').classList.add('hidden');
+                document.getElementById('btn-plus-cajas').classList.add('hidden');
+                document.getElementById('btns-novedades').style.display = 'flex';
+                document.getElementById('btn-reset-lectura').style.display = 'block';
+                
+                const lblVal = document.getElementById('lbl-val-ean');
+                if (lblVal) {
+                    lblVal.textContent = 'Lectura validada con EAN 🔑';
+                    lblVal.style.color = '#9d174d';
+                }
+            }
+
+            evaluarBotonTerminar();
 
             if (itemActivo.req_cajas > 0) {
                 document.getElementById('area-conteo-cajas').classList.remove('hidden');
@@ -825,15 +969,14 @@
                 document.getElementById('area-teclado-fracciones').classList.add('hidden');
             }
 
-            evaluarBotonTerminar();
             document.getElementById('modal-picking').style.display = 'flex';
         }
 
         function cerrarModalPicking() {
             detenerCamara();
             document.getElementById('modal-picking').style.display = 'none';
+            document.getElementById('overlay-bloqueo-andon').style.display = 'none';
             itemActivo = null;
-            faseAlistamiento = '';
             novedadPendiente = null;
             idSupervisorAutorizado = null;
         }
@@ -853,6 +996,28 @@
             }
         }
 
+        function cambiarCajas(valor) {
+            if (!itemActivo) return;
+            let actual = itemActivo.act_cajas;
+            let nuevo = actual + valor;
+
+            if (nuevo >= 0 && nuevo <= itemActivo.req_cajas) {
+                itemActivo.act_cajas = nuevo;
+                document.getElementById('pk-count-cajas').textContent = nuevo;
+                playBeep();
+                evaluarBotonTerminar();
+
+                if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
+                    if(scanner) {
+                        document.getElementById('embedded-reader').style.opacity = '0.5';
+                        detenerCamara();
+                    }
+                } else {
+                    if(scanner) document.getElementById('embedded-reader').style.opacity = '1';
+                }
+            }
+        }
+
         function cambiarFraccion(valor) {
             if (!itemActivo) return;
             let actual = itemActivo.act_unidades;
@@ -865,16 +1030,21 @@
                 evaluarBotonTerminar();
 
                 if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
-                    document.getElementById('embedded-reader').style.opacity = '0.5';
-                    detenerCamara();
+                    if(scanner) {
+                        document.getElementById('embedded-reader').style.opacity = '0.5';
+                        detenerCamara();
+                    }
                 } else {
-                    document.getElementById('embedded-reader').style.opacity = '1';
+                    if(scanner) document.getElementById('embedded-reader').style.opacity = '1';
                 }
             }
         }
 
         function evaluarBotonTerminar() {
+            if (!itemActivo) return;
             const btn = document.querySelector('.btn-finish');
+            btn.disabled = false;
+            
             if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
                 btn.style.background = '#10b981';
                 btn.textContent = 'TERMINAR ÍTEM ✓';
@@ -899,8 +1069,16 @@
 
             const isPortrait = window.innerHeight > window.innerWidth;
             const screenWidth = window.innerWidth;
+            
+            // Calculamos el área de lectura en pantalla
             const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
             const targetHeight = Math.floor(targetWidth * 0.45);
+
+            // Ajustamos la MIRA visual exactamente a esa área
+            const mira = document.getElementById('scanner-mira');
+            mira.style.width = targetWidth + 'px';
+            mira.style.height = targetHeight + 'px';
+            mira.style.display = 'block';
 
             const configScanner = {
                 formatsToSupport: [
@@ -928,6 +1106,13 @@
                     if (target && scanned === target) {
                         lastScanTime = now;
                         playBeep();
+
+                        // Animación de Destello Verde en la Mira
+                        const miraVisual = document.getElementById('scanner-mira');
+                        if (miraVisual) {
+                            miraVisual.classList.add('success');
+                            setTimeout(() => miraVisual.classList.remove('success'), 300);
+                        }
 
                         if (itemActivo.req_cajas > 0 && itemActivo.act_cajas < itemActivo.req_cajas) {
                             itemActivo.act_cajas++;
@@ -964,6 +1149,7 @@
                 console.error(err);
                 alert("Error cámara: Verifica permisos HTTPS en el navegador.");
                 document.getElementById('cam-overlay-btn').style.display = 'flex';
+                document.getElementById('scanner-mira').style.display = 'none';
             });
         }
 
@@ -972,6 +1158,8 @@
                 scanner.stop().then(() => { scanner.clear(); }).catch(e => console.log(e));
                 scanner = null;
             }
+            const mira = document.getElementById('scanner-mira');
+            if(mira) mira.style.display = 'none';
         }
 
         function intentarTerminarItem() {
@@ -987,36 +1175,48 @@
             document.getElementById('modal-verify').style.display = 'none';
         }
 
+        // =====================================
+        // DISPARADORES DE NOVEDADES
+        // =====================================
         function declararFaltaExistencias() {
             if (!itemActivo) return;
-            if (confirm("⚠️ ¿Seguro que este producto NO se encuentra físicamente? Se registrará la novedad y se cerrará con cantidades en CERO (0).")) {
-                itemActivo.act_cajas = 0;
-                itemActivo.act_unidades = 0;
-                novedadPendiente = 'FALTA_EXISTENCIAS';
-                idSupervisorAutorizado = null; 
-                intentarTerminarItem(); 
-            }
+            document.getElementById('modal-confirm-stock').style.display = 'flex';
+        }
+
+        function cerrarConfirmacionStock() {
+            document.getElementById('modal-confirm-stock').style.display = 'none';
+        }
+
+        function ejecutarFaltaExistencias() {
+            cerrarConfirmacionStock();
+            novedadPendiente = 'FALTA_EXISTENCIAS';
+            idSupervisorAutorizado = null; 
+            itemActivo.act_cajas = 0;
+            itemActivo.act_unidades = 0;
+            intentarTerminarItem(); 
         }
 
         function declararSinEAN() {
             if (!itemActivo) return;
-            if (confirm("⚠️ ¿Deseas alistar este ítem manualmente sin lectura de código de barras? El ítem se marcará como alistado y pasará a auditoría visual del verificador.")) {
-                novedadPendiente = 'SIN_EAN';
-                idSupervisorAutorizado = null; 
-                
-                detenerCamara();
-                document.getElementById('cam-overlay-btn').style.display = 'none';
-                document.getElementById('embedded-reader').style.opacity = '0.3';
-
-                itemActivo.act_cajas = itemActivo.req_cajas;
-                itemActivo.act_unidades = itemActivo.req_unidades;
-                document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
-                document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
-
-                evaluarBotonTerminar();
-            }
+            novedadPendiente = 'SIN_EAN';
+            idSupervisorAutorizado = null; 
+            itemActivo.act_cajas = itemActivo.req_cajas;
+            itemActivo.act_unidades = itemActivo.req_unidades;
+            intentarTerminarItem(); 
         }
 
+        function declararNoEnBD() {
+            if (!itemActivo) return;
+            novedadPendiente = 'NO_EN_BD';
+            idSupervisorAutorizado = null; 
+            itemActivo.act_cajas = itemActivo.req_cajas;
+            itemActivo.act_unidades = itemActivo.req_unidades;
+            intentarTerminarItem(); 
+        }
+
+        // =====================================
+        // ENVÍO DE DATOS Y BLOQUEO ANDON
+        // =====================================
         function confirmarVerificacion() {
             const btn = document.querySelector('.btn-v-confirm');
             const textoOriginal = btn.textContent;
@@ -1026,6 +1226,14 @@
             const idParaBorrar = itemActivo.id;
             const cajasGuardar = itemActivo.act_cajas;
             const unidadesGuardar = itemActivo.act_unidades;
+            
+            let novedadAEnviar = novedadPendiente;
+            let supervisorAEnviar = idSupervisorAutorizado;
+
+            if (!novedadPendiente && itemActivo.novedad_alistamiento === 'AUTORIZADO_CIEGAS') {
+                novedadAEnviar = 'AUTORIZADO_CIEGAS';
+                supervisorAEnviar = itemActivo.id_supervisor_novedad || null; 
+            }
 
             fetch('/api/operario/confirmar_item', {
                 method: 'POST',
@@ -1034,8 +1242,8 @@
                     id_row: idParaBorrar,
                     cajas_alistadas: cajasGuardar,
                     unidades_alistadas: unidadesGuardar,
-                    novedad: novedadPendiente,          
-                    id_supervisor: idSupervisorAutorizado 
+                    novedad: novedadAEnviar,          
+                    id_supervisor: supervisorAEnviar 
                 })
             })
             .then(r => {
@@ -1044,18 +1252,24 @@
             })
             .then(d => {
                 if (d.status === 'ok') {
-                    cancelarVerificacion();
-                    cerrarModalPicking();
+                    cancelarVerificacion(); // Cerramos solo el modal de confirmación
                     
-                    const idx = listaItems.findIndex(i => i.id === idParaBorrar);
-                    if (idx > -1) {
-                        listaItems[idx].estado_actividad = d.message && d.message.includes('parcial') ? 'EN_PROCESO' : 'ALISTADO';
-                        listaItems[idx].act_cajas = cajasGuardar;
-                        listaItems[idx].act_unidades = unidadesGuardar;
+                    if (novedadPendiente) {
+                        // SI HAY NOVEDAD: Bloqueo Andon de pantalla completa
+                        document.getElementById('overlay-bloqueo-andon').style.display = 'flex';
+                        // El polling de cargarItemsSilencioso() lo liberará
+                    } else {
+                        // SI NO HAY NOVEDAD: Flujo normal (cerrar y seguir)
+                        cerrarModalPicking();
+                        const idx = listaItems.findIndex(i => i.id === idParaBorrar);
+                        if (idx > -1) {
+                            listaItems[idx].estado_actividad = d.message && d.message.includes('parcial') ? 'EN_PROCESO' : 'ALISTADO';
+                            listaItems[idx].act_cajas = cajasGuardar;
+                            listaItems[idx].act_unidades = unidadesGuardar;
+                        }
+                        renderizarItems();
+                        playBeep();
                     }
-                    
-                    renderizarItems();
-                    playBeep();
                 } else {
                     alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
                 }

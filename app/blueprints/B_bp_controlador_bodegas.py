@@ -56,10 +56,9 @@ def control_logistica():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # KPIs Generales
+        # KPIs Generales - Items
         cur.execute("""
             SELECT 
-                COUNT(DISTINCT numero_orden_origen) as total,
                 SUM(CASE WHEN estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'TERMINADO') OR estado_actividad IS NULL THEN 1 ELSE 0 END) as pendientes,
                 SUM(CASE WHEN estado_actividad IN ('VERIFICADO', 'DESPACHADO') THEN 1 ELSE 0 END) as listos
             FROM picking_importacion_raw 
@@ -67,7 +66,6 @@ def control_logistica():
         """, (empresa_id,))
         row = cur.fetchone()
         if row:
-            kpis['pedidos_totales'] = row['total'] or 0
             kpis['items_pendientes'] = int(row['pendientes'] or 0)
             kpis['items_finalizados'] = int(row['listos'] or 0)
 
@@ -108,11 +106,12 @@ def control_logistica():
         """, (empresa_id,))
         ordenes_sin_asignar = cur.fetchall()
 
-        # Operarios y KPIs
+        # Operarios y KPIs (Incluye conexión en vivo y trae a todos)
         cur.execute("""
             SELECT 
                 u.id as id_operario,
                 u.nombre as nombre_operario,
+                IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
                 GROUP_CONCAT(DISTINCT fp.marca SEPARATOR ', ') as marcas_asignadas,
                 COUNT(DISTINCT fp.marca) as total_marcas,
                 COUNT(p.id) as total_asignados,
@@ -121,11 +120,12 @@ def control_logistica():
                 SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL 
                          THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM usuarios u
+            LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
             LEFT JOIN fabricantes_proveedores fp ON u.id = fp.operador_asignado AND fp.id_empresa = %s
             LEFT JOIN picking_importacion_raw p ON p.marca = fp.marca AND p.id_empresa = %s AND p.puerta_asignada IS NOT NULL AND (p.estado_actividad != 'TERMINADO' OR p.estado_actividad IS NULL) AND p.autorizacion_alistamiento = TRUE
             WHERE u.empresa_id = %s AND u.perfil = 'operador_logistica'
-            GROUP BY u.id, u.nombre
-            ORDER BY u.nombre ASC
+            GROUP BY u.id, u.nombre, ma.ultima_actividad
+            ORDER BY en_linea DESC, u.nombre ASC
         """, (empresa_id, empresa_id, empresa_id))
         operarios_marcas_raw = cur.fetchall()
 
@@ -139,30 +139,52 @@ def control_logistica():
             op_dict['avance_porcentaje'] = round((completados / asignados) * 100) if asignados > 0 else 0
             op_dict['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
             op_dict['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
+            op_dict['en_linea'] = int(op_dict.get('en_linea', 0))
             
             operarios_marcas.append(op_dict)
 
-        # KPIs Verificadores
+        # KPIs Verificadores: Trae a TODOS los verificadores e indica conexión
         cur.execute("""
             SELECT 
                 u.id as id_verificador,
                 u.nombre as nombre_verificador,
-                COUNT(p.id) as items_verificados,
+                IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
+                COUNT(p.id) as total_verificados,
                 SUM(CASE WHEN p.cajas_alistadas != p.cajas_verificadas OR p.unidades_alistadas != p.unidades_verificadas THEN 1 ELSE 0 END) as discrepancias
             FROM usuarios u
-            LEFT JOIN picking_importacion_raw p ON p.id_verificador = u.id AND p.id_empresa = %s AND DATE(p.fecha_verificacion) = CURDATE()
-            WHERE u.empresa_id = %s AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
-            GROUP BY u.id, u.nombre
-            HAVING items_verificados > 0
-            ORDER BY items_verificados DESC
+            LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
+            LEFT JOIN picking_importacion_raw p ON p.id_verificador = u.id AND p.id_empresa = %s AND p.fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
+            WHERE u.empresa_id = %s 
+              AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
+            GROUP BY u.id, u.nombre, ma.ultima_actividad
+            ORDER BY en_linea DESC, total_verificados DESC
         """, (empresa_id, empresa_id))
         verificadores_raw = cur.fetchall()
-
+        
         for v in verificadores_raw:
             v_dict = dict(v)
-            verificados = int(v_dict['items_verificados'] or 0)
+            verificados = int(v_dict['total_verificados'] or 0)
             discrepancias = int(v_dict['discrepancias'] or 0)
             v_dict['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
+            v_dict['en_linea'] = int(v_dict.get('en_linea', 0))
+            
+            # Obtener el total de ítems en las órdenes que este verificador ha tocado hoy
+            cur.execute("""
+                SELECT COUNT(p2.id) as total_items_ordenes_tocadas
+                FROM picking_importacion_raw p2
+                WHERE p2.id_empresa = %s 
+                  AND p2.numero_orden_origen IN (
+                      SELECT DISTINCT numero_orden_origen 
+                      FROM picking_importacion_raw 
+                      WHERE id_verificador = %s AND fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
+                  )
+            """, (empresa_id, v_dict['id_verificador']))
+            row_total = cur.fetchone()
+            total_items_ordenes = row_total['total_items_ordenes_tocadas'] if row_total else 0
+            
+            v_dict['avance_porcentaje'] = round((verificados / total_items_ordenes) * 100) if total_items_ordenes > 0 else 0
+            v_dict['items_verificados'] = verificados
+            
             verificadores_kpis.append(v_dict)
 
         # Backlog de Verificación
@@ -288,6 +310,8 @@ def control_logistica():
                 activos.append(o)
 
         kpis['pedidos_pendientes_reales'] = len(ordenes_sin_asignar) + len(activos)
+        kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']  
+        
         if total_mins_speed > 0:
             kpis['velocidad_promedio'] = round(total_items_speed / total_mins_speed, 2)
 
@@ -310,14 +334,134 @@ def control_logistica():
                            alertas_criticas=alertas_criticas)
 
 # ==============================================================================
-# ENDPOINT DE MONITOREO EN TIEMPO REAL
+# GESTIÓN DE NOVEDADES EN VIVO (SISTEMA ANDON / STOP THE LINE)
+# ==============================================================================
+
+@bp_bodegas.route('/api/bodegas/novedades_en_vivo')
+def novedades_en_vivo():
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT p.id, p.numero_orden_origen, p.codigo_producto, p.descripcion_producto, 
+                   p.cajas_calculadas, p.unidades_calculadas, p.cajas_alistadas, p.unidades_alistadas,
+                   p.novedad_alistamiento, p.nombre_auxiliar_asignado, p.estado_actividad, p.marca
+            FROM picking_importacion_raw p
+            WHERE p.id_empresa = %s 
+              AND p.novedad_alistamiento IN ('NO_EN_BD', 'SIN_EAN', 'FALTA_EXISTENCIAS')
+              AND p.estado_actividad IN ('EN_PROCESO', 'ALISTADO')
+              AND (p.id_supervisor_novedad IS NULL OR p.id_supervisor_novedad = 0)
+            ORDER BY p.fecha_fin_alistamiento DESC
+        """, (session.get('empresa_id'),))
+        data = cur.fetchall()
+        cur.close()
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error novedades en vivo: {e}")
+        return jsonify([])
+
+@bp_bodegas.route('/api/bodegas/resolver_novedad_vivo', methods=['POST'])
+@csrf.exempt
+def resolver_novedad_vivo():
+    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
+    data = request.json
+    id_row = data.get('id_row')
+    accion = data.get('accion') 
+    
+    try:
+        cur = mysql.connection.cursor()
+        
+        if accion == 'CONFIRMAR_FALTANTE' or accion == 'CONFIRMAR_AGOTADO':
+            cur.execute("""
+                UPDATE picking_importacion_raw 
+                SET estado_actividad = 'VERIFICADO', cajas_verificadas = 0, unidades_verificadas = 0, 
+                    novedad_alistamiento = 'FALTA_EXISTENCIAS',
+                    id_supervisor_novedad = %s, id_verificador = %s, fecha_verificacion = NOW()
+                WHERE id = %s AND id_empresa = %s
+            """, (session.get('usuario_id'), session.get('usuario_id'), id_row, session.get('empresa_id')))
+            
+        elif accion == 'ASIGNAR_EAN':
+            ean = data.get('ean')
+            desc = data.get('descripcion')
+            marca = data.get('marca', 'GENERICO')
+            embalaje = data.get('unidad_embalaje', 'UND')
+            
+            cur.execute("""
+                INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE 
+                producto=VALUES(producto), fabricante=VALUES(fabricante), unidad_embalaje=VALUES(unidad_embalaje)
+            """, (session.get('empresa_id'), session.get('nombre_empresa'), 'general', ean, ean, desc, marca, embalaje))
+            
+            cur.execute("""
+                UPDATE picking_importacion_raw 
+                SET codigo_producto = %s, descripcion_producto = %s, marca = %s, 
+                    novedad_alistamiento = NULL, estado_actividad = 'PENDIENTE', id_supervisor_novedad = %s
+                WHERE id = %s AND id_empresa = %s
+            """, (ean, desc, marca, session.get('usuario_id'), id_row, session.get('empresa_id')))
+            
+        elif accion == 'AUTORIZAR_CIEGAS':
+            cur.execute("""
+                UPDATE picking_importacion_raw 
+                SET estado_actividad = 'PENDIENTE', 
+                    novedad_alistamiento = 'AUTORIZADO_CIEGAS',
+                    id_supervisor_novedad = %s
+                WHERE id = %s AND id_empresa = %s
+            """, (session.get('usuario_id'), id_row, session.get('empresa_id')))
+
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'status': 'success', 'message': 'Novedad resuelta y flujo liberado correctamente.'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp_bodegas.route('/api/bodegas/buscar_producto_maestro')
+def buscar_producto_maestro():
+    if 'usuario_id' not in session: return jsonify([])
+    q = request.args.get('q', '').strip()
+    if len(q) < 3: return jsonify([])
+    
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        query = """
+            SELECT ean, producto, IFNULL(fabricante, 'GENERICO') as marca, IFNULL(unidad_embalaje, 'UND') as unidad_embalaje
+            FROM productos 
+            WHERE id_empresa = %s AND (ean LIKE %s OR producto LIKE %s)
+            LIMIT 30
+        """
+        like_q = f"%{q}%"
+        cur.execute(query, (session.get('empresa_id'), like_q, like_q))
+        data = cur.fetchall()
+        cur.close()
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error buscar producto maestro: {e}")
+        return jsonify([])
+
+# ==============================================================================
+# ENDPOINT DE MONITOREO EN TIEMPO REAL (DASHBOARD)
 # ==============================================================================
 @bp_bodegas.route('/api/bodegas/monitoreo_realtime')
 def monitoreo_realtime():
     if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'})
     
     empresa_id = session.get('empresa_id')
+    usuario_id = session.get('usuario_id')
     
+    # --- HEARTBEAT CONTROLADOR ---
+    try:
+        cur_hb = mysql.connection.cursor()
+        cur_hb.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (usuario_id,))
+        mysql.connection.commit()
+        cur_hb.close()
+    except Exception as e:
+        print(f"Error heartbeat controlador: {e}")
+    # -----------------------------
+
     kpis = {
         'pedidos_totales': 0, 
         'items_pendientes': 0, 
@@ -336,7 +480,6 @@ def monitoreo_realtime():
         
         cur.execute("""
             SELECT 
-                COUNT(DISTINCT numero_orden_origen) as total,
                 SUM(CASE WHEN estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'TERMINADO') OR estado_actividad IS NULL THEN 1 ELSE 0 END) as pendientes,
                 SUM(CASE WHEN estado_actividad IN ('VERIFICADO', 'DESPACHADO') THEN 1 ELSE 0 END) as listos
             FROM picking_importacion_raw 
@@ -344,11 +487,9 @@ def monitoreo_realtime():
         """, (empresa_id,))
         row = cur.fetchone()
         if row:
-            kpis['pedidos_totales'] = row['total'] or 0
             kpis['items_pendientes'] = int(row['pendientes'] or 0)
             kpis['items_finalizados'] = int(row['listos'] or 0)
             
-        # Alias Exception
         cur.execute("""
             SELECT COUNT(*) as requiere_alias 
             FROM picking_importacion_raw 
@@ -375,11 +516,13 @@ def monitoreo_realtime():
         for o in ordenes_sin_asignar:
             if isinstance(o['fecha'], datetime): o['fecha'] = o['fecha'].strftime('%Y-%m-%d %H:%M:%S')
 
-        # KPIs Operarios
+        kpis['items_pendientes'] = sum(int(o['total_items']) for o in ordenes_sin_asignar)
+
         cur.execute("""
             SELECT 
                 u.id as id_operario,
                 u.nombre as nombre_operario,
+                IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
                 GROUP_CONCAT(DISTINCT fp.marca SEPARATOR ', ') as marcas_asignadas,
                 COUNT(DISTINCT fp.marca) as total_marcas,
                 COUNT(p.id) as total_asignados,
@@ -388,11 +531,12 @@ def monitoreo_realtime():
                 SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL 
                          THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM usuarios u
+            LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
             LEFT JOIN fabricantes_proveedores fp ON u.id = fp.operador_asignado AND fp.id_empresa = %s
             LEFT JOIN picking_importacion_raw p ON p.marca = fp.marca AND p.id_empresa = %s AND p.puerta_asignada IS NOT NULL AND (p.estado_actividad != 'TERMINADO' OR p.estado_actividad IS NULL) AND p.autorizacion_alistamiento = TRUE
             WHERE u.empresa_id = %s AND u.perfil = 'operador_logistica'
-            GROUP BY u.id, u.nombre
-            ORDER BY u.nombre ASC
+            GROUP BY u.id, u.nombre, ma.ultima_actividad
+            ORDER BY en_linea DESC, u.nombre ASC
         """, (empresa_id, empresa_id, empresa_id))
         operarios_marcas_raw = cur.fetchall()
 
@@ -406,33 +550,52 @@ def monitoreo_realtime():
             op_dict['avance_porcentaje'] = round((completados / asignados) * 100) if asignados > 0 else 0
             op_dict['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
             op_dict['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
+            op_dict['en_linea'] = int(op_dict.get('en_linea', 0))
             
             operarios_marcas.append(op_dict)
 
-        # KPIs Verificadores
         cur.execute("""
             SELECT 
                 u.id as id_verificador,
                 u.nombre as nombre_verificador,
-                COUNT(p.id) as items_verificados,
+                IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
+                COUNT(p.id) as total_verificados,
                 SUM(CASE WHEN p.cajas_alistadas != p.cajas_verificadas OR p.unidades_alistadas != p.unidades_verificadas THEN 1 ELSE 0 END) as discrepancias
             FROM usuarios u
-            LEFT JOIN picking_importacion_raw p ON p.id_verificador = u.id AND p.id_empresa = %s AND DATE(p.fecha_verificacion) = CURDATE()
-            WHERE u.empresa_id = %s AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
-            GROUP BY u.id, u.nombre
-            HAVING items_verificados > 0
-            ORDER BY items_verificados DESC
+            LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
+            LEFT JOIN picking_importacion_raw p ON p.id_verificador = u.id AND p.id_empresa = %s AND p.fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
+            WHERE u.empresa_id = %s 
+              AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
+            GROUP BY u.id, u.nombre, ma.ultima_actividad
+            ORDER BY en_linea DESC, total_verificados DESC
         """, (empresa_id, empresa_id))
         verificadores_raw = cur.fetchall()
 
         for v in verificadores_raw:
             v_dict = dict(v)
-            verificados = int(v_dict['items_verificados'] or 0)
+            verificados = int(v_dict['total_verificados'] or 0)
             discrepancias = int(v_dict['discrepancias'] or 0)
             v_dict['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
+            v_dict['en_linea'] = int(v_dict.get('en_linea', 0))
+            
+            cur.execute("""
+                SELECT COUNT(p2.id) as total_items_ordenes_tocadas
+                FROM picking_importacion_raw p2
+                WHERE p2.id_empresa = %s 
+                  AND p2.numero_orden_origen IN (
+                      SELECT DISTINCT numero_orden_origen 
+                      FROM picking_importacion_raw 
+                      WHERE id_verificador = %s AND fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
+                  )
+            """, (empresa_id, v_dict['id_verificador']))
+            row_total = cur.fetchone()
+            total_items_ordenes = row_total['total_items_ordenes_tocadas'] if row_total else 0
+            
+            v_dict['avance_porcentaje'] = round((verificados / total_items_ordenes) * 100) if total_items_ordenes > 0 else 0
+            v_dict['items_verificados'] = verificados
+            
             verificadores_kpis.append(v_dict)
 
-        # Backlog Verificación
         cur.execute("""
             SELECT COUNT(id) as total_backlog 
             FROM picking_importacion_raw 
@@ -544,6 +707,7 @@ def monitoreo_realtime():
                 activos.append(o)
             else:
                 o['estado_visual'] = 'EN_PROCESO'
+                kpis['items_pendientes'] += (total_it - it_listos) 
                 if o['velocidad'] > 0 and o['velocidad'] < 1.0: 
                     o['color_fila'] = '#fef2f2'
                 elif o['velocidad'] >= 1.0:
@@ -563,6 +727,8 @@ def monitoreo_realtime():
             o.pop('fin', None)
 
         kpis['pedidos_pendientes_reales'] = len(ordenes_sin_asignar) + len(activos)
+        kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']
+        
         if total_mins_speed > 0:
             kpis['velocidad_promedio'] = round(total_items_speed / total_mins_speed, 2)
 
@@ -817,7 +983,6 @@ def operarios_asignacion():
         cur.execute("SELECT id, nombre FROM usuarios WHERE empresa_id = %s AND perfil = 'operador_logistica' ORDER BY nombre ASC", (empresa_id,))
         operarios = cur.fetchall()
 
-        # UPPER() añadido para prevenir errores de case sensitivity en el cruce 
         cur.execute("""
             SELECT DISTINCT m.marca, m.nombre_marca, fp.operador_asignado
             FROM (
@@ -867,23 +1032,56 @@ def guardar_asignacion_marcas():
 @bp_bodegas.route('/bodegas/asignar_puerta', methods=['POST'])
 @csrf.exempt
 def asignar_puerta():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión'}), 401
+    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
     d = request.json
+    empresa_id = session.get('empresa_id')
+    orden = d.get('numero_orden')
+    puerta = d.get('puerta')
+    secuencia = d.get('secuencia', 0)
+    zona = d.get('zona', 'GENERAL')
+
     try:
-        cur = mysql.connection.cursor()
-        secuencia = d.get('secuencia', 0)
-        zona = d.get('zona', 'GENERAL')
-        
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+        cur.execute("""
+            SELECT DISTINCT u.id, u.nombre
+            FROM picking_importacion_raw p
+            INNER JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            INNER JOIN usuarios u ON fp.operador_asignado = u.id
+            WHERE p.numero_orden_origen = %s AND p.id_empresa = %s AND p.marca != 'NO EN BASE DE DATOS'
+        """, (orden, empresa_id))
+        operarios = cur.fetchall()
+
+        if not operarios:
+            cur.execute("SELECT id, nombre FROM usuarios WHERE empresa_id = %s AND perfil = 'operador_logistica'", (empresa_id,))
+            operarios = cur.fetchall()
+
+        cur.execute("""
+            SELECT id FROM picking_importacion_raw
+            WHERE numero_orden_origen = %s AND id_empresa = %s AND marca = 'NO EN BASE DE DATOS'
+        """, (orden, empresa_id))
+        items_huerfanos = cur.fetchall()
+
+        if operarios and items_huerfanos:
+            for i, item in enumerate(items_huerfanos):
+                op_asignado = operarios[i % len(operarios)]
+                cur.execute("""
+                    UPDATE picking_importacion_raw
+                    SET id_auxiliar_asignado = %s, nombre_auxiliar_asignado = %s
+                    WHERE id = %s
+                """, (op_asignado['id'], op_asignado['nombre'], item['id']))
+
         cur.execute("""
             UPDATE picking_importacion_raw 
             SET puerta_asignada=%s, secuencia_alistamiento=%s, zona=%s, estado_actividad='ASIGNADO', fecha_inicio_alistamiento=NOW()
-            WHERE numero_orden_origen=%s AND id_empresa=%s
-        """, (d['puerta'], secuencia, zona, d['numero_orden'], session.get('empresa_id')))
+            WHERE numero_orden_origen=%s AND id_empresa=%s AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
+        """, (puerta, secuencia, zona, orden, empresa_id))
             
         mysql.connection.commit()
         cur.close()
-        return jsonify({'message': 'Muelle y configuración asignada correctamente.'})
-    except Exception as e: return jsonify({'error': str(e)}), 500
+        return jsonify({'message': 'Muelle asignado y novedades repartidas equitativamente.'})
+    except Exception as e: 
+        return jsonify({'error': str(e)}), 500
 
 @bp_bodegas.route('/bodegas/api/items_orden/<orden>')
 def get_items_orden(orden):
@@ -895,12 +1093,8 @@ def get_items_orden(orden):
                 p.id, p.codigo_producto, p.descripcion_producto, p.marca, 
                 p.cajas_calculadas, p.cajas_alistadas, p.cajas_verificadas,
                 p.unidades_calculadas, p.unidades_alistadas, p.unidades_verificadas,
-                p.estado_actividad,
-                IFNULL(prod.unidad_embalaje, 'UND') as embalaje
+                p.estado_actividad, p.autorizacion_alistamiento
             FROM picking_importacion_raw p
-            LEFT JOIN productos prod 
-                ON (p.codigo_producto = prod.ean OR p.codigo_producto = prod.sku) 
-                AND p.id_empresa = prod.id_empresa
             WHERE p.numero_orden_origen = %s AND p.id_empresa = %s
         """, (orden, session.get('empresa_id')))
         items = cur.fetchall()
@@ -1108,6 +1302,7 @@ def get_productos_por_marca(marca):
     except Exception as e: return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/editar_producto', methods=['POST'])
+@csrf.exempt
 def editar_producto():
     if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
         
@@ -1131,6 +1326,7 @@ def editar_producto():
         return jsonify({'status': 'error', 'message': 'Error interno'})
 
 @bp_bodegas.route('/api/bodegas/eliminar_producto', methods=['POST'])
+@csrf.exempt
 def eliminar_producto():
     if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
         
@@ -1155,6 +1351,7 @@ def eliminar_producto():
         return jsonify({'status': 'error', 'message': 'Error interno'})
 
 @bp_bodegas.route('/api/bodegas/eliminar_marca', methods=['POST'])
+@csrf.exempt
 def eliminar_marca():
     if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
         
@@ -1219,6 +1416,7 @@ def detalle_promocion(ean_promo):
         return jsonify([])
 
 @bp_bodegas.route('/api/promociones/guardar', methods=['POST'])
+@csrf.exempt
 def guardar_promocion():
     if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
     try:
@@ -1257,6 +1455,7 @@ def guardar_promocion():
         return jsonify({'status': 'error', 'message': 'Error al guardar'})
 
 @bp_bodegas.route('/api/promociones/estado', methods=['POST'])
+@csrf.exempt
 def cambiar_estado_promocion():
     if 'usuario_id' not in session: return jsonify({'status': 'error'})
     try:
@@ -1271,6 +1470,7 @@ def cambiar_estado_promocion():
         return jsonify({'status': 'error'})
 
 @bp_bodegas.route('/api/promociones/eliminar', methods=['POST'])
+@csrf.exempt
 def eliminar_promocion():
     if 'usuario_id' not in session: return jsonify({'status': 'error'})
     try:
@@ -1598,7 +1798,7 @@ def kpis_historico():
             op_d['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
             operarios_kpis.append(op_d)
             
-        # 3. Verificadores Histórico
+        # 3. Verificadores Histórico (Modificado para intervalo de 14H en vez de CURDATE)
         query_verificadores = """
             SELECT 
                 u.nombre as verificador,
@@ -1607,6 +1807,7 @@ def kpis_historico():
             FROM picking_importacion_raw p
             INNER JOIN usuarios u ON p.id_verificador = u.id
             WHERE p.id_empresa = %s 
+              AND p.fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
               AND DATE(p.fecha_verificacion) BETWEEN %s AND %s
             GROUP BY u.nombre
             ORDER BY items_verificados DESC
@@ -1852,14 +2053,11 @@ def upload_excel():
                     idx_desc = header_map.get('DESCRIPCION')
                     idx_code = header_map.get('CODIGO')
                     
-                    # REGLA ESTRICTA DE FILA VACÍA: Si la descripción está vacía, se salta TODA la fila contigua de inmediato
                     raw_desc = str(row[idx_desc]).strip() if idx_desc is not None and pd.notna(row[idx_desc]) else ""
                     if raw_desc.upper() in ['NAN', 'NULL', 'NONE', '']: 
                         continue
                     
                     lineas_detectadas += 1
-                    
-                    # Devorar dinámicamente cualquier cantidad de puntos suspensivos de relleno contable al final
                     raw_desc = re.sub(r'[\.\s]+$', '', raw_desc).strip()
                     
                     raw_code = str(row[idx_code]).strip() if idx_code is not None and pd.notna(row[idx_code]) else ""
@@ -1869,7 +2067,6 @@ def upload_excel():
                     cajas = 0
                     unidades = 0
                     
-                    # Jerarquía Estricta: Prioridad Caso 1 (Cantidad/Unidad) sobre Caso 2 (Pivote)
                     if 'CANTIDAD' in header_map and 'UNIDAD_MEDIDA' in header_map:
                         val_cant = row[header_map['CANTIDAD']]
                         if str(val_cant).strip() and es_cadena_numerica(val_cant):
@@ -1898,7 +2095,6 @@ def upload_excel():
                     match_encontrado = False
                     es_promo = False
 
-                    # 1. Comparar por EAN (Prioridad)
                     if final_ean:
                         if final_ean in diccionario_promos:
                             es_promo = True
@@ -1914,7 +2110,6 @@ def upload_excel():
                             elif prod_db['unidad_embalaje'] not in ['CAJA', 'CJ', 'CAJAS'] and cajas > 0 and unidades == 0:
                                 unidades = cajas; cajas = 0
 
-                    # 2. Comparar por Descripción EXACTA (Sin tolerancias)
                     if not match_encontrado and final_desc:
                         desc_limpia = limpiar_texto(final_desc)
                         
@@ -1970,7 +2165,6 @@ def upload_excel():
                                 cálculo_marcas_presentes.add(hijo_marca)
                                 sub_items_generados += 1
                     else:
-                        # Detectar promociones huérfanas
                         palabras_clave_promo = ['OFE ', 'OFERTA', 'PROMO', 'KIT ', 'COMBO', 'PAGUE ']
                         desc_upper = str(final_desc).upper() if final_desc else ""
                         es_huerfana = any(k in desc_upper for k in palabras_clave_promo)
@@ -2045,3 +2239,20 @@ def reporte_importacion():
     except Exception as e:
         print(f"Error reporte importacion: {e}")
         return jsonify([])
+
+@bp_bodegas.route('/api/bodegas/offline', methods=['POST'])
+@csrf.exempt
+def set_offline():
+    if 'usuario_id' not in session: return jsonify({'status': 'error'})
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            UPDATE monitoreo_actividad 
+            SET ultima_actividad = DATE_SUB(NOW(), INTERVAL 1 MINUTE) 
+            WHERE id_usuario = %s
+        """, (session.get('usuario_id'),))
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})

@@ -294,7 +294,7 @@
                         <span class="menu-title">Auditar Picking</span>
                     </div>
                 </div>
-                <button class="btn-logout-menu" onclick="location.href='/logout'">Cerrar Sesión</button>
+                <button class="btn-logout-menu" onclick="cerrarSesionInstantanea(event)">Cerrar Sesión</button>
             </div>
 
             <div id="view-orders" class="hidden">
@@ -409,6 +409,13 @@
         let lastScanTime = 0;
         let audioCtx = null;
 
+        function cerrarSesionInstantanea(e) {
+            if (e) e.preventDefault();
+            fetch('/api/bodegas/offline', { method: 'POST' })
+            .then(() => { window.location.href = '/logout'; })
+            .catch(() => { window.location.href = '/logout'; });
+        }
+
         function initAudio() {
             try {
                 if (!audioCtx) {
@@ -489,8 +496,16 @@
                 }).catch(e => console.log(e));
         }
 
+        // --- NUEVO: FUNCIÓN PARA REPORTAR LATIDO MIENTRAS SE ESTÁ EN EL MENÚ ---
+        function enviarPingVerificador() {
+            fetch('/api/verificador/ping?v=' + new Date().getTime(), { method: 'POST' })
+                .catch(e => console.log('Error ping silencioso:', e));
+        }
+
         setInterval(() => {
-            if (!document.getElementById('view-orders').classList.contains('hidden')) {
+            if (!document.getElementById('view-menu').classList.contains('hidden')) {
+                enviarPingVerificador(); // Mantiene al usuario "En línea" en el Controlador
+            } else if (!document.getElementById('view-orders').classList.contains('hidden')) {
                 cargarOrdenesSilencioso();
             } else if (!document.getElementById('view-items').classList.contains('hidden')) {
                 cargarItemsSilencioso();

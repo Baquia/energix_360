@@ -768,7 +768,7 @@
             </div>
         </div>
 
-        <a href="/logout" class="menu-item btn-logout">
+        <a href="#" onclick="cerrarSesionInstantanea(event)" class="menu-item btn-logout">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
                 <path d="M9 21H5a2 2 0 0 1-2 2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
@@ -1235,6 +1235,24 @@
                     </div>
                 </div>
 
+                <!-- SECCIÓN ANDON: NOVEDADES EN VIVO -->
+                <div id="section-andon" class="section-box" style="border: 2px solid #e11d48; display: none;">
+                    <h4 class="section-title" style="background: #fff1f2; color: #be123c; border-bottom: 1px solid #fecdd3;">🚨 Novedades Activas (ANDON) - Operarios Bloqueados</h4>
+                    <table class="data-table" style="background: white;">
+                        <thead>
+                            <tr>
+                                <th>Orden</th>
+                                <th>Novedad</th>
+                                <th>Producto</th>
+                                <th>Operario</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-andon-novedades">
+                        </tbody>
+                    </table>
+                </div>
+
                 <div class="section-box">
                     <h4 class="section-title">🚢 1. Asignar Muelles (Órdenes Nuevas)</h4>
                     <table class="data-table">
@@ -1292,7 +1310,10 @@
                                         {% if operarios_marcas %}
                                             {% for op in operarios_marcas %}
                                             <tr>
-                                                <td data-label="Operario"><strong>{{ op.nombre_operario }}</strong></td>
+                                                <td data-label="Operario">
+                                                    {% if op.en_linea == 1 %}<span style="font-size: 10px;" title="En línea">🟢</span>{% else %}<span style="font-size: 10px;" title="Fuera de línea">⚪</span>{% endif %}
+                                                    <strong>{{ op.nombre_operario }}</strong>
+                                                </td>
                                                 <td data-label="Marcas">
                                                     {% if op.marcas_asignadas %}
                                                         <span style="color: var(--color-primary); font-size: 0.85rem;">{{ op.marcas_asignadas }}</span> 
@@ -1333,7 +1354,10 @@
                                         {% if verificadores_kpis %}
                                             {% for v in verificadores_kpis %}
                                             <tr>
-                                                <td data-label="Verificador"><strong>{{ v.nombre_verificador }}</strong></td>
+                                                <td data-label="Verificador">
+                                                    {% if v.en_linea == 1 %}<span style="font-size: 10px;" title="En línea">🟢</span>{% else %}<span style="font-size: 10px;" title="Fuera de línea">⚪</span>{% endif %}
+                                                    <strong>{{ v.nombre_verificador }}</strong>
+                                                </td>
                                                 <td data-label="Auditados"><span class="badge badge-purple">{{ v.items_verificados }}</span></td>
                                                 <td data-label="Discrepancias">
                                                     <span style="font-weight:700; color:{% if v.indice_discrepancia > 0 %}#e11d48{% else %}#10b981{% endif %};">{{ v.indice_discrepancia }}%</span>
@@ -1425,7 +1449,7 @@
                                     {% if op.estado_visual == 'VERIFICADO' %}
                                     <button onclick="abrirModalDespacho('{{ op.orden }}')" class="btn-assign" style="background:#10b981; color:white; border:none; width: 100%; padding:12px;">🚚 Vehículo</button>
                                     {% elif op.estado_visual == 'DESPACHADO' or op.estado_visual == 'TERMINADO' %}
-                                    <button onclick="window.open('/bodegas/imprimir_acta/{{ op.orden }}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>
+                                    <button onclick="window.open('/bodegas/imprimir_acta/${op.orden}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>
                                     {% elif op.estado_visual == 'ALISTADO' %}
                                     <span style="color:#f59e0b; font-size:0.85rem; display: block; text-align: center; font-weight:700;">En Auditoría</span>
                                     {% else %}
@@ -1441,6 +1465,62 @@
                     </table>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL RESOLVER NOVEDAD EN VIVO (ANDON) -->
+    <div id="modalNovedadVivo" class="modal-overlay" style="z-index: 3200;">
+        <div class="modal-card" style="max-width: 450px; background: #fff; overflow: visible;">
+            <div class="modal-header" style="background: #fff1f2; border-bottom: 1px solid #fecdd3;">
+                <h3 style="color: #be123c;">🛠️ Resolver Novedad en Vivo</h3>
+                <button class="btn-cancel" onclick="cerrarModalNovedadVivo()" style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#be123c;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px; background: #ffffff; overflow: visible;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <span style="font-size: 0.7rem; font-weight: 700; color: #64748b;">PRODUCTO REPORTADO</span>
+                    <div id="nv-prod-name" style="font-weight: 900; font-size: 1.1rem; color: #1e293b; margin-top: 5px;">Nombre Producto</div>
+                    <div style="font-size: 0.85rem; color: #475569; margin-top: 5px;">Código actual: <span id="nv-prod-code" style="font-weight: 700;">123</span></div>
+                    <div style="font-size: 0.85rem; color: #475569; margin-top: 5px;">Operario Bloqueado: <span id="nv-operario" style="color: #e11d48; font-weight: 700;">Operario</span></div>
+                </div>
+
+                <div id="nv-form-formalizar">
+                    <h5 style="color: #0369a1; margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 5px;">👉 Formalizar Producto para Desbloquear</h5>
+                    
+                    <div style="position: relative; margin-bottom: 15px;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #0369a1;">Buscador Catálogo Maestro</label>
+                        <input type="text" id="nv-search-catalogo" onkeyup="buscarProductoNovedad(this.value)" placeholder="🔍 Buscar por nombre o EAN..." style="width:100%; padding:10px; border-radius:6px; border:2px solid #38bdf8; font-size:1rem; background: #f0fdfa;">
+                        <div id="nv-search-results" style="position:absolute; top:100%; left:0; width:100%; max-height:200px; overflow-y:auto; background:white; border:1px solid #ccc; border-radius:6px; z-index:4000; display:none; box-shadow:0 4px 6px rgba(0,0,0,0.1);"></div>
+                    </div>
+
+                    <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">EAN Real / Código de Barras (Requerido)</label>
+                    <input type="text" id="nv-input-ean" style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px; border:1px solid #cbd5e1; font-size:1rem;">
+                    
+                    <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Descripción a guardar</label>
+                    <input type="text" id="nv-input-desc" style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px; border:1px solid #cbd5e1; font-size:1rem;">
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Marca</label>
+                            <input type="text" id="nv-input-marca" style="width:100%; padding:10px; border-radius:6px; border:1px solid #cbd5e1; font-size:1rem;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Unidad Embalaje</label>
+                            <select id="nv-input-emb" style="width:100%; padding:10px; border-radius:6px; border:1px solid #cbd5e1; font-size:1rem; background: white;">
+                                <option value="UND">UND</option>
+                                <option value="CAJA">CAJA</option>
+                                <option value="DISPLAY">DISPLAY</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="ejecutarAccionNovedad('ASIGNAR_EAN')" class="btn-confirm" style="width: 100%; background: #10b981; margin-bottom: 10px; font-size: 1rem;">✅ Guardar y Desbloquear Operario</button>
+                <button onclick="ejecutarAccionNovedad('AUTORIZAR_CIEGAS')" class="btn-cancel" style="width: 100%; color: #d97706; border-color: #fcd34d; background: #fffbeb; margin-bottom: 20px; font-size: 0.95rem; font-weight: 800;">⚠️ Autorizar "A Ciegas" (Excepción)</button>
+                
+                <h5 style="color: #b91c1c; margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 5px;" id="nv-lbl-agotado">👉 El operario indica que no hay stock físico.</h5>
+                <button id="nv-btn-agotado" onclick="ejecutarAccionNovedad('CONFIRMAR_FALTANTE')" class="btn-confirm" style="width: 100%; background: #e11d48; font-size: 1rem;">🚫 Confirmar Agotado (Cerrar en Cero)</button>
+                <input type="hidden" id="nv-id-row">
             </div>
         </div>
     </div>
@@ -1693,6 +1773,13 @@
         window.tempInputs = window.tempInputs || {};
         function guardarInputTemp(el) { window.tempInputs[el.id] = el.value; }
 
+        function cerrarSesionInstantanea(e) {
+            if (e) e.preventDefault();
+            fetch('/api/bodegas/offline', { method: 'POST' })
+            .then(() => { window.location.href = '/logout'; })
+            .catch(() => { window.location.href = '/logout'; });
+        }
+
         function toggleSidebar() {
             const sb = document.getElementById('sidebar');
             const ov = document.getElementById('sidebar-overlay');
@@ -1743,7 +1830,7 @@
             };
             document.getElementById('rango-fechas-lbl').textContent = "Lapso seleccionado: " + mapNombres[lapso];
 
-            fetch(`/api/bodegas/reportes/kpis_historico?lapso=${lapso}`)
+            fetch(`/api/bodegas/reportes/kpis_historico?lapso=${lapso}&t=` + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     const ctx = document.getElementById('chartKPIs').getContext('2d');
@@ -1905,6 +1992,7 @@
                     htmlOp = '<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:#9ca3af;">No hay operarios activos.</td></tr>';
                 } else {
                     data.operarios_marcas.forEach(op => {
+                        let dotOp = op.en_linea === 1 ? '<span style="font-size: 10px;" title="En línea">🟢</span>' : '<span style="font-size: 10px;" title="Fuera de línea">⚪</span>';
                         let marcas = op.marcas_asignadas ? `<span style="color: var(--color-primary); font-size: 0.85rem;">${op.marcas_asignadas}</span> <span class="badge badge-blue">${op.total_marcas}</span>` : `<span style="color: #9ca3af; font-size: 0.85rem;">Sin marcas</span>`;
                         
                         let p_color = op.avance_porcentaje === 100 ? '#10b981' : 'var(--color-secondary)';
@@ -1915,7 +2003,7 @@
                         let nov = `<span style="font-weight:700; color:${nov_color};">${op.indice_novedades}%</span>`;
 
                         htmlOp += `<tr>
-                            <td data-label="Operario"><strong>${op.nombre_operario}</strong></td>
+                            <td data-label="Operario">${dotOp} <strong>${op.nombre_operario}</strong></td>
                             <td data-label="Marcas">${marcas}</td>
                             <td data-label="Avance" style="min-width:120px;">${p_bar}</td>
                             <td data-label="Velocidad">${vel}</td>
@@ -1931,9 +2019,10 @@
                     htmlVerif = '<tr><td colspan="3" style="text-align:center; padding:1.5rem; color:#9ca3af;">No hay verificadores activos hoy.</td></tr>';
                 } else if(data.verificadores_kpis) {
                     data.verificadores_kpis.forEach(v => {
+                        let dotV = v.en_linea === 1 ? '<span style="font-size: 10px;" title="En línea">🟢</span>' : '<span style="font-size: 10px;" title="Fuera de línea">⚪</span>';
                         let disc_color = v.indice_discrepancia > 0 ? '#e11d48' : '#10b981';
                         htmlVerif += `<tr>
-                            <td data-label="Verificador"><strong>${v.nombre_verificador}</strong></td>
+                            <td data-label="Verificador">${dotV} <strong>${v.nombre_verificador}</strong></td>
                             <td data-label="Auditados"><span class="badge badge-purple">${v.items_verificados}</span></td>
                             <td data-label="Discrepancias"><span style="font-weight:700; color:${disc_color};">${v.indice_discrepancia}%</span></td>
                         </tr>`;
@@ -2005,14 +2094,164 @@
                 tbPedidos.innerHTML = htmlPedidos;
                 actualizarCronometros();
             });
+
+            // POLLING NOVEDADES EN VIVO (ANDON)
+            fetch('/api/bodegas/novedades_en_vivo?t=' + Date.now())
+            .then(r => r.json())
+            .then(novedades => {
+                const secAndon = document.getElementById('section-andon');
+                const tbAndon = document.getElementById('tbody-andon-novedades');
+                
+                if (novedades.length > 0) {
+                    secAndon.style.display = 'block';
+                    let html = '';
+                    novedades.forEach(n => {
+                        let tipoNov = n.novedad_alistamiento === 'FALTA_EXISTENCIAS' ? 'FALTA FÍSICA 🚫' : (n.novedad_alistamiento === 'SIN_EAN' ? 'SIN EAN ⚠️' : 'NO EN BD ⚠️');
+                        let btnColor = n.novedad_alistamiento === 'FALTA_EXISTENCIAS' ? '#e11d48' : '#d97706';
+                        let descClean = (n.descripcion_producto || '').replace(/'/g, "\\'");
+                        
+                        html += `<tr>
+                            <td data-label="Orden"><b>${n.numero_orden_origen}</b></td>
+                            <td data-label="Novedad"><span class="badge" style="background:#fee2e2; color:#be123c; border:1px solid #fecaca;">${tipoNov}</span></td>
+                            <td data-label="Producto">${n.descripcion_producto}<br><small>${n.codigo_producto || 'S/C'}</small></td>
+                            <td data-label="Operario" style="color:#e11d48; font-weight:700;">${n.nombre_auxiliar_asignado}</td>
+                            <td data-label="Acción">
+                                <button onclick="abrirModalNovedadVivo(${n.id}, '${n.codigo_producto || ''}', '${descClean}', '${n.marca || ''}', '${n.nombre_auxiliar_asignado}', '${n.novedad_alistamiento}')" class="btn-confirm" style="background:${btnColor}; padding:8px 12px; width:100%;">Gestionar Novedad</button>
+                            </td>
+                        </tr>`;
+                    });
+                    tbAndon.innerHTML = html;
+                } else {
+                    secAndon.style.display = 'none';
+                    tbAndon.innerHTML = '';
+                }
+            }).catch(e => console.error(e));
         }
+
+        function abrirModalNovedadVivo(id, ean, desc, marca, operario, tipo_novedad) {
+            document.getElementById('nv-id-row').value = id;
+            document.getElementById('nv-prod-code').textContent = ean || 'Sin código';
+            document.getElementById('nv-prod-name').textContent = desc;
+            document.getElementById('nv-operario').textContent = operario;
+            
+            document.getElementById('nv-input-ean').value = ean !== 'SIN_CODIGO' ? ean : '';
+            document.getElementById('nv-input-desc').value = desc;
+            document.getElementById('nv-input-marca').value = marca && marca !== 'NO EN BASE DE DATOS' ? marca : '';
+            document.getElementById('nv-input-emb').value = 'UND'; 
+            
+            const formForm = document.getElementById('nv-form-formalizar');
+            const btnAgotado = document.getElementById('nv-btn-agotado');
+            const lblAgotado = document.getElementById('nv-lbl-agotado');
+            
+            if (tipo_novedad === 'FALTA_EXISTENCIAS') {
+                formForm.style.opacity = '0.4';
+                formForm.style.pointerEvents = 'none';
+                btnAgotado.style.display = 'block';
+                lblAgotado.style.display = 'flex';
+            } else {
+                formForm.style.opacity = '1';
+                formForm.style.pointerEvents = 'auto';
+                btnAgotado.style.display = 'none';
+                lblAgotado.style.display = 'none';
+            }
+            
+            document.getElementById('modalNovedadVivo').style.display = 'flex';
+        }
+
+        function cerrarModalNovedadVivo() {
+            document.getElementById('modalNovedadVivo').style.display = 'none';
+            document.getElementById('nv-search-catalogo').value = '';
+            document.getElementById('nv-search-results').style.display = 'none';
+        }
+
+        function ejecutarAccionNovedad(accion) {
+            const id_row = document.getElementById('nv-id-row').value;
+            const ean = document.getElementById('nv-input-ean').value.trim();
+            const desc = document.getElementById('nv-input-desc').value.trim();
+            const marca = document.getElementById('nv-input-marca').value.trim();
+            const emb = document.getElementById('nv-input-emb').value;
+            
+            if (accion === 'ASIGNAR_EAN') {
+                if (!ean || !desc) {
+                    alert("⚠️ Debes ingresar el EAN y la descripción para formalizar el producto.");
+                    return;
+                }
+            }
+            
+            const payload = {
+                id_row: id_row,
+                accion: accion,
+                ean: ean,
+                descripcion: desc,
+                marca: marca || 'GENERICO',
+                unidad_embalaje: emb
+            };
+            
+            fetch('/api/bodegas/resolver_novedad_vivo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    cerrarModalNovedadVivo();
+                    cargarMonitoreoRealTime();
+                } else {
+                    alert("❌ Error: " + (d.error || d.message));
+                }
+            })
+            .catch(e => alert("Error de conexión"));
+        }
+
+        // FUNCIONES NUEVAS DEL BUSCADOR DE CATÁLOGO
+        function buscarProductoNovedad(q) {
+            const resDiv = document.getElementById('nv-search-results');
+            if (q.length < 3) { resDiv.style.display = 'none'; return; }
+            
+            fetch('/api/bodegas/buscar_producto_maestro?q=' + encodeURIComponent(q) + '&t=' + Date.now())
+                .then(r => r.json())
+                .then(data => {
+                    resDiv.innerHTML = '';
+                    if (data.length === 0) {
+                        resDiv.innerHTML = '<div style="padding:10px; color:#9ca3af; font-size:0.9rem;">No se encontraron resultados</div>';
+                    } else {
+                        data.forEach(p => {
+                            let descClean = p.producto.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                            let marcaClean = (p.marca || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                            resDiv.innerHTML += `<div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer;" onclick="seleccionarCatalogoNovedad('${p.ean}', '${descClean}', '${marcaClean}', '${p.unidad_embalaje}')">
+                                <strong style="color:var(--color-primary-dark); font-size:0.95rem;">${p.producto}</strong><br>
+                                <span style="font-size:0.8rem; color:#64748b;">EAN: ${p.ean} | Marca: ${p.marca}</span>
+                            </div>`;
+                        });
+                    }
+                    resDiv.style.display = 'block';
+                })
+                .catch(e => console.error(e));
+        }
+
+        function seleccionarCatalogoNovedad(ean, desc, marca, emb) {
+            document.getElementById('nv-input-ean').value = ean;
+            document.getElementById('nv-input-desc').value = desc;
+            document.getElementById('nv-input-marca').value = marca;
+            document.getElementById('nv-input-emb').value = emb || 'UND';
+            document.getElementById('nv-search-results').style.display = 'none';
+            document.getElementById('nv-search-catalogo').value = '';
+        }
+
+        document.addEventListener('click', function(e) {
+            const resDiv = document.getElementById('nv-search-results');
+            if (resDiv && e.target.id !== 'nv-search-catalogo') {
+                resDiv.style.display = 'none';
+            }
+        });
 
         function abrirModalHistorialActas() {
             document.getElementById('modalHistorialActas').style.display = 'flex';
             const tbody = document.getElementById('tbl-historial-actas-body');
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem;">Cargando historial...</td></tr>';
 
-            fetch('/api/bodegas/historial_actas')
+            fetch('/api/bodegas/historial_actas?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     tbody.innerHTML = '';
@@ -2048,7 +2287,7 @@
             selectOp.innerHTML = '<option value="">Cargando...</option>';
             contMarcas.innerHTML = 'Cargando marcas...';
 
-            fetch('/api/bodegas/operarios_asignacion')
+            fetch('/api/bodegas/operarios_asignacion?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     selectOp.innerHTML = '<option value="">-- Toca para seleccionar Operario --</option>';
@@ -2577,7 +2816,7 @@
 
         function abrirModalEditar() {
             document.getElementById('modal-editar-producto').style.display = 'flex';
-            fetch('/api/bodegas/marcas')
+            fetch('/api/bodegas/marcas?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     const select = document.getElementById('edit-select-marca');
@@ -2606,7 +2845,7 @@
             container2.style.display = 'block';
             selectProd.innerHTML = '<option value="">Cargando productos...</option>';
 
-            fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}`)
+            fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}?t=` + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     productosEdicionCache = data; 
@@ -2651,7 +2890,10 @@
                 .then(r => r.json())
                 .then(res => {
                     if (res.status === 'success') {
-                        cerrarModalEditar(); alert('✅ Producto actualizado correctamente');
+                        cerrarModalEditar(); 
+                        alert('✅ Producto actualizado correctamente');
+                        productosEdicionCache = []; 
+                        cargarProductosParaEdicion(); 
                     } else alert("❌ Error: " + res.message);
                 })
                 .catch(err => alert("❌ Error de conexión al guardar."));
@@ -2661,7 +2903,7 @@
 
         function abrirModalEliminar() {
             document.getElementById('modal-eliminar-producto').style.display = 'flex';
-            fetch('/api/bodegas/marcas')
+            fetch('/api/bodegas/marcas?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     const select = document.getElementById('del-select-marca');
@@ -2691,6 +2933,19 @@
             }
         }
 
+        function cargarProductosParaEliminacion() {
+            const marca = document.getElementById('del-select-marca').value;
+            const selectProd = document.getElementById('del-select-producto');
+            selectProd.innerHTML = '<option value="">Cargando productos...</option>';
+
+            fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}?t=` + Date.now())
+                .then(r => r.json())
+                .then(data => {
+                    selectProd.innerHTML = '<option value="">-- Selecciona el producto --</option>';
+                    data.forEach(p => { selectProd.innerHTML += `<option value="${p.ean}">${p.producto} (EAN: ${p.ean})</option>`; });
+                });
+        }
+
         function setModoEliminacion(modo) {
             modoEliminacionActual = modo;
             const btnSingle = document.getElementById('btn-modo-single');
@@ -2704,17 +2959,7 @@
             if (modo === 'single') {
                 document.getElementById('del-bulk-container').style.display = 'none';
                 document.getElementById('del-single-container').style.display = 'block';
-
-                const marca = document.getElementById('del-select-marca').value;
-                const selectProd = document.getElementById('del-select-producto');
-                selectProd.innerHTML = '<option value="">Cargando productos...</option>';
-
-                fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        selectProd.innerHTML = '<option value="">-- Selecciona el producto --</option>';
-                        data.forEach(p => { selectProd.innerHTML += `<option value="${p.ean}">${p.producto} (EAN: ${p.ean})</option>`; });
-                    });
+                cargarProductosParaEliminacion();
             } else {
                 document.getElementById('del-single-container').style.display = 'none';
                 document.getElementById('del-bulk-container').style.display = 'block';
@@ -2765,7 +3010,12 @@
                 .then(res => {
                     document.getElementById('modal-confirm-delete').style.display = 'none';
                     if (res.status === 'success') {
-                        cerrarModalEliminar(); alert(`✅ Eliminación completada: ${res.message}`);
+                        alert(`✅ Eliminación completada: ${res.message}`);
+                        if (tipo === 'single') {
+                            setModoEliminacion('single');
+                        } else {
+                            cerrarModalEliminar();
+                        }
                     } else alert("❌ Error: " + res.message);
                 })
                 .catch(err => {
@@ -2779,7 +3029,7 @@
         function abrirModalPromociones() {
             document.getElementById('modal-promociones').style.display = 'flex';
             cargarTablaPromociones();
-            fetch('/api/bodegas/marcas')
+            fetch('/api/bodegas/marcas?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     const select = document.getElementById('promo-select-marca');
@@ -2795,7 +3045,7 @@
         }
 
         function cargarTablaPromociones() {
-            fetch('/api/promociones/listar')
+            fetch('/api/promociones/listar?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     const tbody = document.getElementById('tbl-promos-body');
@@ -2836,7 +3086,7 @@
             if (!marca) { selectProd.innerHTML = '<option value="">2. Selecciona Producto...</option>'; return; }
 
             selectProd.innerHTML = '<option value="">Cargando...</option>';
-            fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}`)
+            fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}?t=` + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     selectProd.innerHTML = '<option value="">2. Selecciona Producto...</option>';
@@ -2888,6 +3138,8 @@
         }
         function quitarDeKit(index) { kitActual.splice(index, 1); renderizarCajaKit(); }
 
+        // MÓDULO DE PROMOCIONES - FUNCIONES ACTUALIZADAS
+
         function guardarPromocionFinal() {
             const eanPromo = document.getElementById('promo-codigo').value.trim();
             const nombrePromo = document.getElementById('promo-nombre').value.trim();
@@ -2900,21 +3152,17 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ean_promo: eanPromo, nombre_promo: nombrePromo, componentes: kitActual })
             })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.status === 'success') {
-                        alert("✅ Promoción guardada en la base de datos.");
-                        limpiarArmador(); cargarTablaPromociones();
-                    } else alert("❌ Error: " + res.message);
-                });
-        }
-
-        function limpiarArmador() {
-            document.getElementById('promo-codigo').value = '';
-            document.getElementById('promo-nombre').value = '';
-            document.getElementById('promo-codigo').readOnly = false; 
-            document.getElementById('titulo-armador').textContent = '✨ Armar Nueva Promoción';
-            kitActual = []; renderizarCajaKit();
+            .then(r => r.json())
+            .then(res => {
+                if (res.status === 'success') {
+                    alert("✅ Promoción guardada en la base de datos.");
+                    limpiarArmador(); 
+                    cargarTablaPromociones();
+                } else {
+                    alert("❌ Error: " + res.message);
+                }
+            })
+            .catch(err => alert("❌ Error de red o servidor."));
         }
 
         function toggleEstadoPromo(ean_promo, nuevoEstado) {
@@ -2922,7 +3170,16 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ean_promo, estado: nuevoEstado })
-            }).then(() => cargarTablaPromociones());
+            })
+            .then(r => r.json())
+            .then(res => {
+                if(res.status === 'success') {
+                    cargarTablaPromociones();
+                } else {
+                    alert("❌ Error cambiando el estado.");
+                }
+            })
+            .catch(err => alert("❌ Error de red o servidor."));
         }
 
         function confirmarBorrarPromo(ean_promo) {
@@ -2932,11 +3189,30 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ean_promo })
-                }).then(() => {
-                    alert("🗑️ Promoción destruida.");
-                    cargarTablaPromociones(); limpiarArmador();
-                });
-            } else if (pass !== null) alert("❌ Cancelado.");
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if(res.status === 'success') {
+                        alert("🗑️ Promoción destruida exitosamente.");
+                        cargarTablaPromociones(); 
+                        limpiarArmador();
+                    } else {
+                        alert("❌ Error al eliminar la promoción.");
+                    }
+                })
+                .catch(err => alert("❌ Error de red o servidor."));
+            } else if (pass !== null) {
+                alert("❌ Cancelado.");
+            }
+        }
+
+
+        function limpiarArmador() {
+            document.getElementById('promo-codigo').value = '';
+            document.getElementById('promo-nombre').value = '';
+            document.getElementById('promo-codigo').readOnly = false; 
+            document.getElementById('titulo-armador').textContent = '✨ Armar Nueva Promoción';
+            kitActual = []; renderizarCajaKit();
         }
 
         function cargarEdicionPromo(ean_promo, nombre_promo) {
@@ -2945,7 +3221,7 @@
             document.getElementById('promo-codigo').readOnly = true; 
             document.getElementById('promo-nombre').value = nombre_promo;
 
-            fetch(`/api/promociones/detalle/${encodeURIComponent(ean_promo)}`)
+            fetch(`/api/promociones/detalle/${encodeURIComponent(ean_promo)}?t=` + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     kitActual = data.map(d => ({
@@ -2962,7 +3238,7 @@
             document.getElementById('modalNovedades').style.display = 'flex';
             const tbody = document.getElementById('tbl-novedades-body');
 
-            fetch('/api/bodegas/reportes/novedades')
+            fetch('/api/bodegas/reportes/novedades?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     tbody.innerHTML = '';
@@ -3013,7 +3289,7 @@
             cargarPendientesAlias();
 
             if (listaCatalogoAlias.length === 0) {
-                fetch('/api/bodegas/alias/catalogo')
+                fetch('/api/bodegas/alias/catalogo?t=' + Date.now())
                     .then(r => r.json())
                     .then(data => { listaCatalogoAlias = data; poblarSelectsAlias(); });
             }
@@ -3024,7 +3300,7 @@
             const tbody = document.getElementById('tbl-alias-body');
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:2rem;">Cargando pendientes...</td></tr>';
 
-            fetch('/api/bodegas/alias/pendientes')
+            fetch('/api/bodegas/alias/pendientes?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     tbody.innerHTML = '';
@@ -3104,7 +3380,7 @@
             const tbody = document.getElementById('tbl-importacion-body');
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem;">Cargando informe...</td></tr>';
 
-            fetch('/api/bodegas/reportes/importacion')
+            fetch('/api/bodegas/reportes/importacion?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     tbody.innerHTML = '';

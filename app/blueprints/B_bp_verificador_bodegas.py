@@ -23,8 +23,20 @@ def bodega_verificador():
 def verificador_ordenes():
     if 'usuario_id' not in session: return jsonify([])
     empresa_id = session.get('empresa_id')
+    usuario_id = session.get('usuario_id')
+    
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # --- HEARTBEAT VERIFICADOR ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (usuario_id,))
+        mysql.connection.commit()
+        # -----------------------------
+
         # Selecciona las órdenes que tienen ítems en estado ALISTADO
         cur.execute("""
             SELECT 
@@ -51,8 +63,20 @@ def verificador_ordenes():
 @bp_verificador_bodegas.route('/api/verificador/items_orden/<orden>')
 def verificador_items_orden(orden):
     if 'usuario_id' not in session: return jsonify([])
+    usuario_id = session.get('usuario_id')
+    
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # --- HEARTBEAT VERIFICADOR ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (usuario_id,))
+        mysql.connection.commit()
+        # -----------------------------
+
         cur.execute("""
             SELECT 
                 p.id, p.codigo_producto, p.descripcion_producto, p.marca, p.zona, p.numero_orden_origen,
@@ -96,11 +120,21 @@ def verificador_confirmar_item():
     id_row = d.get('id_row')
     verif_cajas = d.get('cajas_verificadas', 0)
     verif_unidades = d.get('unidades_verificadas', 0)
+    usuario_id = session.get('usuario_id')
     
     if not id_row: return jsonify({'error': 'Datos incompletos'}), 400
 
     try:
         cur = mysql.connection.cursor()
+        
+        # --- HEARTBEAT VERIFICADOR (Al confirmar una acción de trabajo) ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (usuario_id,))
+        # -----------------------------
+
         cur.execute("""
             UPDATE picking_importacion_raw 
             SET 
@@ -110,9 +144,31 @@ def verificador_confirmar_item():
                 id_verificador=%s,
                 fecha_verificacion=NOW()
             WHERE id=%s AND id_empresa=%s
-        """, (verif_cajas, verif_unidades, session.get('usuario_id'), id_row, session.get('empresa_id')))
+        """, (verif_cajas, verif_unidades, usuario_id, id_row, session.get('empresa_id')))
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'ok', 'message': 'Item verificado con éxito'})
     except Exception as e: 
         return jsonify({'error': str(e)}), 500
+
+# ==============================================================================
+# ENDPOINT DE LATIDO (HEARTBEAT) PARA VISTA DE MENÚ
+# ==============================================================================
+@bp_verificador_bodegas.route('/api/verificador/ping', methods=['POST', 'GET'])
+@csrf.exempt
+def verificador_ping():
+    if 'usuario_id' not in session: return jsonify({'status': 'error'})
+    
+    usuario_id = session.get('usuario_id')
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (usuario_id,))
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})

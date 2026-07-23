@@ -33,9 +33,9 @@ def bodega_operativa():
                 SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL 
                          THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM picking_importacion_raw p
-            INNER JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
-            WHERE p.id_empresa = %s AND fp.operador_asignado = %s AND p.puerta_asignada IS NOT NULL
-        """, (empresa_id, uid))
+            LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            WHERE p.id_empresa = %s AND (fp.operador_asignado = %s OR p.id_auxiliar_asignado = %s) AND p.puerta_asignada IS NOT NULL
+        """, (empresa_id, uid, uid))
         
         row = cur.fetchone()
         if row and row['total_items']:
@@ -72,6 +72,16 @@ def operario_mis_ordenes():
     empresa_id = session.get('empresa_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # --- HEARTBEAT OPERARIO ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (uid,))
+        mysql.connection.commit()
+        # -----------------------------
+
         cur.execute("""
             SELECT 
                 p.numero_orden_origen as orden, 
@@ -80,15 +90,15 @@ def operario_mis_ordenes():
                 COUNT(*) as total_items, 
                 CAST(SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) AS SIGNED) as items_listos
             FROM picking_importacion_raw p
-            INNER JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
             WHERE p.id_empresa=%s 
-              AND fp.operador_asignado=%s 
+              AND (fp.operador_asignado=%s OR p.id_auxiliar_asignado=%s)
               AND p.puerta_asignada IS NOT NULL
               AND (p.estado_actividad IS NULL OR p.estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'FINALIZADO_TOTAL', 'TERMINADO'))
             GROUP BY p.numero_orden_origen
             HAVING items_listos < total_items
             ORDER BY secuencia ASC, orden ASC
-        """, (empresa_id, uid))
+        """, (empresa_id, uid, uid))
         data = cur.fetchall()
         cur.close()
         return jsonify(data)
@@ -98,8 +108,19 @@ def operario_mis_ordenes():
 @bp_oper_bodegas.route('/api/operario/items_orden/<orden>')
 def operario_items_orden(orden):
     if 'usuario_id' not in session: return jsonify([])
+    uid = session.get('usuario_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # --- HEARTBEAT OPERARIO ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (uid,))
+        mysql.connection.commit()
+        # -----------------------------
+
         cur.execute("""
             SELECT 
                 p.id, p.codigo_producto, p.descripcion_producto, 
@@ -118,17 +139,18 @@ def operario_items_orden(orden):
             LEFT JOIN productos prod 
                 ON (p.codigo_producto = prod.ean OR p.codigo_producto = prod.sku) 
                 AND p.id_empresa = prod.id_empresa
-            INNER JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
-            WHERE p.id_empresa=%s AND p.numero_orden_origen=%s AND fp.operador_asignado=%s AND p.puerta_asignada IS NOT NULL
+            LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            WHERE p.id_empresa=%s AND p.numero_orden_origen=%s AND (fp.operador_asignado=%s OR p.id_auxiliar_asignado=%s) AND p.puerta_asignada IS NOT NULL
             ORDER BY 
                 CASE 
+                    WHEN p.marca = 'NO EN BASE DE DATOS' THEN 99
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 1
                     WHEN p.codigo_producto = 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 2
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca = 'NO EN BASE DE DATOS' THEN 3
                     ELSE 4
                 END ASC,
                 p.secuencia_alistamiento ASC, p.estado_actividad ASC, p.descripcion_producto ASC
-        """, (session.get('empresa_id'), orden, session.get('usuario_id')))
+        """, (session.get('empresa_id'), orden, uid, uid))
         data = cur.fetchall()
         cur.close()
         return jsonify(data)
@@ -139,6 +161,7 @@ def operario_items_orden(orden):
 def operario_confirmar_item():
     if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
     
+    uid = session.get('usuario_id')
     d = request.json
     id_row = d.get('id_row')
     act_cajas = d.get('cajas_alistadas', 0)
@@ -151,6 +174,14 @@ def operario_confirmar_item():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
+        # --- HEARTBEAT OPERARIO ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (uid,))
+        # -----------------------------
+
         cur.execute("SELECT cajas_calculadas, unidades_calculadas FROM picking_importacion_raw WHERE id=%s AND id_empresa=%s", (id_row, session.get('empresa_id')))
         row = cur.fetchone()
         
@@ -160,7 +191,9 @@ def operario_confirmar_item():
             
         estado_final = 'ALISTADO'
         
-        if not novedad and (act_cajas < row['cajas_calculadas'] or act_unidades < row['unidades_calculadas']):
+        if novedad in ['NO_EN_BD', 'SIN_EAN', 'FALTA_EXISTENCIAS']:
+            estado_final = 'EN_PROCESO'
+        elif act_cajas < row['cajas_calculadas'] or act_unidades < row['unidades_calculadas']:
             estado_final = 'EN_PROCESO'
             
         cur.execute("""
@@ -175,7 +208,7 @@ def operario_confirmar_item():
                 id_auxiliar_asignado=%s,
                 nombre_auxiliar_asignado=%s
             WHERE id=%s AND id_empresa=%s
-        """, (estado_final, act_cajas, act_unidades, novedad, id_supervisor, session.get('usuario_id'), session.get('nombre'), id_row, session.get('empresa_id')))
+        """, (estado_final, act_cajas, act_unidades, novedad, id_supervisor, uid, session.get('nombre'), id_row, session.get('empresa_id')))
         
         mysql.connection.commit()
         cur.close()
@@ -194,6 +227,16 @@ def operario_mis_marcas():
     empresa_id = session.get('empresa_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # --- HEARTBEAT OPERARIO ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (uid,))
+        mysql.connection.commit()
+        # -----------------------------
+
         cur.execute("""
             SELECT 
                 p.marca, 
@@ -202,15 +245,15 @@ def operario_mis_marcas():
                 COUNT(*) as total_items, 
                 CAST(SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) AS SIGNED) as items_listos
             FROM picking_importacion_raw p
-            INNER JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
             WHERE p.id_empresa=%s 
-              AND fp.operador_asignado=%s 
+              AND (fp.operador_asignado=%s OR p.id_auxiliar_asignado=%s)
               AND p.puerta_asignada IS NOT NULL
               AND (p.estado_actividad IS NULL OR p.estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'FINALIZADO_TOTAL', 'TERMINADO'))
             GROUP BY p.marca
             HAVING items_listos < total_items
             ORDER BY secuencia ASC, p.marca ASC
-        """, (empresa_id, uid))
+        """, (empresa_id, uid, uid))
         data = cur.fetchall()
         cur.close()
         return jsonify(data)
@@ -219,8 +262,19 @@ def operario_mis_marcas():
 @bp_oper_bodegas.route('/api/operario/items_lote/<marca>')
 def operario_items_lote(marca):
     if 'usuario_id' not in session: return jsonify([])
+    uid = session.get('usuario_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # --- HEARTBEAT OPERARIO ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (uid,))
+        mysql.connection.commit()
+        # -----------------------------
+
         cur.execute("""
             SELECT 
                 p.id, p.codigo_producto, p.descripcion_producto, p.marca, p.zona, p.numero_orden_origen,
@@ -239,17 +293,18 @@ def operario_items_lote(marca):
             LEFT JOIN productos prod 
                 ON (p.codigo_producto = prod.ean OR p.codigo_producto = prod.sku) 
                 AND p.id_empresa = prod.id_empresa
-            INNER JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
-            WHERE p.id_empresa=%s AND p.marca=%s AND fp.operador_asignado=%s AND p.puerta_asignada IS NOT NULL
+            LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            WHERE p.id_empresa=%s AND p.marca=%s AND (fp.operador_asignado=%s OR p.id_auxiliar_asignado=%s) AND p.puerta_asignada IS NOT NULL
             ORDER BY 
                 CASE 
+                    WHEN p.marca = 'NO EN BASE DE DATOS' THEN 99
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 1
                     WHEN p.codigo_producto = 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 2
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca = 'NO EN BASE DE DATOS' THEN 3
                     ELSE 4
                 END ASC,
                 p.estado_actividad ASC, p.secuencia_alistamiento ASC, p.numero_orden_origen ASC
-        """, (session.get('empresa_id'), marca, session.get('usuario_id')))
+        """, (session.get('empresa_id'), marca, uid, uid))
         data = cur.fetchall()
         cur.close()
         return jsonify(data)
@@ -291,3 +346,68 @@ def validar_supervisor():
         return jsonify({'error': 'Supervisor no encontrado o no pertenece a tu empresa'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ==============================================================================
+# NUEVO ENDPOINT: KPIS OPERADOR EN TIEMPO REAL
+# ==============================================================================
+@bp_oper_bodegas.route('/api/operario/mis_kpis')
+def operario_mis_kpis():
+    if 'usuario_id' not in session: return jsonify({})
+    
+    uid = session.get('usuario_id')
+    empresa_id = str(session.get('empresa_id', ''))
+    
+    kpis = {
+        'avance_porcentaje': 0,
+        'items_completados': 0,
+        'total_asignados': 0,
+        'indice_novedades': 0.0,
+        'velocidad_picking': 0.0
+    }
+    
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # --- HEARTBEAT OPERARIO ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (uid,))
+        mysql.connection.commit()
+        # -----------------------------
+
+        cur.execute("""
+            SELECT 
+                COUNT(p.id) as total_items,
+                SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) as completados,
+                SUM(CASE WHEN p.novedad_alistamiento IS NOT NULL THEN 1 ELSE 0 END) as novedades,
+                SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL 
+                         THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
+            FROM picking_importacion_raw p
+            LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            WHERE p.id_empresa = %s 
+              AND p.puerta_asignada IS NOT NULL
+              AND (p.id_auxiliar_asignado = %s OR (p.id_auxiliar_asignado IS NULL AND fp.operador_asignado = %s))
+        """, (empresa_id, uid, uid))
+        
+        row = cur.fetchone()
+        if row and row['total_items']:
+            kpis['total_asignados'] = int(row['total_items'])
+            kpis['items_completados'] = int(row['completados'] or 0)
+            novedades = int(row['novedades'] or 0)
+            mins = float(row['minutos_totales'] or 0)
+            
+            if kpis['total_asignados'] > 0:
+                kpis['avance_porcentaje'] = round((kpis['items_completados'] / kpis['total_asignados']) * 100)
+                
+            if kpis['items_completados'] > 0:
+                kpis['indice_novedades'] = round((novedades / kpis['items_completados']) * 100, 1)
+                if mins > 0:
+                    kpis['velocidad_picking'] = round(kpis['items_completados'] / mins, 2)
+                    
+        cur.close()
+    except Exception as e:
+        pass
+
+    return jsonify(kpis)
