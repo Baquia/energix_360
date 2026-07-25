@@ -68,8 +68,8 @@
         #toast-success { position: fixed; top: 20px; right: -350px; background: #10b981; color: white; padding: 15px 25px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: right 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); z-index: 10000; display: flex; align-items: center; gap: 10px;}
         #toast-success.show { right: 20px; }
 
-        .chasis-wrapper { background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px dashed var(--border); margin-bottom: 20px; text-align: center; }
-        .chasis-container { position: relative; width: 100%; max-width: 280px; margin: 0 auto; padding: 30px 0; background: #e2e8f0; border-radius: 16px; border: 4px solid #cbd5e1; }
+        .chasis-wrapper { background: #f8fafc; padding: 20px 20px 30px 20px; border-radius: 12px; border: 1px dashed var(--border); margin-bottom: 20px; text-align: center; overflow-x: auto; white-space: nowrap; }
+        .chasis-container { position: relative; width: 100%; max-width: 280px; margin: 0 auto; padding: 30px 0; background: #e2e8f0; border-radius: 16px; border: 4px solid #cbd5e1; display: inline-block;}
         .eje { width: 100%; display: flex; justify-content: space-between; position: relative; margin-bottom: 50px; padding: 0 15px; }
         .eje:last-child { margin-bottom: 0; }
         .eje-barra { position: absolute; top: 50%; left: 30px; right: 30px; height: 8px; background: #64748b; z-index: 1; transform: translateY(-50%); border-radius: 4px; }
@@ -88,6 +88,15 @@
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .btn-logout, .navbar { display: none !important; }
+
+        /* REGLAS RESPONSIVAS PARA DISPOSITIVOS MÓVILES (LLANTAS MÁS PEQUEÑAS) */
+        @media (max-width: 480px) {
+            .chasis-container { padding: 20px 0; max-width: 100%; min-width: 240px; border-width: 2px; }
+            .eje { margin-bottom: 35px; padding: 0 5px; }
+            .llanta-btn { width: 35px; height: 60px; font-size: 9px; border-width: 1px; }
+            .eje-barra { left: 20px; right: 20px; height: 6px; }
+            .llanta-pacha { gap: 3px; }
+        }
     </style>
 </head>
 <body>
@@ -391,7 +400,7 @@
 </div>
 
 <script>
-    const totalSteps = 9; // Se actualizó a 9 capítulos
+    const totalSteps = 9; 
     let isSubmitting = false;
     let streamMedia = null;
 
@@ -549,10 +558,10 @@
     // PREPARAR ENVÍO CON GEOLOCALIZACIÓN ASÍNCRONA
     // ============================================
     function prepararEnvio(e) {
-        // Si el proceso GPS ya terminó, se envía el formulario directamente al servidor
+        // Si el proceso GPS ya terminó, se envía el formulario directamente
         if (window.gpsTerminado) return true;
 
-        e.preventDefault(); // Detenemos el envío nativo inicial
+        e.preventDefault(); // Detener el envío nativo inicial
 
         // Valida que tomaron foto
         if(!document.getElementById('foto_conductor_base64').value) {
@@ -674,7 +683,16 @@
         } else if (tipo === 'dobletroque') {
             html += `<div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_izq_ext" onclick="abrirModalLlanta('ll_t1_izq_ext', 'Troque 1 Izq Ext')">T1 E<br>IZQ</div><div class="llanta-btn" id="ll_t1_izq_int" onclick="abrirModalLlanta('ll_t1_izq_int', 'Troque 1 Izq Int')">T1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_der_int" onclick="abrirModalLlanta('ll_t1_der_int', 'Troque 1 Der Int')">T1 I<br>DER</div><div class="llanta-btn" id="ll_t1_der_ext" onclick="abrirModalLlanta('ll_t1_der_ext', 'Troque 1 Der Ext')">T1 E<br>DER</div></div></div><div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_izq_ext" onclick="abrirModalLlanta('ll_t2_izq_ext', 'Troque 2 Izq Ext')">T2 E<br>IZQ</div><div class="llanta-btn" id="ll_t2_izq_int" onclick="abrirModalLlanta('ll_t2_izq_int', 'Troque 2 Izq Int')">T2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_der_int" onclick="abrirModalLlanta('ll_t2_der_int', 'Troque 2 Der Int')">T2 I<br>DER</div><div class="llanta-btn" id="ll_t2_der_ext" onclick="abrirModalLlanta('ll_t2_der_ext', 'Troque 2 Der Ext')">T2 E<br>DER</div></div></div>`;
             arrayLlantasRequeridas.push('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext');
+        } else if (tipo === 'tractomula') {
+            html += `<div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_izq_ext" onclick="abrirModalLlanta('ll_t1_izq_ext', 'Tracción 1 Izq Ext')">T1 E<br>IZQ</div><div class="llanta-btn" id="ll_t1_izq_int" onclick="abrirModalLlanta('ll_t1_izq_int', 'Tracción 1 Izq Int')">T1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_der_int" onclick="abrirModalLlanta('ll_t1_der_int', 'Tracción 1 Der Int')">T1 I<br>DER</div><div class="llanta-btn" id="ll_t1_der_ext" onclick="abrirModalLlanta('ll_t1_der_ext', 'Tracción 1 Der Ext')">T1 E<br>DER</div></div></div>
+            <div class="eje" style="margin-bottom: 40px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_izq_ext" onclick="abrirModalLlanta('ll_t2_izq_ext', 'Tracción 2 Izq Ext')">T2 E<br>IZQ</div><div class="llanta-btn" id="ll_t2_izq_int" onclick="abrirModalLlanta('ll_t2_izq_int', 'Tracción 2 Izq Int')">T2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_der_int" onclick="abrirModalLlanta('ll_t2_der_int', 'Tracción 2 Der Int')">T2 I<br>DER</div><div class="llanta-btn" id="ll_t2_der_ext" onclick="abrirModalLlanta('ll_t2_der_ext', 'Tracción 2 Der Ext')">T2 E<br>DER</div></div></div>
+            <div style="width: 20px; height: 30px; background: #94a3b8; margin: 0 auto; border-radius: 4px;"></div>
+            <div class="eje" style="margin-top: 10px; margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_r1_izq_ext" onclick="abrirModalLlanta('ll_r1_izq_ext', 'Remolque 1 Izq Ext')">R1 E<br>IZQ</div><div class="llanta-btn" id="ll_r1_izq_int" onclick="abrirModalLlanta('ll_r1_izq_int', 'Remolque 1 Izq Int')">R1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_r1_der_int" onclick="abrirModalLlanta('ll_r1_der_int', 'Remolque 1 Der Int')">R1 I<br>DER</div><div class="llanta-btn" id="ll_r1_der_ext" onclick="abrirModalLlanta('ll_r1_der_ext', 'Remolque 1 Der Ext')">R1 E<br>DER</div></div></div>
+            <div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_r2_izq_ext" onclick="abrirModalLlanta('ll_r2_izq_ext', 'Remolque 2 Izq Ext')">R2 E<br>IZQ</div><div class="llanta-btn" id="ll_r2_izq_int" onclick="abrirModalLlanta('ll_r2_izq_int', 'Remolque 2 Izq Int')">R2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_r2_der_int" onclick="abrirModalLlanta('ll_r2_der_int', 'Remolque 2 Der Int')">R2 I<br>DER</div><div class="llanta-btn" id="ll_r2_der_ext" onclick="abrirModalLlanta('ll_r2_der_ext', 'Remolque 2 Der Ext')">R2 E<br>DER</div></div></div>
+            <div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_r3_izq_ext" onclick="abrirModalLlanta('ll_r3_izq_ext', 'Remolque 3 Izq Ext')">R3 E<br>IZQ</div><div class="llanta-btn" id="ll_r3_izq_int" onclick="abrirModalLlanta('ll_r3_izq_int', 'Remolque 3 Izq Int')">R3 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_r3_der_int" onclick="abrirModalLlanta('ll_r3_der_int', 'Remolque 3 Der Int')">R3 I<br>DER</div><div class="llanta-btn" id="ll_r3_der_ext" onclick="abrirModalLlanta('ll_r3_der_ext', 'Remolque 3 Der Ext')">R3 E<br>DER</div></div></div>`;
+            arrayLlantasRequeridas.push('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext', 'll_r1_izq_ext', 'll_r1_izq_int', 'll_r1_der_int', 'll_r1_der_ext', 'll_r2_izq_ext', 'll_r2_izq_int', 'll_r2_der_int', 'll_r2_der_ext', 'll_r3_izq_ext', 'll_r3_izq_int', 'll_r3_der_int', 'll_r3_der_ext');
         }
+        
         container.innerHTML = html;
         for (let llantaId in objetoLlantas) { let btn = document.getElementById(llantaId); if(btn) btn.className = "llanta-btn " + objetoLlantas[llantaId].labrado; }
     }
