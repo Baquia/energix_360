@@ -107,9 +107,15 @@ def guardar_inspeccion():
         try: llantas_dict = json.loads(estado_llantas_json)
         except: llantas_dict = {}; estado_llantas_json = '{}'
         
-        # Nuevos campos base64 (Foto y Firma)
+        # Base64 (Foto y Firma)
         foto_conductor_base64 = request.form.get('foto_conductor_base64')
         firma_grafica_base64 = request.form.get('firma_grafica_base64')
+        
+        # Geolocalización capturada en el formulario
+        latitud_raw = request.form.get('latitud', '')
+        longitud_raw = request.form.get('longitud', '')
+        latitud = float(latitud_raw) if latitud_raw.strip() else None
+        longitud = float(longitud_raw) if longitud_raw.strip() else None
         
         now = datetime.now()
         anio_actual = now.year
@@ -241,6 +247,14 @@ def guardar_inspeccion():
         )
         cur.execute(query, params)
         cur.execute("UPDATE vehiculos SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
+        
+        # --- REGISTRO OFICIAL DE SESIÓN DE FLOTA CON COORDENADAS GPS ---
+        cur.execute("""
+            INSERT INTO historial_sesiones_flota (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion, latitud, longitud)
+            VALUES (%s, %s, %s, NOW(), 'ACTIVA', %s, %s)
+        """, (empresa_id, usuario_id, placa, latitud, longitud))
+        # --------------------------------------------------------------------------------
+        
         mysql.connection.commit()
         cur.close()
 

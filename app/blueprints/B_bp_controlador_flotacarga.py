@@ -2,6 +2,7 @@
 import os
 import io
 import json
+import math
 import qrcode
 from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash, send_file
 from app import mysql, bcrypt
@@ -40,6 +41,19 @@ def gestor_flota_required(f):
     return decorated_function
 
 # =========================================================
+# HERRAMIENTAS MATEMÁTICAS (HAVERSINE)
+# =========================================================
+def calcular_distancia(lat1, lon1, lat2, lon2):
+    R = 6371000 
+    phi1 = math.radians(float(lat1))
+    phi2 = math.radians(float(lat2))
+    delta_phi = math.radians(float(lat2) - float(lat1))
+    delta_lambda = math.radians(float(lon2) - float(lon1))
+    a = math.sin(delta_phi/2.0)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda/2.0)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c
+
+# =========================================================
 # RUTAS DEL PANEL ADMINISTRATIVO
 # =========================================================
 
@@ -47,13 +61,201 @@ def gestor_flota_required(f):
 @login_required_custom
 @gestor_flota_required
 def dashboard_gestor():
+    empresa_id = session.get('empresa_id')
+    
+    # 1. Crear tablas de monitoreo e inyectar columnas de geolocalización
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS historial_sesiones_flota (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                id_empresa INT NOT NULL,
+                id_usuario INT NOT NULL,
+                placa_vehiculo VARCHAR(20),
+                fecha_login DATETIME,
+                fecha_logout_manual DATETIME,
+                latitud DECIMAL(10, 8),
+                longitud DECIMAL(11, 8),
+                estado_sesion VARCHAR(20) DEFAULT 'ACTIVA',
+                INDEX(id_empresa, id_usuario)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS monitoreo_actividad (
+                id_usuario INT PRIMARY KEY,
+                ultima_actividad DATETIME
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        mysql.connection.commit()
+        
+        # Parche seguro para agregar columnas lat/lng si la tabla ya existía
+        try:
+            cur.execute("ALTER TABLE historial_sesiones_flota ADD COLUMN latitud DECIMAL(10, 8), ADD COLUMN longitud DECIMAL(11, 8)")
+            mysql.connection.commit()
+        except:
+            pass
+            
+        cur.close()
+    except Exception as e:
+        print(f"Aviso tablas monitoreo flota: {e}")
+
+    # 2. Consultar operadores logueados, su estado en vivo, vehículo, tiempos y coordenadas
+    operadores_en_linea = []
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # INNER JOIN en historial_sesiones_flota con ACTIVA para mostrar SOLAMENTE los logueados
+        # Perfil unificado a 'operador_flotacarga'
+        cur.execute("""
+            SELECT 
+                u.id as id_operador,
+                u.nombre as nombre_operador,
+                u.perfil,
+                IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 180, 1, 0) as en_linea,
+                hs.placa_vehiculo,
+                hs.fecha_login,
+                hs.fecha_logout_manual,
+                hs.latitud,
+                hs.longitud
+            FROM usuarios u
+            LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
+            INNER JOIN historial_sesiones_flota hs ON hs.id = (
+                SELECT MAX(id) FROM historial_sesiones_flota 
+                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
+            )
+            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
+            ORDER BY en_linea DESC, u.nombre ASC
+        """, (empresa_id,))
+        
+        operadores_db = cur.fetchall()
+        
+        # Coordenadas exactas Planta Pollos GAR
+        PLANTA_LAT = 4.4134686
+        PLANTA_LNG = -75.1797367
+        
+        # 3. Formatear los datos para la vista
+        for op in operadores_db:
+            op_dict = dict(op)
+            if op_dict['fecha_login']:
+                op_dict['fecha_login_str'] = op_dict['fecha_login'].strftime('%H:%M:%S')
+            else:
+                op_dict['fecha_login_str'] = '--:--'
+                
+            if op_dict['fecha_logout_manual']:
+                op_dict['fecha_logout_str'] = op_dict['fecha_logout_manual'].strftime('%H:%M:%S')
+            else:
+                op_dict['fecha_logout_str'] = '--:--'
+                
+            # Calcular sitio de logueo por geocerca (100 metros)
+            op_dict['sitio_logueo'] = "No registrado"
+            if op_dict.get('latitud') and op_dict.get('longitud'):
+                dist = calcular_distancia(op_dict['latitud'], op_dict['longitud'], PLANTA_LAT, PLANTA_LNG)
+                if dist <= 100:
+                    op_dict['sitio_logueo'] = "PLANTA DE PROCESO POLLOS GAR"
+                else:
+                    op_dict['sitio_logueo'] = f"Lat: {op_dict['latitud']}, Lng: {op_dict['longitud']}"
+                
+            operadores_en_linea.append(op_dict)
+            
+        cur.close()
+    except Exception as e:
+        print(f"Error consultando monitoreo de flota: {e}")
+
     return render_template(
         'B_modulo_controlador_flotacarga.html',
         nit=session.get('nit'),
         empresa=session.get('empresa'),
         nombre=session.get('nombre'),
-        active_module='dashboard' 
+        active_module='dashboard',
+        operadores_en_linea=operadores_en_linea
     )
+
+
+# =========================================================
+# ENDPOINT DE MONITOREO EN TIEMPO REAL (NUEVO AJAX)
+# =========================================================
+@bp_gestorflota.route('/api/flota/monitoreo_realtime')
+@login_required_custom
+def monitoreo_realtime():
+    empresa_id = session.get('empresa_id')
+    operadores_en_linea = []
+    
+    try:
+        # Registrar latido del propio controlador
+        cur_hb = mysql.connection.cursor()
+        cur_hb.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (session.get('usuario_id'),))
+        mysql.connection.commit()
+        cur_hb.close()
+
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # Mostrar ÚNICAMENTE logueados activos con el perfil unificado
+        cur.execute("""
+            SELECT 
+                u.id as id_operador,
+                u.nombre as nombre_operador,
+                u.perfil,
+                IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 180, 1, 0) as en_linea,
+                hs.placa_vehiculo,
+                hs.fecha_login,
+                hs.fecha_logout_manual,
+                hs.latitud,
+                hs.longitud
+            FROM usuarios u
+            LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
+            INNER JOIN historial_sesiones_flota hs ON hs.id = (
+                SELECT MAX(id) FROM historial_sesiones_flota 
+                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
+            )
+            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
+            ORDER BY en_linea DESC, u.nombre ASC
+        """, (empresa_id,))
+        
+        operadores_db = cur.fetchall()
+        
+        PLANTA_LAT = 4.4134686
+        PLANTA_LNG = -75.1797367
+        
+        for op in operadores_db:
+            op_dict = dict(op)
+            if op_dict['fecha_login']:
+                op_dict['fecha_login_str'] = op_dict['fecha_login'].strftime('%H:%M:%S')
+            else:
+                op_dict['fecha_login_str'] = '--:--'
+                
+            if op_dict['fecha_logout_manual']:
+                op_dict['fecha_logout_str'] = op_dict['fecha_logout_manual'].strftime('%H:%M:%S')
+            else:
+                op_dict['fecha_logout_str'] = '--:--'
+                
+            op_dict['sitio_logueo'] = "No registrado"
+            if op_dict.get('latitud') and op_dict.get('longitud'):
+                dist = calcular_distancia(op_dict['latitud'], op_dict['longitud'], PLANTA_LAT, PLANTA_LNG)
+                if dist <= 100:
+                    op_dict['sitio_logueo'] = "PLANTA DE PROCESO POLLOS GAR"
+                else:
+                    op_dict['sitio_logueo'] = f"Lat: {op_dict['latitud']}, Lng: {op_dict['longitud']}"
+            
+            # Formatear el string del perfil
+            op_dict['perfil_str'] = str(op_dict['perfil']).replace('_', ' ').title()
+                
+            # Limpiar los objetos datetime y decimal nativos
+            op_dict.pop('fecha_login', None)
+            op_dict.pop('fecha_logout_manual', None)
+            op_dict.pop('latitud', None)
+            op_dict.pop('longitud', None)
+                
+            operadores_en_linea.append(op_dict)
+            
+        cur.close()
+        return jsonify({'status': 'success', 'operadores': operadores_en_linea})
+    except Exception as e:
+        print(f"Error consultando realtime de flota: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 @bp_gestorflota.route('/vehiculos', methods=['GET', 'POST'])
 @login_required_custom
@@ -72,14 +274,15 @@ def gestion_vehiculos():
             referencia = request.form.get('referencia', '').strip()
             peso_vacio = request.form.get('peso_vacio', 0)
             capacidad = request.form.get('capacidad', 0)
+            propiedad = request.form.get('propiedad', 'Propio').strip()
             
             if placa and caja_de_carga and tipo:
                 cur = mysql.connection.cursor()
                 try:
                     cur.execute("""
-                        INSERT INTO vehiculos (empresa, id_empresa, placa, tipo, caja_de_carga, referencia, peso_vacio, `capacidad (kg)`) 
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (empresa_nombre, empresa_id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad))
+                        INSERT INTO vehiculos (empresa, id_empresa, placa, tipo, caja_de_carga, referencia, peso_vacio, `capacidad (kg)`, propiedad) 
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (empresa_nombre, empresa_id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad))
                     mysql.connection.commit()
                     flash(f"Vehículo con placa {placa} registrado correctamente.", "success")
                 except Exception as e:
@@ -95,15 +298,16 @@ def gestion_vehiculos():
             referencia = request.form.get('referencia', '').strip()
             peso_vacio = request.form.get('peso_vacio', 0)
             capacidad = request.form.get('capacidad', 0)
+            propiedad = request.form.get('propiedad', 'Propio').strip()
             
             if vehiculo_id and placa and caja_de_carga and tipo:
                 cur = mysql.connection.cursor()
                 try:
                     cur.execute("""
                         UPDATE vehiculos 
-                        SET placa = %s, tipo = %s, caja_de_carga = %s, referencia = %s, peso_vacio = %s, `capacidad (kg)` = %s
+                        SET placa = %s, tipo = %s, caja_de_carga = %s, referencia = %s, peso_vacio = %s, `capacidad (kg)` = %s, propiedad = %s
                         WHERE id = %s AND id_empresa = %s
-                    """, (placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, vehiculo_id, empresa_id))
+                    """, (placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad, vehiculo_id, empresa_id))
                     mysql.connection.commit()
                     flash(f"Vehículo {placa} actualizado correctamente.", "success")
                 except Exception as e:
@@ -213,6 +417,54 @@ def gestion_rutas():
         nombre=session.get('nombre'),
         active_module='rutas', 
         rutas=rutas_db
+    )
+
+# =========================================================
+# NUEVA RUTA: MAPA DE RUTAS Y ANALÍTICA DE PARADAS
+# =========================================================
+@bp_gestorflota.route('/mapa_rutas', methods=['GET'])
+@login_required_custom
+@gestor_flota_required
+def mapa_rutas():
+    empresa_id = session.get('empresa_id')
+    
+    # Filtros recibidos
+    fecha_filtro = request.args.get('fecha', datetime.now().strftime('%Y-%m-%d'))
+    placa_filtro = request.args.get('placa', '').upper().strip()
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    
+    # 1. Obtener lista de vehículos para el formulario de filtros
+    cur.execute("SELECT placa FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
+    vehiculos_db = cur.fetchall()
+
+    puntos_ruta = []
+    if placa_filtro:
+        # 2. Consultar el historial filtrando por empresa, placa y día específico
+        cur.execute("""
+            SELECT latitud, longitud, fecha_hora, tipo_registro, nombre_punto
+            FROM vehiculos_historial_rutas
+            WHERE id_empresa = %s AND placa = %s AND DATE(fecha_hora) = %s
+            ORDER BY fecha_hora ASC
+        """, (empresa_id, placa_filtro, fecha_filtro))
+        
+        # 3. Formatear la fecha para que JSON (y JavaScript en el frontend) la pueda procesar
+        for row in cur.fetchall():
+            if isinstance(row['fecha_hora'], datetime):
+                row['fecha_hora'] = row['fecha_hora'].strftime('%Y-%m-%d %H:%M:%S')
+            puntos_ruta.append(row)
+            
+    cur.close()
+
+    return render_template(
+        'B_modulo_controlador_flotacarga.html',
+        nit=session.get('nit'),
+        empresa=session.get('empresa'),
+        nombre=session.get('nombre'),
+        active_module='mapa_rutas',
+        vehiculos=vehiculos_db,
+        puntos_ruta=puntos_ruta,
+        filtros={'fecha': fecha_filtro, 'placa': placa_filtro}
     )
 
 @bp_gestorflota.route('/qrs')
@@ -359,7 +611,7 @@ def gestion_operadores():
             cedula = request.form.get('cedula', '').strip()
             perfil = request.form.get('perfil', '').strip()
             
-            if perfil == 'operador_transportecarga':
+            if perfil == 'operador_flotacarga':
                 password = request.form.get('password', '').strip()
                 if not password:
                     flash("El conductor requiere una contraseña de acceso.", "danger")
@@ -395,7 +647,7 @@ def gestion_operadores():
             if operador_id and nombre and cedula and perfil:
                 cur = mysql.connection.cursor()
                 try:
-                    if perfil == 'operador_transportecarga':
+                    if perfil == 'operador_flotacarga':
                         password = request.form.get('password', '').strip()
                         if password:
                             hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -439,10 +691,11 @@ def gestion_operadores():
         return redirect(url_for('gestorflota.gestion_operadores'))
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    # Filtro unificado estricto
     cur.execute("""
         SELECT id, nombre, cedula, perfil 
         FROM usuarios 
-        WHERE empresa_id = %s AND perfil IN ('operador_transportecarga', 'auxiliar_transportecarga') 
+        WHERE empresa_id = %s AND perfil = 'operador_flotacarga'
         ORDER BY nombre ASC
     """, (empresa_id,))
     operadores_db = cur.fetchall()

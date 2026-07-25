@@ -1,3 +1,4 @@
+<!-- app/templates/B_modulo_controlador_flotacarga.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,6 +8,9 @@
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#015249">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 
     <style>
         /* PALETA CORPORATIVA BQA-ONE */
@@ -149,14 +153,17 @@
         </div>
         
         <nav class="nav-menu">
-            <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="nav-item {% if active_module == 'dashboard' %}active{% endif %}">
+            <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="nav-item {% if active_module == 'dashboard' or not active_module %}active{% endif %}">
                 <span class="nav-icon">📊</span> Panel Central
             </a>
             <a href="{{ url_for('gestorflota.gestion_vehiculos') }}" class="nav-item {% if active_module == 'vehiculos' %}active{% endif %}">
                 <span class="nav-icon">🚚</span> Vehículos
             </a>
             <a href="{{ url_for('gestorflota.gestion_rutas') }}" class="nav-item {% if active_module == 'rutas' %}active{% endif %}">
-                <span class="nav-icon">🗺️</span> Rutas
+                <span class="nav-icon">🗺️</span> Configurar Rutas
+            </a>
+            <a href="{{ url_for('gestorflota.mapa_rutas') }}" class="nav-item {% if active_module == 'mapa_rutas' %}active{% endif %}">
+                <span class="nav-icon">📍</span> Mapa de Rutas
             </a>
             <a href="{{ url_for('gestorflota.gestion_operadores') }}" class="nav-item {% if active_module == 'operadores' %}active{% endif %}">
                 <span class="nav-icon">👷</span> Conductores / Auxiliares
@@ -221,6 +228,7 @@
                                 <th>Referencia / Ejes</th>
                                 <th>Peso Vacío (kg)</th>
                                 <th>Capacidad</th>
+                                <th>Propiedad</th>
                                 <th>Estatus (App)</th>
                                 <th>Acciones</th>
                             </tr>
@@ -234,15 +242,16 @@
                                 <td style="text-transform: capitalize;">{{ v.referencia }}</td>
                                 <td>{{ v.peso_vacio }} kg</td>
                                 <td>{{ v['capacidad (kg)'] }} kg</td>
+                                <td><span class="badge {% if v.propiedad == 'Propio' %}badge-success{% else %}badge-gray{% endif %}">{{ v.propiedad }}</span></td>
                                 <td><span class="badge badge-gray">{{ v.estatus }}</span></td>
                                 <td>
-                                    <button class="btn-icon edit" title="Editar" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.caja_de_carga }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}')">✏️</button>
+                                    <button class="btn-icon edit" title="Editar" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.caja_de_carga }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}', '{{ v.propiedad }}')">✏️</button>
                                     <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminar('{{ v.id }}', '{{ v.placa }}')">🗑️</button>
                                 </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay vehículos registrados para esta empresa.</td>
+                                <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay vehículos registrados para esta empresa.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -284,6 +293,46 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+
+            {% elif active_module == 'mapa_rutas' %}
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Mapa y Analítica de Rutas</h2>
+                    </div>
+                </div>
+                
+                <form class="filter-bar" method="GET" action="{{ url_for('gestorflota.mapa_rutas') }}">
+                    <div class="form-group">
+                        <label>Fecha del Recorrido</label>
+                        <input type="date" name="fecha" value="{{ filtros.fecha }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Vehículo (Placa)</label>
+                        <select name="placa" required>
+                            <option value="">Seleccione vehículo...</option>
+                            {% for vh in vehiculos %}
+                                <option value="{{ vh.placa }}" {% if filtros.placa == vh.placa %}selected{% endif %}>{{ vh.placa }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="filter-btn">🗺️ Trazar Ruta</button>
+                </form>
+
+                <div class="table-card" style="padding: 20px;">
+                    {% if filtros.placa %}
+                        <div id="map" style="height: 550px; width: 100%; border-radius: 12px; z-index: 1;"></div>
+                        
+                        <div style="margin-top: 15px; display: flex; gap: 20px; font-size: 13px; color: var(--text-muted); justify-content: center;">
+                            <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:green; border-radius:50%;"></div> Inicio Ruta</span>
+                            <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:#015249;"></div> Trayecto</span>
+                            <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:blue; border-radius:50%; border:2px solid white;"></div> Parada Manual</span>
+                            <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:red; border-radius:50%; border:2px solid white;"></div> Parada Automática</span>
+                        </div>
+                    {% else %}
+                        <p style="text-align: center; color: var(--text-muted); padding: 40px 0;">Seleccione un vehículo y una fecha para visualizar el trazado de la ruta y las paradas registradas.</p>
+                    {% endif %}
                 </div>
 
             {% elif active_module == 'qrs' %}
@@ -351,7 +400,7 @@
                                 <td style="font-weight: bold; color: var(--verde);">{{ op.nombre }}</td>
                                 <td>{{ op.cedula }}</td>
                                 <td>
-                                    {% if op.perfil == 'operador_transportecarga' %}
+                                    {% if op.perfil == 'operador_flotacarga' %}
                                         <span class="badge badge-success">Conductor</span>
                                     {% else %}
                                         <span class="badge badge-gray">Auxiliar</span>
@@ -440,20 +489,73 @@
                 </div>
 
             {% else %}
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <h2>Monitor de Operadores en Línea</h2>
+                    </div>
+                </div>
+
+                <div class="table-card" style="margin-bottom: 25px;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: center;">Estado</th>
+                                <th>Operador</th>
+                                <th>Vehículo Asignado</th>
+                                <th>Sitio de Logueo</th>
+                                <th>Hora de Logueo</th>
+                                <th>Hora Deslogueo (Manual)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-operadores-body">
+                            {% for op in operadores_en_linea %}
+                            <tr>
+                                <td style="text-align: center;">
+                                    {% if op.en_linea == 1 %}
+                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="En línea"></div>
+                                    {% else %}
+                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Fuera de línea"></div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div style="font-weight: bold; color: var(--verde);">{{ op.nombre_operador }}</div>
+                                    <div style="font-size: 11px; color: var(--text-muted);">{{ op.perfil.replace('_', ' ').title() }}</div>
+                                </td>
+                                <td>
+                                    {% if op.placa_vehiculo %}
+                                        <span class="badge badge-success" style="font-size: 13px;">{{ op.placa_vehiculo }}</span>
+                                    {% else %}
+                                        <span class="badge badge-gray">Sin asignar</span>
+                                    {% endif %}
+                                </td>
+                                <td style="font-size: 12px; font-weight: bold; color: var(--verde-osc);">{{ op.sitio_logueo }}</td>
+                                <td>{{ op.fecha_login_str }}</td>
+                                <td>{{ op.fecha_logout_str }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
                 <div class="table-card" style="padding: 30px; border-left: 5px solid var(--verde);">
                     <h2 style="color: var(--verde); font-size: 20px; margin-bottom: 10px;">Bienvenido, {{ nombre }}</h2>
                     <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6;">
-                        Estás en el <b>Centro de Control de Flota</b> de {{ empresa }}. Utiliza el menú lateral para administrar la base de datos de vehículos, gestionar las rutas de distribución urbana o viajera, controlar los conductores autorizados, emitir las credenciales QR para la cabina o auditar el historial de inspecciones preoperacionales.
+                        Estás en el <b>Centro de Control de Flota</b> de {{ empresa }}. Utiliza el menú lateral para administrar la base de datos de vehículos, gestionar las rutas de distribución urbana o viajera, controlar los conductores autorizados, emitir las credenciales QR para la cabina, visualizar los trazados satelitales o auditar el historial de inspecciones preoperacionales.
                     </p>
                 </div>
             {% endif %}
             
             <div style="margin-top: 30px; font-size: 11px; color: #9ca3af; border-top: 1px solid var(--border); padding-top: 15px;">
-                <p>&copy; 2025 BQA ONE Technology. Sistema Multiusuario Seguro.</p>
+                <p>&copy; 2026 BQA ONE Technology. Sistema Multiusuario Seguro.</p>
             </div>
         </div>
     </main>
 
+    <!-- Modales -->
     <div id="modalVehiculo" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
@@ -502,6 +604,14 @@
                         <option value="sencillo">Sencillo Genérico</option>
                         <option value="dobletroque">Dobletroque Genérico</option>
                         <option value="Tractomula">Tractomula Genérica</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Propiedad</label>
+                    <select name="propiedad" required>
+                        <option value="Propio" selected>Propio</option>
+                        <option value="Tercero">Tercero</option>
                     </select>
                 </div>
 
@@ -573,6 +683,14 @@
                         <option value="sencillo">Sencillo Genérico</option>
                         <option value="dobletroque">Dobletroque Genérico</option>
                         <option value="Tractomula">Tractomula Genérica</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Propiedad</label>
+                    <select name="propiedad" id="edit_propiedad" required>
+                        <option value="Propio">Propio</option>
+                        <option value="Tercero">Tercero</option>
                     </select>
                 </div>
 
@@ -683,7 +801,9 @@
                 <div class="form-group">
                     <label>Perfil Asignado</label>
                     <select name="perfil" id="crear_perfil" required onchange="togglePassword('crear_perfil', 'crear_password_group')">
-                        <option value="">Seleccione...</option><option value="operador_transportecarga">Conductor</option><option value="auxiliar_transportecarga">Auxiliar</option>
+                        <option value="">Seleccione...</option>
+                        <option value="operador_flotacarga">Conductor (Operador Flota)</option>
+                        <option value="auxiliar_transportecarga">Auxiliar</option>
                     </select>
                 </div>
                 <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" required></div>
@@ -707,7 +827,8 @@
                 <div class="form-group">
                     <label>Perfil Asignado</label>
                     <select name="perfil" id="edit_perfil" required onchange="togglePassword('edit_perfil', 'edit_password_group')">
-                        <option value="operador_transportecarga">Conductor</option><option value="auxiliar_transportecarga">Auxiliar</option>
+                        <option value="operador_flotacarga">Conductor (Operador Flota)</option>
+                        <option value="auxiliar_transportecarga">Auxiliar</option>
                     </select>
                 </div>
                 <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" id="edit_nombre" required></div>
@@ -734,8 +855,8 @@
         </div>
     </div>
 
+    <!-- Script General y Modales -->
     <script>
-        // Lógica de Menú Responsivo
         const menuToggle = document.getElementById('menuToggle');
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('sidebarOverlay');
@@ -747,14 +868,11 @@
         menuToggle.addEventListener('click', toggleSidebar);
         overlay.addEventListener('click', toggleSidebar);
 
-        // Lógica de Modales General
         function openModal(id) { document.getElementById(id).classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
-        // ============================================
-        // LÓGICA DE VEHÍCULOS
-        // ============================================
-        function abrirEditarVehiculo(id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad) {
+        // Scripts Vehículos
+        function abrirEditarVehiculo(id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad) {
             document.getElementById('edit_id').value = id;
             document.getElementById('edit_placa').value = placa;
             document.getElementById('edit_tipo').value = tipo.toLowerCase();
@@ -762,17 +880,16 @@
             document.getElementById('edit_referencia').value = referencia.toLowerCase();
             document.getElementById('edit_peso_vacio').value = peso_vacio;
             document.getElementById('edit_capacidad').value = capacidad;
-            
+            document.getElementById('edit_propiedad').value = propiedad;
             openModal('modalEditarVehiculo');
         }
-
         function confirmarEliminar(id, placa) {
             document.getElementById('delete_id').value = id;
             document.getElementById('delete_placa').innerText = placa;
             openModal('modalEliminar');
         }
 
-        // Lógica de Rutas
+        // Scripts Rutas
         function abrirEditarRuta(id, nombre, tipo) {
             document.getElementById('edit_ruta_id').value = id;
             document.getElementById('edit_nombre_ruta').value = nombre;
@@ -785,12 +902,12 @@
             openModal('modalEliminarRuta');
         }
 
-        // Lógica de Operadores
+        // Scripts Operadores
         function togglePassword(selectId, groupId) {
             const select = document.getElementById(selectId);
             const group = document.getElementById(groupId);
             const passwordInput = group.querySelector('input');
-            if (select.value === 'operador_transportecarga') {
+            if (select.value === 'operador_flotacarga') {
                 group.style.display = 'block';
                 if (selectId === 'crear_perfil') passwordInput.setAttribute('required', 'required');
             } else {
@@ -813,5 +930,120 @@
             openModal('modalEliminarOperador');
         }
     </script>
+
+    <!-- Leaflet.js para renderizar el mapa solo cuando estemos en el módulo de rutas -->
+    {% if active_module == 'mapa_rutas' and filtros.placa %}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var map = L.map('map').setView([4.5709, -74.2973], 5); 
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap BQA-One'
+            }).addTo(map);
+
+            var puntos = {{ puntos_ruta | tojson | safe }};
+            
+            if (puntos && puntos.length > 0) {
+                var latlngs = [];
+                var bounds = L.latLngBounds();
+
+                puntos.forEach(function(punto) {
+                    var pos = [punto.latitud, punto.longitud];
+                    latlngs.push(pos);
+                    bounds.extend(pos);
+
+                    // Si es una parada, colocamos un marcador visible
+                    if (punto.tipo_registro && punto.tipo_registro.includes("Parada")) {
+                        var color = punto.tipo_registro.includes("Automático") ? "red" : "blue";
+                        var markerHtml = `
+                            <div style="background-color: ${color}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>
+                        `;
+                        var customIcon = L.divIcon({
+                            html: markerHtml,
+                            className: '',
+                            iconSize: [15, 15],
+                            iconAnchor: [7.5, 7.5]
+                        });
+
+                        var popupText = `<b>${punto.nombre_punto || 'Punto Desconocido'}</b><br>
+                                         <i style="color: #6b7280; font-size: 11px;">${punto.tipo_registro}</i><br>
+                                         <span style="font-size: 12px; font-weight: bold;">${punto.fecha_hora}</span>`;
+                                         
+                        L.marker(pos, {icon: customIcon}).addTo(map).bindPopup(popupText);
+                    }
+                });
+
+                // Dibujar la línea de la ruta
+                var polyline = L.polyline(latlngs, {color: '#015249', weight: 4, opacity: 0.8}).addTo(map);
+                
+                // Ajustar mapa a los puntos
+                map.fitBounds(bounds, {padding: [30, 30]});
+                
+                // Marcador de inicio
+                L.circleMarker(latlngs[0], {color: 'green', radius: 7, fillOpacity: 1, weight: 2}).addTo(map).bindPopup("<b>📍 Inicio de Ruta</b><br>" + puntos[0].fecha_hora);
+                
+                // Marcador de fin (Última ubicación)
+                if(latlngs.length > 1) {
+                    L.circleMarker(latlngs[latlngs.length - 1], {color: '#f59e0b', radius: 7, fillOpacity: 1, weight: 2}).addTo(map).bindPopup("<b>🚩 Última Ubicación</b><br>" + puntos[puntos.length - 1].fecha_hora);
+                }
+            }
+        });
+    </script>
+    {% endif %}
+
+    <!-- SCRIPT AJAX PARA AUTOREFRESCAR EL PANEL DE OPERADORES (DASHBOARD) -->
+    {% if not active_module or active_module == 'dashboard' %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const tablaBody = document.getElementById("tabla-operadores-body");
+            if (!tablaBody) return;
+
+            function actualizarOperadores() {
+                const timeStamp = new Date().getTime();
+                fetch(`{{ url_for('gestorflota.monitoreo_realtime') }}?t=${timeStamp}`, { cache: "no-store" })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            let html = "";
+                            if (data.operadores.length === 0) {
+                                html = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td></tr>`;
+                            } else {
+                                data.operadores.forEach(op => {
+                                    let circulo = op.en_linea === 1 
+                                        ? `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="En línea"></div>`
+                                        : `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Fuera de línea"></div>`;
+                                        
+                                    let placa = op.placa_vehiculo 
+                                        ? `<span class="badge badge-success" style="font-size: 13px;">${op.placa_vehiculo}</span>`
+                                        : `<span class="badge badge-gray">Sin asignar</span>`;
+
+                                    html += `
+                                    <tr>
+                                        <td style="text-align: center;">${circulo}</td>
+                                        <td>
+                                            <div style="font-weight: bold; color: var(--verde);">${op.nombre_operador}</div>
+                                            <div style="font-size: 11px; color: var(--text-muted);">${op.perfil_str}</div>
+                                        </td>
+                                        <td>${placa}</td>
+                                        <td style="font-size: 12px; font-weight: bold; color: var(--verde-osc);">${op.sitio_logueo}</td>
+                                        <td>${op.fecha_login_str}</td>
+                                        <td>${op.fecha_logout_str}</td>
+                                    </tr>`;
+                                });
+                            }
+                            tablaBody.innerHTML = html;
+                        }
+                    })
+                    .catch(err => console.error("Error actualizando panel:", err));
+            }
+
+            // Actualizar tabla cada 10 segundos
+            setInterval(actualizarOperadores, 10000);
+        });
+    </script>
+    {% endif %}
+
 </body>
 </html>

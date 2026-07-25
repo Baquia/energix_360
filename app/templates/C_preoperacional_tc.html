@@ -136,6 +136,10 @@
         <input type="hidden" name="foto_conductor_base64" id="foto_conductor_base64" required>
         <input type="hidden" name="firma_grafica_base64" id="firma_grafica_base64" required>
 
+        <!-- CAMPOS OCULTOS PARA GEOLOCALIZACIÓN -->
+        <input type="hidden" name="latitud" id="input_latitud" value="">
+        <input type="hidden" name="longitud" id="input_longitud" value="">
+
         {% macro render_3_state(name, label) %}
         <div class="form-group">
             <label>{{ label }} <span style="color:#ef4444;">*</span></label>
@@ -337,6 +341,7 @@
                     <button type="submit" class="btn btn-success btn-lg btn-block" style="font-weight:bold; height: 100%;">
                         FINALIZAR Y ENVIAR ✅
                     </button>
+                    <div id="gps-status" style="font-size: 12px; text-align: center; margin-top: 10px; color: var(--verde);"></div>
                 </div>
             </div>
         </div>
@@ -540,24 +545,79 @@
         document.getElementById('firma_grafica_base64').value = "";
     }
 
+    // ============================================
+    // PREPARAR ENVÍO CON GEOLOCALIZACIÓN ASÍNCRONA
+    // ============================================
     function prepararEnvio(e) {
+        // Si el proceso GPS ya terminó, se envía el formulario directamente al servidor
+        if (window.gpsTerminado) return true;
+
+        e.preventDefault(); // Detenemos el envío nativo inicial
+
         // Valida que tomaron foto
         if(!document.getElementById('foto_conductor_base64').value) {
             alert("⚠️ Debe capturar la Fotografía de Auditoría para finalizar.");
-            e.preventDefault(); return false;
+            return false;
         }
         // Valida que firmaron
         if(!firmaAlterada) {
             alert("⚠️ Debe dibujar su firma en el recuadro blanco para finalizar.");
-            e.preventDefault(); return false;
+            return false;
         }
         
         // Guardar firma comprimida en el input hidden
         document.getElementById('firma_grafica_base64').value = canvasFirma.toDataURL('image/png');
         
-        isSubmitting = true;
-        localStorage.clear();
-        return true;
+        const btn = document.querySelector('#step-9 button[type="submit"]');
+        const statusText = document.getElementById('gps-status');
+        
+        btn.disabled = true;
+        btn.innerText = "Obteniendo Coordenadas GPS...";
+        statusText.innerText = "Por favor, permita el acceso a la ubicación si el navegador se lo solicita.";
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    // ÉXITO: Inyectar Coordenadas
+                    document.getElementById('input_latitud').value = position.coords.latitude;
+                    document.getElementById('input_longitud').value = position.coords.longitude;
+                    
+                    statusText.innerText = "¡Ubicación capturada! Enviando auditoría...";
+                    btn.innerText = "ENVIANDO...";
+                    
+                    isSubmitting = true;
+                    localStorage.clear();
+                    window.gpsTerminado = true;
+                    document.getElementById('formPreoperacional').submit(); // Forzar el envío programático
+                },
+                function(error) {
+                    // ERROR: Enviar de todas formas, el backend lo manejará sin coordenadas
+                    console.warn("Error GPS: ", error.message);
+                    statusText.innerText = "No se pudo obtener el GPS. Enviando de todas formas...";
+                    statusText.style.color = "#b45309";
+                    btn.innerText = "ENVIANDO...";
+                    
+                    isSubmitting = true;
+                    localStorage.clear();
+                    window.gpsTerminado = true;
+                    document.getElementById('formPreoperacional').submit();
+                },
+                { 
+                    enableHighAccuracy: true, 
+                    timeout: 8000, 
+                    maximumAge: 0 
+                }
+            );
+        } else {
+            // NAVEGADOR NO SOPORTADO
+            statusText.innerText = "Geolocalización no soportada. Enviando...";
+            isSubmitting = true;
+            localStorage.clear();
+            window.gpsTerminado = true;
+            document.getElementById('formPreoperacional').submit();
+        }
+
+        return false;
     }
 
 

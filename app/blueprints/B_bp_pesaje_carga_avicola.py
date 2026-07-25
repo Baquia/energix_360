@@ -58,7 +58,7 @@ def panel_bascula():
     cur.close()
 
     return render_template(
-        'B_gestion_carga.html',
+        'B_pesaje_carga_avicola.html',
         nombre=session.get('nombre'),
         empresa=session.get('empresa'),
         nit=session.get('nit'),
@@ -333,7 +333,7 @@ def reportes_bascula():
             eficiencia['por_tipo'][tipo] = round(valores['suma'] / valores['conteo'], 1)
 
     return render_template(
-        'B_gestion_carga.html',
+        'B_pesaje_carga_avicola.html',
         nombre=session.get('nombre'),
         empresa=session.get('empresa'),
         nit=session.get('nit'),

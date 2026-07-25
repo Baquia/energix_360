@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Dashboard TC | {{ empresa }}</title>
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
@@ -13,12 +14,8 @@
         /* PALETA CORPORATIVA BQA-ONE */
         :root {
             --verde: #015249;
-            /* Color Principal */
             --verde-osc: #003b35;
-            /* Hover / Oscuro */
             --bg-grad-start: #d7f2ec;
-            /* Inicio Gradiente */
-
             --surface: #ffffff;
             --text: #111827;
             --text-muted: #6b7280;
@@ -27,239 +24,61 @@
             --shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Verdana, Geneva, Tahoma, sans-serif; background: radial-gradient(circle at top, var(--bg-grad-start) 0, #f6f7f8 45%, #f6f7f8 100%); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+        a { text-decoration: none; color: inherit; }
 
-        body {
-            font-family: Verdana, Geneva, Tahoma, sans-serif;
-            background: radial-gradient(circle at top, var(--bg-grad-start) 0, #f6f7f8 45%, #f6f7f8 100%);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+        .header { width: 100%; max-width: 900px; display: flex; justify-content: space-between; align-items: center; padding: 20px 20px 10px 20px; }
+        .brand-area { display: flex; align-items: center; gap: 15px; }
+        .logo-cliente { max-height: 48px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.05)); }
+        .brand-divider { width: 1px; height: 32px; background-color: #cbd5e1; display: block; }
+        .logo-app { max-height: 32px; width: auto; opacity: 0.9; }
 
-        a {
-            text-decoration: none;
-            color: inherit;
-        }
+        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
+        .user-role { font-size: 10px; color: var(--text-muted); background: rgba(255, 255, 255, 0.6); padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
 
-        .header {
-            width: 100%;
-            max-width: 900px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 20px 10px 20px;
-        }
+        .wrap { width: 100%; max-width: 900px; margin: 20px auto 40px; padding: 0 20px; }
+        .welcome-title { color: var(--verde); font-size: 22px; font-weight: 700; margin-bottom: 25px; text-align: left; border-bottom: 2px solid rgba(1, 82, 73, 0.1); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
+        
+        /* Indicador de Estado GPS */
+        .gps-status { font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: bold; background: #e5e7eb; color: #4b5563; display: flex; align-items: center; gap: 6px;}
+        .gps-status.active { background: #d1fae5; color: #065f46; }
+        .gps-status.offline { background: #fee2e2; color: #991b1b; }
 
-        .brand-area {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
+        .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .module-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; height: 100%; cursor: pointer; border: 1px solid transparent; position: relative; overflow: hidden; }
+        .module-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(1, 82, 73, 0.15); border-color: var(--verde); }
+        .module-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--verde); opacity: 0; transition: opacity 0.2s; }
+        .module-card:hover::before { opacity: 1; }
 
-        .logo-cliente {
-            max-height: 48px;
-            width: auto;
-            object-fit: contain;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.05));
-        }
+        .card-icon { font-size: 32px; margin-bottom: 15px; background: #eefcf9; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--verde); }
+        .card-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+        .card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px; flex-grow: 1; }
+        .btn-card { background: var(--verde); color: white; text-align: center; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; transition: background 0.2s; }
+        .module-card:hover .btn-card { background: var(--verde-osc); }
 
-        .brand-divider {
-            width: 1px;
-            height: 32px;
-            background-color: #cbd5e1;
-            display: block;
-        }
+        .footer { margin-top: auto; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; width: 100%; border-top: 1px solid #eee; background: rgba(255, 255, 255, 0.5); }
+        .logout-btn { display: inline-block; margin-top: 8px; color: var(--verde); font-weight: bold; font-size: 12px; border: 1px solid currentColor; padding: 4px 12px; border-radius: 20px; transition: all 0.2s; }
+        .logout-btn:hover { background: var(--verde); color: white; }
 
-        .logo-app {
-            max-height: 32px;
-            width: auto;
-            opacity: 0.9;
-        }
-
-        .user-info {
-            text-align: right;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-        }
-
-        .user-name {
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--verde);
-        }
-
-        .user-role {
-            font-size: 10px;
-            color: var(--text-muted);
-            background: rgba(255, 255, 255, 0.6);
-            padding: 2px 8px;
-            border-radius: 10px;
-            margin-top: 2px;
-        }
-
-        .wrap {
-            width: 100%;
-            max-width: 900px;
-            margin: 20px auto 40px;
-            padding: 0 20px;
-        }
-
-        .welcome-title {
-            color: var(--verde);
-            font-size: 22px;
-            font-weight: 700;
-            margin-bottom: 25px;
-            text-align: left;
-            border-bottom: 2px solid rgba(1, 82, 73, 0.1);
-            padding-bottom: 10px;
-        }
-
-        .modules-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-        }
-
-        .module-card {
-            background: var(--surface);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            padding: 24px;
-            transition: transform 0.2s, box-shadow 0.2s;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            cursor: pointer;
-            border: 1px solid transparent;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .module-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 30px rgba(1, 82, 73, 0.15);
-            border-color: var(--verde);
-        }
-
-        .module-card::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: var(--verde);
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .module-card:hover::before {
-            opacity: 1;
-        }
-
-        .card-icon {
-            font-size: 32px;
-            margin-bottom: 15px;
-            background: #eefcf9;
-            /* Fondo verde muy suave */
-            width: 56px;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 12px;
-            color: var(--verde);
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--text);
-            margin-bottom: 8px;
-        }
-
-        .card-desc {
-            font-size: 13px;
-            color: var(--text-muted);
-            line-height: 1.5;
-            margin-bottom: 20px;
-            flex-grow: 1;
-        }
-
-        .btn-card {
-            background: var(--verde);
-            color: white;
-            text-align: center;
-            padding: 12px;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: 600;
-            transition: background 0.2s;
-        }
-
-        .module-card:hover .btn-card {
-            background: var(--verde-osc);
-        }
-
-        .footer {
-            margin-top: auto;
-            padding: 20px;
-            text-align: center;
-            font-size: 11px;
-            color: #9ca3af;
-            width: 100%;
-            border-top: 1px solid #eee;
-            background: rgba(255, 255, 255, 0.5);
-        }
-
-        .logout-btn {
-            display: inline-block;
-            margin-top: 8px;
-            color: var(--verde);
-            font-weight: bold;
-            font-size: 12px;
-            border: 1px solid currentColor;
-            padding: 4px 12px;
-            border-radius: 20px;
-            transition: all 0.2s;
-        }
-
-        .logout-btn:hover {
-            background: var(--verde);
-            color: white;
-        }
+        /* MODAL DE PARADA */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.85); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-box { background: var(--surface); width: 90%; max-width: 400px; border-radius: var(--radius); padding: 30px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .modal-title { color: var(--verde); margin-bottom: 10px; font-size: 20px; }
+        .modal-text { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+        .form-group { text-align: left; margin-bottom: 15px; }
+        .form-group label { font-size: 13px; font-weight: bold; color: var(--text); }
+        .form-group select, .form-group input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); margin-top: 5px; font-size: 14px; outline: none;}
+        .form-group select:focus, .form-group input:focus { border-color: var(--verde); }
+        .btn-submit { background: var(--verde); color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
+        .timer-text { font-size: 12px; color: #ef4444; margin-top: 15px; font-weight: bold;}
 
         @media (max-width: 600px) {
-            .header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-
-            .brand-area {
-                width: 100%;
-            }
-
-            .user-info {
-                width: 100%;
-                flex-direction: row;
-                justify-content: space-between;
-                align-items: center;
-                border-top: 1px solid #eee;
-                padding-top: 10px;
-            }
-
-            .modules-grid {
-                grid-template-columns: 1fr;
-            }
+            .header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .brand-area, .user-info { width: 100%; }
+            .user-info { flex-direction: row; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 10px; }
+            .modules-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -267,91 +86,400 @@
 <body>
     <header class="header">
         <div class="brand-area">
-            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente"
-                onerror="this.style.display='none'">
+            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
             <span class="brand-divider"></span>
             <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
         </div>
         <div class="user-info">
             <span class="user-name">{{ nombre }}</span>
             <span class="user-role">Transporte Carga</span>
+            {% if session.get('placa_prelogueada') %}
+                <span class="user-role" style="background-color: var(--verde); color: white; margin-top: 5px; font-size: 11px;">Vehículo: {{ session.get('placa_prelogueada') }}</span>
+            {% endif %}
         </div>
     </header>
 
     <main class="wrap">
-        <h2 class="welcome-title">Panel de Control</h2>
+        <h2 class="welcome-title">
+            Panel de Control
+            {% if session.get('placa_prelogueada') %}
+                <div id="indicador_gps" class="gps-status">⚪ Iniciando GPS...</div>
+            {% endif %}
+        </h2>
+        
         <div class="modules-grid">
+            {% if session.get('placa_prelogueada') %}
+            <a href="#" onclick="triggerParadaManual(event)" class="module-card">
+                <div class="card-icon">📍</div>
+                <h3 class="card-title">Registrar Parada</h3>
+                <p class="card-desc">Registre proactivamente un evento, entrega o novedad en su ubicación actual.</p>
+                <div class="btn-card">Notificar Parada &rarr;</div>
+            </a>
+            {% endif %}
+
             <a href="{{ url_for('preoperacional.preoperacional_tc', nit=nit) }}" class="module-card">
                 <div class="card-icon">🚧</div>
                 <h3 class="card-title">Preoperacional de seguridad vial</h3>
-                <p class="card-desc">Reporte de novedades del vehiculo y documentos.</p>
+                <p class="card-desc">Reporte de novedades del vehículo y documentos. Autenticación Biométrica.</p>
                 <div class="btn-card">Ingresar &rarr;</div>
             </a>
             
             <a href="{{ url_for('combustible_flota.registrar_combustible') }}" class="module-card">
                 <div class="card-icon">⛽</div>
                 <h3 class="card-title">Combustible</h3>
-                <p class="card-desc">Monitoreo de consumo y eficiencia de combustible</p>
+                <p class="card-desc">Monitoreo de consumo y eficiencia de combustible.</p>
                 <div class="btn-card">Gestionar &rarr;</div>
             </a>
         </div>
     </main>
 
     <footer class="footer">
-        <p>&copy; 2025 BQA ONE Technology.</p>
-        <a href="{{ url_for('logout') }}" class="logout-btn">Cerrar Sesión</a>
+        <p>&copy; 2026 BQA ONE Technology. Enrutamiento Inteligente.</p>
+        <a href="{{ url_for('logout') }}" class="logout-btn" id="btnLogout">Cerrar Sesión</a>
     </footer>
+
+    <!-- MODAL DE CLASIFICACIÓN DE PARADA -->
+    <div id="modalParada" class="modal-overlay">
+        <div class="modal-box">
+            <h3 class="modal-title">🛑 Vehículo Detenido</h3>
+            <p class="modal-text">Por favor clasifique la actividad que se realiza en este punto:</p>
+            
+            <div class="form-group">
+                <label>Actividad / Motivo:</label>
+                <select id="tipo_parada">
+                    <option value="Entrega a Cliente">Entrega a Cliente</option>
+                    <option value="Tanqueo Combustible">Tanqueo / Combustible</option>
+                    <option value="Alimentación">Alimentación / Comida</option>
+                    <option value="Descanso / Pernoctada">Descanso / Pernoctada</option>
+                    <option value="Falla Mecánica">Falla Mecánica</option>
+                    <option value="Trancón / Retén">Trancón / Retén</option>
+                    <option value="Otra">Otra...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Nombre del Lugar / Cliente (Opcional):</label>
+                <input type="text" id="nombre_punto_parada" placeholder="Ej. Cliente XYZ, Restaurante El Paso">
+            </div>
+            
+            <button onclick="registrarParadaManual()" class="btn-submit">Registrar Parada</button>
+            <p class="timer-text">Autoguardado en <span id="countdown_parada">180</span>s...</p>
+        </div>
+    </div>
+
+    <!-- SCRIPT GLOBAL: Heartbeat y Logout -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // 1. Motor de Latidos (Heartbeat) - Envía señal cada 15 segundos
+            function sendHeartbeat() {
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+                fetch("{{ url_for('flotacarga.heartbeat_flota') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+                }).catch(e => console.log('Heartbeat error'));
+            }
+            setInterval(sendHeartbeat, 15000);
+            sendHeartbeat(); // Latido inicial
+
+            // 2. Interceptar Cierre de Sesión para guardar log de salida manual
+            const btnLogout = document.getElementById('btnLogout');
+            if (btnLogout) {
+                btnLogout.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const logoutUrl = this.href;
+                    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+                    
+                    fetch("{{ url_for('flotacarga.logout_manual_flota') }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+                    }).finally(() => {
+                        window.location.href = logoutUrl;
+                    });
+                });
+            }
+        });
+    </script>
 
     {% if session.get('placa_prelogueada') %}
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            // Intervalo de 10 minutos (600,000 milisegundos)
-            const INTERVALO_TRACKING = 600000;
+            // ==========================================
+            // CONSTANTES Y CONFIGURACIÓN DEL ALGORITMO
+            // ==========================================
+            const FRECUENCIA_SONDEO = 60000;      // Consultar GPS cada 1 minuto (en ms)
+            const TOLERANCIA_METROS = 30;         // Margen de error por GPS Drift
+            const PRECISION_MINIMA = 40;          // Ignorar lecturas peores a 40m de precisión
+            const TIEMPO_PARA_PARADA = 5;         // Minutos inmovil para detonar parada
+            const TIMEOUT_ALERTA = 180;           // Segundos para que el operador responda el modal
 
-            function reportarUbicacion() {
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        function (posicion) {
-                            // Enviar las coordenadas al backend
-                            fetch('/api/actualizar_ubicacion', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    // Si usas CSRF Protect global, descomenta la siguiente línea:
-                                    // 'X-CSRFToken': '{{ csrf_token() }}' 
-                                },
-                                body: JSON.stringify({
-                                    lat: posicion.coords.latitude,
-                                    lng: posicion.coords.longitude
-                                })
-                            })
-                                .then(res => res.json())
-                                .then(data => console.log("📍 GPS Actualizado", data))
-                                .catch(err => console.error("Error en GPS Fetch: ", err));
+            let ultimaUbicacion = null;
+            let minutosInmovil = 0;
+            let paradaActiva = null; 
+            let modalAbierto = false;
+            let timerModal = null;
+            let tiempoRestante = TIMEOUT_ALERTA;
+            let wakeLock = null;
+
+            // Cola Offline Resiliente
+            let syncQueue = JSON.parse(localStorage.getItem('bqa_flota_queue') || '{"ubicaciones":[], "paradas":[]}');
+            
+            const indicadorGPS = document.getElementById('indicador_gps');
+
+            // ==========================================
+            // WAKE LOCK API (Evitar Suspensión de Pantalla)
+            // ==========================================
+            async function solicitarWakeLock() {
+                try {
+                    if ('wakeLock' in navigator) {
+                        wakeLock = await navigator.wakeLock.request('screen');
+                        wakeLock.addEventListener('release', () => console.log('Wake Lock liberado (Pantalla apagada)'));
+                        console.log('Wake Lock Activo: Previniendo suspensión en 2do plano.');
+                    }
+                } catch (err) { console.warn('Wake Lock no soportado o denegado:', err); }
+            }
+            
+            document.addEventListener('visibilitychange', async () => {
+                if (wakeLock !== null && document.visibilityState === 'visible') solicitarWakeLock();
+                if (document.visibilityState === 'visible') sincronizarDatosOffline();
+            });
+            solicitarWakeLock();
+
+            // ==========================================
+            // HERRAMIENTAS Y MATEMÁTICAS (Haversine)
+            // ==========================================
+            function guardarCola() { localStorage.setItem('bqa_flota_queue', JSON.stringify(syncQueue)); }
+            
+            function obtenerFechaHoraActual() {
+                let d = new Date();
+                return {
+                    fecha: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'),
+                    hora: String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0'),
+                    full: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + 
+                          String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0')
+                };
+            }
+
+            function calcularDistancia(lat1, lon1, lat2, lon2) {
+                const R = 6371e3;
+                const r1 = lat1 * Math.PI/180, r2 = lat2 * Math.PI/180;
+                const dLat = (lat2-lat1) * Math.PI/180, dLon = (lon2-lon1) * Math.PI/180;
+                const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(r1)*Math.cos(r2)*Math.sin(dLon/2)*Math.sin(dLon/2);
+                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            }
+
+            // ==========================================
+            // MOTOR DE RASTREO Y DETECCIÓN
+            // ==========================================
+            function procesarLecturaGPS() {
+                if (!navigator.geolocation) return;
+
+                navigator.geolocation.getCurrentPosition(
+                    function (pos) {
+                        // 1. Filtro de Precisión
+                        if (pos.coords.accuracy > PRECISION_MINIMA) {
+                            indicadorGPS.innerText = '🟠 GPS Señal Débil';
+                            indicadorGPS.className = 'gps-status offline';
+                            return; 
+                        }
+
+                        indicadorGPS.innerText = '🟢 Rastreo Activo';
+                        indicadorGPS.className = 'gps-status active';
+
+                        let lat = pos.coords.latitude;
+                        let lng = pos.coords.longitude;
+                        let momento = obtenerFechaHoraActual();
+
+                        // 2. Guardar punto automático para pintar la ruta en el mapa
+                        syncQueue.ubicaciones.push({ lat: lat, lng: lng, fecha_hora: momento.full });
+
+                        // 3. Evaluar movimiento vs Inmovilidad
+                        if (ultimaUbicacion) {
+                            let distancia = calcularDistancia(ultimaUbicacion.lat, ultimaUbicacion.lng, lat, lng);
+                            
+                            if (distancia <= TOLERANCIA_METROS) {
+                                // Sigue en el mismo lugar
+                                if (!paradaActiva) {
+                                    minutosInmovil++;
+                                    if (minutosInmovil >= TIEMPO_PARA_PARADA && !modalAbierto) {
+                                        activarAlertaParada(lat, lng);
+                                    }
+                                }
+                            } else {
+                                // El vehículo se movió
+                                minutosInmovil = 0;
+                                ultimaUbicacion = { lat: lat, lng: lng };
+                                
+                                // Si había una parada activa, la cerramos
+                                if (paradaActiva) {
+                                    paradaActiva.hora_fin = momento.hora;
+                                    paradaActiva = null; // Reiniciamos el ciclo
+                                }
+                            }
+                        } else {
+                            ultimaUbicacion = { lat: lat, lng: lng };
+                        }
+                        
+                        guardarCola();
+                        sincronizarDatosOffline();
+                    },
+                    function (err) {
+                        indicadorGPS.innerText = '🔴 GPS Apagado';
+                        indicadorGPS.className = 'gps-status offline';
+                        console.warn("Error GPS: ", err.message);
+                    },
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                );
+            }
+
+            // ==========================================
+            // GESTIÓN DE INTERFAZ DE PARADA
+            // ==========================================
+            function activarAlertaParada(lat, lng) {
+                modalAbierto = true;
+                tiempoRestante = TIMEOUT_ALERTA;
+                document.getElementById('modalParada').style.display = 'flex';
+                document.getElementById('countdown_parada').innerText = tiempoRestante;
+                
+                // Si el dispositivo soporta vibración, alertar al operador
+                if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
+
+                timerModal = setInterval(() => {
+                    tiempoRestante--;
+                    document.getElementById('countdown_parada').innerText = tiempoRestante;
+                    if (tiempoRestante <= 0) {
+                        clearInterval(timerModal);
+                        // Registro Automático por falta de respuesta
+                        ejecutarRegistroParada("No registrado (Automático)", "Punto no clasificado", "Automático", lat, lng);
+                    }
+                }, 1000);
+            }
+
+            window.registrarParadaManual = function() {
+                clearInterval(timerModal);
+                let tipo = document.getElementById('tipo_parada').value;
+                let nombre = document.getElementById('nombre_punto_parada').value.trim() || 'Punto Desconocido';
+                ejecutarRegistroParada(tipo, nombre, 'Manual', ultimaUbicacion.lat, ultimaUbicacion.lng);
+            };
+
+            window.triggerParadaManual = function(e) {
+                if (e) e.preventDefault();
+                if (!ultimaUbicacion) {
+                    alert("Aún no tenemos señal de GPS. Por favor espere unos segundos o verifique su conexión.");
+                    return;
+                }
+                if (paradaActiva) {
+                    // Cierre automático de parada previa activa
+                    let momento = obtenerFechaHoraActual();
+                    paradaActiva.hora_fin = momento.hora;
+                    paradaActiva = null;
+                    sincronizarDatosOffline();
+                }
+                activarAlertaParada(ultimaUbicacion.lat, ultimaUbicacion.lng);
+            };
+
+            function ejecutarRegistroParada(tipo, nombre, origen, lat, lng) {
+                document.getElementById('modalParada').style.display = 'none';
+                document.getElementById('nombre_punto_parada').value = ''; // Reset
+                modalAbierto = false;
+                let momento = obtenerFechaHoraActual();
+                
+                paradaActiva = {
+                    temp_id: Date.now().toString(),
+                    fecha: momento.fecha,
+                    hora_inicio: momento.hora,
+                    hora_fin: null,
+                    lat: lat,
+                    lng: lng,
+                    tipo_actividad: tipo,
+                    nombre_punto: nombre,
+                    origen_registro: origen
+                };
+                
+                syncQueue.paradas.push(paradaActiva);
+                guardarCola();
+                sincronizarDatosOffline();
+            }
+
+            // ==========================================
+            // SINCRONIZACIÓN OFFLINE-FIRST A MYSQL
+            // ==========================================
+            function sincronizarDatosOffline() {
+                if (!navigator.onLine) {
+                    indicadorGPS.innerText = '🟠 Guardando Offline';
+                    return; 
+                }
+
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+                // 1. Sincronizar Historial de Puntos (Ruta)
+                if (syncQueue.ubicaciones.length > 0) {
+                    let payloadUbi = [...syncQueue.ubicaciones];
+                    fetch('/api/actualizar_ubicacion', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
                         },
-                        function (error) {
-                            console.warn("Error GPS: ", error.message);
+                        body: JSON.stringify({ ubicaciones: payloadUbi })
+                    }).then(res => {
+                        if (res.ok) {
+                            syncQueue.ubicaciones = syncQueue.ubicaciones.filter(u => !payloadUbi.includes(u));
+                            guardarCola();
+                        }
+                    }).catch(e => console.log('Silenced offline error'));
+                }
+
+                // 2. Sincronizar Paradas Nuevas (Aperturas)
+                let paradasNuevas = syncQueue.paradas.filter(p => !p.db_id);
+                if (paradasNuevas.length > 0) {
+                    fetch('/api/registrar_parada', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
                         },
-                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                    );
+                        body: JSON.stringify({ paradas: paradasNuevas })
+                    }).then(res => res.json()).then(data => {
+                        if (data.status === 'success') {
+                            // Vincular ID Temporal con ID real de MySQL
+                            data.ids_mapeados.forEach(mapping => {
+                                let p = syncQueue.paradas.find(x => x.temp_id === mapping.temp_id);
+                                if (p) p.db_id = mapping.db_id;
+                            });
+                            guardarCola();
+                        }
+                    }).catch(e => console.log('Silenced offline error'));
+                }
+
+                // 3. Sincronizar Paradas Cerradas (Cuando reanuda marcha o abre nueva parada)
+                let paradasCerradas = syncQueue.paradas.filter(p => p.db_id && p.hora_fin && !p.sincronizada);
+                if (paradasCerradas.length > 0) {
+                    let payloadFin = paradasCerradas.map(p => ({ id: p.db_id, hora_fin: p.hora_fin }));
+                    fetch('/api/actualizar_fin_parada', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({ paradas: payloadFin })
+                    }).then(res => {
+                        if (res.ok) {
+                            paradasCerradas.forEach(p => p.sincronizada = true);
+                            // Limpiar las ya cerradas y sincronizadas para no llenar el localStorage
+                            syncQueue.paradas = syncQueue.paradas.filter(p => !p.sincronizada);
+                            guardarCola();
+                        }
+                    }).catch(e => console.log('Silenced offline error'));
                 }
             }
 
-            // 1. Ejecutar inmediatamente al entrar al Dashboard
-            reportarUbicacion();
-
-            // 2. Repetir cada 10 minutos
-            setInterval(reportarUbicacion, INTERVALO_TRACKING);
-
-            // 3. Forzar actualización si el conductor desbloquea el celular
-            document.addEventListener("visibilitychange", function () {
-                if (document.visibilityState === 'visible') {
-                    reportarUbicacion();
-                }
-            });
+            // Iniciar ciclo de vida
+            procesarLecturaGPS();
+            setInterval(procesarLecturaGPS, FRECUENCIA_SONDEO);
         });
     </script>
     {% endif %}
 </body>
-
 </html>

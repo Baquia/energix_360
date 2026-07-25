@@ -1,0 +1,262 @@
+<!-- app/templates/comercializador/equipos.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Maestro de Equipos | Comercializador GLP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#015249">
+  
+  <!-- Se hereda la hoja de estilos corporativa -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
+  <style>
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    th {
+      background-color: #f4f6f7;
+      color: #015249;
+      font-weight: bold;
+    }
+    .badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+    }
+    .badge-activo { background-color: #015249; }
+    .badge-inactivo { background-color: #cc0000; }
+    .badge-mantenimiento { background-color: #f59e0b; }
+    
+    .btn-action {
+      padding: 6px 12px;
+      background: #e3f2fd;
+      color: #1565c0;
+      border: 1px solid #2196f3;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .btn-action:hover {
+      background: #1565c0;
+      color: white;
+    }
+
+    /* Estilos Modal Formulario */
+    .form-group {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #333;
+      font-size: 14px;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" class="logo" alt="Logo cliente" onerror="this.style.display='none'">
+    <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo" alt="Logo Energix360">
+  </div>
+
+  <div class="wrap" style="max-width: 900px;">
+    <p id="saludo">¡Hola {{ session.get('nombre','Usuario') }}!</p>
+    <h2 style="color: #015249; margin-bottom: 5px;">Inventario de Equipos GLP</h2>
+    <p style="color: #666; font-size: 14px; margin-top: 0;">Administración de cilindros y tanques estacionarios.</p>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+        <button class="menu-btn" style="background: #015249; color: white; width: auto; padding: 10px 20px;" onclick="abrirModalEquipo()">
+            ➕ Nuevo Equipo
+        </button>
+        <a href="/comercializador/mantenimientos" class="menu-btn" style="width: auto; padding: 10px 20px; text-decoration: none; text-align: center;">
+            ⚙️ Mantenimientos
+        </a>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Serial/Código</th>
+            <th>Capacidad</th>
+            <th>Estado</th>
+            <th>Registro</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for eq in equipos %}
+          <tr>
+            <td style="text-transform: capitalize;">{{ eq.tipo.replace('_', ' ') }}</td>
+            <td style="font-weight: bold; color: #333;">{{ eq.serial_codigo }}</td>
+            <td>{{ eq.capacidad }}</td>
+            <td>
+              <span class="badge 
+                {% if eq.estado == 'activo' %}badge-activo
+                {% elif eq.estado == 'mantenimiento' %}badge-mantenimiento
+                {% else %}badge-inactivo{% endif %}">
+                {{ eq.estado | upper }}
+              </span>
+            </td>
+            <td style="font-size: 12px; color: #777;">{{ eq.fecha_registro.strftime('%Y-%m-%d') if eq.fecha_registro else '' }}</td>
+            <td>
+              <button class="btn-action" onclick='editarEquipo({{ eq | tojson | safe }})'>Editar</button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" style="text-align: center; color: #888; padding: 20px;">No hay equipos registrados.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <a class="logout" href="/logout" style="margin-top: 30px;">Volver al Menú Principal</a>
+  </div>
+
+  <!-- Modal Formulario -->
+  <div id="modalFormEquipo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center; backdrop-filter: blur(2px);">
+    <div style="background:white; padding:24px 20px; border-radius:16px; width:90%; max-width:400px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+      <h3 id="formTitulo" style="margin-top:0; color:#015249; font-size:20px; margin-bottom:15px; text-align: center;">Registrar Equipo</h3>
+      
+      <input type="hidden" id="eq_id">
+      
+      <div class="form-group">
+        <label>Tipo de Equipo *</label>
+        <select id="eq_tipo" required>
+          <option value="">Seleccione...</option>
+          <option value="cilindro">Cilindro</option>
+          <option value="tanque_estacionario">Tanque Estacionario</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Serial / Código Interno *</label>
+        <input type="text" id="eq_serial" placeholder="Ej: TK-001, CIL-045" required>
+      </div>
+
+      <div class="form-group">
+        <label>Capacidad (Libras o Galones)</label>
+        <input type="number" step="0.01" id="eq_capacidad" placeholder="Ej: 100">
+      </div>
+
+      <div class="form-group">
+        <label>Estado</label>
+        <select id="eq_estado">
+          <option value="activo">Activo</option>
+          <option value="mantenimiento">En Mantenimiento</option>
+          <option value="inactivo">Inactivo / Baja</option>
+        </select>
+      </div>
+
+      <div style="display:flex; justify-content:center; gap:12px; margin-top: 20px;">
+        <button onclick="cerrarModalEquipo()" style="flex:1; padding:12px; border-radius:10px; border:none; background:#f4f6f7; color:#555; font-weight:600; font-size:15px; cursor:pointer;">Cancelar</button>
+        <button onclick="guardarEquipo()" id="btnGuardar" style="flex:1; padding:12px; border-radius:10px; border:none; background:#015249; color:white; font-weight:600; font-size:15px; cursor:pointer;">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function abrirModalEquipo() {
+        document.getElementById('formTitulo').innerText = 'Registrar Nuevo Equipo';
+        document.getElementById('eq_id').value = '';
+        document.getElementById('eq_tipo').value = '';
+        document.getElementById('eq_serial').value = '';
+        document.getElementById('eq_capacidad').value = '';
+        document.getElementById('eq_estado').value = 'activo';
+        
+        document.getElementById('modalFormEquipo').style.display = 'flex';
+    }
+
+    function editarEquipo(equipo) {
+        document.getElementById('formTitulo').innerText = 'Editar Equipo';
+        document.getElementById('eq_id').value = equipo.id;
+        document.getElementById('eq_tipo').value = equipo.tipo;
+        document.getElementById('eq_serial').value = equipo.serial_codigo;
+        document.getElementById('eq_capacidad').value = equipo.capacidad;
+        document.getElementById('eq_estado').value = equipo.estado;
+        
+        document.getElementById('modalFormEquipo').style.display = 'flex';
+    }
+
+    function cerrarModalEquipo() {
+        document.getElementById('modalFormEquipo').style.display = 'none';
+    }
+
+    async function guardarEquipo() {
+        const id = document.getElementById('eq_id').value;
+        const tipo = document.getElementById('eq_tipo').value;
+        const serial = document.getElementById('eq_serial').value;
+        const capacidad = document.getElementById('eq_capacidad').value;
+        const estado = document.getElementById('eq_estado').value;
+
+        if(!tipo || !serial) {
+            alert('Los campos Tipo y Serial son obligatorios.');
+            return;
+        }
+
+        const payload = {
+            id: id ? parseInt(id) : null,
+            tipo: tipo,
+            serial_codigo: serial,
+            capacidad: capacidad ? parseFloat(capacidad) : 0,
+            estado: estado,
+            especificaciones_tecnicas: {} 
+        };
+
+        const btn = document.getElementById('btnGuardar');
+        const textBtn = btn.innerText;
+        btn.innerText = 'Guardando...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('/comercializador/equipos/guardar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            if(result.success) {
+                alert(result.message);
+                window.location.reload();
+            } else {
+                alert('Error: ' + result.message);
+                btn.innerText = textBtn;
+                btn.disabled = false;
+            }
+        } catch (error) {
+            alert('Error de conexión con el servidor.');
+            btn.innerText = textBtn;
+            btn.disabled = false;
+        }
+    }
+  </script>
+</body>
+</html>

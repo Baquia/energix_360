@@ -1,0 +1,222 @@
+<!-- app/templates/comercializador/mantenimientos.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mantenimientos | Comercializador GLP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#015249">
+  
+  <!-- Se hereda la hoja de estilos corporativa -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
+  <style>
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    th {
+      background-color: #f4f6f7;
+      color: #015249;
+      font-weight: bold;
+    }
+    .badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+    }
+    .badge-pendiente { background-color: #f59e0b; }
+    .badge-en_proceso { background-color: #3b82f6; }
+    .badge-finalizado { background-color: #10b981; }
+    
+    /* Estilos Modal Formulario */
+    .form-group {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #333;
+      font-size: 14px;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="{{ url_for('static', filename='logo_' + session['empresa'] + '.png') }}" class="logo" alt="Logo cliente" onerror="this.style.display='none'">
+    <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo" alt="Logo Energix360">
+  </div>
+
+  <div class="wrap" style="max-width: 900px;">
+    <p id="saludo">¡Hola {{ session.get('nombre','Usuario') }}!</p>
+    <h2 style="color: #015249; margin-bottom: 5px;">Mantenimientos de Equipos GLP</h2>
+    <p style="color: #666; font-size: 14px; margin-top: 0;">Historial y programación de servicios técnicos.</p>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+        <button class="menu-btn" style="background: #015249; color: white; width: auto; padding: 10px 20px;" onclick="abrirModalMantenimiento()">
+            📅 Programar Mantenimiento
+        </button>
+        <a href="/comercializador/equipos" class="menu-btn" style="width: auto; padding: 10px 20px; text-decoration: none; text-align: center; background: #e3f2fd; color: #1565c0; border: 1px solid #2196f3;">
+            🔙 Volver a Equipos
+        </a>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Equipo</th>
+            <th>Tipo de Equipo</th>
+            <th>Mantenimiento</th>
+            <th>Fecha Prog.</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in mantenimientos %}
+          <tr>
+            <td style="font-weight: bold; color: #333;">{{ m.serial_codigo }}</td>
+            <td style="text-transform: capitalize;">{{ m.tipo.replace('_', ' ') }}</td>
+            <td style="text-transform: capitalize;">{{ m.tipo_mantenimiento.replace('_', ' ') }}</td>
+            <td>{{ m.fecha_programada.strftime('%Y-%m-%d') if m.fecha_programada else '' }}</td>
+            <td>
+              <span class="badge 
+                {% if m.estado == 'pendiente' %}badge-pendiente
+                {% elif m.estado == 'en_proceso' %}badge-en_proceso
+                {% elif m.estado == 'finalizado' %}badge-finalizado
+                {% endif %}">
+                {{ m.estado.replace('_', ' ') | upper }}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" style="text-align: center; color: #888; padding: 20px;">No hay mantenimientos registrados en el sistema.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <a class="logout" href="/logout" style="margin-top: 30px;">Cerrar Sesión</a>
+  </div>
+
+  <!-- Modal Programar Mantenimiento -->
+  <div id="modalFormMantenimiento" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center; backdrop-filter: blur(2px);">
+    <div style="background:white; padding:24px 20px; border-radius:16px; width:90%; max-width:400px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+      <h3 style="margin-top:0; color:#015249; font-size:20px; margin-bottom:15px; text-align: center;">Programar Servicio</h3>
+      
+      <div class="form-group">
+        <label>Equipo a intervenir *</label>
+        <select id="mant_equipo_id" required>
+          <option value="">Seleccione un equipo...</option>
+          {% for eq in equipos %}
+          <option value="{{ eq.id }}">{{ eq.serial_codigo }} ({{ eq.tipo.replace('_', ' ').capitalize() }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Fecha Programada *</label>
+        <input type="date" id="mant_fecha" required>
+      </div>
+
+      <div class="form-group">
+        <label>Tipo de Mantenimiento *</label>
+        <select id="mant_tipo" required>
+          <option value="">Seleccione...</option>
+          <option value="preventivo">Preventivo</option>
+          <option value="correctivo">Correctivo</option>
+          <option value="inspeccion_visual">Inspección Visual</option>
+          <option value="prueba_hidrostatica">Prueba Hidrostática</option>
+          <option value="cambio_valvulas">Cambio de Válvulas</option>
+        </select>
+      </div>
+
+      <div style="display:flex; justify-content:center; gap:12px; margin-top: 25px;">
+        <button onclick="cerrarModalMantenimiento()" style="flex:1; padding:12px; border-radius:10px; border:none; background:#f4f6f7; color:#555; font-weight:600; font-size:15px; cursor:pointer;">Cancelar</button>
+        <button onclick="guardarMantenimiento()" id="btnProgramar" style="flex:1; padding:12px; border-radius:10px; border:none; background:#015249; color:white; font-weight:600; font-size:15px; cursor:pointer;">Programar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function abrirModalMantenimiento() {
+        document.getElementById('mant_equipo_id').value = '';
+        document.getElementById('mant_fecha').value = '';
+        document.getElementById('mant_tipo').value = '';
+        
+        document.getElementById('modalFormMantenimiento').style.display = 'flex';
+    }
+
+    function cerrarModalMantenimiento() {
+        document.getElementById('modalFormMantenimiento').style.display = 'none';
+    }
+
+    async function guardarMantenimiento() {
+        const equipo_id = document.getElementById('mant_equipo_id').value;
+        const fecha_programada = document.getElementById('mant_fecha').value;
+        const tipo_mantenimiento = document.getElementById('mant_tipo').value;
+
+        if(!equipo_id || !fecha_programada || !tipo_mantenimiento) {
+            alert('Todos los campos son obligatorios.');
+            return;
+        }
+
+        const payload = {
+            equipo_id: parseInt(equipo_id),
+            fecha_programada: fecha_programada,
+            tipo_mantenimiento: tipo_mantenimiento
+        };
+
+        const btn = document.getElementById('btnProgramar');
+        const textBtn = btn.innerText;
+        btn.innerText = 'Guardando...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('/comercializador/mantenimientos/programar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            if(result.success) {
+                alert(result.message);
+                window.location.reload();
+            } else {
+                alert('Error: ' + result.message);
+                btn.innerText = textBtn;
+                btn.disabled = false;
+            }
+        } catch (error) {
+            alert('Error de conexión con el servidor.');
+            btn.innerText = textBtn;
+            btn.disabled = false;
+        }
+    }
+  </script>
+</body>
+</html>

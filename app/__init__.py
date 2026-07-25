@@ -1,3 +1,4 @@
+# app/__init__.py
 from flask import Flask
 from flask_mysqldb import MySQL
 from flask_login import LoginManager
@@ -76,6 +77,9 @@ def create_app():
     from app.blueprints.B_bp_controlador_bodegas import bp_bodegas                     
     from app.blueprints.B_bp_controlador_flotacarga import bp_gestorflota
     from app.blueprints.B_bp_pesaje_carga_avicola import bp_gestion_carga               
+    
+    # --- NUEVO: Comercializador GLP ---
+    from app.blueprints.B_bp_comercializador_glp import bp_comercializador_glp
    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
@@ -83,6 +87,9 @@ def create_app():
     app.register_blueprint(bp_bodegas)
     app.register_blueprint(bp_gestorflota)
     app.register_blueprint(bp_gestion_carga)
+    
+    # --- NUEVO: Comercializador GLP ---
+    app.register_blueprint(bp_comercializador_glp)
 
     # ---------------------------------------------------------
     #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
@@ -93,11 +100,17 @@ def create_app():
     from app.blueprints.C_bp_combustible_flota import bp_combustible_flota
     from app.blueprints.C_bp_preoperacional import bp_preoperacional
     
+    # --- NUEVO: Mecánico GLP (PWA) ---
+    from app.blueprints.C_bp_mecanico_glp import bp_mecanico_glp
+    
     app.register_blueprint(bp_oper_bodegas)
     app.register_blueprint(bp_verificador_bodegas)
     app.register_blueprint(bp_flotacarga)
     app.register_blueprint(bp_combustible_flota)
     app.register_blueprint(bp_preoperacional)
+    
+    # --- NUEVO: Mecánico GLP (PWA) ---
+    app.register_blueprint(bp_mecanico_glp)
 
     return app
 
