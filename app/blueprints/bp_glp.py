@@ -3170,7 +3170,7 @@ def admin_aprobar_solicitud():
         return jsonify({"success": False, "message": str(e)})
 
 
- def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
+def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
     """
     Envía correo de aprobación con DISEÑO PRO (Orden de Compra).
     Calcula dinámicamente el Nivel Objetivo basado en el último saldo.
