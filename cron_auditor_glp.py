@@ -28,18 +28,19 @@ def auditar_granjas():
         conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
         cur = conn.cursor(MySQLdb.cursors.DictCursor)
 
-        # 1. CONSULTA OPTIMIZADA: Calculamos MIN y MAX en un solo paso rápido sin subconsultas pesadas
+        # 1. CONSULTA OPTIMIZADA: Lotes Activos
         query_lotes = """
             SELECT 
-                id_empresa, 
-                empresa, 
-                ubicacion, 
-                lote, 
-                MAX(fecha) as ultima_operacion,
-                MIN(fecha) as fecha_inicio
-            FROM cardex_glp
-            WHERE estatus_lote = 'ACTIVO'
-            GROUP BY id_empresa, empresa, ubicacion, lote
+                c.id_empresa, 
+                c.empresa, 
+                c.ubicacion, 
+                c.lote, 
+                MAX(c.fecha) as ultima_operacion,
+                COALESCE(MIN(c.fecha_llegada_pollitos), MIN(c.fecha)) as fecha_inicio
+            FROM cardex_glp c
+            LEFT JOIN cardex_glp f ON c.lote = f.lote AND c.id_empresa = f.id_empresa AND f.operacion = 'finalizar_calefaccion'
+            WHERE f.id IS NULL
+            GROUP BY c.id_empresa, c.empresa, c.ubicacion, c.lote
         """
         cur.execute(query_lotes)
         lotes_activos = cur.fetchall()
@@ -53,7 +54,8 @@ def auditar_granjas():
                 alertas_por_empresa[emp_id] = {
                     'nombre': row['empresa'],
                     'alertas_frecuencia': [],
-                    'alertas_vencidos': []
+                    'alertas_vencidos': [],
+                    'alertas_pedidos': []
                 }
 
             ultima_op = row['ultima_operacion']
@@ -81,15 +83,47 @@ def auditar_granjas():
 
             if alerta_frecuencia:
                 alertas_por_empresa[emp_id]['alertas_frecuencia'].append(
-                    f"🔹 *{row['ubicacion']}* (Último reporte: {razon_frecuencia})"
+                    f"🔹 *{row['ubicacion']}* (Sin actividad registrada: {razon_frecuencia})"
                 )
 
-        # 2. Procesar envíos empresa por empresa (Aislamiento de datos)
+        # 2. CONSULTA NUEVA: Pedidos generados sin registrar tanqueo (>= 3 días)
+        query_pedidos = """
+            SELECT 
+                p.cliente AS empresa, 
+                e.nit AS id_empresa, 
+                p.ubicacion, 
+                p.codigo_pedido, 
+                p.fecha_registro,
+                DATEDIFF(CURDATE(), DATE(p.fecha_registro)) AS dias_retraso
+            FROM pedidos_gas_glp p
+            JOIN empresas e ON TRIM(UPPER(p.cliente)) = TRIM(UPPER(e.nombre_comercial))
+            WHERE p.estatus = 'generado' 
+              AND p.estatus_flujo NOT IN ('tanqueo_registrado', 'legalizado_extemporaneo', 'anulado_sin_evidencia')
+              AND DATEDIFF(CURDATE(), DATE(p.fecha_registro)) >= 3
+        """
+        cur.execute(query_pedidos)
+        pedidos_huerfanos = cur.fetchall()
+
+        for p in pedidos_huerfanos:
+            emp_id = p['id_empresa']
+            if emp_id not in alertas_por_empresa:
+                alertas_por_empresa[emp_id] = {
+                    'nombre': p['empresa'],
+                    'alertas_frecuencia': [],
+                    'alertas_vencidos': [],
+                    'alertas_pedidos': []
+                }
+            alertas_por_empresa[emp_id]['alertas_pedidos'].append(
+                f"⏳ *{p['ubicacion']}* - Pedido: {p['codigo_pedido']} (Generado hace {p['dias_retraso']} días)"
+            )
+
+
+        # 3. Procesar envíos empresa por empresa (Aislamiento de datos)
         for emp_id, datos in alertas_por_empresa.items():
             
-            # Buscamos usuarios supervisores u operadores (Añadido DISTINCT para evitar duplicados)
+            # Buscamos usuarios supervisores u operadores
             cur.execute("""
-                SELECT DISTINCT telegram_id FROM usuarios 
+                SELECT telegram_id FROM usuarios 
                 WHERE empresa_id = %s 
                   AND perfil IN ('supervisor_gas', 'operador_gas') 
                   AND telegram_id IS NOT NULL 
@@ -101,32 +135,29 @@ def auditar_granjas():
             mensaje = f"📊 *REPORTE DE AUDITORÍA GLP* 📊\nEmpresa: {datos['nombre']}\n\n"
 
             # Evaluar si todo está bien o si hay alertas
-            if not datos['alertas_frecuencia'] and not datos['alertas_vencidos']:
-                mensaje += "✅ *Todo en orden.*\nNo hay granjas atrasadas ni lotes vencidos el día de hoy."
+            if not datos['alertas_frecuencia'] and not datos['alertas_vencidos'] and not datos['alertas_pedidos']:
+                mensaje += "✅ *Todo en orden.*\nNo hay granjas atrasadas, lotes vencidos ni pedidos sin registrar el día de hoy."
             else:
                 if datos['alertas_frecuencia']:
-                    mensaje += "⚠️ *Granjas sin reporte de consumo reciente:*\n"
+                    mensaje += "⚠️ *Granjas sin actividad registrada (consumo/tanqueo):*\n"
                     mensaje += "\n".join(datos['alertas_frecuencia']) + "\n\n"
                     
                 if datos['alertas_vencidos']:
                     mensaje += "🔥 *Granjas que excedieron los 15 días de calefacción:*\n"
                     mensaje += "\n".join(datos['alertas_vencidos']) + "\n\n"
+                    
+                if datos['alertas_pedidos']:
+                    mensaje += "⏳ *Pedidos de gas sin registrar (Más de 3 días):*\n"
+                    mensaje += "\n".join(datos['alertas_pedidos']) + "\n\n"
 
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
 
-            # Set para llevar el control de a quién ya se le envió en este ciclo
-            enviados = set()
-
             # Enviar a los destinatarios de la base de datos
             for u in usuarios_destino:
-                chat_id = u['telegram_id']
-                enviar_telegram(chat_id, mensaje)
-                enviados.add(str(chat_id))
+                enviar_telegram(u['telegram_id'], mensaje)
             
-            # BYPASS DE SEGURIDAD: Te envía una copia directa a ti, SOLO si no estabas en la lista anterior
-            bypass_id = "5368207368"
-            if bypass_id not in enviados:
-                enviar_telegram(bypass_id, mensaje)
+            # BYPASS DE SEGURIDAD: Te envía una copia directa a ti sí o sí
+            enviar_telegram("5368207368", mensaje)
 
         cur.close()
         conn.close()

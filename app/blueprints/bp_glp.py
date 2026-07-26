@@ -17,12 +17,14 @@ from MySQLdb import OperationalError
 
 import requests
 import telebot
+import threading
 
 from flask import abort
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from email.utils import make_msgid, formatdate
 # --------------------------------
 
 bp_glp = Blueprint('bp_glp', __name__, url_prefix='/glp')
@@ -105,15 +107,39 @@ def handle_contact(message):
             
             
 #hasta acá....
+
+
+def _enviar_mensajes_telegram_hilo(chat_ids, mensaje):
+    """Envía mensajes a Telegram en segundo plano con reintentos y timeout extendido."""
+    def tarea_envio():
+        # Usamos el TOKEN definido globalmente en tu archivo
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        for chat_id in chat_ids:
+            data = {
+                "chat_id": chat_id,
+                "text": mensaje,
+                "parse_mode": "Markdown"
+            }
+            for intento in range(3): # 3 intentos máximo
+                try:
+                    resp = requests.post(url, data=data, timeout=10) # Timeout aumentado a 10s
+                    if resp.status_code == 200:
+                        break # Éxito, salir del bucle de reintentos
+                    else:
+                        print(f"⚠️ Telegram Error API a {chat_id} (Intento {intento+1}): {resp.text}")
+                except Exception as e:
+                    print(f"⚠️ Telegram Fallo Red a {chat_id} (Intento {intento+1}): {e}")
+                time.sleep(2) # Pausa antes del siguiente reintento
+                
+    hilo = threading.Thread(target=tarea_envio)
+    hilo.daemon = True
+    hilo.start()
+
 def _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, nivel, codigo):
     """
     Envía alerta usando la API NATIVA de Telegram a TODOS los usuarios 
     vinculados que pertenezcan a la empresa solicitante.
     """
-    # ================= TUS DATOS =================
-    TOKEN = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"  
-    # =============================================
-
     mensaje = (
         f"🚨 *SOLICITUD DE GAS*\n\n"
         f"📍 Sede: {ubicacion}\n"
@@ -140,31 +166,19 @@ def _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, nivel, codig
             print(f"⚠️ Telegram: No hay usuarios vinculados para la empresa ID {id_empresa}")
             return False
 
-        exitos = 0
-        # 2. Enviamos el mensaje en bucle a cada usuario encontrado
-        for row in usuarios_destino:
-            # Lectura blindada (por si la BD devuelve dict o tupla)
-            chat_id = row['telegram_id'] if isinstance(row, dict) else row[0]
-            
-            url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-            data = {
-                "chat_id": chat_id,
-                "text": mensaje,
-                "parse_mode": "Markdown"
-            }
-            
-            resp = requests.post(url, data=data, timeout=5)
-            if resp.status_code == 200:
-                exitos += 1
-            else:
-                print(f"❌ Error enviando Telegram a {chat_id}: {resp.text}")
+        # Extraemos solo la lista de IDs limpios
+        chat_ids = [row['telegram_id'] if isinstance(row, dict) else row[0] for row in usuarios_destino]
+        
+        # 2. Enviamos el mensaje en hilo asíncrono
+        _enviar_mensajes_telegram_hilo(chat_ids, mensaje)
 
-        print(f"✅ Telegram enviado exitosamente a {exitos} usuarios de la empresa.")
+        print(f"✅ Hilo asíncrono de Telegram iniciado para {len(chat_ids)} usuarios de la empresa.")
         return True
 
     except Exception as e:
         print(f"❌ Error general en multi-envío Telegram: {e}")
         return False
+    
 
 
 def notificar_opglp_telegram(id_empresa, usuario, operacion, sede, fecha, estado="exito"):
@@ -172,8 +186,6 @@ def notificar_opglp_telegram(id_empresa, usuario, operacion, sede, fecha, estado
     Envía la Notificación Maestra de Operaciones GLP a todos los usuarios 
     vinculados de la empresa correspondiente (Garantiza aislamiento de datos).
     """
-    TOKEN = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
-    
     # Mapeo dinámico del Semáforo de Certidumbre solicitado
     emoji_estado = "ÉXITO ✅"
     if estado == "fallo":
@@ -211,23 +223,16 @@ def notificar_opglp_telegram(id_empresa, usuario, operacion, sede, fecha, estado
             print(f"⚠️ Telegram Maestro: No hay usuarios vinculados para la empresa ID {id_empresa}")
             return False
 
-        # Envío transaccional uno a uno a los supervisores vinculados
-        for row in usuarios_destino:
-            chat_id = row['telegram_id'] if isinstance(row, dict) else row[0]
-            url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-            data = {
-                "chat_id": chat_id,
-                "text": mensaje,
-                "parse_mode": "Markdown"
-            }
-            requests.post(url, data=data, timeout=5)
+        chat_ids = [row['telegram_id'] if isinstance(row, dict) else row[0] for row in usuarios_destino]
+        
+        # Envío transaccional en hilo asíncrono
+        _enviar_mensajes_telegram_hilo(chat_ids, mensaje)
             
         print(f"✅ Notificación Maestra Telegram enviada al grupo corporativo de la Empresa ID {id_empresa}")
         return True
     except Exception as e:
         print(f"❌ Error crítico ejecutando notificar_opglp_telegram: {e}")
-        return False
-    
+        return False    
 # ==============
 # Utilidades base
 # ==============
@@ -671,6 +676,12 @@ def _enviar_alerta_webmaster_nueva_solicitud(empresa, ubicacion, usuario, nivel_
         msg["Subject"] = f"🔔 APROBAR SOLICITUD: {ubicacion} ({codigo_pedido})"
         msg["From"] = email_user
         msg["To"] = email_webmaster
+        
+        # --- CABECERAS ANTI-SPAM ---
+        msg["Message-ID"] = make_msgid()
+        msg["Date"] = formatdate(localtime=True)
+        msg["Reply-To"] = email_user
+        # ---------------------------
 
         with smtplib.SMTP(email_host, email_port) as server:
             server.starttls()
@@ -681,6 +692,7 @@ def _enviar_alerta_webmaster_nueva_solicitud(empresa, ubicacion, usuario, nivel_
     except Exception as e:
         print(f"❌ Error alerta webmaster: {e}")
         return False
+
 
 def _enviar_alerta_pedido_tanqueo(empresa, ubicacion, lote_id, proveedor_principal, tanques_bajos, codigo_pedido):
     if not tanques_bajos:
@@ -808,6 +820,12 @@ def _enviar_alerta_pedido_tanqueo(empresa, ubicacion, lote_id, proveedor_princip
         msg["Subject"] = f"🆕 Solicitud de Tanqueo GLP - {ubicacion} - Cod: {codigo_pedido}"
         msg["From"] = email_from
         msg["To"] = ", ".join(destinatarios)
+        
+        # --- CABECERAS ANTI-SPAM ---
+        msg["Message-ID"] = make_msgid()
+        msg["Date"] = formatdate(localtime=True)
+        msg["Reply-To"] = email_from
+        # ---------------------------
 
         with smtplib.SMTP(email_host, email_port) as server:
             server.starttls()
@@ -953,6 +971,12 @@ def _enviar_alerta_desviacion_tanqueo(
         msg["Subject"] = f"🚨 Alerta: Desviación Tanqueo {round(desvio_total_pct,1)}% - {ubicacion}"
         msg["From"] = email_from
         msg["To"] = ", ".join(destinatarios)
+        
+        # --- CABECERAS ANTI-SPAM ---
+        msg["Message-ID"] = make_msgid()
+        msg["Date"] = formatdate(localtime=True)
+        msg["Reply-To"] = email_from
+        # ---------------------------
 
         with smtplib.SMTP(email_host, email_port) as server:
             server.starttls()
@@ -965,6 +989,7 @@ def _enviar_alerta_desviacion_tanqueo(
         app.logger.error(f"⛔ Error al enviar correo desviación: {e}")
         return False
     
+
 def _enviar_alerta_diferencia_saldos(empresa, ubicacion, usuario, lote_id, tanques_alerta):
     """Envía un correo corporativo si hay una caída mayor al 10% en el inicio de calefacción (Flameo)."""
     email_user = os.environ.get("EMAIL_USER")
@@ -1058,6 +1083,12 @@ def _enviar_alerta_diferencia_saldos(empresa, ubicacion, usuario, lote_id, tanqu
         msg["Subject"] = f"🚨 Alerta Saldo GLP (>10%) Flameo - Sede: {ubicacion}"
         msg["From"] = email_from
         msg["To"] = email_admin
+        
+        # --- CABECERAS ANTI-SPAM ---
+        msg["Message-ID"] = make_msgid()
+        msg["Date"] = formatdate(localtime=True)
+        msg["Reply-To"] = email_from
+        # ---------------------------
 
         with smtplib.SMTP(email_host, email_port) as server:
             server.starttls()
@@ -1097,6 +1128,7 @@ def _calcular_ts_consumo(dias_operacion: int):
     return dr, tr, ts
 
 
+
 def _enviar_alerta_pedido_tanqueo_consumo(
     empresa,
     ubicacion,
@@ -1108,7 +1140,7 @@ def _enviar_alerta_pedido_tanqueo_consumo(
 ):
     """
     Envía correo de alerta de pedido (CONSUMO) con diseño corporativo.
-    El nivel de llenado es variable (ts_solicitado).
+    Traduce el Delta solicitado al Nivel Objetivo final en el manómetro.
     """
 
     # Validación mínima
@@ -1176,11 +1208,16 @@ def _enviar_alerta_pedido_tanqueo_consumo(
         except:
             nivel_float = 0.0
 
+        # CÁLCULO DEL NIVEL OBJETIVO REAL (Tope de seguridad 80%)
+        nivel_objetivo = nivel_float + ts_val
+        if nivel_objetivo > 80.0:
+            nivel_objetivo = 80.0
+
         items_html += f"""
             <tr style="border-bottom: 1px solid #eee;">
                 <td style="padding: 10px; text-align: center;"><strong>{numero or "-"}</strong></td>
                 <td style="padding: 10px; text-align: center; color: #d9534f;"><strong>{round(nivel_float, 2)}%</strong></td>
-                <td style="padding: 10px; text-align: center;"><strong>{round(ts_val, 2)}%</strong></td>
+                <td style="padding: 10px; text-align: center; color: #015249; font-size: 16px;"><strong>{round(nivel_objetivo, 2)}%</strong></td>
             </tr>
         """
 
@@ -1232,7 +1269,7 @@ def _enviar_alerta_pedido_tanqueo_consumo(
                         <tr>
                             <th>Tanque</th>
                             <th>Nivel Actual</th>
-                            <th>Llenar hasta</th>
+                            <th>Nivel Objetivo a Dejar</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1241,7 +1278,7 @@ def _enviar_alerta_pedido_tanqueo_consumo(
                 </table>
 
                 <p class="note">
-                    * El nivel de llenado solicitado ha sido calculado automáticamente por el sistema según los días restantes de operación.
+                    * Favor suministrar el gas hasta que los manómetros de los tanques alcancen el Nivel Objetivo especificado en la tabla superior. No sobrepasar el límite de seguridad (80%).
                 </p>
 
                 <p style="margin-top: 20px; font-size: 14px; color: #555;">
@@ -1261,6 +1298,12 @@ def _enviar_alerta_pedido_tanqueo_consumo(
         msg["Subject"] = f"Solicitud de Tanqueo GLP (CONSUMO): {ubicacion} - Cod: {codigo_pedido}"
         msg["From"] = email_from
         msg["To"] = ", ".join(destinatarios)
+
+        # --- CABECERAS ANTI-SPAM ---
+        msg["Message-ID"] = make_msgid()
+        msg["Date"] = formatdate(localtime=True)
+        msg["Reply-To"] = email_from
+        # ---------------------------
 
         with smtplib.SMTP(email_host, email_port) as server:
             server.starttls()
@@ -1388,6 +1431,12 @@ def _enviar_alerta_pedido_inicio(empresa, ubicacion, lote_id, proveedor_principa
         msg["From"] = email_from
         msg["To"] = ", ".join(destinatarios)
 
+        # --- CABECERAS ANTI-SPAM ---
+        msg["Message-ID"] = make_msgid()
+        msg["Date"] = formatdate(localtime=True)
+        msg["Reply-To"] = email_from
+        # ---------------------------
+
         with smtplib.SMTP(email_host, email_port) as server:
             server.starttls()
             server.login(email_user, email_pass)
@@ -1396,7 +1445,7 @@ def _enviar_alerta_pedido_inicio(empresa, ubicacion, lote_id, proveedor_principa
     except Exception as e:
         print(f"Error email inicio: {e}")
         return False
-
+    
 # ==========================================
 # CEREBRO MATEMÁTICO & COPILOTO (NUEVO)
 # ==========================================
@@ -2567,7 +2616,8 @@ def finalizar_calefaccion_batch():
                     cur.execute("UPDATE cardex_glp SET proveedor=%s WHERE id=%s", (_buscar_proveedor_principal(cur, empresa, ubicacion, tanques), id_operacion))
 
                     # CIERRE DE LOTE
-                    cur.execute("UPDATE cardex_glp SET estatus_lote='INACTIVO' WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND lote=%s", (empresa, ubicacion, lote_id))
+                    # CORRECCIÓN: Actualizamos usando el id_empresa y lote_id exactos
+                    cur.execute("UPDATE cardex_glp SET estatus_lote='INACTIVO' WHERE id_empresa=%s AND lote=%s", (id_empresa, lote_id))
 
                     # =======================================================
                     # 🔊 AVISO A LA BITÁCORA
@@ -3120,9 +3170,10 @@ def admin_aprobar_solicitud():
         return jsonify({"success": False, "message": str(e)})
 
 
-def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
+ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
     """
     Envía correo de aprobación con DISEÑO PRO (Orden de Compra).
+    Calcula dinámicamente el Nivel Objetivo basado en el último saldo.
     """
     if not EMAIL_USER or not EMAIL_PASS:
         app.logger.warning(f"⚠️ GLP: No se envió correo para pedido {pedido_id}. Faltan credenciales.")
@@ -3141,6 +3192,39 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
             emp, ubi, lot, cod, prov = res['cliente'], res['ubicacion'], res['lote'], res['codigo_pedido'], res['proveedor']
         else:
             emp, ubi, lot, cod, prov = res[0], res[1], res[2], res[3], res[4]
+
+        # --- LÓGICA DE CÁLCULO: NIVEL ACTUAL + DELTA APROBADO ---
+        cur.execute("""
+            SELECT `nivel tk-1`, `nivel tk-2`, `nivel tk-3`, `nivel tk-4`, `nivel tk-5`, `nivel tk-6` 
+            FROM cardex_glp 
+            WHERE lote = %s 
+            ORDER BY id DESC LIMIT 1
+        """, (lot,))
+        row_niveles = cur.fetchone()
+        
+        nivel_actual_promedio = 0.0
+        if row_niveles:
+            valores_validos = []
+            if isinstance(row_niveles, dict):
+                for i in range(1, 7):
+                    val = row_niveles.get(f'nivel tk-{i}')
+                    if val is not None: valores_validos.append(float(val))
+            else:
+                for val in row_niveles:
+                    if val is not None: valores_validos.append(float(val))
+            
+            if valores_validos:
+                nivel_actual_promedio = sum(valores_validos) / len(valores_validos)
+                
+        try:
+            delta_aprobado = float(nivel_aprobado)
+        except:
+            delta_aprobado = 0.0
+            
+        nivel_objetivo = nivel_actual_promedio + delta_aprobado
+        if nivel_objetivo > 80.0: 
+            nivel_objetivo = 80.0
+        # --------------------------------------------------------
         
         cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor=%s", (prov,))
         pdat = cur.fetchone()
@@ -3159,7 +3243,7 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
             app.logger.info(f"ℹ️ GLP: Proveedor {prov} sin correos. Enviando copia a administración.")
             emails = [EMAIL_USER]
 
-        # --- AQUÍ ESTÁ EL CAMBIO: DISEÑO PRO ---
+        # --- AQUÍ ESTÁ EL CAMBIO: DISEÑO PRO CON NIVEL OBJETIVO ---
         cuerpo = f"""
         <!DOCTYPE html>
         <html lang="es">
@@ -3194,13 +3278,18 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
                             <td style="padding: 10px 0; font-weight: bold; text-align: right; color: #333;">{ubi}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 10px 0; color: #666;">📊 Nivel Aprobado:</td>
-                            <td style="padding: 10px 0; font-weight: bold; text-align: right; color: #015249; font-size: 18px;">{nivel_aprobado}%</td>
+                            <td style="padding: 10px 0; color: #666;">📊 Nivel Objetivo en Manómetro:</td>
+                            <td style="padding: 10px 0; font-weight: bold; text-align: right; color: #015249; font-size: 18px;">{round(nivel_objetivo, 2)}%</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" style="padding-bottom: 10px; font-size: 12px; color: #888; text-align: right;">
+                                <em>(Nivel actual: {round(nivel_actual_promedio, 1)}% + Autorizado inyectar: {round(delta_aprobado, 1)}%)</em>
+                            </td>
                         </tr>
                     </table>
 
                     <div style="margin-top: 25px; padding: 10px; background-color: #fff8e1; border-left: 4px solid #ffc107; font-size: 13px; color: #795548;">
-                        <strong>Instrucción:</strong> Favor suministrar gas hasta alcanzar el nivel aprobado. Incluir el código de pedido en la factura.
+                        <strong>Instrucción:</strong> Favor suministrar gas hasta que el manómetro alcance el Nivel Objetivo detallado ({round(nivel_objetivo, 2)}%). Incluir el código de pedido en la factura. No sobrepasar la marca de seguridad (80%).
                     </div>
                 </div>
 
@@ -3220,6 +3309,13 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
         msg["Subject"] = f"✅ Orden de Suministro: {cod} - {ubi}"
         msg["From"] = EMAIL_FROM
         msg["To"] = ", ".join(emails)
+
+        # --- CABECERAS ANTI-SPAM ---
+        msg["Message-ID"] = make_msgid()
+        msg["Date"] = formatdate(localtime=True)
+        msg["Reply-To"] = EMAIL_FROM
+        # ---------------------------
+
         msg.attach(MIMEText(cuerpo, "html", "utf-8"))
 
         with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as s:
@@ -3232,7 +3328,8 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado):
 
     except Exception as e:
         app.logger.error(f"⛔ GLP Email: Falló el envío. Error: {str(e)}")
-        
+        return False   
+       
 # ==============================================================================
 # ❌ CAMINO B: ANULACIÓN INVESTIGATIVA (SIN EVIDENCIA)
 # ==============================================================================
@@ -3374,6 +3471,12 @@ def _enviar_correo_investigacion_anulacion(cur, cliente, ubicacion, codigo, fact
         msg["To"] = ", ".join(destinatarios) if destinatarios else email_app
         if destinatarios:
             msg["Cc"] = email_app # Copia a la app
+
+        # --- CABECERAS ANTI-SPAM ---
+        msg["Message-ID"] = make_msgid()
+        msg["Date"] = formatdate(localtime=True)
+        msg["Reply-To"] = email_user
+        # ---------------------------
 
         msg.attach(MIMEText(cuerpo, "html", "utf-8"))
 
@@ -3663,13 +3766,13 @@ def confirmar_arribo_pollito():
             f"📅 *Arribo:* {fecha_arribo}\n"
             f"✅ El reloj del lote *{lote_nom}* ha iniciado."
         )
-        # Enviamos directamente a la API de Telegram para este formato especial
+        
+        # Enviamos asincronamente
         cur.execute("SELECT telegram_id FROM usuarios WHERE empresa_id = %s AND telegram_id IS NOT NULL", (id_empresa,))
         destinatarios = cur.fetchall()
-        for row in destinatarios:
-            chat_id = row['telegram_id'] if isinstance(row, dict) else row[0]
-            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                        data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=5)
+        
+        chat_ids = [row['telegram_id'] if isinstance(row, dict) else row[0] for row in destinatarios]
+        _enviar_mensajes_telegram_hilo(chat_ids, msg)
 
         return jsonify({"success": True, "message": "Arribo confirmado y alerta enviada."})
 

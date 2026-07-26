@@ -440,12 +440,17 @@ def mapa_rutas():
 
     puntos_ruta = []
     if placa_filtro:
-        # 2. Consultar el historial filtrando por empresa, placa y día específico
+        # 2. Consultar el historial con LEFT JOIN a paradas para obtener la clasificación
         cur.execute("""
-            SELECT latitud, longitud, fecha_hora, tipo_registro, nombre_punto
-            FROM vehiculos_historial_rutas
-            WHERE id_empresa = %s AND placa = %s AND DATE(fecha_hora) = %s
-            ORDER BY fecha_hora ASC
+            SELECT vhr.latitud, vhr.longitud, vhr.fecha_hora, vhr.tipo_registro, vhr.nombre_punto, hpf.tipo_actividad
+            FROM vehiculos_historial_rutas vhr
+            LEFT JOIN historial_paradas_flota hpf 
+                ON vhr.id_empresa = hpf.id_empresa 
+                AND vhr.placa = hpf.placa 
+                AND DATE(vhr.fecha_hora) = hpf.fecha 
+                AND TIME(vhr.fecha_hora) = hpf.hora_inicio
+            WHERE vhr.id_empresa = %s AND vhr.placa = %s AND DATE(vhr.fecha_hora) = %s
+            ORDER BY vhr.fecha_hora ASC
         """, (empresa_id, placa_filtro, fecha_filtro))
         
         # 3. Formatear la fecha para que JSON (y JavaScript en el frontend) la pueda procesar

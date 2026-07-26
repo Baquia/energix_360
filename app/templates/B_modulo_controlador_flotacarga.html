@@ -324,7 +324,7 @@
                     {% if filtros.placa %}
                         <div id="map" style="height: 550px; width: 100%; border-radius: 12px; z-index: 1;"></div>
                         
-                        <div style="margin-top: 15px; display: flex; gap: 20px; font-size: 13px; color: var(--text-muted); justify-content: center;">
+                        <div style="margin-top: 15px; display: flex; gap: 20px; font-size: 13px; color: var(--text-muted); justify-content: center; flex-wrap: wrap;">
                             <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:green; border-radius:50%;"></div> Inicio Ruta</span>
                             <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:#015249;"></div> Trayecto</span>
                             <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:blue; border-radius:50%; border:2px solid white;"></div> Parada Manual</span>
@@ -948,6 +948,7 @@
             if (puntos && puntos.length > 0) {
                 var latlngs = [];
                 var bounds = L.latLngBounds();
+                let contadorParadas = 1;
 
                 puntos.forEach(function(punto) {
                     var pos = [punto.latitud, punto.longitud];
@@ -967,11 +968,23 @@
                             iconAnchor: [7.5, 7.5]
                         });
 
-                        var popupText = `<b>${punto.nombre_punto || 'Punto Desconocido'}</b><br>
-                                         <i style="color: #6b7280; font-size: 11px;">${punto.tipo_registro}</i><br>
-                                         <span style="font-size: 12px; font-weight: bold;">${punto.fecha_hora}</span>`;
+                        var tituloParada = punto.nombre_punto && punto.nombre_punto !== "Punto Desconocido" ? punto.nombre_punto : "Punto Registrado";
+                        var tipoActividad = punto.tipo_actividad ? punto.tipo_actividad : "Sin clasificar";
+                        
+                        var popupText = `<div style="text-align:center; min-width: 150px;">
+                                            <b style="color: var(--verde); font-size: 14px;">🛑 Parada #${contadorParadas}</b><br>
+                                            <span style="font-size: 12px; color: #111827;">${tituloParada}</span><br>
+                                            <div style="margin: 6px 0;">
+                                                <span style="background: #eefcf9; color: #015249; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; border: 1px solid #015249;">
+                                                    ${tipoActividad}
+                                                </span>
+                                            </div>
+                                            <span style="font-size: 11px; color: #6b7280;">Origen: ${punto.tipo_registro}</span><br>
+                                            <span style="font-size: 12px; font-weight: bold; color: #4b5563;">⏱️ ${punto.fecha_hora}</span>
+                                         </div>`;
                                          
                         L.marker(pos, {icon: customIcon}).addTo(map).bindPopup(popupText);
+                        contadorParadas++;
                     }
                 });
 
