@@ -32,18 +32,27 @@ def auditar_granjas():
         conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
         cur = conn.cursor(MySQLdb.cursors.DictCursor)
 
-        # 1. CONSULTA OPTIMIZADA: Lotes Activos (Restaurado COALESCE para 15 días exactos)
+        # 1. CONSULTA OPTIMIZADA Y BLINDADA: Filtra estrictamente por el último estado histórico de la sede
         query_lotes = """
             SELECT 
-                id_empresa, 
-                empresa, 
-                ubicacion, 
-                lote, 
-                MAX(fecha) as ultima_operacion,
-                COALESCE(MIN(fecha_llegada_pollitos), MIN(fecha)) as fecha_inicio
-            FROM cardex_glp
-            WHERE estatus_lote = 'ACTIVO'
-            GROUP BY id_empresa, empresa, ubicacion, lote
+                c.id_empresa, 
+                c.empresa, 
+                c.ubicacion, 
+                c.lote, 
+                MAX(c.fecha) as ultima_operacion,
+                COALESCE(MIN(c.fecha_llegada_pollitos), MIN(c.fecha)) as fecha_inicio
+            FROM cardex_glp c
+            INNER JOIN (
+                SELECT t1.lote
+                FROM cardex_glp t1
+                INNER JOIN (
+                    SELECT ubicacion, MAX(id) as max_id
+                    FROM cardex_glp
+                    GROUP BY ubicacion
+                ) t2 ON t1.id = t2.max_id
+                WHERE t1.estatus_lote = 'ACTIVO'
+            ) activos ON c.lote = activos.lote
+            GROUP BY c.id_empresa, c.empresa, c.ubicacion, c.lote
         """
         cur.execute(query_lotes)
         lotes_activos = cur.fetchall()
@@ -89,7 +98,7 @@ def auditar_granjas():
                     f"🔹 <b>{row['ubicacion']}</b> (Último reporte: {razon_frecuencia})"
                 )
 
-        # 2. CONSULTA BLINDADA TOTAL: Pedidos aprobados sin registrar tanqueo (>= 3 días) para lotes ACTIVOS
+        # 2. CONSULTA BLINDADA TOTAL: Pedidos aprobados sin registrar tanqueo (>= 3 días) validando estado ACTUAL
         query_pedidos = """
             SELECT 
                 p.cliente AS empresa, 
@@ -105,6 +114,10 @@ def auditar_granjas():
               AND EXISTS (
                   SELECT 1 FROM cardex_glp c 
                   WHERE c.lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci 
+                    AND c.id = (
+                        SELECT MAX(id) FROM cardex_glp 
+                        WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci
+                    )
                     AND c.estatus_lote = 'ACTIVO'
               )
               AND NOT EXISTS (
