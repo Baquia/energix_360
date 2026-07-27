@@ -34,8 +34,8 @@ def enviar_telegram(chat_id, mensaje, max_reintentos=3):
     return False
 
 def auditar_granjas():
-    # MARCA DE AGUA V8 PARA AUDITAR CACHÉ DE PYTHONANYWHERE
-    print(f"🚀 INICIANDO AUDITORÍA V8: {datetime.now()}")
+    # MARCA DE AGUA V9 PARA AUDITAR CACHÉ DE PYTHONANYWHERE
+    print(f"🚀 INICIANDO AUDITORÍA V9: {datetime.now()}")
     hoy = datetime.now().date()
     es_viernes = datetime.now().weekday() == 4 # 0=Lunes, 4=Viernes
 
@@ -113,30 +113,31 @@ def auditar_granjas():
                     f"🔹 <b>{row['ubicacion']}</b> (Último reporte: {razon_frecuencia})"
                 )
 
-        # 2. CONSULTA V8: Exclusión estricta de estatus 'validado' y estatus_flujo 'rechazado' (Sin lecturas fantasma)
+        # 2. CONSULTA V9: Regla estricta de la "Realidad Física" de la granja (cardex -> pedidos)
         query_pedidos = """
             SELECT 
-                p.cliente AS empresa, 
-                e.nit AS id_empresa, 
-                p.ubicacion, 
-                p.codigo_pedido, 
+                c.empresa, 
+                c.id_empresa, 
+                c.ubicacion, 
+                c.codigo_pedido, 
                 p.fecha_registro,
                 p.estatus_flujo,
                 DATEDIFF(CURDATE(), DATE(p.fecha_registro)) AS dias_retraso
-            FROM pedidos_gas_glp p
-            JOIN empresas e ON TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(e.nombre_comercial)) COLLATE utf8mb4_general_ci
-            WHERE p.estatus_flujo NOT IN ('tanqueo_registrado', 'anulado_sin_evidencia', 'legalizado_extemporaneo', 'rechazado')
-              AND p.estatus NOT IN ('cancelado', 'anulado', 'validado')
+            FROM cardex_glp c
+            INNER JOIN (
+                SELECT ubicacion, MAX(id) as max_id
+                FROM cardex_glp
+                GROUP BY ubicacion
+            ) ultimos ON c.id = ultimos.max_id
+            JOIN pedidos_gas_glp p 
+              ON c.codigo_pedido COLLATE utf8mb4_general_ci = p.codigo_pedido COLLATE utf8mb4_general_ci
+            WHERE c.estatus_lote = 'ACTIVO'
+              AND c.operacion IN ('inicio_calefaccion', 'consumo')
+              AND c.codigo_pedido IS NOT NULL 
+              AND c.codigo_pedido != ''
               AND DATEDIFF(CURDATE(), DATE(p.fecha_registro)) >= 3
-              AND EXISTS (
-                  SELECT 1 FROM cardex_glp c 
-                  WHERE c.lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci 
-                    AND c.id = (
-                        SELECT MAX(id) FROM cardex_glp 
-                        WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci
-                    )
-                    AND c.estatus_lote = 'ACTIVO'
-              )
+              AND p.estatus_flujo NOT IN ('tanqueo_registrado', 'anulado_sin_evidencia', 'legalizado_extemporaneo')
+              AND p.estatus NOT IN ('rechazado', 'cancelado', 'anulado')
         """
         cur.execute(query_pedidos)
         pedidos_huerfanos = cur.fetchall()
@@ -190,8 +191,8 @@ def auditar_granjas():
                     mensaje += "\n".join(datos['alertas_vencidos']) + "\n\n"
 
                 if datos['alertas_pedidos']:
-                    # TÍTULO V8 RASTREADOR:
-                    mensaje += "🔍 <b>AUDITORÍA V8 - Pedidos de gas en tránsito:</b>\n"
+                    # TÍTULO V9 RASTREADOR:
+                    mensaje += "🔍 <b>AUDITORÍA V9 - Pedidos de gas en tránsito:</b>\n"
                     mensaje += "\n".join(datos['alertas_pedidos']) + "\n\n"
 
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
@@ -202,10 +203,10 @@ def auditar_granjas():
 
         cur.close()
         conn.close()
-        print("✅ Auditoría V8 finalizada correctamente.")
+        print("✅ Auditoría V9 finalizada correctamente.")
 
     except Exception as e:
-        print(f"❌ Error crítico en el auditor V8: {e}")
+        print(f"❌ Error crítico en el auditor V9: {e}")
         
 if __name__ == "__main__":
     auditar_granjas()
