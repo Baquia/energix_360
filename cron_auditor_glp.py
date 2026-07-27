@@ -31,16 +31,15 @@ def auditar_granjas():
         # 1. CONSULTA OPTIMIZADA: Lotes Activos
         query_lotes = """
             SELECT 
-                c.id_empresa, 
-                c.empresa, 
-                c.ubicacion, 
-                c.lote, 
-                MAX(c.fecha) as ultima_operacion,
-                COALESCE(MIN(c.fecha_llegada_pollitos), MIN(c.fecha)) as fecha_inicio
-            FROM cardex_glp c
-            LEFT JOIN cardex_glp f ON c.lote = f.lote AND c.id_empresa = f.id_empresa AND f.operacion = 'finalizar_calefaccion'
-            WHERE f.id IS NULL
-            GROUP BY c.id_empresa, c.empresa, c.ubicacion, c.lote
+                id_empresa, 
+                empresa, 
+                ubicacion, 
+                lote, 
+                MAX(fecha) as ultima_operacion,
+                MIN(fecha) as fecha_inicio
+            FROM cardex_glp
+            WHERE estatus_lote = 'ACTIVO'
+            GROUP BY id_empresa, empresa, ubicacion, lote
         """
         cur.execute(query_lotes)
         lotes_activos = cur.fetchall()
@@ -83,11 +82,10 @@ def auditar_granjas():
 
             if alerta_frecuencia:
                 alertas_por_empresa[emp_id]['alertas_frecuencia'].append(
-                    f"🔹 *{row['ubicacion']}* (Sin actividad registrada: {razon_frecuencia})"
+                    f"🔹 *{row['ubicacion']}* (Último reporte: {razon_frecuencia})"
                 )
 
-        # 2. CONSULTA NUEVA: Pedidos generados sin registrar tanqueo (>= 3 días)
-        # --- AQUÍ ESTÁ LA CORRECCIÓN DEL COLLATE ---
+        # 2. CONSULTA BLINDADA: Pedidos aprobados sin registrar tanqueo (>= 3 días) para lotes ACTIVOS
         query_pedidos = """
             SELECT 
                 p.cliente AS empresa, 
@@ -98,9 +96,16 @@ def auditar_granjas():
                 DATEDIFF(CURDATE(), DATE(p.fecha_registro)) AS dias_retraso
             FROM pedidos_gas_glp p
             JOIN empresas e ON TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(e.nombre_comercial)) COLLATE utf8mb4_general_ci
-            WHERE p.estatus = 'generado' 
-              AND p.estatus_flujo NOT IN ('tanqueo_registrado', 'legalizado_extemporaneo', 'anulado_sin_evidencia')
+            WHERE p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
               AND DATEDIFF(CURDATE(), DATE(p.fecha_registro)) >= 3
+              AND EXISTS (
+                  SELECT 1 FROM cardex_glp c 
+                  WHERE c.lote = p.lote AND c.estatus_lote = 'ACTIVO'
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM cardex_glp c2 
+                  WHERE c2.codigo_pedido = p.codigo_pedido AND c2.operacion = 'tanqueo'
+              )
         """
         cur.execute(query_pedidos)
         pedidos_huerfanos = cur.fetchall()
@@ -115,9 +120,8 @@ def auditar_granjas():
                     'alertas_pedidos': []
                 }
             alertas_por_empresa[emp_id]['alertas_pedidos'].append(
-                f"⏳ *{p['ubicacion']}* - Pedido: {p['codigo_pedido']} (Generado hace {p['dias_retraso']} días)"
+                f"⏳ *{p['ubicacion']}* - Pedido: {p['codigo_pedido']} (Aprobado hace {p['dias_retraso']} días, sin registrar)"
             )
-
 
         # 3. Procesar envíos empresa por empresa (Aislamiento de datos)
         for emp_id, datos in alertas_por_empresa.items():
@@ -140,15 +144,15 @@ def auditar_granjas():
                 mensaje += "✅ *Todo en orden.*\nNo hay granjas atrasadas, lotes vencidos ni pedidos sin registrar el día de hoy."
             else:
                 if datos['alertas_frecuencia']:
-                    mensaje += "⚠️ *Granjas sin actividad registrada (consumo/tanqueo):*\n"
+                    mensaje += "⚠️ *Granjas sin reporte de consumo reciente:*\n"
                     mensaje += "\n".join(datos['alertas_frecuencia']) + "\n\n"
                     
                 if datos['alertas_vencidos']:
                     mensaje += "🔥 *Granjas que excedieron los 15 días de calefacción:*\n"
                     mensaje += "\n".join(datos['alertas_vencidos']) + "\n\n"
-                    
+
                 if datos['alertas_pedidos']:
-                    mensaje += "⏳ *Pedidos de gas sin registrar (Más de 3 días):*\n"
+                    mensaje += "⏳ *Pedidos de gas aprobados sin registrar:*\n"
                     mensaje += "\n".join(datos['alertas_pedidos']) + "\n\n"
 
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
