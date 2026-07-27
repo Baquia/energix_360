@@ -21,14 +21,12 @@ def enviar_telegram(chat_id, mensaje, max_reintentos=3):
         try:
             resp = requests.post(url, data=data, timeout=15)
             if resp.status_code == 200:
-                # Éxito: salimos del bucle
                 return True
             else:
                 print(f"⚠️ [Intento {intento}] Telegram rechazó el mensaje a {chat_id}: {resp.text}")
         except Exception as e:
             print(f"❌ [Intento {intento}] Error de red enviando a {chat_id}: {e}")
         
-        # Si falló y aún quedan intentos, esperamos 5 segundos antes de reintentar
         if intento < max_reintentos:
             time.sleep(5)
             
@@ -36,8 +34,8 @@ def enviar_telegram(chat_id, mensaje, max_reintentos=3):
     return False
 
 def auditar_granjas():
-    # MARCA DE AGUA DE VERSIÓN PARA AUDITAR CACHÉ DE PYTHONANYWHERE
-    print(f"🚀 INICIANDO AUDITORÍA V6: {datetime.now()}")
+    # MARCA DE AGUA V7 PARA AUDITAR CACHÉ DE PYTHONANYWHERE
+    print(f"🚀 INICIANDO AUDITORÍA V7: {datetime.now()}")
     hoy = datetime.now().date()
     es_viernes = datetime.now().weekday() == 4 # 0=Lunes, 4=Viernes
 
@@ -111,7 +109,7 @@ def auditar_granjas():
                     f"🔹 <b>{row['ubicacion']}</b> (Último reporte: {razon_frecuencia})"
                 )
 
-        # 2. CONSULTA BLINDADA TOTAL: Pedidos aprobados sin registrar tanqueo (>= 3 días) validando estado ACTUAL
+        # 2. CONSULTA V7: Busca pedidos >= 3 días que NO estén en 'tanqueo_registrado', ni cancelados, para lotes ACTIVOS
         query_pedidos = """
             SELECT 
                 p.cliente AS empresa, 
@@ -119,10 +117,12 @@ def auditar_granjas():
                 p.ubicacion, 
                 p.codigo_pedido, 
                 p.fecha_registro,
+                p.estatus_flujo,
                 DATEDIFF(CURDATE(), DATE(p.fecha_registro)) AS dias_retraso
             FROM pedidos_gas_glp p
             JOIN empresas e ON TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(e.nombre_comercial)) COLLATE utf8mb4_general_ci
-            WHERE p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
+            WHERE p.estatus_flujo NOT IN ('tanqueo_registrado', 'anulado_sin_evidencia', 'legalizado_extemporaneo')
+              AND p.estatus NOT IN ('cancelado', 'anulado')
               AND DATEDIFF(CURDATE(), DATE(p.fecha_registro)) >= 3
               AND EXISTS (
                   SELECT 1 FROM cardex_glp c 
@@ -132,11 +132,6 @@ def auditar_granjas():
                         WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci
                     )
                     AND c.estatus_lote = 'ACTIVO'
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM cardex_glp c2 
-                  WHERE c2.codigo_pedido COLLATE utf8mb4_general_ci = p.codigo_pedido COLLATE utf8mb4_general_ci 
-                    AND c2.operacion = 'tanqueo'
               )
         """
         cur.execute(query_pedidos)
@@ -152,10 +147,10 @@ def auditar_granjas():
                     'alertas_pedidos': []
                 }
             alertas_por_empresa[emp_id]['alertas_pedidos'].append(
-                f"⏳ <b>{p['ubicacion']}</b> - Pedido: {p['codigo_pedido']} (Aprobado hace {p['dias_retraso']} días, sin registrar)"
+                f"⏳ <b>{p['ubicacion']}</b> - Pedido: {p['codigo_pedido']} (Atraso: {p['dias_retraso']} días. Estado: {p['estatus_flujo']})"
             )
 
-        # 3. Procesar envíos empresa por empresa (Aislamiento de datos)
+        # 3. Procesar envíos empresa por empresa
         for emp_id, datos in alertas_por_empresa.items():
             
             # Buscamos usuarios supervisores u operadores
@@ -168,12 +163,11 @@ def auditar_granjas():
             """, (emp_id,))
             usuarios_destino = cur.fetchall()
 
-            # Construimos el encabezado estándar en formato HTML
+            # Encabezado estándar en formato HTML
             mensaje = f"📊 <b>REPORTE DE AUDITORÍA GLP</b> 📊\nEmpresa: {datos['nombre']}\n\n"
 
-            # Evaluar si todo está bien o si hay alertas
             if not datos['alertas_frecuencia'] and not datos['alertas_vencidos'] and not datos['alertas_pedidos']:
-                mensaje += "✅ <b>Todo en orden.</b>\nNo hay granjas atrasadas, lotes vencidos ni pedidos sin registrar el día de hoy."
+                mensaje += "✅ <b>Todo en orden.</b>\nNo hay granjas atrasadas, lotes vencidos ni pedidos en tránsito el día de hoy."
             else:
                 if datos['alertas_frecuencia']:
                     mensaje += "⚠️ <b>Granjas sin reporte de consumo reciente:</b>\n"
@@ -184,7 +178,8 @@ def auditar_granjas():
                     mensaje += "\n".join(datos['alertas_vencidos']) + "\n\n"
 
                 if datos['alertas_pedidos']:
-                    mensaje += "⏳ <b>Pedidos de gas aprobados sin registrar:</b>\n"
+                    # TÍTULO V7 RASTREADOR:
+                    mensaje += "🔍 <b>AUDITORÍA V7 - Pedidos de gas en tránsito:</b>\n"
                     mensaje += "\n".join(datos['alertas_pedidos']) + "\n\n"
 
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
@@ -198,10 +193,10 @@ def auditar_granjas():
 
         cur.close()
         conn.close()
-        print("✅ Auditoría finalizada correctamente.")
+        print("✅ Auditoría V7 finalizada correctamente.")
 
     except Exception as e:
-        print(f"❌ Error crítico en el auditor: {e}")
+        print(f"❌ Error crítico en el auditor V7: {e}")
         
 if __name__ == "__main__":
     auditar_granjas()
