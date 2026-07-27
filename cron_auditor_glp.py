@@ -13,11 +13,15 @@ TOKEN_TELEGRAM = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
 
 def enviar_telegram(chat_id, mensaje):
     url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
-    data = {"chat_id": chat_id, "text": mensaje, "parse_mode": "Markdown"}
+    # CAMBIO: Usamos HTML para que no colapse si una granja tiene caracteres especiales (_)
+    data = {"chat_id": chat_id, "text": mensaje, "parse_mode": "HTML"}
     try:
-        requests.post(url, data=data, timeout=5)
+        resp = requests.post(url, data=data, timeout=10)
+        # Trazabilidad de Red
+        if resp.status_code != 200:
+            print(f"⚠️ Telegram rechazó el mensaje a {chat_id}: {resp.text}")
     except Exception as e:
-        print(f"Error enviando a {chat_id}: {e}")
+        print(f"❌ Error de red enviando a {chat_id}: {e}")
 
 def auditar_granjas():
     print(f"Iniciando auditoría GLP: {datetime.now()}")
@@ -28,7 +32,7 @@ def auditar_granjas():
         conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
         cur = conn.cursor(MySQLdb.cursors.DictCursor)
 
-        # 1. CONSULTA OPTIMIZADA: Lotes Activos
+        # 1. CONSULTA OPTIMIZADA: Lotes Activos (Restaurado COALESCE para 15 días exactos)
         query_lotes = """
             SELECT 
                 id_empresa, 
@@ -36,7 +40,7 @@ def auditar_granjas():
                 ubicacion, 
                 lote, 
                 MAX(fecha) as ultima_operacion,
-                MIN(fecha) as fecha_inicio
+                COALESCE(MIN(fecha_llegada_pollitos), MIN(fecha)) as fecha_inicio
             FROM cardex_glp
             WHERE estatus_lote = 'ACTIVO'
             GROUP BY id_empresa, empresa, ubicacion, lote
@@ -66,7 +70,7 @@ def auditar_granjas():
             # REGLA 1: Más de 15 días sin cerrar calefacción
             if dias_totales > 15:
                 alertas_por_empresa[emp_id]['alertas_vencidos'].append(
-                    f"🔸 *{row['ubicacion']}* (Lleva {dias_totales} días activo)"
+                    f"🔸 <b>{row['ubicacion']}</b> (Lleva {dias_totales} días activo)"
                 )
 
             # REGLA 2: Frecuencia de Consumo
@@ -82,10 +86,10 @@ def auditar_granjas():
 
             if alerta_frecuencia:
                 alertas_por_empresa[emp_id]['alertas_frecuencia'].append(
-                    f"🔹 *{row['ubicacion']}* (Último reporte: {razon_frecuencia})"
+                    f"🔹 <b>{row['ubicacion']}</b> (Último reporte: {razon_frecuencia})"
                 )
 
-        # 2. CONSULTA BLINDADA: Pedidos aprobados sin registrar tanqueo (>= 3 días) para lotes ACTIVOS
+        # 2. CONSULTA BLINDADA TOTAL: Pedidos aprobados sin registrar tanqueo (>= 3 días) para lotes ACTIVOS
         query_pedidos = """
             SELECT 
                 p.cliente AS empresa, 
@@ -100,11 +104,13 @@ def auditar_granjas():
               AND DATEDIFF(CURDATE(), DATE(p.fecha_registro)) >= 3
               AND EXISTS (
                   SELECT 1 FROM cardex_glp c 
-                  WHERE c.lote = p.lote AND c.estatus_lote = 'ACTIVO'
+                  WHERE c.lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci 
+                    AND c.estatus_lote = 'ACTIVO'
               )
               AND NOT EXISTS (
                   SELECT 1 FROM cardex_glp c2 
-                  WHERE c2.codigo_pedido = p.codigo_pedido AND c2.operacion = 'tanqueo'
+                  WHERE c2.codigo_pedido COLLATE utf8mb4_general_ci = p.codigo_pedido COLLATE utf8mb4_general_ci 
+                    AND c2.operacion = 'tanqueo'
               )
         """
         cur.execute(query_pedidos)
@@ -120,7 +126,7 @@ def auditar_granjas():
                     'alertas_pedidos': []
                 }
             alertas_por_empresa[emp_id]['alertas_pedidos'].append(
-                f"⏳ *{p['ubicacion']}* - Pedido: {p['codigo_pedido']} (Aprobado hace {p['dias_retraso']} días, sin registrar)"
+                f"⏳ <b>{p['ubicacion']}</b> - Pedido: {p['codigo_pedido']} (Aprobado hace {p['dias_retraso']} días, sin registrar)"
             )
 
         # 3. Procesar envíos empresa por empresa (Aislamiento de datos)
@@ -136,23 +142,23 @@ def auditar_granjas():
             """, (emp_id,))
             usuarios_destino = cur.fetchall()
 
-            # Construimos el encabezado estándar
-            mensaje = f"📊 *REPORTE DE AUDITORÍA GLP* 📊\nEmpresa: {datos['nombre']}\n\n"
+            # Construimos el encabezado estándar en formato HTML
+            mensaje = f"📊 <b>REPORTE DE AUDITORÍA GLP</b> 📊\nEmpresa: {datos['nombre']}\n\n"
 
             # Evaluar si todo está bien o si hay alertas
             if not datos['alertas_frecuencia'] and not datos['alertas_vencidos'] and not datos['alertas_pedidos']:
-                mensaje += "✅ *Todo en orden.*\nNo hay granjas atrasadas, lotes vencidos ni pedidos sin registrar el día de hoy."
+                mensaje += "✅ <b>Todo en orden.</b>\nNo hay granjas atrasadas, lotes vencidos ni pedidos sin registrar el día de hoy."
             else:
                 if datos['alertas_frecuencia']:
-                    mensaje += "⚠️ *Granjas sin reporte de consumo reciente:*\n"
+                    mensaje += "⚠️ <b>Granjas sin reporte de consumo reciente:</b>\n"
                     mensaje += "\n".join(datos['alertas_frecuencia']) + "\n\n"
                     
                 if datos['alertas_vencidos']:
-                    mensaje += "🔥 *Granjas que excedieron los 15 días de calefacción:*\n"
+                    mensaje += "🔥 <b>Granjas que excedieron los 15 días de calefacción:</b>\n"
                     mensaje += "\n".join(datos['alertas_vencidos']) + "\n\n"
 
                 if datos['alertas_pedidos']:
-                    mensaje += "⏳ *Pedidos de gas aprobados sin registrar:*\n"
+                    mensaje += "⏳ <b>Pedidos de gas aprobados sin registrar:</b>\n"
                     mensaje += "\n".join(datos['alertas_pedidos']) + "\n\n"
 
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
