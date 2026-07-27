@@ -115,29 +115,38 @@ def auditar_granjas():
 
         # 2. CONSULTA V10: Algoritmo secuencial estricto basado en la historia del lote
         query_pedidos = """
-            SELECT 
-                c.empresa, 
-                c.id_empresa, 
-                c.ubicacion, 
-                c.codigo_pedido, 
-                c.fecha as fecha_operacion,
-                p.estatus_flujo,
-                DATEDIFF(CURDATE(), DATE(c.fecha)) AS dias_retraso
-            FROM cardex_glp c
-            INNER JOIN (
-                SELECT ubicacion, MAX(id) as max_id
-                FROM cardex_glp
-                WHERE estatus_lote = 'ACTIVO'
-                GROUP BY ubicacion
-            ) ultimos ON c.id = ultimos.max_id
-            JOIN pedidos_gas_glp p 
-              ON c.codigo_pedido COLLATE utf8mb4_general_ci = p.codigo_pedido COLLATE utf8mb4_general_ci
-            WHERE c.operacion IN ('inicio_calefaccion', 'consumo')
-              AND c.codigo_pedido IS NOT NULL 
-              AND c.codigo_pedido != ''
-              AND p.estatus_flujo NOT IN ('anulado', 'tanqueo_registrado', 'anulado_sin_evidencia', 'legalizado_extemporaneo')
-              AND p.estatus NOT IN ('rechazado', 'cancelado', 'anulado')
-              AND DATEDIFF(CURDATE(), DATE(c.fecha)) > 3
+           WITH operaciones_con_pedido AS (
+    SELECT
+        id,
+        ubicacion,
+        operacion,
+        codigo_pedido,
+        fecha,
+        ROW_NUMBER() OVER (
+            PARTITION BY ubicacion
+            ORDER BY fecha DESC, id DESC
+        ) AS rn
+    FROM cardex_glp
+    WHERE estatus_lote = 'ACTIVO'
+      AND operacion IN ('inicio_calefaccion', 'consumo')
+      AND codigo_pedido IS NOT NULL
+      AND TRIM(codigo_pedido) <> ''
+)
+
+SELECT
+    o.ubicacion,
+    o.operacion,
+    o.codigo_pedido,
+    o.fecha,
+    p.estatus_flujo,
+    DATEDIFF(CURDATE(), o.fecha) AS dias_transcurridos
+FROM operaciones_con_pedido o
+INNER JOIN pedidos_gas_glp p
+    ON p.codigo_pedido = o.codigo_pedido
+WHERE o.rn = 1
+  AND p.estatus_flujo NOT IN ('anulado', 'tanqueo_registrado')
+  AND DATEDIFF(CURDATE(), o.fecha) > 3
+ORDER BY dias_transcurridos DESC, o.ubicacion;
         """
         cur.execute(query_pedidos)
         pedidos_huerfanos = cur.fetchall()
