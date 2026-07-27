@@ -34,13 +34,17 @@ def enviar_telegram(chat_id, mensaje, max_reintentos=3):
     return False
 
 def auditar_granjas():
-    # MARCA DE AGUA V7 PARA AUDITAR CACHÉ DE PYTHONANYWHERE
-    print(f"🚀 INICIANDO AUDITORÍA V7: {datetime.now()}")
+    # MARCA DE AGUA V8 PARA AUDITAR CACHÉ DE PYTHONANYWHERE
+    print(f"🚀 INICIANDO AUDITORÍA V8: {datetime.now()}")
     hoy = datetime.now().date()
     es_viernes = datetime.now().weekday() == 4 # 0=Lunes, 4=Viernes
 
     try:
         conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
+        
+        # ⚠️ REFRESCO FORZADO: Rompe cualquier "Lectura Fantasma" de transacciones previas cacheadas
+        conn.commit() 
+        
         cur = conn.cursor(MySQLdb.cursors.DictCursor)
 
         # 1. CONSULTA OPTIMIZADA Y BLINDADA: Filtra estrictamente por el último estado histórico del LOTE
@@ -109,7 +113,7 @@ def auditar_granjas():
                     f"🔹 <b>{row['ubicacion']}</b> (Último reporte: {razon_frecuencia})"
                 )
 
-        # 2. CONSULTA V7: Busca pedidos >= 3 días que NO estén en 'tanqueo_registrado', ni cancelados, para lotes ACTIVOS
+        # 2. CONSULTA V8: Exclusión estricta de estatus 'validado' y estatus_flujo 'rechazado' (Sin lecturas fantasma)
         query_pedidos = """
             SELECT 
                 p.cliente AS empresa, 
@@ -121,8 +125,8 @@ def auditar_granjas():
                 DATEDIFF(CURDATE(), DATE(p.fecha_registro)) AS dias_retraso
             FROM pedidos_gas_glp p
             JOIN empresas e ON TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(e.nombre_comercial)) COLLATE utf8mb4_general_ci
-            WHERE p.estatus_flujo NOT IN ('tanqueo_registrado', 'anulado_sin_evidencia', 'legalizado_extemporaneo')
-              AND p.estatus NOT IN ('cancelado', 'anulado')
+            WHERE p.estatus_flujo NOT IN ('tanqueo_registrado', 'anulado_sin_evidencia', 'legalizado_extemporaneo', 'rechazado')
+              AND p.estatus NOT IN ('cancelado', 'anulado', 'validado')
               AND DATEDIFF(CURDATE(), DATE(p.fecha_registro)) >= 3
               AND EXISTS (
                   SELECT 1 FROM cardex_glp c 
@@ -162,6 +166,14 @@ def auditar_granjas():
                   AND telegram_id != ''
             """, (emp_id,))
             usuarios_destino = cur.fetchall()
+            
+            # ⚠️ ANTI-DUPLICADOS: Usamos un Set para almacenar IDs únicos de envío
+            destinatarios_unicos = set()
+            for u in usuarios_destino:
+                destinatarios_unicos.add(u['telegram_id'])
+            
+            # BYPASS DE SEGURIDAD: Te enviamos una copia
+            destinatarios_unicos.add("5368207368")
 
             # Encabezado estándar en formato HTML
             mensaje = f"📊 <b>REPORTE DE AUDITORÍA GLP</b> 📊\nEmpresa: {datos['nombre']}\n\n"
@@ -178,25 +190,22 @@ def auditar_granjas():
                     mensaje += "\n".join(datos['alertas_vencidos']) + "\n\n"
 
                 if datos['alertas_pedidos']:
-                    # TÍTULO V7 RASTREADOR:
-                    mensaje += "🔍 <b>AUDITORÍA V7 - Pedidos de gas en tránsito:</b>\n"
+                    # TÍTULO V8 RASTREADOR:
+                    mensaje += "🔍 <b>AUDITORÍA V8 - Pedidos de gas en tránsito:</b>\n"
                     mensaje += "\n".join(datos['alertas_pedidos']) + "\n\n"
 
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
 
-            # Enviar a los destinatarios de la base de datos
-            for u in usuarios_destino:
-                enviar_telegram(u['telegram_id'], mensaje)
-            
-            # BYPASS DE SEGURIDAD: Te envía una copia directa a ti sí o sí
-            enviar_telegram("5368207368", mensaje)
+            # Enviar a la colección de destinatarios únicos
+            for chat_id in destinatarios_unicos:
+                enviar_telegram(chat_id, mensaje)
 
         cur.close()
         conn.close()
-        print("✅ Auditoría V7 finalizada correctamente.")
+        print("✅ Auditoría V8 finalizada correctamente.")
 
     except Exception as e:
-        print(f"❌ Error crítico en el auditor V7: {e}")
+        print(f"❌ Error crítico en el auditor V8: {e}")
         
 if __name__ == "__main__":
     auditar_granjas()
