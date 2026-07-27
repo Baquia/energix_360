@@ -87,6 +87,7 @@ def auditar_granjas():
                 )
 
         # 2. CONSULTA NUEVA: Pedidos generados sin registrar tanqueo (>= 3 días)
+        # --- AQUÍ ESTÁ LA CORRECCIÓN DEL COLLATE ---
         query_pedidos = """
             SELECT 
                 p.cliente AS empresa, 
@@ -96,7 +97,7 @@ def auditar_granjas():
                 p.fecha_registro,
                 DATEDIFF(CURDATE(), DATE(p.fecha_registro)) AS dias_retraso
             FROM pedidos_gas_glp p
-            JOIN empresas e ON TRIM(UPPER(p.cliente)) = TRIM(UPPER(e.nombre_comercial))
+            JOIN empresas e ON TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(e.nombre_comercial)) COLLATE utf8mb4_general_ci
             WHERE p.estatus = 'generado' 
               AND p.estatus_flujo NOT IN ('tanqueo_registrado', 'legalizado_extemporaneo', 'anulado_sin_evidencia')
               AND DATEDIFF(CURDATE(), DATE(p.fecha_registro)) >= 3
