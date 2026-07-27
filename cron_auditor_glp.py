@@ -24,7 +24,8 @@ def enviar_telegram(chat_id, mensaje):
         print(f"❌ Error de red enviando a {chat_id}: {e}")
 
 def auditar_granjas():
-    print(f"Iniciando auditoría GLP: {datetime.now()}")
+    # MARCA DE AGUA DE VERSIÓN PARA AUDITAR CACHÉ DE PYTHONANYWHERE
+    print(f"🚀 INICIANDO AUDITORÍA V5: {datetime.now()}")
     hoy = datetime.now().date()
     es_viernes = datetime.now().weekday() == 4 # 0=Lunes, 4=Viernes
 
@@ -32,7 +33,7 @@ def auditar_granjas():
         conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
         cur = conn.cursor(MySQLdb.cursors.DictCursor)
 
-        # 1. CONSULTA OPTIMIZADA Y BLINDADA: Filtra estrictamente por el último estado histórico de la sede
+        # 1. CONSULTA OPTIMIZADA Y BLINDADA: Filtra estrictamente por el último estado histórico del LOTE
         query_lotes = """
             SELECT 
                 c.id_empresa, 
@@ -46,9 +47,9 @@ def auditar_granjas():
                 SELECT t1.lote
                 FROM cardex_glp t1
                 INNER JOIN (
-                    SELECT ubicacion, MAX(id) as max_id
+                    SELECT lote, MAX(id) as max_id
                     FROM cardex_glp
-                    GROUP BY ubicacion
+                    GROUP BY lote
                 ) t2 ON t1.id = t2.max_id
                 WHERE t1.estatus_lote = 'ACTIVO'
             ) activos ON c.lote = activos.lote
