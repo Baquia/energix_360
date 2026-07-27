@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import MySQLdb
 import requests
+import time
 from datetime import datetime, timedelta
 
 # ================= TUS DATOS DE PRODUCCIÓN =================
@@ -11,21 +12,32 @@ DB_NAME = "baquiasoft$energix_360"
 TOKEN_TELEGRAM = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
 # ==========================================================
 
-def enviar_telegram(chat_id, mensaje):
+def enviar_telegram(chat_id, mensaje, max_reintentos=3):
     url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
-    # CAMBIO: Usamos HTML para que no colapse si una granja tiene caracteres especiales (_)
     data = {"chat_id": chat_id, "text": mensaje, "parse_mode": "HTML"}
-    try:
-        resp = requests.post(url, data=data, timeout=10)
-        # Trazabilidad de Red
-        if resp.status_code != 200:
-            print(f"⚠️ Telegram rechazó el mensaje a {chat_id}: {resp.text}")
-    except Exception as e:
-        print(f"❌ Error de red enviando a {chat_id}: {e}")
+    
+    # Sistema de Reintentos Automáticos (Retry-Backoff) para fallos del Proxy 503
+    for intento in range(1, max_reintentos + 1):
+        try:
+            resp = requests.post(url, data=data, timeout=15)
+            if resp.status_code == 200:
+                # Éxito: salimos del bucle
+                return True
+            else:
+                print(f"⚠️ [Intento {intento}] Telegram rechazó el mensaje a {chat_id}: {resp.text}")
+        except Exception as e:
+            print(f"❌ [Intento {intento}] Error de red enviando a {chat_id}: {e}")
+        
+        # Si falló y aún quedan intentos, esperamos 5 segundos antes de reintentar
+        if intento < max_reintentos:
+            time.sleep(5)
+            
+    print(f"💀 Fracaso definitivo enviando a {chat_id} tras {max_reintentos} intentos por inestabilidad de red.")
+    return False
 
 def auditar_granjas():
     # MARCA DE AGUA DE VERSIÓN PARA AUDITAR CACHÉ DE PYTHONANYWHERE
-    print(f"🚀 INICIANDO AUDITORÍA V5: {datetime.now()}")
+    print(f"🚀 INICIANDO AUDITORÍA V6: {datetime.now()}")
     hoy = datetime.now().date()
     es_viernes = datetime.now().weekday() == 4 # 0=Lunes, 4=Viernes
 
