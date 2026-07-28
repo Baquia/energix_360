@@ -48,19 +48,19 @@ def auditar_granjas():
         # Diccionario para agrupar alertas exclusivamente por empresa
         alertas_por_empresa = {}
 
-        # CONSULTA ÚNICA V10: Algoritmo de rastreo físico basado 100% en cardex_glp
+        # 1. Cargar todas las empresas que tienen lotes ACTIVOS para garantizar envío de Telegram
+        cur.execute("SELECT DISTINCT id_empresa, empresa FROM cardex_glp WHERE estatus_lote = 'ACTIVO'")
+        empresas_activas = cur.fetchall()
+        for emp in empresas_activas:
+            emp_id = emp['id_empresa']
+            alertas_por_empresa[emp_id] = {
+                'nombre': emp['empresa'],
+                'alertas_pedidos': []
+            }
+
+        # 2. CONSULTA ÚNICA V10: Algoritmo de rastreo físico basado 100% en cardex_glp
         query_pedidos = """
-        WITH LotesActivos AS (
-            SELECT id_empresa, empresa, ubicacion, lote
-            FROM cardex_glp
-            WHERE id IN (
-                SELECT MAX(id)
-                FROM cardex_glp
-                GROUP BY id_empresa, ubicacion
-            )
-            AND estatus_lote = 'ACTIVO'
-        ),
-        UltimaOperacionConCodigo AS (
+        WITH OperacionesConPedido AS (
             SELECT
                 c.id_empresa,
                 c.empresa,
@@ -69,38 +69,39 @@ def auditar_granjas():
                 c.operacion,
                 c.codigo_pedido,
                 c.fecha,
+                c.id,
                 ROW_NUMBER() OVER (
                     PARTITION BY c.id_empresa, c.ubicacion
                     ORDER BY c.fecha DESC, c.id DESC
                 ) AS rn
             FROM cardex_glp c
-            INNER JOIN LotesActivos la
-                ON c.id_empresa = la.id_empresa
-               AND c.ubicacion = la.ubicacion
-               AND c.lote = la.lote
-            WHERE c.operacion IN ('inicio_calefaccion', 'consumo')
+            WHERE c.estatus_lote = 'ACTIVO'
+              AND c.operacion IN ('inicio_calefaccion', 'consumo')
               AND c.codigo_pedido IS NOT NULL
               AND TRIM(c.codigo_pedido) <> ''
         )
         SELECT
-            u.id_empresa,
-            u.empresa,
-            u.ubicacion,
-            u.operacion,
-            u.codigo_pedido,
-            u.fecha,
+            o.id_empresa,
+            o.empresa,
+            o.ubicacion,
+            o.operacion,
+            o.codigo_pedido,
+            o.fecha,
             'Pendiente de Registro' AS estatus_flujo,
-            DATEDIFF(CURDATE(), u.fecha) AS dias_retraso
-        FROM UltimaOperacionConCodigo u
-        WHERE u.rn = 1
-          AND DATEDIFF(CURDATE(), u.fecha) > 3
+            DATEDIFF(CURDATE(), o.fecha) AS dias_retraso
+        FROM OperacionesConPedido o
+        WHERE o.rn = 1
+          AND DATEDIFF(CURDATE(), o.fecha) > 3
           AND NOT EXISTS (
               SELECT 1
               FROM cardex_glp t
-              WHERE t.codigo_pedido = u.codigo_pedido
+              WHERE t.id_empresa = o.id_empresa
+                AND t.ubicacion = o.ubicacion
+                AND t.lote = o.lote
                 AND t.operacion = 'tanqueo'
+                AND t.id > o.id
           )
-        ORDER BY dias_retraso DESC, u.ubicacion;
+        ORDER BY dias_retraso DESC, o.ubicacion;
         """
         cur.execute(query_pedidos)
         pedidos_huerfanos = cur.fetchall()
@@ -116,10 +117,7 @@ def auditar_granjas():
                 f"⏳ <b>{p['ubicacion']}</b> - Pedido: {p['codigo_pedido']} (Atraso: {p['dias_retraso']} días. Estado: {p['estatus_flujo']})"
             )
 
-        # Procesar envíos a Telegram
-        if not alertas_por_empresa:
-            print("ℹ️ No se detectaron pedidos pendientes de registro con más de 3 días de atraso.")
-
+        # 3. Procesar envíos a Telegram por empresa
         for emp_id, datos in alertas_por_empresa.items():
             
             # Buscamos usuarios supervisores u operadores
