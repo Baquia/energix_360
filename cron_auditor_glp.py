@@ -36,8 +36,6 @@ def enviar_telegram(chat_id, mensaje, max_reintentos=3):
 def auditar_granjas():
     # MARCA DE AGUA V10 PARA AUDITAR CACHÉ DE PYTHONANYWHERE
     print(f"🚀 INICIANDO AUDITORÍA V10: {datetime.now()}")
-    hoy = datetime.now().date()
-    es_viernes = datetime.now().weekday() == 4 # 0=Lunes, 4=Viernes
 
     try:
         conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
@@ -47,79 +45,10 @@ def auditar_granjas():
         
         cur = conn.cursor(MySQLdb.cursors.DictCursor)
 
-        # 1. CONSULTA DE ALERTAS DE FRECUENCIA Y VENCIMIENTO
-        # CORRECCIÓN: Filtro estricto evaluando únicamente el último ID absoluto de la granja
-        query_lotes = """
-            WITH LotesActivos AS (
-                SELECT id_empresa, empresa, ubicacion, lote
-                FROM cardex_glp
-                WHERE id IN (
-                    SELECT MAX(id)
-                    FROM cardex_glp
-                    GROUP BY id_empresa, ubicacion
-                )
-                AND estatus_lote = 'ACTIVO'
-            )
-            SELECT 
-                c.id_empresa, 
-                c.empresa, 
-                c.ubicacion, 
-                c.lote, 
-                MAX(c.fecha) as ultima_operacion,
-                COALESCE(MIN(c.fecha_llegada_pollitos), MIN(c.fecha)) as fecha_inicio
-            FROM cardex_glp c
-            INNER JOIN LotesActivos la 
-                ON c.id_empresa = la.id_empresa 
-               AND c.ubicacion = la.ubicacion 
-               AND c.lote = la.lote
-            GROUP BY c.id_empresa, c.empresa, c.ubicacion, c.lote
-        """
-        cur.execute(query_lotes)
-        lotes_activos = cur.fetchall()
-
-        # Diccionario para agrupar alertas por empresa
+        # Diccionario para agrupar alertas exclusivamente por empresa
         alertas_por_empresa = {}
 
-        for row in lotes_activos:
-            emp_id = row['id_empresa']
-            if emp_id not in alertas_por_empresa:
-                alertas_por_empresa[emp_id] = {
-                    'nombre': row['empresa'],
-                    'alertas_frecuencia': [],
-                    'alertas_vencidos': [],
-                    'alertas_pedidos': []
-                }
-
-            ultima_op = row['ultima_operacion']
-            inicio_op = row['fecha_inicio']
-            
-            dias_sin_registro = (hoy - ultima_op).days if ultima_op else 0
-            dias_totales = (hoy - inicio_op).days + 1 if inicio_op else 1
-
-            # REGLA 1: Más de 15 días sin cerrar calefacción
-            if dias_totales > 15:
-                alertas_por_empresa[emp_id]['alertas_vencidos'].append(
-                    f"🔸 <b>{row['ubicacion']}</b> (Lleva {dias_totales} días activo)"
-                )
-
-            # REGLA 2: Frecuencia de Consumo
-            alerta_frecuencia = False
-            razon_frecuencia = ""
-
-            if dias_sin_registro >= 2:
-                alerta_frecuencia = True
-                razon_frecuencia = f"hace {dias_sin_registro} días"
-            elif es_viernes and dias_sin_registro >= 1:
-                alerta_frecuencia = True
-                razon_frecuencia = "no reportado para el fin de semana"
-
-            if alerta_frecuencia:
-                alertas_por_empresa[emp_id]['alertas_frecuencia'].append(
-                    f"🔹 <b>{row['ubicacion']}</b> (Último reporte: {razon_frecuencia})"
-                )
-
-        # 2. CONSULTA V10: Algoritmo de rastreo físico basado 100% en cardex_glp
-        # CORRECCIÓN: Filtrado por lotes reales activos y extracción dinámica del último código
+        # CONSULTA ÚNICA V10: Algoritmo de rastreo físico basado 100% en cardex_glp
         query_pedidos = """
         WITH LotesActivos AS (
             SELECT id_empresa, empresa, ubicacion, lote
@@ -181,15 +110,16 @@ def auditar_granjas():
             if emp_id not in alertas_por_empresa:
                 alertas_por_empresa[emp_id] = {
                     'nombre': p['empresa'],
-                    'alertas_frecuencia': [],
-                    'alertas_vencidos': [],
                     'alertas_pedidos': []
                 }
             alertas_por_empresa[emp_id]['alertas_pedidos'].append(
                 f"⏳ <b>{p['ubicacion']}</b> - Pedido: {p['codigo_pedido']} (Atraso: {p['dias_retraso']} días. Estado: {p['estatus_flujo']})"
             )
 
-        # 3. Procesar envíos empresa por empresa
+        # Procesar envíos a Telegram
+        if not alertas_por_empresa:
+            print("ℹ️ No se detectaron pedidos pendientes de registro con más de 3 días de atraso.")
+
         for emp_id, datos in alertas_por_empresa.items():
             
             # Buscamos usuarios supervisores u operadores
@@ -213,22 +143,11 @@ def auditar_granjas():
             # Encabezado estándar en formato HTML
             mensaje = f"📊 <b>REPORTE DE AUDITORÍA GLP</b> 📊\nEmpresa: {datos['nombre']}\n\n"
 
-            if not datos['alertas_frecuencia'] and not datos['alertas_vencidos'] and not datos['alertas_pedidos']:
-                mensaje += "✅ <b>Todo en orden.</b>\nNo hay granjas atrasadas, lotes vencidos ni pedidos en tránsito el día de hoy."
+            if not datos['alertas_pedidos']:
+                mensaje += "✅ <b>Todo en orden.</b>\nNo hay pedidos pendientes de registrar tanqueo con más de 3 días de atraso el día de hoy."
             else:
-                if datos['alertas_frecuencia']:
-                    mensaje += "⚠️ <b>Granjas sin reporte de consumo reciente:</b>\n"
-                    mensaje += "\n".join(datos['alertas_frecuencia']) + "\n\n"
-                    
-                if datos['alertas_vencidos']:
-                    mensaje += "🔥 <b>Granjas que excedieron los 15 días de calefacción:</b>\n"
-                    mensaje += "\n".join(datos['alertas_vencidos']) + "\n\n"
-
-                if datos['alertas_pedidos']:
-                    # TÍTULO V10 RASTREADOR:
-                    mensaje += "🔍 <b>AUDITORÍA V10 - Pedidos de gas en tránsito:</b>\n"
-                    mensaje += "\n".join(datos['alertas_pedidos']) + "\n\n"
-
+                mensaje += "🔍 <b>AUDITORÍA V10 - Pedidos de gas pendientes de registrar tanqueo:</b>\n"
+                mensaje += "\n".join(datos['alertas_pedidos']) + "\n\n"
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
 
             # Enviar a la colección de destinatarios únicos
