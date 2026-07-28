@@ -34,22 +34,19 @@ def enviar_telegram(chat_id, mensaje, max_reintentos=3):
     return False
 
 def auditar_granjas():
-    # MARCA DE AGUA V10 PARA AUDITAR CACHÉ DE PYTHONANYWHERE
-    print(f"🚀 INICIANDO AUDITORÍA V10: {datetime.now()}")
-    hoy = datetime.now().date()
+    print(f"🚀 INICIANDO AUDITORÍA - TANQUEOS NO REGISTRADOS: {datetime.now()}")
 
     try:
         conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
         
-        # ⚠️ REFRESCO FORZADO: Rompe cualquier "Lectura Fantasma" de transacciones previas cacheadas
+        # REFRESCO FORZADO: Evita lecturas obsoletas de transacciones previas cacheadas
         conn.commit() 
         
         cur = conn.cursor(MySQLdb.cursors.DictCursor)
 
-        # Diccionario para agrupar alertas exclusivamente por empresa
         alertas_por_empresa = {}
 
-        # Cargar todas las empresas con lotes ACTIVOS para garantizar que siempre se construya e informe
+        # Cargar empresas activas para garantizar inicialización de estructuras por tenant
         cur.execute("SELECT DISTINCT id_empresa, empresa FROM cardex_glp WHERE estatus_lote = 'ACTIVO'")
         empresas_activas = cur.fetchall()
         for emp in empresas_activas:
@@ -60,74 +57,65 @@ def auditar_granjas():
             }
 
         # -----------------------------------------------------------------
-        # PASO 1: Obtener solicitudes de gas en lotes ACTIVOS
+        # CONSULTA SQL ÚNICA SOLICITADA (Con inclusión de id_empresa/empresa para multitenancy)
         # -----------------------------------------------------------------
-        query_solicitudes = """
-            SELECT id, id_empresa, empresa, ubicacion, lote, operacion, codigo_pedido, fecha
-            FROM cardex_glp
-            WHERE estatus_lote = 'ACTIVO'
-              AND operacion IN ('inicio_calefaccion', 'consumo')
-              AND codigo_pedido IS NOT NULL
-              AND TRIM(codigo_pedido) <> ''
-            ORDER BY fecha DESC, id DESC;
-        """
-        cur.execute(query_solicitudes)
-        solicitudes = cur.fetchall()
-
-        # -----------------------------------------------------------------
-        # PASO 2: Filtrar la última solicitud por sede y consultar tanqueo
-        # -----------------------------------------------------------------
-        ubicaciones_procesadas = set()
-
-        for sol in solicitudes:
-            clave_ubicacion = (sol['id_empresa'], sol['ubicacion'])
-            
-            # Garantizar evaluacion exclusiva de la última solicitud por sede (rn = 1)
-            if clave_ubicacion in ubicaciones_procesadas:
-                continue
-            
-            ubicaciones_procesadas.add(clave_ubicacion)
-
-            # Consulta individual para verificar si existe un tanqueo registrado posteriormente
-            query_tanqueo = """
-                SELECT COUNT(*) AS total
+        query_tanqueos_no_registrados = """
+            SELECT
+                c.fecha,
+                c.ubicacion,
+                c.estatus_lote,
+                c.codigo_pedido,
+                c.operacion,
+                c.id_empresa,
+                c.empresa
+            FROM cardex_glp c
+            INNER JOIN (
+                SELECT
+                    ubicacion,
+                    MAX(id) AS ultimo_id
                 FROM cardex_glp
-                WHERE operacion = 'tanqueo'
-                  AND id_empresa = %s
-                  AND ubicacion = %s
-                  AND lote = %s
-                  AND (codigo_pedido = %s OR id > %s);
-            """
-            cur.execute(query_tanqueo, (
-                sol['id_empresa'],
-                sol['ubicacion'],
-                sol['lote'],
-                sol['codigo_pedido'],
-                sol['id']
-            ))
-            res_tanqueo = cur.fetchone()
-            total_tanqueos = res_tanqueo['total'] if res_tanqueo else 0
-
-            # -------------------------------------------------------------
-            # PASO 3: Evaluar retraso si NO existe registro de tanqueo
-            # -------------------------------------------------------------
-            if total_tanqueos == 0:
-                fecha_solicitud = sol['fecha']
-                dias_retraso = (hoy - fecha_solicitud).days if fecha_solicitud else 0
-
-                if dias_retraso > 3:
-                    emp_id = sol['id_empresa']
-                    if emp_id not in alertas_por_empresa:
-                        alertas_por_empresa[emp_id] = {
-                            'nombre': sol['empresa'],
-                            'alertas_pedidos': []
-                        }
-                    alertas_por_empresa[emp_id]['alertas_pedidos'].append(
-                        f"⏳ <b>{sol['ubicacion']}</b> - Pedido: {sol['codigo_pedido']} (Atraso: {dias_retraso} días. Estado: Pendiente de Registro)"
-                    )
+                WHERE estatus_lote = 'ACTIVO'
+                  AND operacion IN ('inicio_calefaccion', 'consumo')
+                GROUP BY ubicacion
+            ) ult
+                ON c.id = ult.ultimo_id
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM cardex_glp t
+                WHERE t.codigo_pedido = c.codigo_pedido
+                  AND t.ubicacion = c.ubicacion
+                  AND t.operacion = 'registrar_tanqueo'
+                  AND t.id > c.id
+            )
+            ORDER BY c.ubicacion;
+        """
+        cur.execute(query_tanqueos_no_registrados)
+        registros = cur.fetchall()
 
         # -----------------------------------------------------------------
-        # PASO 4: Procesar envíos a Telegram por empresa
+        # PROCESAMIENTO Y DISCRIMINACIÓN POR UBICACIÓN
+        # -----------------------------------------------------------------
+        for reg in registros:
+            emp_id = reg['id_empresa']
+            if emp_id not in alertas_por_empresa:
+                alertas_por_empresa[emp_id] = {
+                    'nombre': reg['empresa'],
+                    'alertas_pedidos': []
+                }
+            
+            cod_pedido = reg['codigo_pedido'] if reg['codigo_pedido'] else 'S/N'
+            fec_str = reg['fecha'].strftime('%Y-%m-%d') if reg['fecha'] else 'N/A'
+            
+            alertas_por_empresa[emp_id]['alertas_pedidos'].append(
+                f"📍 <b>Ubicación: {reg['ubicacion']}</b>\n"
+                f"   • Código Pedido: {cod_pedido}\n"
+                f"   • Última Operación: {reg['operacion']}\n"
+                f"   • Fecha: {fec_str}\n"
+                f"   • Estado Lote: {reg['estatus_lote']}"
+            )
+
+        # -----------------------------------------------------------------
+        # ENVÍO DE INFORMES A TELEGRAM
         # -----------------------------------------------------------------
         for emp_id, datos in alertas_por_empresa.items():
             
@@ -144,29 +132,28 @@ def auditar_granjas():
             for u in usuarios_destino:
                 destinatarios_unicos.add(u['telegram_id'])
             
-            # BYPASS DE SEGURIDAD: Te enviamos una copia
+            # Copia de seguridad
             destinatarios_unicos.add("5368207368")
 
-            # Encabezado estándar en formato HTML
-            mensaje = f"📊 <b>REPORTE DE AUDITORÍA GLP</b> 📊\nEmpresa: {datos['nombre']}\n\n"
+            # Encabezado con el nombre exacto del informe
+            mensaje = f"📊 <b>TANQUEOS NO REGISTRADOS</b> 📊\nEmpresa: {datos['nombre']}\n\n"
 
             if not datos['alertas_pedidos']:
-                mensaje += "✅ <b>Todo en orden.</b>\nNo hay pedidos pendientes de registrar tanqueo con más de 3 días de atraso el día de hoy."
+                mensaje += "✅ <b>Todo en orden.</b>\nNo hay sedes con tanqueos pendientes de registro para sus lotes activos."
             else:
-                mensaje += "🔍 <b>AUDITORÍA V10 - Pedidos de gas pendientes de registrar tanqueo:</b>\n"
-                mensaje += "\n".join(datos['alertas_pedidos']) + "\n\n"
+                mensaje += "🔍 <b>Reporte discriminado por ubicación:</b>\n\n"
+                mensaje += "\n\n".join(datos['alertas_pedidos']) + "\n\n"
                 mensaje += "Por favor, contactar a los operarios de estas sedes."
 
-            # Enviar a la colección de destinatarios únicos
             for chat_id in destinatarios_unicos:
                 enviar_telegram(chat_id, mensaje)
 
         cur.close()
         conn.close()
-        print("✅ Auditoría V10 finalizada correctamente.")
+        print("✅ Auditoría de tanqueos no registrados finalizada correctamente.")
 
     except Exception as e:
-        print(f"❌ Error crítico en el auditor V10: {e}")
+        print(f"❌ Error crítico en el auditor: {e}")
         
 if __name__ == "__main__":
     auditar_granjas()
