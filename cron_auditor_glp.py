@@ -141,8 +141,8 @@ def auditar_granjas():
             DATEDIFF(CURDATE(), u.fecha) AS dias_retraso
         FROM UltimaOperacion u
         INNER JOIN pedidos_gas_glp p
-            ON p.codigo_pedido = u.codigo_pedido
-            AND p.cliente = u.empresa
+            ON p.codigo_pedido COLLATE utf8mb4_general_ci = u.codigo_pedido COLLATE utf8mb4_general_ci
+            AND p.cliente COLLATE utf8mb4_general_ci = u.empresa COLLATE utf8mb4_general_ci
         WHERE u.rn = 1
           AND u.operacion IN ('inicio_calefaccion', 'consumo')
           AND u.codigo_pedido IS NOT NULL
