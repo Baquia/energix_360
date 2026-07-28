@@ -113,30 +113,49 @@ def auditar_granjas():
                     f"🔹 <b>{row['ubicacion']}</b> (Último reporte: {razon_frecuencia})"
                 )
 
-        # 2. CONSULTA V10: Algoritmo basado 100% en existencia operativa dentro de cardex_glp
+        # 2. CONSULTA V10: Algoritmo de rastreo físico basado 100% en cardex_glp
         query_pedidos = """
+        WITH OperacionesConPedido AS (
+            SELECT
+                id_empresa,
+                empresa,
+                ubicacion,
+                lote,
+                operacion,
+                codigo_pedido,
+                fecha,
+                ROW_NUMBER() OVER (
+                    PARTITION BY id_empresa, ubicacion
+                    ORDER BY fecha DESC, id DESC
+                ) AS rn
+            FROM cardex_glp
+            WHERE estatus_lote = 'ACTIVO'
+              AND operacion IN ('inicio_calefaccion', 'consumo')
+              AND codigo_pedido IS NOT NULL
+              AND TRIM(codigo_pedido) <> ''
+        )
         SELECT
-            c.id_empresa,
-            c.empresa,
-            c.ubicacion,
-            c.operacion,
-            c.codigo_pedido,
-            c.fecha,
+            o.id_empresa,
+            o.empresa,
+            o.ubicacion,
+            o.operacion,
+            o.codigo_pedido,
+            o.fecha,
             'Pendiente de Registro' AS estatus_flujo,
-            DATEDIFF(CURDATE(), c.fecha) AS dias_retraso
-        FROM cardex_glp c
-        WHERE c.estatus_lote = 'ACTIVO'
-          AND c.operacion IN ('inicio_calefaccion', 'consumo')
-          AND c.codigo_pedido IS NOT NULL
-          AND TRIM(c.codigo_pedido) <> ''
-          AND DATEDIFF(CURDATE(), c.fecha) > 3
+            DATEDIFF(CURDATE(), o.fecha) AS dias_retraso
+        FROM OperacionesConPedido o
+        WHERE o.rn = 1
+          AND DATEDIFF(CURDATE(), o.fecha) > 3
           AND NOT EXISTS (
               SELECT 1
               FROM cardex_glp t
-              WHERE t.codigo_pedido = c.codigo_pedido
+              WHERE t.id_empresa = o.id_empresa
+                AND t.ubicacion = o.ubicacion
+                AND t.lote = o.lote
                 AND t.operacion = 'tanqueo'
+                AND t.fecha >= o.fecha
           )
-        ORDER BY dias_retraso DESC, c.ubicacion;
+        ORDER BY dias_retraso DESC, o.ubicacion;
         """
         cur.execute(query_pedidos)
         pedidos_huerfanos = cur.fetchall()
