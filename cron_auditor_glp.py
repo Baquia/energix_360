@@ -113,43 +113,30 @@ def auditar_granjas():
                     f"🔹 <b>{row['ubicacion']}</b> (Último reporte: {razon_frecuencia})"
                 )
 
-        # 2. CONSULTA V10: Algoritmo secuencial estricto basado en la historia del lote
+        # 2. CONSULTA V10: Algoritmo basado 100% en existencia operativa dentro de cardex_glp
         query_pedidos = """
-        WITH UltimaOperacion AS (
-            SELECT
-                id_empresa,
-                empresa,
-                ubicacion,
-                operacion,
-                codigo_pedido,
-                fecha,
-                ROW_NUMBER() OVER (
-                    PARTITION BY id_empresa, ubicacion
-                    ORDER BY fecha DESC, id DESC
-                ) AS rn
-            FROM cardex_glp
-            WHERE estatus_lote = 'ACTIVO'
-        )
         SELECT
-            u.id_empresa,
-            u.empresa,
-            u.ubicacion,
-            u.operacion,
-            u.codigo_pedido,
-            u.fecha,
-            p.estatus_flujo,
-            DATEDIFF(CURDATE(), u.fecha) AS dias_retraso
-        FROM UltimaOperacion u
-        INNER JOIN pedidos_gas_glp p
-            ON p.codigo_pedido COLLATE utf8mb4_general_ci = u.codigo_pedido COLLATE utf8mb4_general_ci
-            AND p.cliente COLLATE utf8mb4_general_ci = u.empresa COLLATE utf8mb4_general_ci
-        WHERE u.rn = 1
-          AND u.operacion IN ('inicio_calefaccion', 'consumo')
-          AND u.codigo_pedido IS NOT NULL
-          AND TRIM(u.codigo_pedido) <> ''
-          AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
-          AND DATEDIFF(CURDATE(), u.fecha) > 3
-        ORDER BY dias_retraso DESC, u.ubicacion;
+            c.id_empresa,
+            c.empresa,
+            c.ubicacion,
+            c.operacion,
+            c.codigo_pedido,
+            c.fecha,
+            'Pendiente de Registro' AS estatus_flujo,
+            DATEDIFF(CURDATE(), c.fecha) AS dias_retraso
+        FROM cardex_glp c
+        WHERE c.estatus_lote = 'ACTIVO'
+          AND c.operacion IN ('inicio_calefaccion', 'consumo')
+          AND c.codigo_pedido IS NOT NULL
+          AND TRIM(c.codigo_pedido) <> ''
+          AND DATEDIFF(CURDATE(), c.fecha) > 3
+          AND NOT EXISTS (
+              SELECT 1
+              FROM cardex_glp t
+              WHERE t.codigo_pedido = c.codigo_pedido
+                AND t.operacion = 'tanqueo'
+          )
+        ORDER BY dias_retraso DESC, c.ubicacion;
         """
         cur.execute(query_pedidos)
         pedidos_huerfanos = cur.fetchall()
