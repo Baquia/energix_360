@@ -36,6 +36,7 @@ def enviar_telegram(chat_id, mensaje, max_reintentos=3):
 def auditar_granjas():
     # MARCA DE AGUA V10 PARA AUDITAR CACHÉ DE PYTHONANYWHERE
     print(f"🚀 INICIANDO AUDITORÍA V10: {datetime.now()}")
+    hoy = datetime.now().date()
 
     try:
         conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
@@ -48,7 +49,7 @@ def auditar_granjas():
         # Diccionario para agrupar alertas exclusivamente por empresa
         alertas_por_empresa = {}
 
-        # 1. Cargar todas las empresas que tienen lotes ACTIVOS para garantizar envío de Telegram
+        # Cargar todas las empresas con lotes ACTIVOS para garantizar que siempre se construya e informe
         cur.execute("SELECT DISTINCT id_empresa, empresa FROM cardex_glp WHERE estatus_lote = 'ACTIVO'")
         empresas_activas = cur.fetchall()
         for emp in empresas_activas:
@@ -58,69 +59,78 @@ def auditar_granjas():
                 'alertas_pedidos': []
             }
 
-        # 2. CONSULTA ÚNICA V10: Algoritmo de rastreo físico basado 100% en cardex_glp
-        query_pedidos = """
-        WITH OperacionesConPedido AS (
-            SELECT
-                c.id_empresa,
-                c.empresa,
-                c.ubicacion,
-                c.lote,
-                c.operacion,
-                c.codigo_pedido,
-                c.fecha,
-                c.id,
-                ROW_NUMBER() OVER (
-                    PARTITION BY c.id_empresa, c.ubicacion
-                    ORDER BY c.fecha DESC, c.id DESC
-                ) AS rn
-            FROM cardex_glp c
-            WHERE c.estatus_lote = 'ACTIVO'
-              AND c.operacion IN ('inicio_calefaccion', 'consumo')
-              AND c.codigo_pedido IS NOT NULL
-              AND TRIM(c.codigo_pedido) <> ''
-        )
-        SELECT
-            o.id_empresa,
-            o.empresa,
-            o.ubicacion,
-            o.operacion,
-            o.codigo_pedido,
-            o.fecha,
-            'Pendiente de Registro' AS estatus_flujo,
-            DATEDIFF(CURDATE(), o.fecha) AS dias_retraso
-        FROM OperacionesConPedido o
-        WHERE o.rn = 1
-          AND DATEDIFF(CURDATE(), o.fecha) > 3
-          AND NOT EXISTS (
-              SELECT 1
-              FROM cardex_glp t
-              WHERE t.id_empresa = o.id_empresa
-                AND t.ubicacion = o.ubicacion
-                AND t.lote = o.lote
-                AND t.operacion = 'tanqueo'
-                AND t.id > o.id
-          )
-        ORDER BY dias_retraso DESC, o.ubicacion;
+        # -----------------------------------------------------------------
+        # PASO 1: Obtener solicitudes de gas en lotes ACTIVOS
+        # -----------------------------------------------------------------
+        query_solicitudes = """
+            SELECT id, id_empresa, empresa, ubicacion, lote, operacion, codigo_pedido, fecha
+            FROM cardex_glp
+            WHERE estatus_lote = 'ACTIVO'
+              AND operacion IN ('inicio_calefaccion', 'consumo')
+              AND codigo_pedido IS NOT NULL
+              AND TRIM(codigo_pedido) <> ''
+            ORDER BY fecha DESC, id DESC;
         """
-        cur.execute(query_pedidos)
-        pedidos_huerfanos = cur.fetchall()
+        cur.execute(query_solicitudes)
+        solicitudes = cur.fetchall()
 
-        for p in pedidos_huerfanos:
-            emp_id = p['id_empresa']
-            if emp_id not in alertas_por_empresa:
-                alertas_por_empresa[emp_id] = {
-                    'nombre': p['empresa'],
-                    'alertas_pedidos': []
-                }
-            alertas_por_empresa[emp_id]['alertas_pedidos'].append(
-                f"⏳ <b>{p['ubicacion']}</b> - Pedido: {p['codigo_pedido']} (Atraso: {p['dias_retraso']} días. Estado: {p['estatus_flujo']})"
-            )
+        # -----------------------------------------------------------------
+        # PASO 2: Filtrar la última solicitud por sede y consultar tanqueo
+        # -----------------------------------------------------------------
+        ubicaciones_procesadas = set()
 
-        # 3. Procesar envíos a Telegram por empresa
+        for sol in solicitudes:
+            clave_ubicacion = (sol['id_empresa'], sol['ubicacion'])
+            
+            # Garantizar evaluacion exclusiva de la última solicitud por sede (rn = 1)
+            if clave_ubicacion in ubicaciones_procesadas:
+                continue
+            
+            ubicaciones_procesadas.add(clave_ubicacion)
+
+            # Consulta individual para verificar si existe un tanqueo registrado posteriormente
+            query_tanqueo = """
+                SELECT COUNT(*) AS total
+                FROM cardex_glp
+                WHERE operacion = 'tanqueo'
+                  AND id_empresa = %s
+                  AND ubicacion = %s
+                  AND lote = %s
+                  AND (codigo_pedido = %s OR id > %s);
+            """
+            cur.execute(query_tanqueo, (
+                sol['id_empresa'],
+                sol['ubicacion'],
+                sol['lote'],
+                sol['codigo_pedido'],
+                sol['id']
+            ))
+            res_tanqueo = cur.fetchone()
+            total_tanqueos = res_tanqueo['total'] if res_tanqueo else 0
+
+            # -------------------------------------------------------------
+            # PASO 3: Evaluar retraso si NO existe registro de tanqueo
+            # -------------------------------------------------------------
+            if total_tanqueos == 0:
+                fecha_solicitud = sol['fecha']
+                dias_retraso = (hoy - fecha_solicitud).days if fecha_solicitud else 0
+
+                if dias_retraso > 3:
+                    emp_id = sol['id_empresa']
+                    if emp_id not in alertas_por_empresa:
+                        alertas_por_empresa[emp_id] = {
+                            'nombre': sol['empresa'],
+                            'alertas_pedidos': []
+                        }
+                    alertas_por_empresa[emp_id]['alertas_pedidos'].append(
+                        f"⏳ <b>{sol['ubicacion']}</b> - Pedido: {sol['codigo_pedido']} (Atraso: {dias_retraso} días. Estado: Pendiente de Registro)"
+                    )
+
+        # -----------------------------------------------------------------
+        # PASO 4: Procesar envíos a Telegram por empresa
+        # -----------------------------------------------------------------
         for emp_id, datos in alertas_por_empresa.items():
             
-            # Buscamos usuarios supervisores u operadores
             cur.execute("""
                 SELECT telegram_id FROM usuarios 
                 WHERE empresa_id = %s 
@@ -130,7 +140,6 @@ def auditar_granjas():
             """, (emp_id,))
             usuarios_destino = cur.fetchall()
             
-            # ⚠️ ANTI-DUPLICADOS: Usamos un Set para almacenar IDs únicos de envío
             destinatarios_unicos = set()
             for u in usuarios_destino:
                 destinatarios_unicos.add(u['telegram_id'])
