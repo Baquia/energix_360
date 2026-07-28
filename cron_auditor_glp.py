@@ -76,6 +76,8 @@ def auditar_granjas():
                 FROM cardex_glp
                 WHERE estatus_lote = 'ACTIVO'
                   AND operacion IN ('inicio_calefaccion', 'consumo')
+                  AND codigo_pedido IS NOT NULL
+                  AND TRIM(codigo_pedido) <> ''
                 GROUP BY ubicacion
             ) ult
                 ON c.id = ult.ultimo_id
@@ -84,8 +86,7 @@ def auditar_granjas():
                 FROM cardex_glp t
                 WHERE t.codigo_pedido = c.codigo_pedido
                   AND t.ubicacion = c.ubicacion
-                  AND t.operacion = 'registrar_tanqueo'
-                  AND t.id > c.id
+                  AND t.operacion = 'tanqueo'
             )
             ORDER BY c.ubicacion;
         """
