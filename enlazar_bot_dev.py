@@ -6,7 +6,7 @@ import sys
 DB_HOST = "baquiasoft.mysql.pythonanywhere-services.com"
 DB_USER = "baquiasoft"
 DB_PASS = "Ataraxia123*/"
-DB_NAME = "baquiasoft$energix_360"
+DB_NAME = "baquiasoft$energix_v2"
 TOKEN = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
 
 bot = telebot.TeleBot(TOKEN)
