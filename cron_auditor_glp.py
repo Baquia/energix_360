@@ -147,7 +147,7 @@ def auditar_granjas():
           AND u.operacion IN ('inicio_calefaccion', 'consumo')
           AND u.codigo_pedido IS NOT NULL
           AND TRIM(u.codigo_pedido) <> ''
-          AND p.estatus_flujo NOT IN ('anulado', 'tanqueo_registrado')
+          AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
           AND DATEDIFF(CURDATE(), u.fecha) > 3
         ORDER BY dias_retraso DESC, u.ubicacion;
         """
