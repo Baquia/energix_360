@@ -48,7 +48,18 @@ def auditar_granjas():
         cur = conn.cursor(MySQLdb.cursors.DictCursor)
 
         # 1. CONSULTA DE ALERTAS DE FRECUENCIA Y VENCIMIENTO
+        # CORRECCIÓN: Filtro estricto evaluando únicamente el último ID absoluto de la granja
         query_lotes = """
+            WITH LotesActivos AS (
+                SELECT id_empresa, empresa, ubicacion, lote
+                FROM cardex_glp
+                WHERE id IN (
+                    SELECT MAX(id)
+                    FROM cardex_glp
+                    GROUP BY id_empresa, ubicacion
+                )
+                AND estatus_lote = 'ACTIVO'
+            )
             SELECT 
                 c.id_empresa, 
                 c.empresa, 
@@ -57,16 +68,10 @@ def auditar_granjas():
                 MAX(c.fecha) as ultima_operacion,
                 COALESCE(MIN(c.fecha_llegada_pollitos), MIN(c.fecha)) as fecha_inicio
             FROM cardex_glp c
-            INNER JOIN (
-                SELECT t1.lote
-                FROM cardex_glp t1
-                INNER JOIN (
-                    SELECT lote, MAX(id) as max_id
-                    FROM cardex_glp
-                    GROUP BY lote
-                ) t2 ON t1.id = t2.max_id
-                WHERE t1.estatus_lote = 'ACTIVO'
-            ) activos ON c.lote = activos.lote
+            INNER JOIN LotesActivos la 
+                ON c.id_empresa = la.id_empresa 
+               AND c.ubicacion = la.ubicacion 
+               AND c.lote = la.lote
             GROUP BY c.id_empresa, c.empresa, c.ubicacion, c.lote
         """
         cur.execute(query_lotes)
@@ -114,48 +119,59 @@ def auditar_granjas():
                 )
 
         # 2. CONSULTA V10: Algoritmo de rastreo físico basado 100% en cardex_glp
+        # CORRECCIÓN: Filtrado por lotes reales activos y extracción dinámica del último código
         query_pedidos = """
-        WITH OperacionesConPedido AS (
-            SELECT
-                id_empresa,
-                empresa,
-                ubicacion,
-                lote,
-                operacion,
-                codigo_pedido,
-                fecha,
-                ROW_NUMBER() OVER (
-                    PARTITION BY id_empresa, ubicacion
-                    ORDER BY fecha DESC, id DESC
-                ) AS rn
+        WITH LotesActivos AS (
+            SELECT id_empresa, empresa, ubicacion, lote
             FROM cardex_glp
-            WHERE estatus_lote = 'ACTIVO'
-              AND operacion IN ('inicio_calefaccion', 'consumo')
-              AND codigo_pedido IS NOT NULL
-              AND TRIM(codigo_pedido) <> ''
+            WHERE id IN (
+                SELECT MAX(id)
+                FROM cardex_glp
+                GROUP BY id_empresa, ubicacion
+            )
+            AND estatus_lote = 'ACTIVO'
+        ),
+        UltimaOperacionConCodigo AS (
+            SELECT
+                c.id_empresa,
+                c.empresa,
+                c.ubicacion,
+                c.lote,
+                c.operacion,
+                c.codigo_pedido,
+                c.fecha,
+                ROW_NUMBER() OVER (
+                    PARTITION BY c.id_empresa, c.ubicacion
+                    ORDER BY c.fecha DESC, c.id DESC
+                ) AS rn
+            FROM cardex_glp c
+            INNER JOIN LotesActivos la
+                ON c.id_empresa = la.id_empresa
+               AND c.ubicacion = la.ubicacion
+               AND c.lote = la.lote
+            WHERE c.operacion IN ('inicio_calefaccion', 'consumo')
+              AND c.codigo_pedido IS NOT NULL
+              AND TRIM(c.codigo_pedido) <> ''
         )
         SELECT
-            o.id_empresa,
-            o.empresa,
-            o.ubicacion,
-            o.operacion,
-            o.codigo_pedido,
-            o.fecha,
+            u.id_empresa,
+            u.empresa,
+            u.ubicacion,
+            u.operacion,
+            u.codigo_pedido,
+            u.fecha,
             'Pendiente de Registro' AS estatus_flujo,
-            DATEDIFF(CURDATE(), o.fecha) AS dias_retraso
-        FROM OperacionesConPedido o
-        WHERE o.rn = 1
-          AND DATEDIFF(CURDATE(), o.fecha) > 3
+            DATEDIFF(CURDATE(), u.fecha) AS dias_retraso
+        FROM UltimaOperacionConCodigo u
+        WHERE u.rn = 1
+          AND DATEDIFF(CURDATE(), u.fecha) > 3
           AND NOT EXISTS (
               SELECT 1
               FROM cardex_glp t
-              WHERE t.id_empresa = o.id_empresa
-                AND t.ubicacion = o.ubicacion
-                AND t.lote = o.lote
+              WHERE t.codigo_pedido = u.codigo_pedido
                 AND t.operacion = 'tanqueo'
-                AND t.fecha >= o.fecha
           )
-        ORDER BY dias_retraso DESC, o.ubicacion;
+        ORDER BY dias_retraso DESC, u.ubicacion;
         """
         cur.execute(query_pedidos)
         pedidos_huerfanos = cur.fetchall()
