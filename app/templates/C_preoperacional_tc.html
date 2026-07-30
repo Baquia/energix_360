@@ -1,3 +1,4 @@
+<!-- app/templates/C_preoperacional_tc.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -27,7 +28,14 @@
             color: var(--text);
         }
 
-        .container { max-width: 800px; margin-top: 30px; margin-bottom: 50px; }
+        .container { max-width: 800px; margin-top: 20px; margin-bottom: 50px; }
+        
+        /* NUEVOS ESTILOS CABECERA DE MARCA */
+        .brand-header { display: flex; justify-content: center; align-items: center; gap: 20px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid rgba(1, 82, 73, 0.1); }
+        .header-logo-cliente { max-height: 50px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05)); }
+        .header-divider { width: 1px; height: 35px; background-color: #cbd5e1; display: block; }
+        .header-logo-app { max-height: 35px; width: auto; opacity: 0.9; }
+
         .title-header { color: var(--verde); font-weight: 800; font-size: 24px; text-transform: uppercase; margin-bottom: 5px; }
         .subtitle-header { color: var(--text-muted); font-size: 14px; margin-bottom: 25px; }
 
@@ -104,8 +112,15 @@
 <div id="toast-success"><span>✅</span> <span id="toast-text">Capítulo completado con éxito</span></div>
 
 <div class="container">
+    
+    <div class="brand-header">
+        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="header-logo-cliente" alt="{{ empresa }}" onerror="this.style.display='none'">
+        <span class="header-divider"></span>
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="header-logo-app" alt="BQA-ONE">
+    </div>
+    
     <div class="text-center mb-4">
-        <h2 class="title-header">BQA-ONE: FLOTA DE CARGA</h2>
+        <h2 class="title-header">FLOTA DE CARGA</h2>
         <div class="subtitle-header">Diligenciamiento Preoperacional de Seguridad Vial</div>
     </div>
 
@@ -665,25 +680,18 @@
                 });
             });
 
-            {% if not scanner_mode %} renderizarChasis('{{ vehiculo.tipo|lower }}'); {% endif %}
+            {% if not scanner_mode %} renderizarChasis('{{ vehiculo.tipo|default("")|lower }}', '{{ vehiculo.referencia|default("")|lower }}'); {% endif %}
         }
     });
 
-    function renderizarChasis(tipo) {
+    function renderizarChasis(tipo, referencia) {
         const container = document.getElementById('chasis_render'); let html = '';
+        const searchStr = (tipo + " " + referencia).toLowerCase();
+        
         html += `<div class="eje"><div class="llanta-btn" id="ll_dir_izq" onclick="abrirModalLlanta('ll_dir_izq', 'Dir. Izquierda')">DIR<br>IZQ</div><div class="eje-barra"></div><div class="llanta-btn" id="ll_dir_der" onclick="abrirModalLlanta('ll_dir_der', 'Dir. Derecha')">DIR<br>DER</div></div>`;
         arrayLlantasRequeridas.push('ll_dir_izq', 'll_dir_der');
 
-        if (tipo === 'camion ligero') {
-            html += `<div class="eje"><div class="llanta-btn" id="ll_trac_izq" onclick="abrirModalLlanta('ll_trac_izq', 'Trac. Izquierda')">TRAC<br>IZQ</div><div class="eje-barra"></div><div class="llanta-btn" id="ll_trac_der" onclick="abrirModalLlanta('ll_trac_der', 'Trac. Derecha')">TRAC<br>DER</div></div>`;
-            arrayLlantasRequeridas.push('ll_trac_izq', 'll_trac_der');
-        } else if (tipo === 'camion sencillo') {
-            html += `<div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_trac_izq_ext" onclick="abrirModalLlanta('ll_trac_izq_ext', 'Trac. Izq Ext')">EXT<br>IZQ</div><div class="llanta-btn" id="ll_trac_izq_int" onclick="abrirModalLlanta('ll_trac_izq_int', 'Trac. Izq Int')">INT<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_trac_der_int" onclick="abrirModalLlanta('ll_trac_der_int', 'Trac. Der Int')">INT<br>DER</div><div class="llanta-btn" id="ll_trac_der_ext" onclick="abrirModalLlanta('ll_trac_der_ext', 'Trac. Der Ext')">EXT<br>DER</div></div></div>`;
-            arrayLlantasRequeridas.push('ll_trac_izq_ext', 'll_trac_izq_int', 'll_trac_der_int', 'll_trac_der_ext');
-        } else if (tipo === 'dobletroque') {
-            html += `<div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_izq_ext" onclick="abrirModalLlanta('ll_t1_izq_ext', 'Troque 1 Izq Ext')">T1 E<br>IZQ</div><div class="llanta-btn" id="ll_t1_izq_int" onclick="abrirModalLlanta('ll_t1_izq_int', 'Troque 1 Izq Int')">T1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_der_int" onclick="abrirModalLlanta('ll_t1_der_int', 'Troque 1 Der Int')">T1 I<br>DER</div><div class="llanta-btn" id="ll_t1_der_ext" onclick="abrirModalLlanta('ll_t1_der_ext', 'Troque 1 Der Ext')">T1 E<br>DER</div></div></div><div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_izq_ext" onclick="abrirModalLlanta('ll_t2_izq_ext', 'Troque 2 Izq Ext')">T2 E<br>IZQ</div><div class="llanta-btn" id="ll_t2_izq_int" onclick="abrirModalLlanta('ll_t2_izq_int', 'Troque 2 Izq Int')">T2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_der_int" onclick="abrirModalLlanta('ll_t2_der_int', 'Troque 2 Der Int')">T2 I<br>DER</div><div class="llanta-btn" id="ll_t2_der_ext" onclick="abrirModalLlanta('ll_t2_der_ext', 'Troque 2 Der Ext')">T2 E<br>DER</div></div></div>`;
-            arrayLlantasRequeridas.push('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext');
-        } else if (tipo === 'tractomula') {
+        if (searchStr.includes('tractomula')) {
             html += `<div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_izq_ext" onclick="abrirModalLlanta('ll_t1_izq_ext', 'Tracción 1 Izq Ext')">T1 E<br>IZQ</div><div class="llanta-btn" id="ll_t1_izq_int" onclick="abrirModalLlanta('ll_t1_izq_int', 'Tracción 1 Izq Int')">T1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_der_int" onclick="abrirModalLlanta('ll_t1_der_int', 'Tracción 1 Der Int')">T1 I<br>DER</div><div class="llanta-btn" id="ll_t1_der_ext" onclick="abrirModalLlanta('ll_t1_der_ext', 'Tracción 1 Der Ext')">T1 E<br>DER</div></div></div>
             <div class="eje" style="margin-bottom: 40px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_izq_ext" onclick="abrirModalLlanta('ll_t2_izq_ext', 'Tracción 2 Izq Ext')">T2 E<br>IZQ</div><div class="llanta-btn" id="ll_t2_izq_int" onclick="abrirModalLlanta('ll_t2_izq_int', 'Tracción 2 Izq Int')">T2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_der_int" onclick="abrirModalLlanta('ll_t2_der_int', 'Tracción 2 Der Int')">T2 I<br>DER</div><div class="llanta-btn" id="ll_t2_der_ext" onclick="abrirModalLlanta('ll_t2_der_ext', 'Tracción 2 Der Ext')">T2 E<br>DER</div></div></div>
             <div style="width: 20px; height: 30px; background: #94a3b8; margin: 0 auto; border-radius: 4px;"></div>
@@ -691,6 +699,15 @@
             <div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_r2_izq_ext" onclick="abrirModalLlanta('ll_r2_izq_ext', 'Remolque 2 Izq Ext')">R2 E<br>IZQ</div><div class="llanta-btn" id="ll_r2_izq_int" onclick="abrirModalLlanta('ll_r2_izq_int', 'Remolque 2 Izq Int')">R2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_r2_der_int" onclick="abrirModalLlanta('ll_r2_der_int', 'Remolque 2 Der Int')">R2 I<br>DER</div><div class="llanta-btn" id="ll_r2_der_ext" onclick="abrirModalLlanta('ll_r2_der_ext', 'Remolque 2 Der Ext')">R2 E<br>DER</div></div></div>
             <div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_r3_izq_ext" onclick="abrirModalLlanta('ll_r3_izq_ext', 'Remolque 3 Izq Ext')">R3 E<br>IZQ</div><div class="llanta-btn" id="ll_r3_izq_int" onclick="abrirModalLlanta('ll_r3_izq_int', 'Remolque 3 Izq Int')">R3 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_r3_der_int" onclick="abrirModalLlanta('ll_r3_der_int', 'Remolque 3 Der Int')">R3 I<br>DER</div><div class="llanta-btn" id="ll_r3_der_ext" onclick="abrirModalLlanta('ll_r3_der_ext', 'Remolque 3 Der Ext')">R3 E<br>DER</div></div></div>`;
             arrayLlantasRequeridas.push('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext', 'll_r1_izq_ext', 'll_r1_izq_int', 'll_r1_der_int', 'll_r1_der_ext', 'll_r2_izq_ext', 'll_r2_izq_int', 'll_r2_der_int', 'll_r2_der_ext', 'll_r3_izq_ext', 'll_r3_izq_int', 'll_r3_der_int', 'll_r3_der_ext');
+        } else if (searchStr.includes('dobletroque')) {
+            html += `<div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_izq_ext" onclick="abrirModalLlanta('ll_t1_izq_ext', 'Troque 1 Izq Ext')">T1 E<br>IZQ</div><div class="llanta-btn" id="ll_t1_izq_int" onclick="abrirModalLlanta('ll_t1_izq_int', 'Troque 1 Izq Int')">T1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_der_int" onclick="abrirModalLlanta('ll_t1_der_int', 'Troque 1 Der Int')">T1 I<br>DER</div><div class="llanta-btn" id="ll_t1_der_ext" onclick="abrirModalLlanta('ll_t1_der_ext', 'Troque 1 Der Ext')">T1 E<br>DER</div></div></div><div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_izq_ext" onclick="abrirModalLlanta('ll_t2_izq_ext', 'Troque 2 Izq Ext')">T2 E<br>IZQ</div><div class="llanta-btn" id="ll_t2_izq_int" onclick="abrirModalLlanta('ll_t2_izq_int', 'Troque 2 Izq Int')">T2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_der_int" onclick="abrirModalLlanta('ll_t2_der_int', 'Troque 2 Der Int')">T2 I<br>DER</div><div class="llanta-btn" id="ll_t2_der_ext" onclick="abrirModalLlanta('ll_t2_der_ext', 'Troque 2 Der Ext')">T2 E<br>DER</div></div></div>`;
+            arrayLlantasRequeridas.push('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext');
+        } else if (searchStr.includes('sencillo') || searchStr.includes('npr')) {
+            html += `<div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_trac_izq_ext" onclick="abrirModalLlanta('ll_trac_izq_ext', 'Trac. Izq Ext')">EXT<br>IZQ</div><div class="llanta-btn" id="ll_trac_izq_int" onclick="abrirModalLlanta('ll_trac_izq_int', 'Trac. Izq Int')">INT<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_trac_der_int" onclick="abrirModalLlanta('ll_trac_der_int', 'Trac. Der Int')">INT<br>DER</div><div class="llanta-btn" id="ll_trac_der_ext" onclick="abrirModalLlanta('ll_trac_der_ext', 'Trac. Der Ext')">EXT<br>DER</div></div></div>`;
+            arrayLlantasRequeridas.push('ll_trac_izq_ext', 'll_trac_izq_int', 'll_trac_der_int', 'll_trac_der_ext');
+        } else if (searchStr.includes('ligero') || searchStr.includes('nhr') || searchStr.includes('turbo')) {
+            html += `<div class="eje"><div class="llanta-btn" id="ll_trac_izq" onclick="abrirModalLlanta('ll_trac_izq', 'Trac. Izquierda')">TRAC<br>IZQ</div><div class="eje-barra"></div><div class="llanta-btn" id="ll_trac_der" onclick="abrirModalLlanta('ll_trac_der', 'Trac. Derecha')">TRAC<br>DER</div></div>`;
+            arrayLlantasRequeridas.push('ll_trac_izq', 'll_trac_der');
         }
         
         container.innerHTML = html;

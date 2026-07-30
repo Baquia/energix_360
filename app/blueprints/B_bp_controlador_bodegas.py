@@ -1886,6 +1886,7 @@ def upload_excel():
         
         maestra_productos_ean = {}
         maestra_productos_nombre = {}
+        maestra_productos_nombre_lista = {} # <--- NUEVO
 
         for row in db_products:
             sku_val = normalizar_codigo(row[0])
@@ -1900,7 +1901,11 @@ def upload_excel():
 
             if ean_val: maestra_productos_ean[ean_val] = item_data
             if sku_val: maestra_productos_ean[sku_val] = item_data
-            if desc_limpia: maestra_productos_nombre[desc_limpia] = item_data
+            if desc_limpia: 
+                maestra_productos_nombre[desc_limpia] = item_data
+                if desc_limpia not in maestra_productos_nombre_lista:
+                    maestra_productos_nombre_lista[desc_limpia] = {}
+                maestra_productos_nombre_lista[desc_limpia][unidad_embalaje] = item_data
 
         cur.execute("SELECT ean_promo, nombre_promo, ean_componente, cajas_componente, fracciones_componente FROM promociones_clientes WHERE id_empresa = %s AND estado = 'ACTIVO'", (empresa_id,))
         db_promos = cur.fetchall()
@@ -2172,10 +2177,68 @@ def upload_excel():
                         estado_insert = 'PROMO_HUERFANA' if es_huerfana else 'PENDIENTE'
                         auth_insert = False if es_huerfana else auth
 
-                        data_to_insert.append((empresa_id, meta_orden, meta_zona, final_ean, raw_code, final_desc, final_marca, cajas, 0, unidades, 0, estado_insert, fecha_creacion, meta_fecha, auth_insert))
-                        cálculo_total_cajas += cajas
-                        cálculo_total_unidades += unidades
-                        cálculo_marcas_presentes.add(final_marca)
+                        if cajas > 0 and unidades > 0 and not es_huerfana:
+                            # --- LÓGICA DE BIFURCACIÓN DE LÍNEAS (SPLIT) ---
+                            ean_caja = final_ean
+                            marca_caja = final_marca
+                            desc_caja = final_desc
+                            auth_caja = auth_insert
+                            
+                            ean_und = final_ean
+                            marca_und = final_marca
+                            desc_und = final_desc
+                            auth_und = auth_insert
+                            
+                            desc_limpia_split = limpiar_texto(final_desc)
+                            found_caja = False
+                            found_und = False
+                            
+                            if desc_limpia_split in maestra_productos_nombre_lista:
+                                ops = maestra_productos_nombre_lista[desc_limpia_split]
+                                
+                                for k in ['CAJA', 'CJ', 'CAJAS']:
+                                    if k in ops:
+                                        ean_caja = ops[k]['ean']
+                                        marca_caja = ops[k]['marca']
+                                        desc_caja = ops[k]['desc']
+                                        auth_caja = True
+                                        found_caja = True
+                                        break
+                                        
+                                for k in ['UND', 'UNIDADES', 'UNIDAD', '']:
+                                    if k in ops:
+                                        ean_und = ops[k]['ean']
+                                        marca_und = ops[k]['marca']
+                                        desc_und = ops[k]['desc']
+                                        auth_und = True
+                                        found_und = True
+                                        break
+                            
+                            if not found_caja:
+                                ean_caja = 'SIN_CODIGO'
+                                marca_caja = 'NO EN BASE DE DATOS'
+                                auth_caja = False
+                                desc_caja = final_desc
+                                
+                            if not found_und:
+                                ean_und = 'SIN_CODIGO'
+                                marca_und = 'NO EN BASE DE DATOS'
+                                auth_und = False
+                                desc_und = final_desc
+                                
+                            data_to_insert.append((empresa_id, meta_orden, meta_zona, ean_caja, raw_code, desc_caja, marca_caja, cajas, 0, 0, 0, estado_insert, fecha_creacion, meta_fecha, auth_caja))
+                            data_to_insert.append((empresa_id, meta_orden, meta_zona, ean_und, raw_code, desc_und, marca_und, 0, 0, unidades, 0, estado_insert, fecha_creacion, meta_fecha, auth_und))
+                            
+                            cálculo_total_cajas += cajas
+                            cálculo_total_unidades += unidades
+                            cálculo_marcas_presentes.add(marca_caja)
+                            cálculo_marcas_presentes.add(marca_und)
+                            sub_items_generados += 1
+                        else:
+                            data_to_insert.append((empresa_id, meta_orden, meta_zona, final_ean, raw_code, final_desc, final_marca, cajas, 0, unidades, 0, estado_insert, fecha_creacion, meta_fecha, auth_insert))
+                            cálculo_total_cajas += cajas
+                            cálculo_total_unidades += unidades
+                            cálculo_marcas_presentes.add(final_marca)
 
                 if data_to_insert:
                     cur = mysql.connection.cursor()
