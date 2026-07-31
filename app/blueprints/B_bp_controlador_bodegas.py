@@ -1093,8 +1093,12 @@ def get_items_orden(orden):
                 p.id, p.codigo_producto, p.descripcion_producto, p.marca, 
                 p.cajas_calculadas, p.cajas_alistadas, p.cajas_verificadas,
                 p.unidades_calculadas, p.unidades_alistadas, p.unidades_verificadas,
-                p.estado_actividad, p.autorizacion_alistamiento
+                p.estado_actividad, p.autorizacion_alistamiento,
+                IFNULL(prod.unidad_embalaje, 'UND') as embalaje
             FROM picking_importacion_raw p
+            LEFT JOIN productos prod 
+                ON (p.codigo_producto = prod.ean OR p.codigo_producto = prod.sku) 
+                AND p.id_empresa = prod.id_empresa
             WHERE p.numero_orden_origen = %s AND p.id_empresa = %s
         """, (orden, session.get('empresa_id')))
         items = cur.fetchall()
@@ -2254,7 +2258,7 @@ def upload_excel():
                         f"📊 Reporte de Carga Transparente:\n"
                         f"• Líneas detectadas en Excel: {lineas_detectadas}\n"
                         f"• Líneas ignoradas (Cantidades en cero): {lineas_ignoradas}\n"
-                        f"• Kits/Promociones desarmadas: +{sub_items_generados} sub-ítems generados\n"
+                        f"• Desdoblamientos (Cajas/Unidades o Kits): +{sub_items_generados} líneas generadas\n"
                         f"• Total final de líneas a preparar en Bodega: {len(data_to_insert)}\n"
                         f"• Auditoría Final: {cálculo_total_cajas} Cajas y {cálculo_total_unidades} Unidades."
                     )

@@ -2524,31 +2524,37 @@ async function iniciarConfirmacionArribo() {
   }
 
   try {
-    // 🛠️ LA SOLUCIÓN: Pausa de medio segundo (500ms)
-    // Le da tiempo al navegador de cerrar la ventana anterior y calcular el tamaño 
-    // de la pantalla para que la cámara NO se renderice con tamaño de 0 píxeles.
+    // 🛠️ Pausa para renderizado correcto de la cámara
     await new Promise(r => setTimeout(r, 500));
 
-    // 1. Pedir QR (Obligatorio para saber A QUÉ GRANJA le vamos a registrar los pollitos)
+    // 1. Pedir QR para identificar la sede
     const info = await leerQR("Escanea el QR de la sede para confirmar el arribo");
     sedeQR = info.sede;
 
-    // 2. Revisar si la granja escaneada realmente está esperando pollitos
-    const infoLote = JSON.parse(localStorage.getItem(`estado_lote_${sedeQR}`));
+    // Mensaje visual para el usuario mientras el sistema piensa
+    const texto = document.getElementById("preguntaTexto");
+    if (texto) texto.textContent = "Verificando estado de la granja...";
 
-    if (infoLote && infoLote.esperando_pollito) {
-      // Si todo está bien, abre el formulario del pollito
+    // 2. NUEVO: Consultar el servidor (Single Source of Truth) con soporte Offline
+    const res = await obtenerTanquesConFallback(sedeQR);
+    if (texto) texto.textContent = "";
+
+    // 3. Revisar también el estado local (Respaldo por si acaba de iniciarse sin red)
+    const infoLoteLocal = JSON.parse(localStorage.getItem(`estado_lote_${sedeQR}`));
+    const esperandoLocal = infoLoteLocal && infoLoteLocal.esperando_pollito;
+
+    // 4. LÓGICA MULTIUSUARIO: Si el Servidor O el caché local dicen que falta, abrimos modal
+    if ((res && res.bloqueado_por_arribo) || esperandoLocal) {
       abrirModalArribo();
     } else {
       alert("✅ Esta granja (" + sedeQR + ") no tiene un arribo pendiente o ya fue confirmado.");
       mostrarMenu();
     }
   } catch (e) {
-    alert("No fue posible leer el QR: " + e);
+    alert("Operación cancelada o no fue posible validar el QR.");
     mostrarMenu();
   }
 }
-
 function abrirModalArribo() {
   // Ocultar la cámara y textos detrás del modal
   const lector = document.getElementById("lectorQR");
