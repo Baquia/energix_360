@@ -168,7 +168,19 @@
 
     <!-- SCRIPT GLOBAL: Heartbeat y Logout -->
     <script>
+        // MODO QUIOSCO / SEGURIDAD ANTI-NAVEGACIÓN (Global Flag)
+        let isNavigatingLegally = false;
+
         document.addEventListener("DOMContentLoaded", function () {
+            
+            // Marcar como navegación legal al hacer clic en enlaces internos o botones de la app
+            document.querySelectorAll('a, button').forEach(el => {
+                el.addEventListener('click', () => {
+                    isNavigatingLegally = true;
+                    setTimeout(() => { isNavigatingLegally = false; }, 1000);
+                });
+            });
+
             // 1. Motor de Latidos (Heartbeat) - Envía señal cada 15 segundos
             function sendHeartbeat() {
                 const csrfMeta = document.querySelector('meta[name="csrf-token"]');
@@ -186,6 +198,7 @@
             if (btnLogout) {
                 btnLogout.addEventListener('click', function(e) {
                     e.preventDefault();
+                    isNavigatingLegally = true; // Permitir salida legal
                     const logoutUrl = this.href;
                     const csrfMeta = document.querySelector('meta[name="csrf-token"]');
                     const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
@@ -198,6 +211,37 @@
                     });
                 });
             }
+
+            // ============================================
+            // INICIO: LÓGICA MODO QUIOSCO
+            // ============================================
+            // 3. Bloqueo de botón nativo "Atrás"
+            history.pushState(null, null, location.href);
+            window.addEventListener('popstate', function(event) {
+                history.pushState(null, null, location.href);
+                alert("⚠️ Acción denegada: Use los botones de la interfaz para navegar por la aplicación.");
+            });
+
+            // 4. Bloqueo de recarga rápida y atajos de teclado (F5, Ctrl+R)
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
+                    e.preventDefault();
+                    alert("⚠️ Acción denegada: No está permitido recargar la página durante la sesión operativa.");
+                }
+            });
+
+            // 5. Prevención de cierre accidental o refresco de pestaña
+            window.addEventListener('beforeunload', function (e) {
+                // Verificamos si tiene placa (sesión activa)
+                const isSessionActive = {% if session.get('placa_prelogueada') %}true{% else %}false{% endif %};
+                if (!isNavigatingLegally && isSessionActive) {
+                    e.preventDefault();
+                    e.returnValue = 'Tiene una sesión activa en progreso. ¿Está seguro que desea salir y detener el rastreo?';
+                }
+            });
+            // ============================================
+            // FIN: LÓGICA MODO QUIOSCO
+            // ============================================
         });
     </script>
 

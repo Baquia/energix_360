@@ -1,7 +1,7 @@
 # app/blueprints/C_bp_combustible_flota.py
 import os
 import base64
-import time
+import uuid
 from flask import Blueprint, render_template, session, redirect, url_for, request, flash
 from app import mysql
 from app.utils import login_required_custom
@@ -15,23 +15,6 @@ bp_combustible_flota = Blueprint('combustible_flota', __name__)
 def registrar_combustible():
     empresa_id = session.get('empresa_id')
     
-    # 1. PARCHE AUTOMÁTICO DE BASE DE DATOS (Agrega las columnas si no existen)
-    try:
-        cur_patch = mysql.connection.cursor()
-        cur_patch.execute("""
-            ALTER TABLE vehiculos_combustible_flota 
-            ADD COLUMN foto_voucher_path VARCHAR(255) NULL, 
-            ADD COLUMN foto_selfie_path VARCHAR(255) NULL, 
-            ADD COLUMN firma_path VARCHAR(255) NULL, 
-            ADD COLUMN latitud DECIMAL(10, 8) NULL, 
-            ADD COLUMN longitud DECIMAL(11, 8) NULL
-        """)
-        mysql.connection.commit()
-        cur_patch.close()
-    except Exception:
-        # Si las columnas ya existen, el motor lanzará una excepción que podemos ignorar de forma segura
-        pass
-
     if request.method == 'POST':
         placa = str(request.form.get('placa', '')).upper().strip()
         tipo_combustible = request.form.get('tipo_combustible', '').strip()
@@ -39,17 +22,8 @@ def registrar_combustible():
         kilometraje = request.form.get('kilometraje')
         galones = request.form.get('galones')
         valor_total = request.form.get('valor_total')
+        foto_voucher_base64 = request.form.get('foto_voucher_base64', '')
         
-        # Nuevos datos de Evidencia y GPS
-        foto_voucher_base64 = request.form.get('foto_voucher_base64')
-        foto_selfie_base64 = request.form.get('foto_selfie_base64')
-        firma_grafica_base64 = request.form.get('firma_grafica_base64')
-        
-        latitud_raw = request.form.get('latitud', '')
-        longitud_raw = request.form.get('longitud', '')
-        latitud = float(latitud_raw) if latitud_raw.strip() else None
-        longitud = float(longitud_raw) if longitud_raw.strip() else None
-
         usuario_id = session.get('usuario_id')
         nombre_operador = session.get('nombre')
         empresa_nombre = session.get('empresa')
@@ -68,58 +42,44 @@ def registrar_combustible():
             flash("El vehículo seleccionado no es válido o no pertenece a su empresa.", "danger")
             return redirect(url_for('combustible_flota.registrar_combustible'))
 
-        # 2. PROCESAMIENTO Y ALMACENAMIENTO OPTIMIZADO DE IMÁGENES
-        foto_voucher_path, foto_selfie_path, firma_path = None, None, None
-        
+        # Procesamiento y almacenamiento seguro de la imagen del voucher
+        ruta_comprobante = None
+        if foto_voucher_base64 and ',' in foto_voucher_base64:
+            try:
+                # Extraer cabecera y datos puros en Base64
+                header, encoded = foto_voucher_base64.split(",", 1)
+                data = base64.b64decode(encoded)
+                
+                # Crear directorio de destino si no existe
+                upload_folder = os.path.join('app', 'static', 'uploads', 'vouchers')
+                os.makedirs(upload_folder, exist_ok=True)
+                
+                # Generar nombre único para evitar colisiones
+                filename = f"voucher_{placa}_{uuid.uuid4().hex[:8]}.jpg"
+                filepath = os.path.join(upload_folder, filename)
+                
+                # Guardar el archivo físico
+                with open(filepath, "wb") as f:
+                    f.write(data)
+                    
+                # Guardar la ruta relativa para consultarla luego desde el frontend
+                ruta_comprobante = f"uploads/vouchers/{filename}"
+            except Exception as e:
+                print(f"Error procesando imagen del voucher: {e}")
+
         try:
-            base_dir = os.path.abspath(os.path.dirname(__file__))
-            static_dir = os.path.join(base_dir, '..', 'static')
-            mes_anio = datetime.now().strftime('%Y_%m')
-            
-            # Crear ruta estructurada: /static/uploads/combustible/ID_EMPRESA/YYYY_MM/
-            upload_rel_dir = os.path.join('uploads', 'combustible', str(empresa_id), mes_anio)
-            upload_abs_dir = os.path.join(static_dir, upload_rel_dir)
-            os.makedirs(upload_abs_dir, exist_ok=True)
-            
-            ts = str(int(time.time()))
-
-            def guardar_imagen_b64(b64_str, prefijo, ext):
-                if not b64_str: return None
-                try:
-                    head, data = b64_str.split(',', 1)
-                    img_data = base64.b64decode(data)
-                    filename = f"{prefijo}_{placa}_{ts}.{ext}"
-                    filepath = os.path.join(upload_abs_dir, filename)
-                    with open(filepath, 'wb') as f:
-                        f.write(img_data)
-                    # Guardamos la ruta relativa para facilitar su uso en Jinja (ej. url_for('static', filename=path))
-                    return f"{upload_rel_dir}/{filename}".replace('\\', '/')
-                except Exception as e:
-                    print(f"Error procesando {prefijo}: {e}")
-                    return None
-
-            foto_voucher_path = guardar_imagen_b64(foto_voucher_base64, "voucher", "jpg")
-            foto_selfie_path = guardar_imagen_b64(foto_selfie_base64, "selfie", "jpg")
-            firma_path = guardar_imagen_b64(firma_grafica_base64, "firma", "png")
-            
-        except Exception as img_err:
-            print(f"Alerta guardando imágenes: {img_err}")
-
-        # 3. REGISTRO EN LA BASE DE DATOS
-        try:
+            # Modificamos el INSERT para incluir la ruta del comprobante
             cur.execute("""
                 INSERT INTO vehiculos_combustible_flota (
                     id_empresa, empresa, placa, tipo_combustible, fecha_tanqueo, 
-                    kilometraje_actual, galones, valor_total, id_operador, nombre_operador,
-                    foto_voucher_path, foto_selfie_path, firma_path, latitud, longitud
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    kilometraje_actual, galones, valor_total, id_operador, nombre_operador, ruta_comprobante
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 empresa_id, empresa_nombre, placa, tipo_combustible, fecha_tanqueo,
-                kilometraje, galones, valor_total, usuario_id, nombre_operador,
-                foto_voucher_path, foto_selfie_path, firma_path, latitud, longitud
+                kilometraje, galones, valor_total, usuario_id, nombre_operador, ruta_comprobante
             ))
             mysql.connection.commit()
-            flash("Registro de tanqueo y evidencias guardado exitosamente.", "success")
+            flash("Registro de tanqueo guardado exitosamente.", "success")
             
             # Retorna al enrutador maestro
             return redirect(url_for('router_universal', modulo='flota'))
