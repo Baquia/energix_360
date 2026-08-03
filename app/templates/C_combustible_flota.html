@@ -65,6 +65,7 @@
         .auth-container label { color:#0f172a; font-size:14px; display: block; margin-bottom: 2px;}
         .auth-container p { font-size:11px; color:var(--text-muted); margin-bottom: 12px;}
         
+        #video-voucher { width: 100%; max-width: 300px; border-radius: 8px; display: none; margin: 0 auto 10px; }
         #preview-voucher { width: 100%; max-width: 300px; border-radius: 8px; display: none; margin: 10px auto; border: 2px solid var(--verde); }
         
         #video-selfie { width: 100%; max-width: 300px; border-radius: 8px; display: none; margin: 0 auto 10px; }
@@ -117,12 +118,19 @@
             <div class="card-body">
                 <div class="form-group">
                     <label>Vehículo (Placa) <span style="color:#ef4444;">*</span></label>
-                    <select name="placa" class="form-control" required>
-                        <option value="">Seleccione el vehículo...</option>
-                        {% for v in vehiculos %}
-                            <option value="{{ v.placa }}">{{ v.placa }} - {{ v.referencia|capitalize }}</option>
-                        {% endfor %}
-                    </select>
+                    {% if placa_prelogueada %}
+                        <!-- Visualmente bloqueado para el usuario, envía la placa por hidden -->
+                        <input type="text" class="form-control" value="{{ placa_prelogueada }}" disabled style="background-color: #f3f4f6; font-weight: bold; color: var(--verde); text-align: center; font-size: 18px;">
+                        <input type="hidden" name="placa" value="{{ placa_prelogueada }}">
+                    {% else %}
+                        <!-- Fallback: Selector original si no hay sesión prelogueada -->
+                        <select name="placa" class="form-control" required>
+                            <option value="">Seleccione el vehículo...</option>
+                            {% for v in vehiculos %}
+                                <option value="{{ v.placa }}">{{ v.placa }} - {{ v.referencia|capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    {% endif %}
                 </div>
 
                 <div class="form-group">
@@ -188,16 +196,24 @@
             </div>
             <div class="card-body">
                 
-                <!-- 1. FOTO DEL VOUCHER -->
+                <!-- 1. FOTO DEL VOUCHER (Cámara Trasera) -->
                 <div class="auth-container">
                     <label>1. Comprobante de Tanqueo (Voucher) <span style="color:#ef4444;">*</span></label>
-                    <p>Tome una fotografía legible del recibo entregado en la estación.</p>
+                    <p>Encienda la cámara trasera y tome una fotografía legible del recibo entregado en la estación.</p>
                     
-                    <input type="file" id="input-voucher" accept="image/*" capture="environment" class="form-control" style="padding: 3px;" required>
+                    <video id="video-voucher" autoplay playsinline></video>
+                    <canvas id="canvas-voucher" style="display:none;"></canvas>
                     <img id="preview-voucher" alt="Voucher Capturado">
+                    
+                    <div id="btn-group-camara-voucher">
+                        <button type="button" class="btn btn-primary btn-sm px-4" onclick="iniciarCamaraVoucher()">Encender Cámara Trasera</button>
+                    </div>
+                    <div id="btn-group-captura-voucher" style="display:none;">
+                        <button type="button" class="btn btn-success btn-sm px-4" onclick="tomarVoucher()">Capturar Voucher</button>
+                    </div>
                 </div>
 
-                <!-- 2. SELFIE DEL OPERADOR -->
+                <!-- 2. SELFIE DEL OPERADOR (Cámara Frontal) -->
                 <div class="auth-container">
                     <label>2. Fotografía de Auditoría (Selfie) <span style="color:#ef4444;">*</span></label>
                     <p>Encienda la cámara frontal para respaldar el diligenciamiento.</p>
@@ -207,7 +223,7 @@
                     <img id="preview-selfie" alt="Selfie Capturada">
                     
                     <div id="btn-group-camara">
-                        <button type="button" class="btn btn-primary btn-sm px-4" onclick="iniciarCamaraSelfie()">Encender Cámara</button>
+                        <button type="button" class="btn btn-primary btn-sm px-4" onclick="iniciarCamaraSelfie()">Encender Cámara Frontal</button>
                     </div>
                     <div id="btn-group-captura" style="display:none;">
                         <button type="button" class="btn btn-success btn-sm px-4" onclick="tomarSelfie()">Capturar Foto</button>
@@ -246,6 +262,7 @@
 <script>
     let isSubmitting = false;
     let streamMedia = null;
+    let streamVoucher = null;
 
     // Inicializar canvas de firma al cargar la página
     document.addEventListener("DOMContentLoaded", function() {
@@ -254,43 +271,59 @@
     });
 
     // ============================================
-    // 1. COMPRESIÓN DE VOUCHER (Input File Nativo)
+    // 1. CÁMARA TRASERA (Voucher)
     // ============================================
-    document.getElementById('input-voucher').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if(!file) return;
+    async function iniciarCamaraVoucher() {
+        const video = document.getElementById('video-voucher');
+        try {
+            streamVoucher = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = streamVoucher;
+            video.style.display = 'block';
+            document.getElementById('preview-voucher').style.display = 'none';
+            document.getElementById('btn-group-camara-voucher').style.display = 'none';
+            document.getElementById('btn-group-captura-voucher').style.display = 'block';
+        } catch (err) {
+            alert("No se pudo acceder a la cámara trasera. Por favor, permita el acceso en su navegador.");
+        }
+    }
+
+    function tomarVoucher() {
+        const video = document.getElementById('video-voucher');
+        const canvas = document.getElementById('canvas-voucher');
+        const preview = document.getElementById('preview-voucher');
         
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const img = new Image();
-            img.onload = function() {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 1280; // Resolución optimizada para auditoría
-                let width = img.width;
-                let height = img.height;
-                
-                if (width > MAX_WIDTH) {
-                    height = Math.round((height * MAX_WIDTH) / width);
-                    width = MAX_WIDTH;
-                }
-                
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                
-                // Comprimir en JPEG al 75%
-                const base64Voucher = canvas.toDataURL('image/jpeg', 0.75);
-                document.getElementById('foto_voucher_base64').value = base64Voucher;
-                
-                const preview = document.getElementById('preview-voucher');
-                preview.src = base64Voucher;
-                preview.style.display = 'block';
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
+        // Optimizar resolución para lectura del recibo sin exceder peso
+        const MAX_WIDTH = 1280;
+        let width = video.videoWidth;
+        let height = video.videoHeight;
+        
+        if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+        } else if (width === 0) {
+            width = 800; height = 600; // Fallback preventivo
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, width, height);
+        
+        // Comprimir en JPEG al 75%
+        const base64Voucher = canvas.toDataURL('image/jpeg', 0.75);
+        document.getElementById('foto_voucher_base64').value = base64Voucher;
+        
+        preview.src = base64Voucher;
+        preview.style.display = 'block';
+        video.style.display = 'none';
+        
+        if(streamVoucher) streamVoucher.getTracks().forEach(track => track.stop());
+        
+        document.getElementById('btn-group-captura-voucher').style.display = 'none';
+        document.getElementById('btn-group-camara-voucher').style.display = 'block';
+        document.querySelector('#btn-group-camara-voucher button').innerText = "Volver a Tomar";
+    }
 
     // ============================================
     // 2. CÁMARA FRONTAL (Selfie)
@@ -404,7 +437,7 @@
 
         // Validar Evidencias
         if(!document.getElementById('foto_voucher_base64').value) {
-            alert("⚠️ Debe capturar o adjuntar la Fotografía del Comprobante (Voucher).");
+            alert("⚠️ Debe capturar la Fotografía del Comprobante (Voucher).");
             return false;
         }
         if(!document.getElementById('foto_selfie_base64').value) {
