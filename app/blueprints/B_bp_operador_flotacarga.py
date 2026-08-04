@@ -21,7 +21,7 @@ def dashboard_operador():
 
 
 # ==============================================================================
-# 2. LÓGICA DE PRELOGIN (Enlace con el Vehículo)
+# 2. LÓGICA DE PRELOGIN Y VIAJES (Enlace con el Vehículo)
 # ==============================================================================
 @bp_flotacarga.route('/dashboard/flota/prelogin', methods=['POST'])
 @login_required_custom
@@ -88,6 +88,93 @@ def prelogin_flota():
         redirect_url="/router/flota"
     )
 
+@bp_flotacarga.route('/api/viaje/iniciar', methods=['POST'])
+@login_required_custom
+def iniciar_viaje():
+    empresa_id = session.get('empresa_id')
+    usuario_id = session.get('usuario_id')
+    placa = session.get('placa_prelogueada')
+
+    if not placa:
+        return jsonify({"status": "error", "message": "No hay vehículo prelogueado."}), 400
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        # Aseguramos la existencia de la tabla viajes_flotacarga
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS viajes_flotacarga (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                id_empresa INT NOT NULL,
+                id_usuario_operador INT NOT NULL,
+                placa_vehiculo VARCHAR(20) NOT NULL,
+                consecutivo_viaje VARCHAR(50) NOT NULL,
+                fecha_hora_inicio DATETIME NOT NULL,
+                fecha_hora_fin DATETIME NULL,
+                estado VARCHAR(20) DEFAULT 'Activo',
+                INDEX(id_empresa, id_usuario_operador)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        
+        # Generar consecutivo VIAJE-PLACA-001 (por año en curso)
+        cur.execute("""
+            SELECT COUNT(*) as total 
+            FROM viajes_flotacarga 
+            WHERE id_empresa = %s AND placa_vehiculo = %s AND YEAR(fecha_hora_inicio) = YEAR(NOW())
+        """, (empresa_id, placa))
+        resultado = cur.fetchone()
+        contador = (resultado['total'] if resultado else 0) + 1
+        
+        consecutivo = f"VIAJE-{placa}-{str(contador).zfill(3)}"
+
+        # Registrar el inicio del viaje
+        cur.execute("""
+            INSERT INTO viajes_flotacarga (id_empresa, id_usuario_operador, placa_vehiculo, consecutivo_viaje, fecha_hora_inicio, estado)
+            VALUES (%s, %s, %s, %s, NOW(), 'Activo')
+        """, (empresa_id, usuario_id, placa, consecutivo))
+        
+        id_viaje = cur.lastrowid
+        mysql.connection.commit()
+
+        # Inyectar variables de control a la sesión
+        session['viaje_activo'] = True
+        session['consecutivo_viaje'] = consecutivo
+        session['id_viaje'] = id_viaje
+
+        return jsonify({"status": "success", "consecutivo": consecutivo}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+@bp_flotacarga.route('/api/viaje/finalizar', methods=['POST'])
+@login_required_custom
+def finalizar_viaje():
+    id_viaje = session.get('id_viaje')
+    if not id_viaje:
+        return jsonify({"status": "error", "message": "No hay un viaje activo para finalizar."}), 400
+
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("""
+            UPDATE viajes_flotacarga 
+            SET fecha_hora_fin = NOW(), estado = 'Finalizado' 
+            WHERE id = %s AND id_empresa = %s
+        """, (id_viaje, session.get('empresa_id')))
+        mysql.connection.commit()
+
+        # Limpiamos los flags de viaje activo de la sesión (pero conservamos placa_prelogueada)
+        session.pop('viaje_activo', None)
+        session.pop('consecutivo_viaje', None)
+        session.pop('id_viaje', None)
+
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
 # ==============================================================================
 # 3. RUTAS DE SESIÓN EN VIVO (HEARTBEAT Y LOGOUT)
 # ==============================================================================
@@ -115,6 +202,10 @@ def logout_manual_flota():
     """Cierra la sesión operativa, marcando la hora exacta para el dashboard"""
     if 'usuario_id' not in session: 
         return jsonify({"status": "error"}), 401
+    
+    # SEGURIDAD MODO QUIOSCO: Bloquear deslogueo si hay viaje activo
+    if session.get('viaje_activo'):
+        return jsonify({"status": "error", "message": "No puedes cerrar sesión mientras el viaje está en curso. Finaliza el viaje primero."}), 403
         
     empresa_id = session.get('empresa_id')
     usuario_id = session.get('usuario_id')
@@ -318,10 +409,6 @@ def cron_deslogueo_geocerca():
     if vehiculos_a_desloguear:
         format_strings = ','.join(['%s'] * len(vehiculos_a_desloguear))
         cur.execute(f"UPDATE vehiculos SET estatus = 'No logueado' WHERE placa IN ({format_strings})", tuple(vehiculos_a_desloguear))
-        
-        # Opcional: Cerrar la sesión en historial_sesiones_flota si fue forzado por geocerca
-        # ...
-        
         mysql.connection.commit()
         
     cur.close()

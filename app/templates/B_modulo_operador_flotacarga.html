@@ -1,3 +1,4 @@
+<!-- app/templates/B_modulo_operador_flotacarga.html -->
 <!DOCTYPE html>
 <html lang="es">
 
@@ -55,7 +56,7 @@
         .card-icon { font-size: 32px; margin-bottom: 15px; background: #eefcf9; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--verde); }
         .card-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
         .card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px; flex-grow: 1; }
-        .btn-card { background: var(--verde); color: white; text-align: center; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; transition: background 0.2s; }
+        .btn-card { background: var(--verde); color: white; text-align: center; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; transition: background 0.2s; border: none; cursor: pointer; }
         .module-card:hover .btn-card { background: var(--verde-osc); }
 
         .footer { margin-top: auto; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; width: 100%; border-top: 1px solid #eee; background: rgba(255, 255, 255, 0.5); }
@@ -102,40 +103,75 @@
     <main class="wrap">
         <h2 class="welcome-title">
             Panel de Control
-            {% if session.get('placa_prelogueada') %}
+            {% if session.get('viaje_activo') %}
                 <div id="indicador_gps" class="gps-status">⚪ Iniciando GPS...</div>
             {% endif %}
         </h2>
         
         <div class="modules-grid">
             {% if session.get('placa_prelogueada') %}
-            <a href="#" onclick="triggerParadaManual(event)" class="module-card">
-                <div class="card-icon">📍</div>
-                <h3 class="card-title">Registrar Parada</h3>
-                <p class="card-desc">Registre proactivamente un evento, entrega o novedad en su ubicación actual.</p>
-                <div class="btn-card">Notificar Parada &rarr;</div>
-            </a>
-            {% endif %}
+                
+                {% if session.get('viaje_activo') %}
+                    <!-- MÓDULOS DE OPERACIÓN: Solo visibles si hay viaje activo -->
+                    <div style="grid-column: 1 / -1; margin-bottom: 10px;">
+                        <div style="background: #eefcf9; color: var(--verde-osc); padding: 12px; border-radius: 8px; border: 1px solid var(--verde); font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 15px;">
+                            🚀 Consecutivo de viaje: {{ session.get('consecutivo_viaje') }}
+                        </div>
+                        <button onclick="finalizarViaje()" class="btn-card" style="background: #ef4444; color: white; width: 100%; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);">
+                            ⏹ Finalizar Viaje
+                        </button>
+                    </div>
 
-            <a href="{{ url_for('preoperacional.preoperacional_tc', nit=nit) }}" class="module-card">
-                <div class="card-icon">🚧</div>
-                <h3 class="card-title">Preoperacional de seguridad vial</h3>
-                <p class="card-desc">Reporte de novedades del vehículo y documentos. Autenticación Biométrica.</p>
-                <div class="btn-card">Ingresar &rarr;</div>
-            </a>
-            
-            <a href="{{ url_for('combustible_flota.registrar_combustible') }}" class="module-card">
-                <div class="card-icon">⛽</div>
-                <h3 class="card-title">Combustible</h3>
-                <p class="card-desc">Monitoreo de consumo y eficiencia de combustible.</p>
-                <div class="btn-card">Gestionar &rarr;</div>
-            </a>
+                    <a href="#" onclick="triggerParadaManual(event)" class="module-card">
+                        <div class="card-icon">📍</div>
+                        <h3 class="card-title">Registrar Parada</h3>
+                        <p class="card-desc">Registre proactivamente un evento, entrega o novedad en su ubicación actual.</p>
+                        <div class="btn-card">Notificar Parada &rarr;</div>
+                    </a>
+
+                    <a href="{{ url_for('preoperacional.preoperacional_tc', nit=nit) }}" class="module-card">
+                        <div class="card-icon">🚧</div>
+                        <h3 class="card-title">Preoperacional de seguridad vial</h3>
+                        <p class="card-desc">Reporte de novedades del vehículo y documentos. Autenticación Biométrica.</p>
+                        <div class="btn-card">Ingresar &rarr;</div>
+                    </a>
+                    
+                    <a href="{{ url_for('combustible_flota.registrar_combustible') }}" class="module-card">
+                        <div class="card-icon">⛽</div>
+                        <h3 class="card-title">Combustible</h3>
+                        <p class="card-desc">Monitoreo de consumo y eficiencia de combustible.</p>
+                        <div class="btn-card">Gestionar &rarr;</div>
+                    </a>
+                {% else %}
+                    <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE (Oculta el resto) -->
+                    <div style="width: 100%; text-align: center; grid-column: 1 / -1; padding: 30px 10px;">
+                        <h3 style="color: var(--verde); margin-bottom: 15px;">Vehículo enlazado: {{ session.get('placa_prelogueada') }}</h3>
+                        <p style="color: var(--text-muted); margin-bottom: 25px;">Habilite su consola de operación e inicie el rastreo satelital marcando el inicio de su viaje.</p>
+                        <button onclick="iniciarViaje()" class="btn-card" style="background: var(--verde); color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(1, 82, 73, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto;">
+                            <span style="font-size: 24px;">▶</span> INICIAR VIAJE
+                        </button>
+                    </div>
+                {% endif %}
+                
+            {% else %}
+                <!-- MÓDULOS DE PRE-LOGUEO: (Vehículo NO logueado, redirige al scanner QR) -->
+                <a href="{{ url_for('preoperacional.preoperacional_tc', nit=nit) }}" class="module-card">
+                    <div class="card-icon">🚧</div>
+                    <h3 class="card-title">Preoperacional de seguridad vial</h3>
+                    <p class="card-desc">Reporte de novedades del vehículo y documentos. Autenticación Biométrica.</p>
+                    <div class="btn-card">Escanear QR Cabina &rarr;</div>
+                </a>
+            {% endif %}
         </div>
     </main>
 
     <footer class="footer">
         <p>&copy; 2026 BQA ONE Technology. Enrutamiento Inteligente.</p>
-        <a href="{{ url_for('logout') }}" class="logout-btn" id="btnLogout">Cerrar Sesión</a>
+        {% if session.get('viaje_activo') %}
+            <div style="margin-top: 10px; color: #ef4444; font-weight: bold; background: #fee2e2; display: inline-block; padding: 5px 15px; border-radius: 12px;">Cierre de sesión bloqueado en ruta. Finalice el viaje primero.</div>
+        {% else %}
+            <a href="{{ url_for('logout') }}" class="logout-btn" id="btnLogout">Cerrar Sesión</a>
+        {% endif %}
     </footer>
 
     <!-- MODAL DE CLASIFICACIÓN DE PARADA -->
@@ -166,7 +202,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT GLOBAL: Heartbeat y Logout -->
+    <!-- SCRIPT GLOBAL Y VIAJES -->
     <script>
         // MODO QUIOSCO / SEGURIDAD ANTI-NAVEGACIÓN (Global Flag)
         let isNavigatingLegally = false;
@@ -213,7 +249,7 @@
             }
 
             // ============================================
-            // INICIO: LÓGICA MODO QUIOSCO
+            // INICIO: LÓGICA MODO QUIOSCO Y BLOQUEOS
             // ============================================
             // 3. Bloqueo de botón nativo "Atrás"
             history.pushState(null, null, location.href);
@@ -230,22 +266,82 @@
                 }
             });
 
-            // 5. Prevención de cierre accidental o refresco de pestaña
+            // 5. Prevención de cierre accidental o refresco de pestaña condicionado al VIAJE
             window.addEventListener('beforeunload', function (e) {
-                // Verificamos si tiene placa (sesión activa)
-                const isSessionActive = {% if session.get('placa_prelogueada') %}true{% else %}false{% endif %};
-                if (!isNavigatingLegally && isSessionActive) {
+                // Bloqueo duro: Si hay viaje activo
+                const isViajeActivo = {% if session.get('viaje_activo') %}true{% else %}false{% endif %};
+                if (!isNavigatingLegally && isViajeActivo) {
                     e.preventDefault();
-                    e.returnValue = 'Tiene una sesión activa en progreso. ¿Está seguro que desea salir y detener el rastreo?';
+                    e.returnValue = 'Tiene un VIAJE ACTIVO en progreso. No debe cerrar el navegador o evadirá el rastreo de control de flota.';
                 }
             });
             // ============================================
             // FIN: LÓGICA MODO QUIOSCO
             // ============================================
         });
+
+        // ============================================
+        // API CALLS: INICIAR / FINALIZAR VIAJE
+        // ============================================
+        function iniciarViaje() {
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = '⏱ Iniciando...';
+
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            
+            fetch("{{ url_for('flotacarga.iniciar_viaje') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+            }).then(res => res.json())
+              .then(data => {
+                  if(data.status === 'success') {
+                      window.location.reload();
+                  } else {
+                      alert("Error al iniciar viaje: " + data.message);
+                      btn.disabled = false;
+                      btn.innerHTML = '<span style="font-size: 24px;">▶</span> INICIAR VIAJE';
+                  }
+              }).catch(e => {
+                  alert("Error de conexión. Intente nuevamente.");
+                  btn.disabled = false;
+                  btn.innerHTML = '<span style="font-size: 24px;">▶</span> INICIAR VIAJE';
+              });
+        }
+
+        function finalizarViaje() {
+            if(!confirm("⚠️ ¿Está absolutamente seguro de finalizar el viaje actual?\n\nEsto detendrá el rastreo satelital inmediatamente y cerrará los reportes operacionales.")) return;
+            
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = '⏱ Finalizando...';
+
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            
+            fetch("{{ url_for('flotacarga.finalizar_viaje') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+            }).then(res => res.json())
+              .then(data => {
+                  if(data.status === 'success') {
+                      window.location.reload();
+                  } else {
+                      alert("Error al finalizar viaje: " + data.message);
+                      btn.disabled = false;
+                      btn.innerHTML = '⏹ Finalizar Viaje';
+                  }
+              }).catch(e => {
+                  alert("Error de conexión.");
+                  btn.disabled = false;
+                  btn.innerHTML = '⏹ Finalizar Viaje';
+              });
+        }
     </script>
 
-    {% if session.get('placa_prelogueada') %}
+    <!-- EL RASTREO GPS SÓLO SE EJECUTA DURANTE EL VIAJE -->
+    {% if session.get('viaje_activo') %}
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             // ==========================================

@@ -122,10 +122,17 @@ def guardar_inspeccion():
         fecha_inspeccion = now.date()
         hora_inspeccion = now.time().strftime("%H:%M:%S")
 
-        cur.execute("SELECT COUNT(*) as total FROM inspeccion_preoperacional_carga WHERE id_empresa = %s AND YEAR(fecha_inspeccion) = %s", (empresa_id, anio_actual))
-        contador = cur.fetchone()['total'] + 1
-        siglas = "".join([word[0] for word in empresa_nombre.split() if word.isalpha()])[:4].upper()
-        consecutivo = f"{siglas}-{anio_actual}-{str(contador).zfill(5)}"
+        # =========================================================
+        # INTEGRACIÓN CON VIAJE ACTIVO
+        # Si el operador inició viaje antes, usamos ese consecutivo
+        # =========================================================
+        if session.get('consecutivo_viaje'):
+            consecutivo = session.get('consecutivo_viaje')
+        else:
+            cur.execute("SELECT COUNT(*) as total FROM inspeccion_preoperacional_carga WHERE id_empresa = %s AND YEAR(fecha_inspeccion) = %s", (empresa_id, anio_actual))
+            contador = cur.fetchone()['total'] + 1
+            siglas = "".join([word[0] for word in empresa_nombre.split() if word.isalpha()])[:4].upper()
+            consecutivo = f"{siglas}-{anio_actual}-{str(contador).zfill(5)}"
 
         def get_int(field_name, default=1):
             try: return int(request.form.get(field_name, default))
