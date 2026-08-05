@@ -89,7 +89,6 @@ def dashboard_gestor():
         """)
         mysql.connection.commit()
         
-        # Parche seguro para agregar columnas lat/lng si la tabla ya existía
         try:
             cur.execute("ALTER TABLE historial_sesiones_flota ADD COLUMN latitud DECIMAL(10, 8), ADD COLUMN longitud DECIMAL(11, 8)")
             mysql.connection.commit()
@@ -104,27 +103,25 @@ def dashboard_gestor():
     operadores_en_linea = []
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # INNER JOIN en historial_sesiones_flota con ACTIVA para mostrar SOLAMENTE los logueados
-        # Perfil unificado a 'operador_flotacarga'
+        # ESTADO SIEMPRE VERDE: Forzamos en_linea = 1 porque la condición de ACTIVA ya garantiza el logueo
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 180, 1, 0) as en_linea,
+                1 as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,
                 hs.latitud,
                 hs.longitud
             FROM usuarios u
-            LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
             INNER JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
                 WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
             )
             WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
-            ORDER BY en_linea DESC, u.nombre ASC
+            ORDER BY u.nombre ASC
         """, (empresa_id,))
         
         operadores_db = cur.fetchall()
@@ -133,15 +130,25 @@ def dashboard_gestor():
         PLANTA_LAT = 4.4134686
         PLANTA_LNG = -75.1797367
         
+        # AJUSTE HORA COLOMBIA (UTC-5): Calculamos dinámicamente el desfase del servidor
+        now_local = datetime.now()
+        now_utc = datetime.utcnow()
+        server_offset = round((now_local - now_utc).total_seconds() / 3600)
+        adj_hours = -5 - server_offset # Objetivo UTC-5 (Colombia)
+        
         # 3. Formatear los datos para la vista
         for op in operadores_db:
             op_dict = dict(op)
+            
+            # Aplicar ajuste horario a logueo y deslogueo
             if op_dict['fecha_login']:
+                op_dict['fecha_login'] += timedelta(hours=adj_hours)
                 op_dict['fecha_login_str'] = op_dict['fecha_login'].strftime('%H:%M:%S')
             else:
                 op_dict['fecha_login_str'] = '--:--'
                 
             if op_dict['fecha_logout_manual']:
+                op_dict['fecha_logout_manual'] += timedelta(hours=adj_hours)
                 op_dict['fecha_logout_str'] = op_dict['fecha_logout_manual'].strftime('%H:%M:%S')
             else:
                 op_dict['fecha_logout_str'] = '--:--'
@@ -192,26 +199,25 @@ def monitoreo_realtime():
         cur_hb.close()
 
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Mostrar ÚNICAMENTE logueados activos con el perfil unificado
+        # Mostrar ÚNICAMENTE logueados activos con estado siempre verde
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 180, 1, 0) as en_linea,
+                1 as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,
                 hs.latitud,
                 hs.longitud
             FROM usuarios u
-            LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
             INNER JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
                 WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
             )
             WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
-            ORDER BY en_linea DESC, u.nombre ASC
+            ORDER BY u.nombre ASC
         """, (empresa_id,))
         
         operadores_db = cur.fetchall()
@@ -219,14 +225,23 @@ def monitoreo_realtime():
         PLANTA_LAT = 4.4134686
         PLANTA_LNG = -75.1797367
         
+        # AJUSTE HORA COLOMBIA (UTC-5) PARA AJAX
+        now_local = datetime.now()
+        now_utc = datetime.utcnow()
+        server_offset = round((now_local - now_utc).total_seconds() / 3600)
+        adj_hours = -5 - server_offset
+        
         for op in operadores_db:
             op_dict = dict(op)
+            
             if op_dict['fecha_login']:
+                op_dict['fecha_login'] += timedelta(hours=adj_hours)
                 op_dict['fecha_login_str'] = op_dict['fecha_login'].strftime('%H:%M:%S')
             else:
                 op_dict['fecha_login_str'] = '--:--'
                 
             if op_dict['fecha_logout_manual']:
+                op_dict['fecha_logout_manual'] += timedelta(hours=adj_hours)
                 op_dict['fecha_logout_str'] = op_dict['fecha_logout_manual'].strftime('%H:%M:%S')
             else:
                 op_dict['fecha_logout_str'] = '--:--'

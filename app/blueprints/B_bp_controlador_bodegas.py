@@ -309,6 +309,15 @@ def control_logistica():
                     o['color_fila'] = '#ffffff'
                 activos.append(o)
 
+            if o['inicio'] and o['estado_visual'] not in ['TERMINADO', 'DESPACHADO', 'VERIFICADO', 'ALISTADO']:
+                try:
+                    inicio_dt = o['inicio'] if isinstance(o['inicio'], datetime) else datetime.strptime(str(o['inicio']), '%Y-%m-%d %H:%M:%S')
+                    o['segundos_transcurridos'] = int((ahora - inicio_dt).total_seconds())
+                except Exception:
+                    o['segundos_transcurridos'] = 0
+            else:
+                o['segundos_transcurridos'] = None
+
         kpis['pedidos_pendientes_reales'] = len(ordenes_sin_asignar) + len(activos)
         kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']  
         
@@ -715,6 +724,15 @@ def monitoreo_realtime():
                 else:
                     o['color_fila'] = '#ffffff'
                 activos.append(o)
+
+            if o['inicio'] and o['estado_visual'] not in ['TERMINADO', 'DESPACHADO', 'VERIFICADO', 'ALISTADO']:
+                try:
+                    inicio_dt = o['inicio'] if isinstance(o['inicio'], datetime) else datetime.strptime(str(o['inicio']), '%Y-%m-%d %H:%M:%S')
+                    o['segundos_transcurridos'] = int((ahora - inicio_dt).total_seconds())
+                except Exception:
+                    o['segundos_transcurridos'] = 0
+            else:
+                o['segundos_transcurridos'] = None
 
             if o['inicio']:
                 o['inicio_str'] = o['inicio'].strftime('%Y-%m-%d %H:%M:%S') if isinstance(o['inicio'], datetime) else str(o['inicio'])
@@ -1212,8 +1230,14 @@ def upload_productos_masivo():
     if not file: return jsonify({'error': 'No hay archivo'}), 400
 
     try:
-        if file.filename.endswith('.xlsx'):
-            df = pd.read_excel(file, dtype=str)
+        ext = file.filename.lower()
+        if ext.endswith(('.xlsx', '.xls')):
+            try:
+                df = pd.read_excel(file, dtype=str)
+            except Exception as e:
+                if 'xlrd' in str(e):
+                    return jsonify({'error': 'Falta la librería xlrd en el servidor para leer archivos .xls antiguos. Ejecute: pip install xlrd>=2.0.1 y REINICIE EL SERVIDOR.'}), 500
+                raise e
         else:
             df = pd.read_csv(file, dtype=str, sep=None, engine='python')
             
@@ -1942,10 +1966,17 @@ def upload_excel():
             filename = file.filename
             
             try:
-                if file.filename.lower().endswith('.csv'):
-                    df_raw = pd.read_csv(file, header=None, sep=None, engine='python')
+                ext = file.filename.lower()
+                if ext.endswith('.csv'):
+                    df_raw = pd.read_csv(file, header=None, sep=None, engine='python', dtype=str)
                 else:
-                    df_raw = pd.read_excel(file, header=None)
+                    try:
+                        df_raw = pd.read_excel(file, header=None, dtype=str)
+                    except Exception as e:
+                        if 'xlrd' in str(e):
+                            resultados_error.append(f"❌ {filename}: Falta la librería 'xlrd' en el servidor para leer archivos .xls antiguos. Por favor instálela y REINICIE EL SERVIDOR.")
+                            continue
+                        raise e
                 
                 df_raw = df_raw.fillna('')
 

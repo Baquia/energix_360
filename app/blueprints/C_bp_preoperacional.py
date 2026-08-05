@@ -24,8 +24,34 @@ def preoperacional_tc():
     if "placa_prelogueada" in session:
         placa = session["placa_prelogueada"]
         empresa_id = session.get("empresa_id")
+        usuario_id = session.get('usuario_id')
         
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # =========================================================
+        # 1. RECUPERACIÓN FORZADA (Evitar doble preoperacional)
+        # =========================================================
+        cur.execute("""
+            SELECT id, consecutivo_viaje 
+            FROM viajes_flotacarga 
+            WHERE placa_vehiculo = %s AND id_empresa = %s AND id_usuario_operador = %s AND estado = 'Activo'
+            ORDER BY id DESC LIMIT 1
+        """, (placa, empresa_id, usuario_id))
+        viaje_activo = cur.fetchone()
+        
+        if viaje_activo:
+            session['viaje_activo'] = True
+            session['consecutivo_viaje'] = viaje_activo['consecutivo_viaje']
+            session['id_viaje'] = viaje_activo['id']
+            
+            cur.execute("UPDATE vehiculos SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
+            mysql.connection.commit()
+            cur.close()
+            
+            flash("Sesión recuperada automáticamente. Tienes un viaje activo en curso.", "success")
+            return redirect(url_for('flotacarga.dashboard_operador'))
+        # =========================================================
+
         cur.execute("SELECT * FROM vehiculos WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
         vehiculo = cur.fetchone()
         
@@ -253,7 +279,6 @@ def guardar_inspeccion():
             foto_conductor_base64, firma_grafica_base64
         )
         cur.execute(query, params)
-        cur.execute("UPDATE vehiculos SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
         
         # --- REGISTRO OFICIAL DE SESIÓN DE FLOTA CON COORDENADAS GPS ---
         cur.execute("""

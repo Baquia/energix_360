@@ -175,6 +175,57 @@ def finalizar_viaje():
     finally:
         cur.close()
 
+
+@bp_flotacarga.route('/api/viaje/recuperar', methods=['POST'])
+@login_required_custom
+def recuperar_viaje():
+    """Recupera la sesión del servidor si el dispositivo perdió conexión pero tiene viaje activo"""
+    datos = request.get_json(silent=True) or {}
+    placa = datos.get('placa')
+    empresa_id = session.get('empresa_id')
+    usuario_id = session.get('usuario_id')
+    
+    if not placa:
+        return jsonify({"status": "error", "message": "Placa no proporcionada"}), 400
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        # 1. Buscar si hay un viaje activo para este operador, placa y empresa
+        cur.execute("""
+            SELECT id, consecutivo_viaje 
+            FROM viajes_flotacarga 
+            WHERE placa_vehiculo = %s AND id_empresa = %s AND id_usuario_operador = %s AND estado = 'Activo'
+            ORDER BY id DESC LIMIT 1
+        """, (placa, empresa_id, usuario_id))
+        viaje = cur.fetchone()
+
+        if viaje:
+            # 2. Reconstruir las variables de sesión caídas
+            session['placa_prelogueada'] = placa
+            session['viaje_activo'] = True
+            session['consecutivo_viaje'] = viaje['consecutivo_viaje']
+            session['id_viaje'] = viaje['id']
+
+            # 3. Restablecer el estatus del vehículo a Logueado en caso de que un CRON lo haya tumbado
+            cur.execute("UPDATE vehiculos SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
+            
+            # 4. Registrar la reconexión en el historial de sesiones
+            cur.execute("""
+                INSERT INTO historial_sesiones_flota (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion)
+                VALUES (%s, %s, %s, NOW(), 'ACTIVA')
+            """, (empresa_id, usuario_id, placa))
+
+            mysql.connection.commit()
+            return jsonify({"status": "success", "consecutivo": viaje['consecutivo_viaje']}), 200
+        else:
+            return jsonify({"status": "error", "message": "No se encontró un viaje activo válido para recuperar."}), 404
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+
 # ==============================================================================
 # 3. RUTAS DE SESIÓN EN VIVO (HEARTBEAT Y LOGOUT)
 # ==============================================================================

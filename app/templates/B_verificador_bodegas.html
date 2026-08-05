@@ -211,6 +211,26 @@
             min-height: 250px;
         }
 
+        /* --- RESTAURACIÓN DE LA MIRA Y DESTELLO --- */
+        .scanner-mira {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 4px solid rgba(255,255,255,0.6);
+            border-radius: 12px;
+            z-index: 10;
+            pointer-events: none;
+            display: none;
+            transition: all 0.1s ease-in-out;
+        }
+        .scanner-mira.success {
+            border-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.4);
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
+        }
+
         #embedded-reader { width: 100%; height: 100%; }
 
         .btn-start-cam {
@@ -340,6 +360,7 @@
             <!-- Zona Escáner y Datos (Scrollable en Portrait, Mitad Izq/Der en Landscape) -->
             <div class="camera-container" id="camera-section">
                 <div id="embedded-reader"></div>
+                <div id="scanner-mira" class="scanner-mira"></div> <!-- LA MIRA VISUAL -->
                 <div id="cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraIncrustada()">
                     <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -408,12 +429,31 @@
         let ordenActual = null, listaItems = [], itemActivo = null, scanner = null;
         let lastScanTime = 0;
         let audioCtx = null;
+        let wakeLock = null;
 
         function cerrarSesionInstantanea(e) {
             if (e) e.preventDefault();
             fetch('/api/bodegas/offline', { method: 'POST' })
             .then(() => { window.location.href = '/logout'; })
             .catch(() => { window.location.href = '/logout'; });
+        }
+
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release().then(() => {
+                    wakeLock = null;
+                });
+            }
         }
 
         function initAudio() {
@@ -438,6 +478,10 @@
 
         function playBeep() {
             try {
+                if (navigator.vibrate) {
+                    navigator.vibrate(150); 
+                }
+                
                 if (audioCtx) {
                     const oscillator = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
@@ -469,7 +513,7 @@
                     let html = '';
                     if (d.length === 0) html = '<div style="grid-column: 1 / -1; text-align:center; color:#94a3b8; font-weight:600; padding:20px;">No hay órdenes listas para auditar</div>';
                     d.forEach(o => {
-                        const p = Math.round((o.items_verificados / o.total_items) * 100);
+                        const p = o.total_items > 0 ? Math.round((o.items_verificados / o.total_items) * 100) : 0;
                         html += `
                         <div class="order-card" onclick="abrirOrden('${o.orden}')">
                             <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona || 'General'}</span></div>
@@ -496,7 +540,6 @@
                 }).catch(e => console.log(e));
         }
 
-        // --- NUEVO: FUNCIÓN PARA REPORTAR LATIDO MIENTRAS SE ESTÁ EN EL MENÚ ---
         function enviarPingVerificador() {
             fetch('/api/verificador/ping?v=' + new Date().getTime(), { method: 'POST' })
                 .catch(e => console.log('Error ping silencioso:', e));
@@ -504,7 +547,7 @@
 
         setInterval(() => {
             if (!document.getElementById('view-menu').classList.contains('hidden')) {
-                enviarPingVerificador(); // Mantiene al usuario "En línea" en el Controlador
+                enviarPingVerificador(); 
             } else if (!document.getElementById('view-orders').classList.contains('hidden')) {
                 cargarOrdenesSilencioso();
             } else if (!document.getElementById('view-items').classList.contains('hidden')) {
@@ -604,6 +647,8 @@
 
             itemActivo = item;
             lastScanTime = 0;
+            
+            requestWakeLock();
 
             const pickHeader = document.querySelector('.pick-header');
             const oldAlert = document.getElementById('kit-alert-msg');
@@ -679,6 +724,7 @@
         }
 
         function cerrarModalVerificacion() {
+            releaseWakeLock();
             detenerCamara();
             document.getElementById('modal-picking').style.display = 'none';
             itemActivo = null;
@@ -742,7 +788,6 @@
             if (!itemActivo) return;
             document.getElementById('cam-overlay-btn').style.display = 'none';
 
-            // Desbloquear audio
             initAudio();
 
             if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
@@ -754,6 +799,12 @@
             const screenWidth = window.innerWidth;
             const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
             const targetHeight = Math.floor(targetWidth * 0.45);
+
+            // Ajustamos la MIRA visual exactamente a esa área
+            const mira = document.getElementById('scanner-mira');
+            mira.style.width = targetWidth + 'px';
+            mira.style.height = targetHeight + 'px';
+            mira.style.display = 'block';
 
             const configScanner = {
                 formatsToSupport: [
@@ -771,7 +822,7 @@
             scanner.start(
                 { facingMode: "environment" },
                 { 
-                    fps: 30, 
+                    fps: 10, 
                     qrbox: { width: targetWidth, height: targetHeight }
                 },
                 (decodedText) => {
@@ -784,6 +835,13 @@
                     if (target && scanned === target) {
                         lastScanTime = now;
                         playBeep();
+
+                        // Animación de Destello Verde en la Mira
+                        const miraVisual = document.getElementById('scanner-mira');
+                        if (miraVisual) {
+                            miraVisual.classList.add('success');
+                            setTimeout(() => miraVisual.classList.remove('success'), 300);
+                        }
 
                         if (itemActivo.req_cajas > 0 && itemActivo.act_cajas < itemActivo.req_cajas) {
                             itemActivo.act_cajas++;
@@ -820,6 +878,7 @@
                 console.error(err);
                 alert("Error cámara. Verifica permisos.");
                 document.getElementById('cam-overlay-btn').style.display = 'flex';
+                document.getElementById('scanner-mira').style.display = 'none';
             });
         }
 
@@ -828,6 +887,8 @@
                 scanner.stop().catch(e => console.log(e));
                 scanner = null;
             }
+            const mira = document.getElementById('scanner-mira');
+            if(mira) mira.style.display = 'none';
         }
 
         function intentarVerificarItem() {

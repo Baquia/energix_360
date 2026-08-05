@@ -572,12 +572,31 @@
         let ordenActual = null, isLoteMode = false, listaItems = [], itemActivo = null, scanner = null;
         let lastScanTime = 0; 
         let audioCtx = null;
+        let wakeLock = null;
 
         function cerrarSesionInstantanea(e) {
             if (e) e.preventDefault();
             fetch('/api/bodegas/offline', { method: 'POST' })
             .then(() => { window.location.href = '/logout'; })
             .catch(() => { window.location.href = '/logout'; });
+        }
+
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release().then(() => {
+                    wakeLock = null;
+                });
+            }
         }
 
         function initAudio() {
@@ -895,6 +914,8 @@
             lastScanTime = 0; 
             novedadPendiente = null;
 
+            requestWakeLock();
+
             const nombre = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
             document.getElementById('pk-name').textContent = nombre;
             document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
@@ -973,6 +994,7 @@
         }
 
         function cerrarModalPicking() {
+            releaseWakeLock();
             detenerCamara();
             document.getElementById('modal-picking').style.display = 'none';
             document.getElementById('overlay-bloqueo-andon').style.display = 'none';
@@ -1095,7 +1117,7 @@
             scanner = new Html5Qrcode("embedded-reader", configScanner);
             scanner.start(
                 { facingMode: "environment" },
-                { fps: 30, qrbox: { width: targetWidth, height: targetHeight } },
+                { fps: 10, qrbox: { width: targetWidth, height: targetHeight } },
                 (decodedText) => {
                     const now = Date.now();
                     if (now - lastScanTime < 1500) return; 
