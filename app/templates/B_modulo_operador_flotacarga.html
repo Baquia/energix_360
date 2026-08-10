@@ -441,7 +441,7 @@
             
             const FRECUENCIA_SONDEO = 60000;      
             const TOLERANCIA_METROS = 30;         
-            const PRECISION_MINIMA = 40;          
+            const PRECISION_MINIMA = 120; // Ajustado a 120m para permitir triangulación de red en zonas de baja señal
             const TIEMPO_PARA_PARADA = 5;         
             const TIMEOUT_ALERTA = 180;           
 
@@ -470,6 +470,11 @@
                 if (document.visibilityState === 'visible') sincronizarDatosOffline();
             });
             solicitarWakeLock();
+
+            // Disparador agresivo de sincronización en cuanto la conexión vuelva a estar en línea (micro-conexiones)
+            window.addEventListener('online', () => {
+                if(typeof sincronizarDatosOffline === 'function') sincronizarDatosOffline();
+            });
 
             function guardarCola() { localStorage.setItem('bqa_flota_queue', JSON.stringify(syncQueue)); }
             
@@ -537,9 +542,10 @@
                         sincronizarDatosOffline();
                     },
                     function (err) {
-                        if(isTransmitting) { indicadorGPS.innerText = '🔴 GPS Apagado'; indicadorGPS.className = 'gps-status offline'; }
+                        if(isTransmitting) { indicadorGPS.innerText = '🔴 GPS Apagado / Sin Señal'; indicadorGPS.className = 'gps-status offline'; }
                     },
-                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                    // Ajuste de timeout a 45s y maximumAge a 5s para tolerar lentitud y microcortes de antena
+                    { enableHighAccuracy: true, timeout: 45000, maximumAge: 5000 }
                 );
             }
 
