@@ -103,7 +103,7 @@ def dashboard_gestor():
     operadores_en_linea = []
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # ESTADO DINÁMICO DE 3 NIVELES: 2 (Transmitiendo), 1 (Logueado pero en Pausa), 0 (Desconectado)
+        # ESTADO DINÁMICO DE 3 NIVELES ORDENADO POR ESTADO Y LUEGO ALFABÉTICAMENTE
         cur.execute("""
             SELECT 
                 u.id as id_operador,
@@ -126,7 +126,7 @@ def dashboard_gestor():
             )
             LEFT JOIN monitoreo_actividad ma ON ma.id_usuario = u.id
             WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga'
-            ORDER BY u.nombre ASC
+            ORDER BY en_linea DESC, u.nombre ASC
         """, (empresa_id,))
         
         operadores_db = cur.fetchall()
@@ -202,7 +202,7 @@ def monitoreo_realtime():
         cur_hb.close()
 
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # ESTADO DINÁMICO DE 3 NIVELES
+        # ESTADO DINÁMICO DE 3 NIVELES CON ORDENAMIENTO POR ACTIVIDAD
         cur.execute("""
             SELECT 
                 u.id as id_operador,
@@ -225,7 +225,7 @@ def monitoreo_realtime():
             )
             LEFT JOIN monitoreo_actividad ma ON ma.id_usuario = u.id
             WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga'
-            ORDER BY u.nombre ASC
+            ORDER BY en_linea DESC, u.nombre ASC
         """, (empresa_id,))
         
         operadores_db = cur.fetchall()
