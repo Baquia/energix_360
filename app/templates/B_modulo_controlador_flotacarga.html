@@ -102,7 +102,7 @@
         .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-width: 1000px; overflow-x: auto; }
         .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;}
         .data-table th { background: #f9fafb; padding: 15px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
-        .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); }
+        .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); vertical-align: middle;}
         .data-table tr:hover { background-color: #fdfdfd; }
         
         .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
@@ -570,56 +570,24 @@
                         <h2>Monitor de Operadores en Línea</h2>
                     </div>
                 </div>
-                
-                <!-- NUEVA GRÁFICA DE HEARTBEAT (Chart.js) -->
-                <div class="table-card" style="margin-bottom: 25px; padding: 20px; height: 350px;">
-                    <canvas id="heartbeatChart"></canvas>
-                </div>
 
                 <div class="table-card" style="margin-bottom: 25px;">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th style="text-align: center;">Estado</th>
+                                <th style="text-align: center; width: 60px;">Estado</th>
                                 <th>Operador</th>
                                 <th>Vehículo Asignado</th>
                                 <th>Sitio de Logueo</th>
                                 <th>Hora de Logueo</th>
-                                <th>Hora Deslogueo (Manual)</th>
+                                <th>Histórico Señal (5m)</th>
                             </tr>
                         </thead>
                         <tbody id="tabla-operadores-body">
-                            {% for op in operadores_en_linea %}
+                            <!-- Inyección dinámica vía AJAX -->
                             <tr>
-                                <td style="text-align: center;">
-                                    {% if op.en_linea == 2 %}
-                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="Transmitiendo"></div>
-                                    {% elif op.en_linea == 1 %}
-                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #d97706; margin: 0 auto; box-shadow: 0 0 5px rgba(217, 119, 6, 0.5);" title="Corte / Pausa"></div>
-                                    {% else %}
-                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Desconectado"></div>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div style="font-weight: bold; color: var(--verde);">{{ op.nombre_operador }}</div>
-                                    <div style="font-size: 11px; color: var(--text-muted);">{{ op.perfil.replace('_', ' ').title() }}</div>
-                                </td>
-                                <td>
-                                    {% if op.placa_vehiculo %}
-                                        <span class="badge badge-success" style="font-size: 13px;">{{ op.placa_vehiculo }}</span>
-                                    {% else %}
-                                        <span class="badge badge-gray">Sin asignar</span>
-                                    {% endif %}
-                                </td>
-                                <td style="font-size: 12px; font-weight: bold; color: var(--verde-osc);">{{ op.sitio_logueo }}</td>
-                                <td>{{ op.fecha_login_str }}</td>
-                                <td>{{ op.fecha_logout_str }}</td>
+                                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">Sincronizando operadores en tiempo real...</td>
                             </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td>
-                            </tr>
-                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -1092,77 +1060,14 @@
     <!-- SCRIPT AJAX PARA AUTOREFRESCAR EL PANEL DE OPERADORES Y CHART.JS (DASHBOARD) -->
     {% if not active_module or active_module == 'dashboard' %}
     <script>
-        // Función auxiliar para generar un color único basado en el nombre del operador
-        function stringToColor(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = str.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-            return '#' + '00000'.substring(0, 6 - c.length) + c;
-        }
-
         document.addEventListener("DOMContentLoaded", function () {
             const tablaBody = document.getElementById("tabla-operadores-body");
             if (!tablaBody) return;
 
-            // Variables de Chart.js
-            let heartbeatChart = null;
-            const MAX_DATAPOINTS = 30; // 5 minutos de historial a 10s por ciclo
-
-            // Inicializar Gráfica
-            function initChart() {
-                const ctx = document.getElementById('heartbeatChart').getContext('2d');
-                heartbeatChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: []
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: 2.2,
-                                ticks: {
-                                    stepSize: 1,
-                                    callback: function(value) {
-                                        if (value === 2) return 'Transmitiendo';
-                                        if (value === 1) return 'Corte / Pausa';
-                                        if (value === 0) return 'Desconectado';
-                                        return '';
-                                    }
-                                }
-                            }
-                        },
-                        plugins: {
-                            legend: { 
-                                position: 'bottom',
-                                labels: { boxWidth: 12 }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        let status = 'Desconectado';
-                                        if (context.raw >= 1.9) status = 'Transmitiendo';
-                                        else if (context.raw >= 0.9) status = 'Corte / Pausa';
-                                        return context.dataset.label + ': ' + status;
-                                    }
-                                }
-                            }
-                        },
-                        animation: false, // Desactivar para evitar saltos visuales en tiempo real
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
-                        }
-                    }
-                });
-            }
-
-            initChart();
+            // Variables de configuración de las mini-gráficas (Sparklines)
+            let historyData = {}; // Diccionario para guardar el historial { 'id_operador': [datos...] }
+            let sparkCharts = {}; // Diccionario para gestionar las instancias de Chart.js
+            const MAX_POINTS = 30; // 5 minutos de historial a 10s por ciclo
 
             function actualizarOperadores() {
                 const timeStamp = new Date().getTime();
@@ -1171,11 +1076,27 @@
                     .then(data => {
                         if (data.status === 'success') {
                             
-                            // 1. ACTUALIZAR TABLA HTML
+                            // 1. Destruir las gráficas anteriores para evitar fugas de memoria
+                            Object.values(sparkCharts).forEach(chart => chart.destroy());
+                            sparkCharts = {};
+                            
                             let html = "";
+                            
                             if (data.operadores.length === 0) {
                                 html = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td></tr>`;
                             } else {
+                                // 2. Actualizar el historial de datos para cada operador
+                                data.operadores.forEach(op => {
+                                    if (!historyData[op.id_operador]) {
+                                        historyData[op.id_operador] = new Array(MAX_POINTS).fill(null);
+                                    }
+                                    historyData[op.id_operador].push(op.en_linea);
+                                    if (historyData[op.id_operador].length > MAX_POINTS) {
+                                        historyData[op.id_operador].shift();
+                                    }
+                                });
+
+                                // 3. Construir la tabla HTML (El backend ya los entrega ordenados: Verde, Amarillo, Gris)
                                 data.operadores.forEach(op => {
                                     let circulo = '';
                                     if (op.en_linea === 2) {
@@ -1200,51 +1121,53 @@
                                         <td>${placa}</td>
                                         <td style="font-size: 12px; font-weight: bold; color: var(--verde-osc);">${op.sitio_logueo}</td>
                                         <td>${op.fecha_login_str}</td>
-                                        <td>${op.fecha_logout_str}</td>
+                                        <td>
+                                            <div style="width: 120px; height: 35px;">
+                                                <canvas id="spark_${op.id_operador}"></canvas>
+                                            </div>
+                                        </td>
                                     </tr>`;
                                 });
                             }
+                            
+                            // Inyectar el HTML ordenado en el DOM
                             tablaBody.innerHTML = html;
 
-                            // 2. ACTUALIZAR GRÁFICA LINEAL (HEARTBEAT)
-                            if (heartbeatChart) {
-                                const now = new Date();
-                                const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
-                                                now.getMinutes().toString().padStart(2, '0') + ':' + 
-                                                now.getSeconds().toString().padStart(2, '0');
-                                
-                                heartbeatChart.data.labels.push(timeStr);
-                                if (heartbeatChart.data.labels.length > MAX_DATAPOINTS) {
-                                    heartbeatChart.data.labels.shift();
+                            // 4. Instanciar las nuevas mini-gráficas en los canvas recién creados
+                            data.operadores.forEach(op => {
+                                const canvasElement = document.getElementById(`spark_${op.id_operador}`);
+                                if (canvasElement) {
+                                    const ctx = canvasElement.getContext('2d');
+                                    let lineColor = op.en_linea === 2 ? '#10b981' : (op.en_linea === 1 ? '#d97706' : '#9ca3af');
+                                    
+                                    sparkCharts[op.id_operador] = new Chart(ctx, {
+                                        type: 'line',
+                                        data: {
+                                            labels: new Array(MAX_POINTS).fill(''),
+                                            datasets: [{
+                                                data: historyData[op.id_operador],
+                                                borderColor: lineColor,
+                                                borderWidth: 2,
+                                                stepped: true,
+                                                pointRadius: 0
+                                            }]
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            animation: false,
+                                            plugins: { 
+                                                legend: { display: false }, 
+                                                tooltip: { enabled: false } 
+                                            },
+                                            scales: { 
+                                                x: { display: false }, 
+                                                y: { display: false, min: -0.5, max: 2.5 } 
+                                            }
+                                        }
+                                    });
                                 }
-
-                                data.operadores.forEach(op => {
-                                    let dataset = heartbeatChart.data.datasets.find(ds => ds.label === op.nombre_operador);
-                                    
-                                    if (!dataset) {
-                                        dataset = {
-                                            label: op.nombre_operador,
-                                            data: new Array(heartbeatChart.data.labels.length - 1).fill(null), // rellenar histórico en blanco
-                                            borderColor: stringToColor(op.nombre_operador),
-                                            borderWidth: 2,
-                                            stepped: true, // Línea escalonada para simular señal digital
-                                            tension: 0
-                                        };
-                                        heartbeatChart.data.datasets.push(dataset);
-                                    }
-                                    
-                                    // Separar visualmente las líneas si coinciden (Offset visual)
-                                    let baseValue = op.en_linea;
-                                    let visualOffset = (Math.random() * 0.08) - 0.04; 
-                                    dataset.data.push(baseValue + visualOffset);
-                                    
-                                    if (dataset.data.length > MAX_DATAPOINTS) {
-                                        dataset.data.shift();
-                                    }
-                                });
-
-                                heartbeatChart.update();
-                            }
+                            });
                         }
                     })
                     .catch(err => console.error("Error actualizando panel:", err));
