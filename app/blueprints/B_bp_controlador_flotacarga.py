@@ -781,6 +781,60 @@ def historial_preoperacionales():
         filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'placa': placa_filtro}
     )
 
+# =========================================================
+# MÓDULO 6: MONITOREO DE COMBUSTIBLE
+# =========================================================
+@bp_gestorflota.route('/monitoreo_combustible')
+@login_required_custom
+@gestor_flota_required
+def monitoreo_combustible():
+    empresa_id = session.get('empresa_id')
+    
+    fecha_inicio = request.args.get('fecha_inicio', (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'))
+    fecha_fin = request.args.get('fecha_fin', datetime.now().strftime('%Y-%m-%d'))
+    placa_filtro = request.args.get('placa', 'todas')
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # 1. Extraer placas de la empresa para el selector del filtro
+    cur.execute("SELECT DISTINCT placa FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
+    vehiculos_historicos = cur.fetchall()
+
+    # 2. Consultar registros de combustible según filtro
+    query = """
+        SELECT id, placa, tipo_combustible, fecha_tanqueo, kilometraje_actual, 
+               galones, valor_total, nombre_operador, ruta_comprobante
+        FROM vehiculos_combustible_flota 
+        WHERE id_empresa = %s AND fecha_tanqueo BETWEEN %s AND %s
+    """
+    params = [empresa_id, fecha_inicio, fecha_fin]
+    
+    if placa_filtro != 'todas':
+        query += " AND placa = %s"
+        params.append(placa_filtro)
+        
+    query += " ORDER BY fecha_tanqueo DESC, id DESC"
+    
+    try:
+        cur.execute(query, tuple(params))
+        registros_combustible = cur.fetchall()
+    except Exception as e:
+        print(f"Error consultando combustible: {e}")
+        registros_combustible = []
+        
+    cur.close()
+
+    return render_template(
+        'B_modulo_controlador_flotacarga.html',
+        nit=session.get('nit'),
+        empresa=session.get('empresa'),
+        nombre=session.get('nombre'),
+        active_module='monitoreo_combustible',
+        registros_combustible=registros_combustible,
+        vehiculos_historicos=vehiculos_historicos,
+        filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'placa': placa_filtro}
+    )
+
 
 @bp_gestorflota.route('/cron/mantenimiento_bd', methods=['GET'])
 def cron_limpieza_datos():

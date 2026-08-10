@@ -177,6 +177,9 @@
             <a href="{{ url_for('gestorflota.historial_preoperacionales') }}" class="nav-item {% if active_module == 'preoperacionales' %}active{% endif %}">
                 <span class="nav-icon">📋</span> Preoperacionales
             </a>
+            <a href="{{ url_for('gestorflota.monitoreo_combustible') }}" class="nav-item {% if active_module == 'monitoreo_combustible' %}active{% endif %}">
+                <span class="nav-icon">⛽</span> Combustible
+            </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -485,6 +488,76 @@
                             {% else %}
                             <tr>
                                 <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No se encontraron inspecciones en el rango seleccionado.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'monitoreo_combustible' %}
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Monitoreo de Combustible</h2>
+                    </div>
+                </div>
+
+                <form class="filter-bar" method="GET" action="{{ url_for('gestorflota.monitoreo_combustible') }}">
+                    <div class="form-group">
+                        <label>Desde</label>
+                        <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Hasta</label>
+                        <input type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Placa Vehículo</label>
+                        <select name="placa">
+                            <option value="todas">Todas las placas</option>
+                            {% for vh in vehiculos_historicos %}
+                                <option value="{{ vh.placa }}" {% if filtros.placa == vh.placa %}selected{% endif %}>{{ vh.placa }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="filter-btn">🔍 Filtrar</button>
+                </form>
+
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Placa</th>
+                                <th>Operador</th>
+                                <th>Combustible</th>
+                                <th>Galones</th>
+                                <th>Valor Total</th>
+                                <th>Odómetro</th>
+                                <th>Voucher</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rc in registros_combustible %}
+                            <tr>
+                                <td>{{ rc.fecha_tanqueo }}</td>
+                                <td style="font-weight: bold; color: var(--verde);">{{ rc.placa }}</td>
+                                <td>{{ rc.nombre_operador }}</td>
+                                <td>{{ rc.tipo_combustible }}</td>
+                                <td>{{ rc.galones }}</td>
+                                <td>$ {{ rc.valor_total }}</td>
+                                <td>{{ rc.kilometraje_actual }} km</td>
+                                <td>
+                                    {% if rc.ruta_comprobante %}
+                                        <a href="{{ url_for('static', filename=rc.ruta_comprobante) }}" target="_blank" class="btn-icon edit" title="Ver Voucher">👁️ Ver</a>
+                                    {% else %}
+                                        <span class="badge badge-gray">N/A</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">No se encontraron registros en el rango seleccionado.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
