@@ -801,9 +801,10 @@ def monitoreo_combustible():
     vehiculos_historicos = cur.fetchall()
 
     # 2. Consultar registros de combustible según filtro
+    # CORRECCIÓN: Se reemplaza ruta_comprobante por foto_voucher_path as ruta_comprobante
     query = """
         SELECT id, placa, tipo_combustible, fecha_tanqueo, kilometraje_actual, 
-               galones, valor_total, nombre_operador, ruta_comprobante
+               galones, valor_total, nombre_operador, foto_voucher_path as ruta_comprobante
         FROM vehiculos_combustible_flota 
         WHERE id_empresa = %s AND fecha_tanqueo BETWEEN %s AND %s
     """
