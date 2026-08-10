@@ -317,20 +317,28 @@ def actualizar_ubicacion():
     if not ubicaciones:
         return jsonify({"status": "error", "message": "Faltan coordenadas"}), 400
 
-    cur = mysql.connection.cursor()
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
         # 1. Actualizar última ubicación en tabla vehículos (usando el punto más reciente)
         ultima_lat = ubicaciones[-1]['lat']
         ultima_lng = ubicaciones[-1]['lng']
         cur.execute("UPDATE vehiculos SET ultima_latitud = %s, ultima_longitud = %s WHERE placa = %s AND id_empresa = %s", (ultima_lat, ultima_lng, placa, empresa_id))
         
-        # 2. Guardar el recorrido en el historial de rutas
+        # 2. Guardar el recorrido en el historial de rutas PREVINIENDO DUPLICADOS
         for ubi in ubicaciones:
             fecha_hora = ubi.get('fecha_hora', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            
             cur.execute("""
-                INSERT INTO vehiculos_historial_rutas (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro)
-                VALUES (%s, %s, %s, %s, %s, 'Automático')
-            """, (empresa_id, placa, ubi['lat'], ubi['lng'], fecha_hora))
+                SELECT id FROM vehiculos_historial_rutas 
+                WHERE id_empresa = %s AND placa = %s AND fecha_hora = %s
+                LIMIT 1
+            """, (empresa_id, placa, fecha_hora))
+            
+            if not cur.fetchone():
+                cur.execute("""
+                    INSERT INTO vehiculos_historial_rutas (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro)
+                    VALUES (%s, %s, %s, %s, %s, 'Automático')
+                """, (empresa_id, placa, ubi['lat'], ubi['lng'], fecha_hora))
 
         mysql.connection.commit()
         return jsonify({"status": "success"}), 200
@@ -360,38 +368,53 @@ def registrar_parada():
     if not paradas:
         return jsonify({"status": "error", "message": "Datos de parada vacíos"}), 400
         
-    cur = mysql.connection.cursor()
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
         ids_insertados = []
         for p in paradas:
-            # 1. Guardar en el historial analítico de paradas
-            cur.execute("""
-                INSERT INTO historial_paradas_flota 
-                (id_empresa, placa, usuario_id, fecha, hora_inicio, hora_fin, latitud, longitud, tipo_actividad, nombre_punto, origen_registro)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                empresa_id, placa, usuario_id, 
-                p.get('fecha', datetime.now().strftime('%Y-%m-%d')),
-                p.get('hora_inicio', datetime.now().strftime('%H:%M:%S')),
-                p.get('hora_fin'), # Puede ser nulo si la parada sigue activa
-                p.get('lat'), p.get('lng'),
-                p.get('tipo_actividad', 'Otra'),
-                p.get('nombre_punto', 'Punto Desconocido'),
-                p.get('origen_registro', 'Manual')
-            ))
-            nuevo_id = cur.lastrowid
-            ids_insertados.append({"temp_id": p.get('temp_id'), "db_id": nuevo_id})
+            fecha_p = p.get('fecha', datetime.now().strftime('%Y-%m-%d'))
+            hora_p = p.get('hora_inicio', datetime.now().strftime('%H:%M:%S'))
             
-            # 2. Insertar también un punto destacado en el historial de rutas
-            fecha_hora = f"{p.get('fecha', datetime.now().strftime('%Y-%m-%d'))} {p.get('hora_inicio', datetime.now().strftime('%H:%M:%S'))}"
+            # PREVENCIÓN DE DUPLICADOS
             cur.execute("""
-                INSERT INTO vehiculos_historial_rutas (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro, nombre_punto)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                empresa_id, placa, p.get('lat'), p.get('lng'), fecha_hora,
-                'Parada ' + p.get('origen_registro', 'Manual'),
-                p.get('nombre_punto', 'Punto Desconocido')
-            ))
+                SELECT id FROM historial_paradas_flota 
+                WHERE id_empresa = %s AND placa = %s AND fecha = %s AND hora_inicio = %s
+                LIMIT 1
+            """, (empresa_id, placa, fecha_p, hora_p))
+            
+            existente = cur.fetchone()
+            
+            if existente:
+                # Si ya existe, devolvemos el ID real para que el celular lo saque de su cola
+                ids_insertados.append({"temp_id": p.get('temp_id'), "db_id": existente['id']})
+            else:
+                # 1. Guardar en el historial analítico de paradas
+                cur.execute("""
+                    INSERT INTO historial_paradas_flota 
+                    (id_empresa, placa, usuario_id, fecha, hora_inicio, hora_fin, latitud, longitud, tipo_actividad, nombre_punto, origen_registro)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    empresa_id, placa, usuario_id, 
+                    fecha_p, hora_p,
+                    p.get('hora_fin'),
+                    p.get('lat'), p.get('lng'),
+                    p.get('tipo_actividad', 'Otra'),
+                    p.get('nombre_punto', 'Punto Desconocido'),
+                    p.get('origen_registro', 'Manual')
+                ))
+                nuevo_id = cur.lastrowid
+                ids_insertados.append({"temp_id": p.get('temp_id'), "db_id": nuevo_id})
+                
+                # 2. Insertar también un punto destacado en el historial de rutas
+                fecha_hora = f"{fecha_p} {hora_p}"
+                cur.execute("""
+                    INSERT INTO vehiculos_historial_rutas (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro, nombre_punto)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    empresa_id, placa, p.get('lat'), p.get('lng'), fecha_hora,
+                    'Parada ' + p.get('origen_registro', 'Manual'),
+                    p.get('nombre_punto', 'Punto Desconocido')
+                ))
 
         mysql.connection.commit()
         return jsonify({"status": "success", "ids_mapeados": ids_insertados}), 200
@@ -416,6 +439,7 @@ def actualizar_fin_parada():
         
     cur = mysql.connection.cursor()
     try:
+        # UPDATE es idempotente, si se ejecuta dos veces no genera duplicados.
         for p in paradas:
             if p.get('id'):
                 cur.execute("""
