@@ -592,10 +592,12 @@
                             {% for op in operadores_en_linea %}
                             <tr>
                                 <td style="text-align: center;">
-                                    {% if op.en_linea == 1 %}
-                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="En línea"></div>
+                                    {% if op.en_linea == 2 %}
+                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="Transmitiendo"></div>
+                                    {% elif op.en_linea == 1 %}
+                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #d97706; margin: 0 auto; box-shadow: 0 0 5px rgba(217, 119, 6, 0.5);" title="Corte / Pausa"></div>
                                     {% else %}
-                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Fuera de línea"></div>
+                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Desconectado"></div>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -1123,12 +1125,13 @@
                         scales: {
                             y: {
                                 beginAtZero: true,
-                                max: 1.2,
+                                max: 2.2,
                                 ticks: {
                                     stepSize: 1,
                                     callback: function(value) {
-                                        if (value === 1) return 'Transmitiendo';
-                                        if (value === 0) return 'Corte / Pausa';
+                                        if (value === 2) return 'Transmitiendo';
+                                        if (value === 1) return 'Corte / Pausa';
+                                        if (value === 0) return 'Desconectado';
                                         return '';
                                     }
                                 }
@@ -1142,7 +1145,10 @@
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        return context.dataset.label + ': ' + (context.raw >= 1 ? 'En línea' : 'Sin señal');
+                                        let status = 'Desconectado';
+                                        if (context.raw >= 1.9) status = 'Transmitiendo';
+                                        else if (context.raw >= 0.9) status = 'Corte / Pausa';
+                                        return context.dataset.label + ': ' + status;
                                     }
                                 }
                             }
@@ -1171,9 +1177,14 @@
                                 html = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td></tr>`;
                             } else {
                                 data.operadores.forEach(op => {
-                                    let circulo = op.en_linea === 1 
-                                        ? `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="En línea"></div>`
-                                        : `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #ef4444; margin: 0 auto;" title="Corte de Señal"></div>`;
+                                    let circulo = '';
+                                    if (op.en_linea === 2) {
+                                        circulo = `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="Transmitiendo"></div>`;
+                                    } else if (op.en_linea === 1) {
+                                        circulo = `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #d97706; margin: 0 auto; box-shadow: 0 0 5px rgba(217, 119, 6, 0.5);" title="Corte / Pausa"></div>`;
+                                    } else {
+                                        circulo = `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Desconectado"></div>`;
+                                    }
                                         
                                     let placa = op.placa_vehiculo 
                                         ? `<span class="badge badge-success" style="font-size: 13px;">${op.placa_vehiculo}</span>`
@@ -1222,8 +1233,7 @@
                                         heartbeatChart.data.datasets.push(dataset);
                                     }
                                     
-                                    // Separar visualmente las líneas si coinciden en 1 o 0 (Offset visual)
-                                    // Para evitar que se superpongan todas en el valor exacto
+                                    // Separar visualmente las líneas si coinciden (Offset visual)
                                     let baseValue = op.en_linea;
                                     let visualOffset = (Math.random() * 0.08) - 0.04; 
                                     dataset.data.push(baseValue + visualOffset);

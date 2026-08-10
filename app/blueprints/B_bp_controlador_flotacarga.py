@@ -99,29 +99,33 @@ def dashboard_gestor():
     except Exception as e:
         print(f"Aviso tablas monitoreo flota: {e}")
 
-    # 2. Consultar operadores logueados, su estado en vivo, vehículo, tiempos y coordenadas
+    # 2. Consultar TODOS los operadores, su estado en vivo, vehículo, tiempos y coordenadas
     operadores_en_linea = []
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # ESTADO DINÁMICO: Aumento de tolerancia a 300 segundos (5 min) para soportar pausas de OS en móviles
+        # ESTADO DINÁMICO DE 3 NIVELES: 2 (Transmitiendo), 1 (Logueado pero en Pausa), 0 (Desconectado)
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300, 1, 0) as en_linea,
+                CASE 
+                    WHEN hs.id IS NOT NULL AND ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300 THEN 2
+                    WHEN hs.id IS NOT NULL THEN 1
+                    ELSE 0
+                END as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,
                 hs.latitud,
                 hs.longitud
             FROM usuarios u
-            INNER JOIN historial_sesiones_flota hs ON hs.id = (
+            LEFT JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
-                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
+                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE() AND estado_sesion = 'ACTIVA'
             )
             LEFT JOIN monitoreo_actividad ma ON ma.id_usuario = u.id
-            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
+            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga'
             ORDER BY u.nombre ASC
         """, (empresa_id,))
         
@@ -131,17 +135,16 @@ def dashboard_gestor():
         PLANTA_LAT = 4.4134686
         PLANTA_LNG = -75.1797367
         
-        # AJUSTE HORA COLOMBIA (UTC-5): Calculamos dinámicamente el desfase del servidor
+        # AJUSTE HORA COLOMBIA (UTC-5)
         now_local = datetime.now()
         now_utc = datetime.utcnow()
         server_offset = round((now_local - now_utc).total_seconds() / 3600)
-        adj_hours = -5 - server_offset # Objetivo UTC-5 (Colombia)
+        adj_hours = -5 - server_offset 
         
         # 3. Formatear los datos para la vista
         for op in operadores_db:
             op_dict = dict(op)
             
-            # Aplicar ajuste horario a logueo y deslogueo
             if op_dict['fecha_login']:
                 op_dict['fecha_login'] += timedelta(hours=adj_hours)
                 op_dict['fecha_login_str'] = op_dict['fecha_login'].strftime('%H:%M:%S')
@@ -154,7 +157,6 @@ def dashboard_gestor():
             else:
                 op_dict['fecha_logout_str'] = '--:--'
                 
-            # Calcular sitio de logueo por geocerca (100 metros)
             op_dict['sitio_logueo'] = "No registrado"
             if op_dict.get('latitud') and op_dict.get('longitud'):
                 dist = calcular_distancia(op_dict['latitud'], op_dict['longitud'], PLANTA_LAT, PLANTA_LNG)
@@ -200,25 +202,29 @@ def monitoreo_realtime():
         cur_hb.close()
 
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Mostrar logueados activos e identificar cortes de señal con tolerancia de 300s (5 min)
+        # ESTADO DINÁMICO DE 3 NIVELES
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300, 1, 0) as en_linea,
+                CASE 
+                    WHEN hs.id IS NOT NULL AND ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300 THEN 2
+                    WHEN hs.id IS NOT NULL THEN 1
+                    ELSE 0
+                END as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,
                 hs.latitud,
                 hs.longitud
             FROM usuarios u
-            INNER JOIN historial_sesiones_flota hs ON hs.id = (
+            LEFT JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
-                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
+                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE() AND estado_sesion = 'ACTIVA'
             )
             LEFT JOIN monitoreo_actividad ma ON ma.id_usuario = u.id
-            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
+            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga'
             ORDER BY u.nombre ASC
         """, (empresa_id,))
         
@@ -227,7 +233,6 @@ def monitoreo_realtime():
         PLANTA_LAT = 4.4134686
         PLANTA_LNG = -75.1797367
         
-        # AJUSTE HORA COLOMBIA (UTC-5) PARA AJAX
         now_local = datetime.now()
         now_utc = datetime.utcnow()
         server_offset = round((now_local - now_utc).total_seconds() / 3600)
@@ -256,10 +261,8 @@ def monitoreo_realtime():
                 else:
                     op_dict['sitio_logueo'] = f"Lat: {op_dict['latitud']}, Lng: {op_dict['longitud']}"
             
-            # Formatear el string del perfil
             op_dict['perfil_str'] = str(op_dict['perfil']).replace('_', ' ').title()
                 
-            # Limpiar los objetos datetime y decimal nativos
             op_dict.pop('fecha_login', None)
             op_dict.pop('fecha_logout_manual', None)
             op_dict.pop('latitud', None)
@@ -801,7 +804,7 @@ def monitoreo_combustible():
     vehiculos_historicos = cur.fetchall()
 
     # 2. Consultar registros de combustible según filtro
-    # CORRECCIÓN: Se reemplaza ruta_comprobante por foto_voucher_path as ruta_comprobante
+    # Usando el alias correcto: foto_voucher_path as ruta_comprobante
     query = """
         SELECT id, placa, tipo_combustible, fecha_tanqueo, kilometraje_actual, 
                galones, valor_total, nombre_operador, foto_voucher_path as ruta_comprobante
