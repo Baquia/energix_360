@@ -1,7 +1,7 @@
 # app/blueprints/B_bp_operador_flotacarga.py
 import math
 from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash
-from app import mysql
+from app import mysql, csrf
 from app.utils import login_required_custom
 from datetime import datetime
 import MySQLdb.cursors
@@ -89,6 +89,7 @@ def prelogin_flota():
     )
 
 @bp_flotacarga.route('/api/viaje/iniciar', methods=['POST'])
+@csrf.exempt
 @login_required_custom
 def iniciar_viaje():
     empresa_id = session.get('empresa_id')
@@ -148,6 +149,7 @@ def iniciar_viaje():
         cur.close()
 
 @bp_flotacarga.route('/api/viaje/finalizar', methods=['POST'])
+@csrf.exempt
 @login_required_custom
 def finalizar_viaje():
     id_viaje = session.get('id_viaje')
@@ -177,6 +179,7 @@ def finalizar_viaje():
 
 
 @bp_flotacarga.route('/api/viaje/recuperar', methods=['POST'])
+@csrf.exempt
 @login_required_custom
 def recuperar_viaje():
     """Recupera la sesión del servidor si el dispositivo perdió conexión pero tiene viaje activo"""
@@ -230,6 +233,7 @@ def recuperar_viaje():
 # 3. RUTAS DE SESIÓN EN VIVO (HEARTBEAT Y LOGOUT)
 # ==============================================================================
 @bp_flotacarga.route('/api/flota/heartbeat', methods=['POST'])
+@csrf.exempt
 def heartbeat_flota():
     """Endpoint llamado por la PWA del operador para mantener su estado en línea"""
     if 'usuario_id' not in session:
@@ -249,6 +253,7 @@ def heartbeat_flota():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @bp_flotacarga.route('/api/flota/logout_manual', methods=['POST'])
+@csrf.exempt
 def logout_manual_flota():
     """Cierra la sesión operativa, marcando la hora exacta para el dashboard"""
     if 'usuario_id' not in session: 
@@ -292,6 +297,7 @@ def logout_manual_flota():
 # 4. MOTOR DE RASTREO, GEOCERCA Y RUTAS HISTÓRICAS
 # ==============================================================================
 @bp_flotacarga.route('/api/actualizar_ubicacion', methods=['POST'])
+@csrf.exempt
 def actualizar_ubicacion():
     if 'usuario_id' not in session or 'placa_prelogueada' not in session:
         return jsonify({"status": "error", "message": "Sesión inválida o vehículo no logueado"}), 401
@@ -336,6 +342,7 @@ def actualizar_ubicacion():
 
 
 @bp_flotacarga.route('/api/registrar_parada', methods=['POST'])
+@csrf.exempt
 def registrar_parada():
     """Endpoint para clasificar e insertar paradas manuales o automáticas, compatible con offline sync."""
     if 'usuario_id' not in session or 'placa_prelogueada' not in session:
@@ -396,6 +403,7 @@ def registrar_parada():
 
 
 @bp_flotacarga.route('/api/actualizar_fin_parada', methods=['POST'])
+@csrf.exempt
 def actualizar_fin_parada():
     """Endpoint para cerrar una parada (hora_fin) cuando el vehículo reanuda la marcha."""
     if 'usuario_id' not in session: 
