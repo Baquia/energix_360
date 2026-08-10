@@ -103,13 +103,13 @@ def dashboard_gestor():
     operadores_en_linea = []
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # ESTADO SIEMPRE VERDE: Forzamos en_linea = 1 porque la condición de ACTIVA ya garantiza el logueo
+        # ESTADO DINÁMICO: Validamos cortes de señal si el último latido fue hace más de 30 segundos
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                1 as en_linea,
+                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 30, 1, 0) as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,
@@ -118,8 +118,9 @@ def dashboard_gestor():
             FROM usuarios u
             INNER JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
-                WHERE id_usuario = u.id
+                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
             )
+            LEFT JOIN monitoreo_actividad ma ON ma.id_usuario = u.id
             WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
             ORDER BY u.nombre ASC
         """, (empresa_id,))
@@ -199,13 +200,13 @@ def monitoreo_realtime():
         cur_hb.close()
 
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Mostrar ÚNICAMENTE logueados activos con estado siempre verde
+        # Mostrar logueados activos e identificar cortes de señal con tolerancia de 30s
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                1 as en_linea,
+                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 30, 1, 0) as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,
@@ -214,8 +215,9 @@ def monitoreo_realtime():
             FROM usuarios u
             INNER JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
-                WHERE id_usuario = u.id
+                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
             )
+            LEFT JOIN monitoreo_actividad ma ON ma.id_usuario = u.id
             WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
             ORDER BY u.nombre ASC
         """, (empresa_id,))
@@ -824,7 +826,7 @@ def descargar_preoperacional_pdf(consecutivo):
     nit_empresa = session.get('nit')
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT * FROM inspeccion_preoperacional_carga internal WHERE consecutivo_anual = %s AND id_empresa = %s LIMIT 1", (consecutivo, empresa_id))
+    cur.execute("SELECT * FROM inspeccion_preoperacional_carga WHERE consecutivo_anual = %s AND id_empresa = %s LIMIT 1", (consecutivo, empresa_id))
     insp = cur.fetchone()
     cur.close()
 

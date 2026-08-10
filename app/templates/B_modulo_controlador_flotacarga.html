@@ -11,6 +11,9 @@
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Chart.js para Analítica en Tiempo Real -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         /* PALETA CORPORATIVA BQA-ONE */
@@ -493,6 +496,11 @@
                     <div class="action-title-group">
                         <h2>Monitor de Operadores en Línea</h2>
                     </div>
+                </div>
+                
+                <!-- NUEVA GRÁFICA DE HEARTBEAT (Chart.js) -->
+                <div class="table-card" style="margin-bottom: 25px; padding: 20px; height: 350px;">
+                    <canvas id="heartbeatChart"></canvas>
                 </div>
 
                 <div class="table-card" style="margin-bottom: 25px;">
@@ -1006,12 +1014,76 @@
     </script>
     {% endif %}
 
-    <!-- SCRIPT AJAX PARA AUTOREFRESCAR EL PANEL DE OPERADORES (DASHBOARD) -->
+    <!-- SCRIPT AJAX PARA AUTOREFRESCAR EL PANEL DE OPERADORES Y CHART.JS (DASHBOARD) -->
     {% if not active_module or active_module == 'dashboard' %}
     <script>
+        // Función auxiliar para generar un color único basado en el nombre del operador
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+            return '#' + '00000'.substring(0, 6 - c.length) + c;
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
             const tablaBody = document.getElementById("tabla-operadores-body");
             if (!tablaBody) return;
+
+            // Variables de Chart.js
+            let heartbeatChart = null;
+            const MAX_DATAPOINTS = 30; // 5 minutos de historial a 10s por ciclo
+
+            // Inicializar Gráfica
+            function initChart() {
+                const ctx = document.getElementById('heartbeatChart').getContext('2d');
+                heartbeatChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: []
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 1.2,
+                                ticks: {
+                                    stepSize: 1,
+                                    callback: function(value) {
+                                        if (value === 1) return 'Transmitiendo';
+                                        if (value === 0) return 'Corte / Pausa';
+                                        return '';
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: { 
+                                position: 'bottom',
+                                labels: { boxWidth: 12 }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + (context.raw === 1 ? 'En línea' : 'Sin señal');
+                                    }
+                                }
+                            }
+                        },
+                        animation: false, // Desactivar para evitar saltos visuales en tiempo real
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    }
+                });
+            }
+
+            initChart();
 
             function actualizarOperadores() {
                 const timeStamp = new Date().getTime();
@@ -1019,6 +1091,8 @@
                     .then(response => response.json())
                     .then(data => {
                         if (data.status === 'success') {
+                            
+                            // 1. ACTUALIZAR TABLA HTML
                             let html = "";
                             if (data.operadores.length === 0) {
                                 html = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td></tr>`;
@@ -1026,7 +1100,7 @@
                                 data.operadores.forEach(op => {
                                     let circulo = op.en_linea === 1 
                                         ? `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="En línea"></div>`
-                                        : `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Fuera de línea"></div>`;
+                                        : `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #ef4444; margin: 0 auto;" title="Corte de Señal"></div>`;
                                         
                                     let placa = op.placa_vehiculo 
                                         ? `<span class="badge badge-success" style="font-size: 13px;">${op.placa_vehiculo}</span>`
@@ -1047,12 +1121,54 @@
                                 });
                             }
                             tablaBody.innerHTML = html;
+
+                            // 2. ACTUALIZAR GRÁFICA LINEAL (HEARTBEAT)
+                            if (heartbeatChart) {
+                                const now = new Date();
+                                const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
+                                                now.getMinutes().toString().padStart(2, '0') + ':' + 
+                                                now.getSeconds().toString().padStart(2, '0');
+                                
+                                heartbeatChart.data.labels.push(timeStr);
+                                if (heartbeatChart.data.labels.length > MAX_DATAPOINTS) {
+                                    heartbeatChart.data.labels.shift();
+                                }
+
+                                data.operadores.forEach(op => {
+                                    let dataset = heartbeatChart.data.datasets.find(ds => ds.label === op.nombre_operador);
+                                    
+                                    if (!dataset) {
+                                        dataset = {
+                                            label: op.nombre_operador,
+                                            data: new Array(heartbeatChart.data.labels.length - 1).fill(null), // rellenar histórico en blanco
+                                            borderColor: stringToColor(op.nombre_operador),
+                                            borderWidth: 2,
+                                            stepped: true, // Línea escalonada para simular señal digital
+                                            tension: 0
+                                        };
+                                        heartbeatChart.data.datasets.push(dataset);
+                                    }
+                                    
+                                    // Separar visualmente las líneas si coinciden en 1 o 0 (Offset visual)
+                                    // Para evitar que se superpongan todas en el valor 1.0 exacto
+                                    let baseValue = op.en_linea;
+                                    let visualOffset = (Math.random() * 0.08) - 0.04; 
+                                    dataset.data.push(baseValue + (baseValue === 1 ? visualOffset : 0));
+                                    
+                                    if (dataset.data.length > MAX_DATAPOINTS) {
+                                        dataset.data.shift();
+                                    }
+                                });
+
+                                heartbeatChart.update();
+                            }
                         }
                     })
                     .catch(err => console.error("Error actualizando panel:", err));
             }
 
-            // Actualizar tabla cada 10 segundos
+            // Iniciar ciclo de actualización cada 10 segundos
+            actualizarOperadores();
             setInterval(actualizarOperadores, 10000);
         });
     </script>
