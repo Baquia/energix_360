@@ -88,6 +88,14 @@
 </head>
 
 <body>
+
+    <!-- OVERLAY MODO AHORRO (PANTALLA NEGRA PARA OLED) -->
+    <div id="dim-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
+        <div style="color: #222; font-size: 60px; margin-bottom: 20px;">🔋</div>
+        <p style="color: #333; font-size: 16px; text-align: center; max-width: 80%; font-weight: bold;">MODO AHORRO DE ENERGÍA<br><span style="font-size: 12px; font-weight: normal;">Rastreo GPS Activo</span></p>
+        <button onclick="desactivarModoAhorro()" style="margin-top: 50px; padding: 15px 40px; background: #111; border: 1px solid #333; color: #666; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer;">Tocar para Despertar</button>
+    </div>
+
     <header class="header">
         <div class="brand-area">
             <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
@@ -128,14 +136,17 @@
                         <div style="background: #eefcf9; color: var(--verde-osc); padding: 12px; border-radius: 8px; border: 1px solid var(--verde); font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 15px;">
                             🚀 Consecutivo de viaje: {{ session.get('consecutivo_viaje') }}
                         </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button id="btnPausarViaje" onclick="togglePausarViaje()" class="btn-card" style="background: #f59e0b; color: white; width: 50%; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);">
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button id="btnPausarViaje" onclick="togglePausarViaje()" class="btn-card" style="background: #f59e0b; color: white; flex: 1; min-width: 140px; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);">
                                 ⏸ Pausar Datos
                             </button>
-                            <button onclick="finalizarViaje()" class="btn-card" style="background: #ef4444; color: white; width: 50%; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);">
+                            <button onclick="finalizarViaje()" class="btn-card" style="background: #ef4444; color: white; flex: 1; min-width: 140px; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);">
                                 ⏹ Finalizar Viaje
                             </button>
                         </div>
+                        <button onclick="activarModoAhorro()" class="btn-card" style="background: #1e293b; color: #94a3b8; width: 100%; padding: 15px; font-size: 15px; margin-top: 10px; border: 1px solid #334155;">
+                            🔋 Activar Modo Ahorro (Pantalla Negra)
+                        </button>
                     </div>
 
                     <a href="#" onclick="triggerParadaManual(event)" class="module-card">
@@ -225,6 +236,16 @@
             if (dataMeter) dataMeter.innerText = `📶 ${mb} MB`;
         }
 
+        // Funciones de Ahorro de Energía (Pantalla Negra OLED)
+        function activarModoAhorro() {
+            document.getElementById('dim-overlay').style.display = 'flex';
+            if ('vibrate' in navigator) navigator.vibrate(50);
+        }
+        function desactivarModoAhorro() {
+            document.getElementById('dim-overlay').style.display = 'none';
+            if ('vibrate' in navigator) navigator.vibrate(50);
+        }
+
         function togglePausarViaje() {
             isTransmitting = !isTransmitting;
             const btn = document.getElementById('btnPausarViaje');
@@ -261,7 +282,7 @@
                             batteryMeter.innerText = `${battery.charging ? '⚡' : '🔋'} ${level}%`;
                             if (level <= 20 && !battery.charging) {
                                 batteryMeter.style.color = '#ef4444';
-                                alert("⚠️ BATERÍA BAJA: El nivel de batería ha caído por debajo del 20%. Por favor conecte el celular al cargador del vehículo para no perder el rastreo satelital.");
+                                alert("⚠️ BATERÍA BAJA: El nivel de batería ha caído por debajo del 20%. Por favor conecte el celular al cargador del vehículo o active el Modo Ahorro.");
                             } else {
                                 batteryMeter.style.color = 'inherit';
                             }
@@ -439,14 +460,14 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             
-            const FRECUENCIA_SONDEO = 60000;      
             const TOLERANCIA_METROS = 30;         
             const PRECISION_MINIMA = 120; // Ajustado a 120m para permitir triangulación de red en zonas de baja señal
             const TIEMPO_PARA_PARADA = 5;         
             const TIMEOUT_ALERTA = 180;           
 
             let ultimaUbicacion = null;
-            let minutosInmovil = 0;
+            let lastMoveTime = Date.now();
+            let lastRecordedTime = 0;
             let paradaActiva = null; 
             let modalAbierto = false;
             let timerModal = null;
@@ -471,7 +492,7 @@
             });
             solicitarWakeLock();
 
-            // Disparador agresivo de sincronización en cuanto la conexión vuelva a estar en línea (micro-conexiones)
+            // Disparador agresivo de sincronización en cuanto la conexión vuelva a estar en línea
             window.addEventListener('online', () => {
                 if(typeof sincronizarDatosOffline === 'function') sincronizarDatosOffline();
             });
@@ -496,56 +517,59 @@
                 return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             }
 
-            function procesarLecturaGPS() {
-                if (!navigator.geolocation) return;
+            // CRONÓMETRO DE PARADAS: Independiente de watchPosition, evalúa el tiempo inmóvil
+            setInterval(() => {
+                if (!ultimaUbicacion || paradaActiva) return;
+                let tiempoInmovilMinutos = (Date.now() - lastMoveTime) / 60000;
+                if (tiempoInmovilMinutos >= TIEMPO_PARA_PARADA && !modalAbierto) {
+                    activarAlertaParada(ultimaUbicacion.lat, ultimaUbicacion.lng);
+                }
+            }, 60000);
+
+            // MOTOR GPS PASIVO: watchPosition amarra la antena al hardware
+            function procesarLecturaGPS(pos) {
+                if (pos.coords.accuracy > PRECISION_MINIMA) {
+                    if(isTransmitting) { indicadorGPS.innerText = '🟠 GPS Señal Débil'; indicadorGPS.className = 'gps-status offline'; }
+                    return; 
+                }
+
+                if(isTransmitting) { indicadorGPS.innerText = '🟢 Rastreo Activo'; indicadorGPS.className = 'gps-status active'; }
+
+                let lat = pos.coords.latitude;
+                let lng = pos.coords.longitude;
+                let momento = obtenerFechaHoraActual();
+                let now = Date.now();
+
+                let distancia = ultimaUbicacion ? calcularDistancia(ultimaUbicacion.lat, ultimaUbicacion.lng, lat, lng) : 999;
                 
-                // Seguir leyendo GPS offline para no perder la ruta, 
-                // la variable isTransmitting detiene el FETCH no el SENSOR.
+                // Evitar saturar la BD: Guardamos si pasó 1 minuto o si se movió más de 50 metros
+                if ((now - lastRecordedTime) > 60000 || distancia > 50) {
+                    syncQueue.ubicaciones.push({ lat: lat, lng: lng, fecha_hora: momento.full });
+                    lastRecordedTime = now;
+                    guardarCola();
+                    sincronizarDatosOffline();
+                }
 
-                navigator.geolocation.getCurrentPosition(
-                    function (pos) {
-                        if (pos.coords.accuracy > PRECISION_MINIMA) {
-                            if(isTransmitting) { indicadorGPS.innerText = '🟠 GPS Señal Débil'; indicadorGPS.className = 'gps-status offline'; }
-                            return; 
-                        }
-
-                        if(isTransmitting) { indicadorGPS.innerText = '🟢 Rastreo Activo'; indicadorGPS.className = 'gps-status active'; }
-
-                        let lat = pos.coords.latitude;
-                        let lng = pos.coords.longitude;
-                        let momento = obtenerFechaHoraActual();
-
-                        syncQueue.ubicaciones.push({ lat: lat, lng: lng, fecha_hora: momento.full });
-
-                        if (ultimaUbicacion) {
-                            let distancia = calcularDistancia(ultimaUbicacion.lat, ultimaUbicacion.lng, lat, lng);
-                            if (distancia <= TOLERANCIA_METROS) {
-                                if (!paradaActiva) {
-                                    minutosInmovil++;
-                                    if (minutosInmovil >= TIEMPO_PARA_PARADA && !modalAbierto) {
-                                        activarAlertaParada(lat, lng);
-                                    }
-                                }
-                            } else {
-                                minutosInmovil = 0;
-                                ultimaUbicacion = { lat: lat, lng: lng };
-                                if (paradaActiva) {
-                                    paradaActiva.hora_fin = momento.hora;
-                                    paradaActiva = null; 
-                                }
-                            }
-                        } else {
-                            ultimaUbicacion = { lat: lat, lng: lng };
-                        }
-                        
-                        guardarCola();
+                if (distancia > TOLERANCIA_METROS) {
+                    lastMoveTime = now;
+                    ultimaUbicacion = { lat: lat, lng: lng };
+                    if (paradaActiva) {
+                        paradaActiva.hora_fin = momento.hora;
+                        paradaActiva = null; 
                         sincronizarDatosOffline();
-                    },
+                    }
+                } else if (!ultimaUbicacion) {
+                    ultimaUbicacion = { lat: lat, lng: lng };
+                }
+            }
+
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(
+                    procesarLecturaGPS,
                     function (err) {
                         if(isTransmitting) { indicadorGPS.innerText = '🔴 GPS Apagado / Sin Señal'; indicadorGPS.className = 'gps-status offline'; }
                     },
-                    // Ajuste de timeout a 45s y maximumAge a 5s para tolerar lentitud y microcortes de antena
-                    { enableHighAccuracy: true, timeout: 45000, maximumAge: 5000 }
+                    { enableHighAccuracy: true, timeout: 45000, maximumAge: 10000 }
                 );
             }
 
@@ -681,9 +705,6 @@
                     }).catch(e => {});
                 }
             }
-
-            procesarLecturaGPS();
-            setInterval(procesarLecturaGPS, FRECUENCIA_SONDEO);
         });
     </script>
     {% endif %}

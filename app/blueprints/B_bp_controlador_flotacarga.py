@@ -103,13 +103,13 @@ def dashboard_gestor():
     operadores_en_linea = []
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # ESTADO DINÁMICO: Validamos cortes de señal si el último latido fue hace más de 30 segundos
+        # ESTADO DINÁMICO: Aumento de tolerancia a 300 segundos (5 min) para soportar pausas de OS en móviles
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 30, 1, 0) as en_linea,
+                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300, 1, 0) as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,
@@ -200,13 +200,13 @@ def monitoreo_realtime():
         cur_hb.close()
 
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Mostrar logueados activos e identificar cortes de señal con tolerancia de 30s
+        # Mostrar logueados activos e identificar cortes de señal con tolerancia de 300s (5 min)
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 30, 1, 0) as en_linea,
+                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300, 1, 0) as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,

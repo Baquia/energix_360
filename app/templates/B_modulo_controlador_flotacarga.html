@@ -1069,7 +1069,7 @@
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        return context.dataset.label + ': ' + (context.raw === 1 ? 'En línea' : 'Sin señal');
+                                        return context.dataset.label + ': ' + (context.raw >= 1 ? 'En línea' : 'Sin señal');
                                     }
                                 }
                             }
@@ -1150,10 +1150,10 @@
                                     }
                                     
                                     // Separar visualmente las líneas si coinciden en 1 o 0 (Offset visual)
-                                    // Para evitar que se superpongan todas en el valor 1.0 exacto
+                                    // Para evitar que se superpongan todas en el valor exacto
                                     let baseValue = op.en_linea;
                                     let visualOffset = (Math.random() * 0.08) - 0.04; 
-                                    dataset.data.push(baseValue + (baseValue === 1 ? visualOffset : 0));
+                                    dataset.data.push(baseValue + visualOffset);
                                     
                                     if (dataset.data.length > MAX_DATAPOINTS) {
                                         dataset.data.shift();
