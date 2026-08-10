@@ -181,6 +181,16 @@
       </a>
       {% endif %}
 
+      <!-- NUEVO MÓDULO: TRANSPORTE ESPECIAL -->
+      {% if 'flotaespecial' in modulos_activos %}
+      <a href="/router/flotaespecial" class="card-link">
+        <div class="card">
+          <div class="card-icon">🚐</div>
+          <div class="card-title">Transporte Especial</div>
+        </div>
+      </a>
+      {% endif %}
+
       <!-- MÓDULO 2: GESTIÓN DE GAS / GLP AVÍCOLA -->
       {% if 'gas' in modulos_activos or 'glp' in modulos_activos %}
       <a href="/router/gas" class="card-link">

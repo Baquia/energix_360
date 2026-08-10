@@ -316,7 +316,10 @@ def api_modulos_sistema_disponibles():
         'preoperacional': 'flota',
         'gestion_carga': 'carga', 
         'gestionavicola_bp': 'carga',
-        'gestion_mermas': 'mermas'
+        'gestion_mermas': 'mermas',
+        # --- NUEVO: Transporte Especial ---
+        'controlador_flotaespecial': 'flotaespecial',
+        'operador_flotaespecial': 'flotaespecial'
     }
     
     # 3. Homologamos hacia los 4 nombres estándar del Dashboard V2

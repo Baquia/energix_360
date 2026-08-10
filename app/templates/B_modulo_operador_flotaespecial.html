@@ -1,0 +1,686 @@
+<!-- app/templates/B_modulo_operador_flotaespecial.html -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Dashboard Trans. Especial | {{ empresa }}</title>
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#015249">
+
+    <style>
+        /* PALETA CORPORATIVA BQA-ONE */
+        :root {
+            --verde: #015249;
+            --verde-osc: #003b35;
+            --bg-grad-start: #d7f2ec;
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e0e0e0;
+            --radius: 14px;
+            --shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Verdana, Geneva, Tahoma, sans-serif; background: radial-gradient(circle at top, var(--bg-grad-start) 0, #f6f7f8 45%, #f6f7f8 100%); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+        a { text-decoration: none; color: inherit; }
+
+        .header { width: 100%; max-width: 900px; display: flex; justify-content: space-between; align-items: center; padding: 20px 20px 10px 20px; }
+        .brand-area { display: flex; align-items: center; gap: 15px; }
+        .logo-cliente { max-height: 48px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.05)); }
+        .brand-divider { width: 1px; height: 32px; background-color: #cbd5e1; display: block; }
+        .logo-app { max-height: 32px; width: auto; opacity: 0.9; }
+
+        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
+        .user-role { font-size: 10px; color: var(--text-muted); background: rgba(255, 255, 255, 0.6); padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
+        
+        .telemetry-bar { display: flex; gap: 10px; font-size: 11px; background: rgba(1, 82, 73, 0.1); padding: 4px 10px; border-radius: 20px; color: var(--verde); font-weight: bold; margin-top: 5px; border: 1px solid rgba(1, 82, 73, 0.2); }
+
+        .wrap { width: 100%; max-width: 900px; margin: 20px auto 40px; padding: 0 20px; }
+        .welcome-title { color: var(--verde); font-size: 22px; font-weight: 700; margin-bottom: 25px; text-align: left; border-bottom: 2px solid rgba(1, 82, 73, 0.1); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
+        
+        /* Indicador de Estado GPS */
+        .gps-status { font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: bold; background: #e5e7eb; color: #4b5563; display: flex; align-items: center; gap: 6px;}
+        .gps-status.active { background: #d1fae5; color: #065f46; }
+        .gps-status.offline { background: #fee2e2; color: #991b1b; }
+        .gps-status.paused { background: #fef3c7; color: #b45309; }
+
+        .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .module-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; height: 100%; cursor: pointer; border: 1px solid transparent; position: relative; overflow: hidden; }
+        .module-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(1, 82, 73, 0.15); border-color: var(--verde); }
+        .module-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--verde); opacity: 0; transition: opacity 0.2s; }
+        .module-card:hover::before { opacity: 1; }
+
+        .card-icon { font-size: 32px; margin-bottom: 15px; background: #eefcf9; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--verde); }
+        .card-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+        .card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px; flex-grow: 1; }
+        .btn-card { background: var(--verde); color: white; text-align: center; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; transition: background 0.2s; border: none; cursor: pointer; }
+        .module-card:hover .btn-card { background: var(--verde-osc); }
+
+        .footer { margin-top: auto; padding: 20px; text-align: center; font-size: 11px; color: #9ca3af; width: 100%; border-top: 1px solid #eee; background: rgba(255, 255, 255, 0.5); }
+        .logout-btn { display: inline-block; margin-top: 8px; color: var(--verde); font-weight: bold; font-size: 12px; border: 1px solid currentColor; padding: 4px 12px; border-radius: 20px; transition: all 0.2s; }
+        .logout-btn:hover { background: var(--verde); color: white; }
+
+        /* MODAL DE PARADA */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.85); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-box { background: var(--surface); width: 90%; max-width: 400px; border-radius: var(--radius); padding: 30px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .modal-title { color: var(--verde); margin-bottom: 10px; font-size: 20px; }
+        .modal-text { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+        .form-group { text-align: left; margin-bottom: 15px; }
+        .form-group label { font-size: 13px; font-weight: bold; color: var(--text); }
+        .form-group select, .form-group input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); margin-top: 5px; font-size: 14px; outline: none;}
+        .form-group select:focus, .form-group input:focus { border-color: var(--verde); }
+        .btn-submit { background: var(--verde); color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
+        .timer-text { font-size: 12px; color: #ef4444; margin-top: 15px; font-weight: bold;}
+
+        @media (max-width: 600px) {
+            .header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .brand-area, .user-info { width: 100%; }
+            .user-info { flex-direction: row; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 10px; flex-wrap: wrap;}
+            .modules-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="brand-area">
+            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            <span class="brand-divider"></span>
+            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+        </div>
+        <div class="user-info">
+            <span class="user-name">{{ nombre }}</span>
+            <span class="user-role">Transporte Especial</span>
+            {% if session.get('placa_prelogueada_especial') %}
+                <span class="user-role" style="background-color: var(--verde); color: white; margin-top: 5px; font-size: 11px;">Vehículo: {{ session.get('placa_prelogueada_especial') }}</span>
+            {% endif %}
+            
+            {% if session.get('viaje_activo_especial') %}
+                <div class="telemetry-bar">
+                    <span id="batteryMeter" title="Nivel de batería local">🔋 --%</span>
+                    <span style="color: #cbd5e1;">|</span>
+                    <span id="dataMeter" title="Datos móviles consumidos en esta sesión">📶 0.00 MB</span>
+                </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="wrap">
+        <h2 class="welcome-title">
+            Panel de Operación
+            {% if session.get('viaje_activo_especial') %}
+                <div id="indicador_gps" class="gps-status">⚪ Iniciando GPS...</div>
+            {% endif %}
+        </h2>
+        
+        <div class="modules-grid">
+            {% if session.get('placa_prelogueada_especial') %}
+                
+                {% if session.get('viaje_activo_especial') %}
+                    <!-- MÓDULOS DE OPERACIÓN: Solo visibles si hay viaje activo -->
+                    <div style="grid-column: 1 / -1; margin-bottom: 10px;">
+                        <div style="background: #eefcf9; color: var(--verde-osc); padding: 12px; border-radius: 8px; border: 1px solid var(--verde); font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 15px;">
+                            🚀 Consecutivo de viaje: {{ session.get('consecutivo_viaje_especial') }}
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btnPausarViaje" onclick="togglePausarViaje()" class="btn-card" style="background: #f59e0b; color: white; width: 50%; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);">
+                                ⏸ Pausar Datos
+                            </button>
+                            <button onclick="finalizarViaje()" class="btn-card" style="background: #ef4444; color: white; width: 50%; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);">
+                                ⏹ Finalizar Viaje
+                            </button>
+                        </div>
+                    </div>
+
+                    <a href="#" onclick="triggerParadaManual(event)" class="module-card">
+                        <div class="card-icon">📍</div>
+                        <h3 class="card-title">Registrar Parada</h3>
+                        <p class="card-desc">Registre proactivamente un evento, novedad de ruta o punto de interés.</p>
+                        <div class="btn-card">Notificar Parada &rarr;</div>
+                    </a>
+
+                    <a href="{{ url_for('combustible_flota.registrar_combustible') }}" class="module-card">
+                        <div class="card-icon">⛽</div>
+                        <h3 class="card-title">Combustible</h3>
+                        <p class="card-desc">Monitoreo de consumo y eficiencia de combustible.</p>
+                        <div class="btn-card">Gestionar &rarr;</div>
+                    </a>
+                {% else %}
+                    <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE (Oculta el resto) -->
+                    <div style="width: 100%; text-align: center; grid-column: 1 / -1; padding: 30px 10px;">
+                        <h3 style="color: var(--verde); margin-bottom: 15px;">Vehículo enlazado: {{ session.get('placa_prelogueada_especial') }}</h3>
+                        <p style="color: var(--text-muted); margin-bottom: 25px;">Habilite su consola de operación e inicie el rastreo satelital marcando el inicio de su viaje.</p>
+                        <button onclick="iniciarViaje()" class="btn-card" style="background: var(--verde); color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(1, 82, 73, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto;">
+                            <span style="font-size: 24px;">▶</span> INICIAR VIAJE
+                        </button>
+                    </div>
+                {% endif %}
+                
+            {% else %}
+                <!-- MÓDULOS DE PRE-LOGUEO: (Vehículo NO logueado, redirige al scanner QR) -->
+                <a href="{{ url_for('preoperacional.preoperacional_tc', nit=nit) }}" class="module-card">
+                    <div class="card-icon">🚧</div>
+                    <h3 class="card-title">Preoperacional de seguridad vial</h3>
+                    <p class="card-desc">Reporte de novedades del vehículo y documentos. Autenticación Biométrica.</p>
+                    <div class="btn-card">Escanear QR Cabina &rarr;</div>
+                </a>
+            {% endif %}
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 BQA ONE Technology. Transporte Especial.</p>
+        {% if session.get('viaje_activo_especial') %}
+            <div style="margin-top: 10px; color: #ef4444; font-weight: bold; background: #fee2e2; display: inline-block; padding: 5px 15px; border-radius: 12px;">Cierre de sesión bloqueado en ruta. Finalice el viaje primero.</div>
+        {% else %}
+            <a href="{{ url_for('logout') }}" class="logout-btn" id="btnLogout">Cerrar Sesión</a>
+        {% endif %}
+    </footer>
+
+    <!-- MODAL DE CLASIFICACIÓN DE PARADA -->
+    <div id="modalParada" class="modal-overlay">
+        <div class="modal-box">
+            <h3 class="modal-title">🛑 Vehículo Detenido</h3>
+            <p class="modal-text">Por favor clasifique la actividad que se realiza en este punto:</p>
+            
+            <div class="form-group">
+                <label>Actividad / Motivo:</label>
+                <select id="tipo_parada">
+                    <option value="Recogida Pasajeros">Recogida de Pasajeros</option>
+                    <option value="Descenso Pasajeros">Descenso de Pasajeros</option>
+                    <option value="Tanqueo Combustible">Tanqueo / Combustible</option>
+                    <option value="Alimentación">Alimentación / Comida</option>
+                    <option value="Descanso / Pernoctada">Descanso / Pernoctada</option>
+                    <option value="Falla Mecánica">Falla Mecánica</option>
+                    <option value="Trancón / Retén">Trancón / Retén</option>
+                    <option value="Otra">Otra...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Nombre del Lugar / Novedad (Opcional):</label>
+                <input type="text" id="nombre_punto_parada" placeholder="Ej. Hotel XYZ, Restaurante El Paso">
+            </div>
+            
+            <button onclick="registrarParadaManual()" class="btn-submit">Registrar Parada</button>
+            <p class="timer-text">Autoguardado en <span id="countdown_parada">180</span>s...</p>
+        </div>
+    </div>
+
+    <!-- SCRIPT GLOBAL Y VIAJES -->
+    <script>
+        let isNavigatingLegally = false;
+        let isTransmitting = true; 
+        let totalDataBytes = parseInt(localStorage.getItem('bqa_data_bytes_especial') || '0');
+
+        function addDataUsage(bytes) {
+            totalDataBytes += bytes;
+            localStorage.setItem('bqa_data_bytes_especial', totalDataBytes.toString());
+            const mb = (totalDataBytes / (1024 * 1024)).toFixed(2);
+            const dataMeter = document.getElementById('dataMeter');
+            if (dataMeter) dataMeter.innerText = `📶 ${mb} MB`;
+        }
+
+        function togglePausarViaje() {
+            isTransmitting = !isTransmitting;
+            const btn = document.getElementById('btnPausarViaje');
+            const indicadorGPS = document.getElementById('indicador_gps');
+            if (isTransmitting) {
+                btn.innerHTML = '⏸ Pausar Datos';
+                btn.style.background = '#f59e0b';
+                btn.style.boxShadow = '0 4px 10px rgba(245, 158, 11, 0.3)';
+                if (indicadorGPS) { indicadorGPS.innerText = '🟢 Transmisión Reanudada'; indicadorGPS.className = 'gps-status active'; }
+            } else {
+                btn.innerHTML = '▶ Reanudar Datos';
+                btn.style.background = '#10b981';
+                btn.style.boxShadow = '0 4px 10px rgba(16, 185, 129, 0.3)';
+                if (indicadorGPS) { indicadorGPS.innerText = '⏸ Transmisión Pausada'; indicadorGPS.className = 'gps-status paused'; }
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            
+            // Inicializar Medidor de Datos en la UI
+            const dataMeter = document.getElementById('dataMeter');
+            if (dataMeter) {
+                const mb = (totalDataBytes / (1024 * 1024)).toFixed(2);
+                dataMeter.innerText = `📶 ${mb} MB`;
+            }
+
+            // Inicializar Medidor de Batería Nativos
+            if ('getBattery' in navigator) {
+                navigator.getBattery().then(function(battery) {
+                    function updateBatteryUI() {
+                        const level = Math.round(battery.level * 100);
+                        const batteryMeter = document.getElementById('batteryMeter');
+                        if (batteryMeter) {
+                            batteryMeter.innerText = `${battery.charging ? '⚡' : '🔋'} ${level}%`;
+                            if (level <= 20 && !battery.charging) {
+                                batteryMeter.style.color = '#ef4444';
+                                alert("⚠️ BATERÍA BAJA: El nivel de batería ha caído por debajo del 20%. Por favor conecte el celular al cargador del vehículo para no perder el rastreo satelital.");
+                            } else {
+                                batteryMeter.style.color = 'inherit';
+                            }
+                        }
+                    }
+                    updateBatteryUI();
+                    battery.addEventListener('levelchange', updateBatteryUI);
+                    battery.addEventListener('chargingchange', updateBatteryUI);
+                });
+            }
+
+            // Navegación legal
+            document.querySelectorAll('a, button').forEach(el => {
+                el.addEventListener('click', () => {
+                    isNavigatingLegally = true;
+                    setTimeout(() => { isNavigatingLegally = false; }, 1000);
+                });
+            });
+
+            // Motor de Latidos (Heartbeat) - Envíos condicionados a isTransmitting
+            function sendHeartbeat() {
+                if (!isTransmitting) return; // Ahorro de datos cuando está pausado
+                
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+                
+                fetch("{{ url_for('operador_flotaespecial.heartbeat_flotaespecial') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+                }).then(() => addDataUsage(600)).catch(e => console.log('Heartbeat offline'));
+            }
+            setInterval(sendHeartbeat, 15000);
+            sendHeartbeat();
+
+            // Recuperación Automática (Offline-First)
+            function intentarRecuperarSesion() {
+                const placaGuardada = localStorage.getItem('bqa_placa_activa_especial');
+                const viajeGuardado = localStorage.getItem('bqa_viaje_activo_especial');
+                const viajeActivoServer = {% if session.get('viaje_activo_especial') %}true{% else %}false{% endif %};
+
+                if (viajeGuardado === 'true' && placaGuardada && !viajeActivoServer && navigator.onLine) {
+                    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+                    fetch("{{ url_for('operador_flotaespecial.recuperar_viaje_especial') }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                        body: JSON.stringify({ placa: placaGuardada })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 'success') {
+                            window.location.reload();
+                        } else {
+                            localStorage.removeItem('bqa_viaje_activo_especial');
+                            localStorage.removeItem('bqa_placa_activa_especial');
+                            localStorage.removeItem('bqa_data_bytes_especial');
+                        }
+                    }).catch(e => console.error("Error en reconexión silenciosa:", e));
+                }
+            }
+            intentarRecuperarSesion();
+            window.addEventListener('online', intentarRecuperarSesion);
+
+            // Logout Manual interceptado
+            const btnLogout = document.getElementById('btnLogout');
+            if (btnLogout) {
+                btnLogout.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    isNavigatingLegally = true; 
+                    const logoutUrl = this.href;
+                    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+                    
+                    fetch("{{ url_for('operador_flotaespecial.logout_manual_flotaespecial') }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+                    }).finally(() => {
+                        window.location.href = logoutUrl;
+                    });
+                });
+            }
+
+            // Modo Quiosco Anti-Navegación
+            history.pushState(null, null, location.href);
+            window.addEventListener('popstate', function(event) {
+                history.pushState(null, null, location.href);
+                alert("⚠️ Acción denegada: Use los botones de la interfaz para navegar por la aplicación.");
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
+                    e.preventDefault();
+                    alert("⚠️ Acción denegada: No está permitido recargar la página durante la sesión operativa.");
+                }
+            });
+
+            window.addEventListener('beforeunload', function (e) {
+                const isViajeActivo = {% if session.get('viaje_activo_especial') %}true{% else %}false{% endif %};
+                if (!isNavigatingLegally && isViajeActivo) {
+                    e.preventDefault();
+                    e.returnValue = 'Tiene un VIAJE ACTIVO en progreso. No debe cerrar el navegador o evadirá el rastreo de control de flota.';
+                }
+            });
+        });
+
+        // ============================================
+        // API CALLS: INICIAR / FINALIZAR VIAJE
+        // ============================================
+        function iniciarViaje() {
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = '⏱ Iniciando...';
+
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            
+            fetch("{{ url_for('operador_flotaespecial.iniciar_viaje_especial') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+            }).then(res => res.json())
+              .then(data => {
+                  if(data.status === 'success') {
+                      localStorage.setItem('bqa_viaje_activo_especial', 'true');
+                      localStorage.setItem('bqa_placa_activa_especial', '{{ session.get("placa_prelogueada_especial") }}');
+                      localStorage.setItem('bqa_data_bytes_especial', '0'); // Resetear datos en nuevo viaje
+                      window.location.reload();
+                  } else {
+                      alert("Error al iniciar viaje: " + data.message);
+                      btn.disabled = false;
+                      btn.innerHTML = '<span style="font-size: 24px;">▶</span> INICIAR VIAJE';
+                  }
+              }).catch(e => {
+                  alert("Error de conexión. Intente nuevamente.");
+                  btn.disabled = false;
+                  btn.innerHTML = '<span style="font-size: 24px;">▶</span> INICIAR VIAJE';
+              });
+        }
+
+        function finalizarViaje() {
+            if(!confirm("⚠️ ¿Está absolutamente seguro de finalizar el viaje actual?\n\nEsto detendrá el rastreo satelital inmediatamente y cerrará los reportes operacionales.")) return;
+            
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = '⏱ Finalizando...';
+
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            
+            fetch("{{ url_for('operador_flotaespecial.finalizar_viaje_especial') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+            }).then(res => res.json())
+              .then(data => {
+                  if(data.status === 'success') {
+                      localStorage.removeItem('bqa_viaje_activo_especial');
+                      localStorage.removeItem('bqa_placa_activa_especial');
+                      localStorage.removeItem('bqa_data_bytes_especial');
+                      window.location.reload();
+                  } else {
+                      alert("Error al finalizar viaje: " + data.message);
+                      btn.disabled = false;
+                      btn.innerHTML = '⏹ Finalizar Viaje';
+                  }
+              }).catch(e => {
+                  alert("Error de conexión.");
+                  btn.disabled = false;
+                  btn.innerHTML = '⏹ Finalizar Viaje';
+              });
+        }
+    </script>
+
+    <!-- EL RASTREO GPS SÓLO SE EJECUTA DURANTE EL VIAJE -->
+    {% if session.get('viaje_activo_especial') %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            
+            const FRECUENCIA_SONDEO = 60000;      
+            const TOLERANCIA_METROS = 30;         
+            const PRECISION_MINIMA = 40;          
+            const TIEMPO_PARA_PARADA = 5;         
+            const TIMEOUT_ALERTA = 180;           
+
+            let ultimaUbicacion = null;
+            let minutosInmovil = 0;
+            let paradaActiva = null; 
+            let modalAbierto = false;
+            let timerModal = null;
+            let tiempoRestante = TIMEOUT_ALERTA;
+            let wakeLock = null;
+
+            let syncQueue = JSON.parse(localStorage.getItem('bqa_flotaespecial_queue') || '{"ubicaciones":[], "paradas":[]}');
+            const indicadorGPS = document.getElementById('indicador_gps');
+
+            async function solicitarWakeLock() {
+                try {
+                    if ('wakeLock' in navigator) {
+                        wakeLock = await navigator.wakeLock.request('screen');
+                        wakeLock.addEventListener('release', () => console.log('Wake Lock liberado (Pantalla apagada)'));
+                    }
+                } catch (err) { console.warn('Wake Lock no soportado o denegado:', err); }
+            }
+            
+            document.addEventListener('visibilitychange', async () => {
+                if (wakeLock !== null && document.visibilityState === 'visible') solicitarWakeLock();
+                if (document.visibilityState === 'visible') sincronizarDatosOffline();
+            });
+            solicitarWakeLock();
+
+            function guardarCola() { localStorage.setItem('bqa_flotaespecial_queue', JSON.stringify(syncQueue)); }
+            
+            function obtenerFechaHoraActual() {
+                let d = new Date();
+                return {
+                    fecha: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'),
+                    hora: String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0'),
+                    full: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + 
+                          String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0')
+                };
+            }
+
+            function calcularDistancia(lat1, lon1, lat2, lon2) {
+                const R = 6371e3;
+                const r1 = lat1 * Math.PI/180, r2 = lat2 * Math.PI/180;
+                const dLat = (lat2-lat1) * Math.PI/180, dLon = (lon2-lon1) * Math.PI/180;
+                const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(r1)*Math.cos(r2)*Math.sin(dLon/2)*Math.sin(dLon/2);
+                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            }
+
+            function procesarLecturaGPS() {
+                if (!navigator.geolocation) return;
+                
+                // Seguir leyendo GPS offline para no perder la ruta, 
+                // la variable isTransmitting detiene el FETCH no el SENSOR.
+
+                navigator.geolocation.getCurrentPosition(
+                    function (pos) {
+                        if (pos.coords.accuracy > PRECISION_MINIMA) {
+                            if(isTransmitting) { indicadorGPS.innerText = '🟠 GPS Señal Débil'; indicadorGPS.className = 'gps-status offline'; }
+                            return; 
+                        }
+
+                        if(isTransmitting) { indicadorGPS.innerText = '🟢 Rastreo Activo'; indicadorGPS.className = 'gps-status active'; }
+
+                        let lat = pos.coords.latitude;
+                        let lng = pos.coords.longitude;
+                        let momento = obtenerFechaHoraActual();
+
+                        syncQueue.ubicaciones.push({ lat: lat, lng: lng, fecha_hora: momento.full });
+
+                        if (ultimaUbicacion) {
+                            let distancia = calcularDistancia(ultimaUbicacion.lat, ultimaUbicacion.lng, lat, lng);
+                            if (distancia <= TOLERANCIA_METROS) {
+                                if (!paradaActiva) {
+                                    minutosInmovil++;
+                                    if (minutosInmovil >= TIEMPO_PARA_PARADA && !modalAbierto) {
+                                        activarAlertaParada(lat, lng);
+                                    }
+                                }
+                            } else {
+                                minutosInmovil = 0;
+                                ultimaUbicacion = { lat: lat, lng: lng };
+                                if (paradaActiva) {
+                                    paradaActiva.hora_fin = momento.hora;
+                                    paradaActiva = null; 
+                                }
+                            }
+                        } else {
+                            ultimaUbicacion = { lat: lat, lng: lng };
+                        }
+                        
+                        guardarCola();
+                        sincronizarDatosOffline();
+                    },
+                    function (err) {
+                        if(isTransmitting) { indicadorGPS.innerText = '🔴 GPS Apagado'; indicadorGPS.className = 'gps-status offline'; }
+                    },
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                );
+            }
+
+            function activarAlertaParada(lat, lng) {
+                modalAbierto = true;
+                tiempoRestante = TIMEOUT_ALERTA;
+                document.getElementById('modalParada').style.display = 'flex';
+                document.getElementById('countdown_parada').innerText = tiempoRestante;
+                
+                if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
+
+                timerModal = setInterval(() => {
+                    tiempoRestante--;
+                    document.getElementById('countdown_parada').innerText = tiempoRestante;
+                    if (tiempoRestante <= 0) {
+                        clearInterval(timerModal);
+                        ejecutarRegistroParada("No registrado (Automático)", "Punto no clasificado", "Automático", lat, lng);
+                    }
+                }, 1000);
+            }
+
+            window.registrarParadaManual = function() {
+                clearInterval(timerModal);
+                let tipo = document.getElementById('tipo_parada').value;
+                let nombre = document.getElementById('nombre_punto_parada').value.trim() || 'Punto Desconocido';
+                ejecutarRegistroParada(tipo, nombre, 'Manual', ultimaUbicacion.lat, ultimaUbicacion.lng);
+            };
+
+            window.triggerParadaManual = function(e) {
+                if (e) e.preventDefault();
+                if (!ultimaUbicacion) {
+                    alert("Aún no tenemos señal de GPS. Por favor espere unos segundos o verifique su conexión.");
+                    return;
+                }
+                if (paradaActiva) {
+                    let momento = obtenerFechaHoraActual();
+                    paradaActiva.hora_fin = momento.hora;
+                    paradaActiva = null;
+                    sincronizarDatosOffline();
+                }
+                activarAlertaParada(ultimaUbicacion.lat, ultimaUbicacion.lng);
+            };
+
+            function ejecutarRegistroParada(tipo, nombre, origen, lat, lng) {
+                document.getElementById('modalParada').style.display = 'none';
+                document.getElementById('nombre_punto_parada').value = ''; 
+                modalAbierto = false;
+                let momento = obtenerFechaHoraActual();
+                
+                paradaActiva = {
+                    temp_id: Date.now().toString(),
+                    fecha: momento.fecha,
+                    hora_inicio: momento.hora,
+                    hora_fin: null,
+                    lat: lat,
+                    lng: lng,
+                    tipo_actividad: tipo,
+                    nombre_punto: nombre,
+                    origen_registro: origen
+                };
+                
+                syncQueue.paradas.push(paradaActiva);
+                guardarCola();
+                sincronizarDatosOffline();
+            }
+
+            function sincronizarDatosOffline() {
+                // Si no hay red o si el operador pausó la transmisión, NO enviamos
+                if (!navigator.onLine || !isTransmitting) {
+                    if (indicadorGPS && isTransmitting) indicadorGPS.innerText = '🟠 Guardando Offline';
+                    return; 
+                }
+
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+                if (syncQueue.ubicaciones.length > 0) {
+                    let payloadUbi = [...syncQueue.ubicaciones];
+                    let bodyStr = JSON.stringify({ ubicaciones: payloadUbi });
+                    let estimatedBytes = new Blob([bodyStr]).size + 500; // body + headers
+                    
+                    fetch('/api/flotaespecial/actualizar_ubicacion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                        body: bodyStr
+                    }).then(res => {
+                        if (res.ok) {
+                            addDataUsage(estimatedBytes);
+                            syncQueue.ubicaciones = syncQueue.ubicaciones.filter(u => !payloadUbi.includes(u));
+                            guardarCola();
+                        }
+                    }).catch(e => {});
+                }
+
+                let paradasNuevas = syncQueue.paradas.filter(p => !p.db_id);
+                if (paradasNuevas.length > 0) {
+                    let bodyStr = JSON.stringify({ paradas: paradasNuevas });
+                    let estimatedBytes = new Blob([bodyStr]).size + 500;
+                    
+                    fetch('/api/flotaespecial/registrar_parada', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                        body: bodyStr
+                    }).then(res => res.json()).then(data => {
+                        if (data.status === 'success') {
+                            addDataUsage(estimatedBytes);
+                            data.ids_mapeados.forEach(mapping => {
+                                let p = syncQueue.paradas.find(x => x.temp_id === mapping.temp_id);
+                                if (p) p.db_id = mapping.db_id;
+                            });
+                            guardarCola();
+                        }
+                    }).catch(e => {});
+                }
+
+                let paradasCerradas = syncQueue.paradas.filter(p => p.db_id && p.hora_fin && !p.sincronizada);
+                if (paradasCerradas.length > 0) {
+                    let payloadFin = paradasCerradas.map(p => ({ id: p.db_id, hora_fin: p.hora_fin }));
+                    let bodyStr = JSON.stringify({ paradas: payloadFin });
+                    let estimatedBytes = new Blob([bodyStr]).size + 500;
+                    
+                    fetch('/api/flotaespecial/actualizar_fin_parada', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                        body: bodyStr
+                    }).then(res => {
+                        if (res.ok) {
+                            addDataUsage(estimatedBytes);
+                            paradasCerradas.forEach(p => p.sincronizada = true);
+                            syncQueue.paradas = syncQueue.paradas.filter(p => !p.sincronizada);
+                            guardarCola();
+                        }
+                    }).catch(e => {});
+                }
+            }
+
+            procesarLecturaGPS();
+            setInterval(procesarLecturaGPS, FRECUENCIA_SONDEO);
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

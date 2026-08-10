@@ -80,6 +80,9 @@ def create_app():
     
     # --- NUEVO: Comercializador GLP ---
     from app.blueprints.B_bp_comercializador_glp import bp_comercializador_glp
+    
+    # --- NUEVO: Transporte Especial ---
+    from app.blueprints.B_bp_controlador_flotaespecial import bp_controlador_flotaespecial
    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
@@ -90,6 +93,9 @@ def create_app():
     
     # --- NUEVO: Comercializador GLP ---
     app.register_blueprint(bp_comercializador_glp)
+    
+    # --- NUEVO: Transporte Especial ---
+    app.register_blueprint(bp_controlador_flotaespecial)
 
     # ---------------------------------------------------------
     #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
@@ -103,6 +109,9 @@ def create_app():
     # --- NUEVO: Mecánico GLP (PWA) ---
     from app.blueprints.C_bp_mecanico_glp import bp_mecanico_glp
     
+    # --- NUEVO: Transporte Especial ---
+    from app.blueprints.B_bp_operador_flotaespecial import bp_operador_flotaespecial
+    
     app.register_blueprint(bp_oper_bodegas)
     app.register_blueprint(bp_verificador_bodegas)
     app.register_blueprint(bp_flotacarga)
@@ -111,6 +120,9 @@ def create_app():
     
     # --- NUEVO: Mecánico GLP (PWA) ---
     app.register_blueprint(bp_mecanico_glp)
+    
+    # --- NUEVO: Transporte Especial ---
+    app.register_blueprint(bp_operador_flotaespecial)
 
     return app
 

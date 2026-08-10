@@ -1,0 +1,481 @@
+# app/blueprints/B_bp_operador_flotaespecial.py
+import math
+from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash
+from app import mysql
+from app.utils import login_required_custom
+from datetime import datetime
+import MySQLdb.cursors
+
+bp_operador_flotaespecial = Blueprint('operador_flotaespecial', __name__)
+
+# ==============================================================================
+# 1. RUTA: DASHBOARD PRINCIPAL DEL OPERADOR DE TRANSPORTE ESPECIAL
+# ==============================================================================
+@bp_operador_flotaespecial.route('/dashboard_operador_especial')
+@login_required_custom
+def dashboard_operador_especial():
+    return render_template('B_modulo_operador_flotaespecial.html',
+                           nit=session.get('nit'),
+                           empresa=session.get('empresa'),
+                           nombre=session.get('nombre'))
+
+
+# ==============================================================================
+# 2. LÓGICA DE PRELOGIN Y VIAJES (Enlace con el Vehículo Especial)
+# ==============================================================================
+@bp_operador_flotaespecial.route('/dashboard/flotaespecial/prelogin', methods=['POST'])
+@login_required_custom
+def prelogin_flotaespecial():
+    modulos_activos = session.get('modulos_activos', [])
+    if 'flotaespecial' not in modulos_activos:
+        return jsonify(success=False, message="Acceso denegado: Tu empresa no tiene contratado el módulo de Transporte Especial."), 403
+
+    data = request.get_json(silent=True) or {}
+    placa = (data.get("placa") or "").upper().strip()
+    
+    if not placa:
+        return jsonify(success=False, message="Placa no detectada."), 400
+
+    empresa = session.get("empresa")
+    empresa_id = session.get("empresa_id")
+    usuario_id = session.get("usuario_id")
+    if not empresa or not usuario_id:
+        return jsonify(success=False, message="Sesión inválida."), 403
+
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id, empresa FROM vehiculos WHERE placa = %s LIMIT 1", (placa,))
+    v = cur.fetchone()
+
+    if not v:
+        cur.close()
+        return jsonify(success=False, message="Vehículo no encontrado en el sistema."), 404
+    
+    v_empresa = v.get("empresa") if isinstance(v, dict) else v[1]
+    v_id = v.get("id") if isinstance(v, dict) else v[0]
+
+    if str(v_empresa).strip() != str(empresa).strip():
+        cur.close()
+        return jsonify(success=False, message="Este vehículo no pertenece a su empresa."), 403
+
+    try:
+        cur.execute("UPDATE vehiculos SET estatus='Prelogueado' WHERE id=%s", (v_id,))
+        
+        # Tabla adaptada para especial
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS historial_sesiones_flotaespecial (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                id_empresa INT NOT NULL,
+                id_usuario INT NOT NULL,
+                placa_vehiculo VARCHAR(20),
+                fecha_login DATETIME,
+                fecha_logout_manual DATETIME,
+                latitud DECIMAL(10, 8),
+                longitud DECIMAL(11, 8),
+                estado_sesion VARCHAR(20) DEFAULT 'ACTIVA',
+                INDEX(id_empresa, id_usuario)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        
+        cur.execute("""
+            INSERT INTO historial_sesiones_flotaespecial (id_empresa, id_usuario, placa_vehiculo, fecha_login)
+            VALUES (%s, %s, %s, NOW())
+        """, (empresa_id, usuario_id, placa))
+        
+        mysql.connection.commit()
+    except Exception as e:
+        mysql.connection.rollback()
+        cur.close()
+        return jsonify(success=False, message=f"Error al registrar sesión: {str(e)}"), 500
+    finally:
+        cur.close()
+
+    session["placa_prelogueada_especial"] = placa
+    
+    return jsonify(
+        success=True, 
+        message="Vehículo prelogueado correctamente.", 
+        redirect_url="/router/flotaespecial"
+    )
+
+@bp_operador_flotaespecial.route('/api/viaje_especial/iniciar', methods=['POST'])
+@login_required_custom
+def iniciar_viaje_especial():
+    empresa_id = session.get('empresa_id')
+    usuario_id = session.get('usuario_id')
+    placa = session.get('placa_prelogueada_especial')
+
+    if not placa:
+        return jsonify({"status": "error", "message": "No hay vehículo prelogueado."}), 400
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS viajes_flotaespecial (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                id_empresa INT NOT NULL,
+                id_usuario_operador INT NOT NULL,
+                placa_vehiculo VARCHAR(20) NOT NULL,
+                consecutivo_viaje VARCHAR(50) NOT NULL,
+                fecha_hora_inicio DATETIME NOT NULL,
+                fecha_hora_fin DATETIME NULL,
+                estado VARCHAR(20) DEFAULT 'Activo',
+                INDEX(id_empresa, id_usuario_operador)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        
+        cur.execute("""
+            SELECT COUNT(*) as total 
+            FROM viajes_flotaespecial 
+            WHERE id_empresa = %s AND placa_vehiculo = %s AND YEAR(fecha_hora_inicio) = YEAR(NOW())
+        """, (empresa_id, placa))
+        resultado = cur.fetchone()
+        contador = (resultado['total'] if resultado else 0) + 1
+        
+        consecutivo = f"VIAJE-ESP-{placa}-{str(contador).zfill(3)}"
+
+        cur.execute("""
+            INSERT INTO viajes_flotaespecial (id_empresa, id_usuario_operador, placa_vehiculo, consecutivo_viaje, fecha_hora_inicio, estado)
+            VALUES (%s, %s, %s, %s, NOW(), 'Activo')
+        """, (empresa_id, usuario_id, placa, consecutivo))
+        
+        id_viaje = cur.lastrowid
+        mysql.connection.commit()
+
+        session['viaje_activo_especial'] = True
+        session['consecutivo_viaje_especial'] = consecutivo
+        session['id_viaje_especial'] = id_viaje
+
+        return jsonify({"status": "success", "consecutivo": consecutivo}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+@bp_operador_flotaespecial.route('/api/viaje_especial/finalizar', methods=['POST'])
+@login_required_custom
+def finalizar_viaje_especial():
+    id_viaje = session.get('id_viaje_especial')
+    if not id_viaje:
+        return jsonify({"status": "error", "message": "No hay un viaje activo para finalizar."}), 400
+
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("""
+            UPDATE viajes_flotaespecial 
+            SET fecha_hora_fin = NOW(), estado = 'Finalizado' 
+            WHERE id = %s AND id_empresa = %s
+        """, (id_viaje, session.get('empresa_id')))
+        mysql.connection.commit()
+
+        session.pop('viaje_activo_especial', None)
+        session.pop('consecutivo_viaje_especial', None)
+        session.pop('id_viaje_especial', None)
+
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+
+@bp_operador_flotaespecial.route('/api/viaje_especial/recuperar', methods=['POST'])
+@login_required_custom
+def recuperar_viaje_especial():
+    datos = request.get_json(silent=True) or {}
+    placa = datos.get('placa')
+    empresa_id = session.get('empresa_id')
+    usuario_id = session.get('usuario_id')
+    
+    if not placa:
+        return jsonify({"status": "error", "message": "Placa no proporcionada"}), 400
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("""
+            SELECT id, consecutivo_viaje 
+            FROM viajes_flotaespecial 
+            WHERE placa_vehiculo = %s AND id_empresa = %s AND id_usuario_operador = %s AND estado = 'Activo'
+            ORDER BY id DESC LIMIT 1
+        """, (placa, empresa_id, usuario_id))
+        viaje = cur.fetchone()
+
+        if viaje:
+            session['placa_prelogueada_especial'] = placa
+            session['viaje_activo_especial'] = True
+            session['consecutivo_viaje_especial'] = viaje['consecutivo_viaje']
+            session['id_viaje_especial'] = viaje['id']
+
+            cur.execute("UPDATE vehiculos SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
+            
+            cur.execute("""
+                INSERT INTO historial_sesiones_flotaespecial (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion)
+                VALUES (%s, %s, %s, NOW(), 'ACTIVA')
+            """, (empresa_id, usuario_id, placa))
+
+            mysql.connection.commit()
+            return jsonify({"status": "success", "consecutivo": viaje['consecutivo_viaje']}), 200
+        else:
+            return jsonify({"status": "error", "message": "No se encontró un viaje activo válido para recuperar."}), 404
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+# ==============================================================================
+# 3. RUTAS DE SESIÓN EN VIVO (HEARTBEAT Y LOGOUT)
+# ==============================================================================
+@bp_operador_flotaespecial.route('/api/flotaespecial/heartbeat', methods=['POST'])
+def heartbeat_flotaespecial():
+    if 'usuario_id' not in session:
+        return jsonify({"status": "error", "message": "No autenticado"}), 401
+        
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (session.get('usuario_id'),))
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@bp_operador_flotaespecial.route('/api/flotaespecial/logout_manual', methods=['POST'])
+def logout_manual_flotaespecial():
+    if 'usuario_id' not in session: 
+        return jsonify({"status": "error"}), 401
+    
+    if session.get('viaje_activo_especial'):
+        return jsonify({"status": "error", "message": "Finaliza el viaje primero."}), 403
+        
+    empresa_id = session.get('empresa_id')
+    usuario_id = session.get('usuario_id')
+    placa = session.get('placa_prelogueada_especial')
+    
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            UPDATE historial_sesiones_flotaespecial 
+            SET fecha_logout_manual = NOW(), estado_sesion = 'FINALIZADA'
+            WHERE id_usuario = %s AND id_empresa = %s AND estado_sesion = 'ACTIVA'
+            ORDER BY id DESC LIMIT 1
+        """, (usuario_id, empresa_id))
+        
+        if placa:
+            cur.execute("UPDATE vehiculos SET estatus='No logueado' WHERE placa=%s AND id_empresa=%s", (placa, empresa_id))
+            
+        mysql.connection.commit()
+        cur.close()
+        
+        session.pop('placa_prelogueada_especial', None)
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ==============================================================================
+# 4. MOTOR DE RASTREO, GEOCERCA Y RUTAS HISTÓRICAS
+# ==============================================================================
+@bp_operador_flotaespecial.route('/api/flotaespecial/actualizar_ubicacion', methods=['POST'])
+def actualizar_ubicacion_especial():
+    if 'usuario_id' not in session or 'placa_prelogueada_especial' not in session:
+        return jsonify({"status": "error", "message": "Sesión inválida"}), 401
+
+    placa = session.get('placa_prelogueada_especial')
+    empresa_id = session.get('empresa_id')
+    datos = request.get_json(silent=True) or {}
+    
+    ubicaciones = datos.get('ubicaciones', [])
+    if not ubicaciones:
+        latitud = datos.get('lat')
+        longitud = datos.get('lng')
+        if latitud and longitud:
+            ubicaciones = [{'lat': latitud, 'lng': longitud, 'fecha_hora': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]
+
+    if not ubicaciones:
+        return jsonify({"status": "error", "message": "Faltan coordenadas"}), 400
+
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS vehiculos_historial_rutas_especial (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                id_empresa INT NOT NULL,
+                placa VARCHAR(20) NOT NULL,
+                latitud DECIMAL(10, 8),
+                longitud DECIMAL(11, 8),
+                fecha_hora DATETIME,
+                tipo_registro VARCHAR(50),
+                nombre_punto VARCHAR(255),
+                INDEX(id_empresa, placa)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+
+        ultima_lat = ubicaciones[-1]['lat']
+        ultima_lng = ubicaciones[-1]['lng']
+        cur.execute("UPDATE vehiculos SET ultima_latitud = %s, ultima_longitud = %s WHERE placa = %s AND id_empresa = %s", (ultima_lat, ultima_lng, placa, empresa_id))
+        
+        for ubi in ubicaciones:
+            fecha_hora = ubi.get('fecha_hora', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            cur.execute("""
+                INSERT INTO vehiculos_historial_rutas_especial (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro)
+                VALUES (%s, %s, %s, %s, %s, 'Automático')
+            """, (empresa_id, placa, ubi['lat'], ubi['lng'], fecha_hora))
+
+        mysql.connection.commit()
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+
+@bp_operador_flotaespecial.route('/api/flotaespecial/registrar_parada', methods=['POST'])
+def registrar_parada_especial():
+    if 'usuario_id' not in session or 'placa_prelogueada_especial' not in session:
+        return jsonify({"status": "error", "message": "Sesión inválida"}), 401
+        
+    datos = request.get_json(silent=True) or {}
+    empresa_id = session.get('empresa_id')
+    placa = session.get('placa_prelogueada_especial')
+    usuario_id = session.get('usuario_id')
+    
+    paradas = datos.get('paradas', [])
+    if not paradas and 'lat' in datos:
+        paradas = [datos]
+        
+    if not paradas:
+        return jsonify({"status": "error", "message": "Datos vacíos"}), 400
+        
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS historial_paradas_flotaespecial (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                id_empresa INT NOT NULL,
+                placa VARCHAR(20) NOT NULL,
+                usuario_id INT NOT NULL,
+                fecha DATE,
+                hora_inicio TIME,
+                hora_fin TIME,
+                latitud DECIMAL(10, 8),
+                longitud DECIMAL(11, 8),
+                tipo_actividad VARCHAR(100),
+                nombre_punto VARCHAR(255),
+                origen_registro VARCHAR(50),
+                INDEX(id_empresa, placa)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+
+        ids_insertados = []
+        for p in paradas:
+            cur.execute("""
+                INSERT INTO historial_paradas_flotaespecial 
+                (id_empresa, placa, usuario_id, fecha, hora_inicio, hora_fin, latitud, longitud, tipo_actividad, nombre_punto, origen_registro)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                empresa_id, placa, usuario_id, 
+                p.get('fecha', datetime.now().strftime('%Y-%m-%d')),
+                p.get('hora_inicio', datetime.now().strftime('%H:%M:%S')),
+                p.get('hora_fin'),
+                p.get('lat'), p.get('lng'),
+                p.get('tipo_actividad', 'Otra'),
+                p.get('nombre_punto', 'Punto Desconocido'),
+                p.get('origen_registro', 'Manual')
+            ))
+            nuevo_id = cur.lastrowid
+            ids_insertados.append({"temp_id": p.get('temp_id'), "db_id": nuevo_id})
+            
+            fecha_hora = f"{p.get('fecha', datetime.now().strftime('%Y-%m-%d'))} {p.get('hora_inicio', datetime.now().strftime('%H:%M:%S'))}"
+            cur.execute("""
+                INSERT INTO vehiculos_historial_rutas_especial (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro, nombre_punto)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                empresa_id, placa, p.get('lat'), p.get('lng'), fecha_hora,
+                'Parada ' + p.get('origen_registro', 'Manual'),
+                p.get('nombre_punto', 'Punto Desconocido')
+            ))
+
+        mysql.connection.commit()
+        return jsonify({"status": "success", "ids_mapeados": ids_insertados}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+
+@bp_operador_flotaespecial.route('/api/flotaespecial/actualizar_fin_parada', methods=['POST'])
+def actualizar_fin_parada_especial():
+    if 'usuario_id' not in session: 
+        return jsonify({"status": "error"}), 401
+    
+    datos = request.get_json(silent=True) or {}
+    paradas = datos.get('paradas', [])
+    if not paradas and 'id' in datos:
+        paradas = [datos]
+        
+    cur = mysql.connection.cursor()
+    try:
+        for p in paradas:
+            if p.get('id'):
+                cur.execute("""
+                    UPDATE historial_paradas_flotaespecial 
+                    SET hora_fin = %s 
+                    WHERE id = %s AND id_empresa = %s
+                """, (p.get('hora_fin', datetime.now().strftime('%H:%M:%S')), p.get('id'), session.get('empresa_id')))
+        mysql.connection.commit()
+        return jsonify({"status":"success"})
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status":"error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+
+def calcular_distancia(lat1, lon1, lat2, lon2):
+    R = 6371000 
+    phi1 = math.radians(float(lat1))
+    phi2 = math.radians(float(lat2))
+    delta_phi = math.radians(float(lat2) - float(lat1))
+    delta_lambda = math.radians(float(lon2) - float(lon1))
+    a = math.sin(delta_phi/2.0)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda/2.0)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c
+
+
+@bp_operador_flotaespecial.route('/cron/flotaespecial/deslogueo_geocerca', methods=['GET', 'POST'])
+def cron_deslogueo_geocerca_especial():
+    token = request.args.get('token')
+    if token != 'BQA_CRON_2026': return jsonify({"status": "error"}), 403
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("""
+        SELECT v.placa, v.ultima_latitud, v.ultima_longitud, 
+               e.base_latitud, e.base_longitud, e.radio_permitido_metros
+        FROM vehiculos v
+        JOIN empresas e ON v.id_empresa = e.id
+        WHERE v.estatus IN ('Logueado', 'Prelogueado') 
+          AND v.ultima_latitud IS NOT NULL AND e.base_latitud IS NOT NULL
+    """)
+    vehiculos = cur.fetchall()
+    vehiculos_a_desloguear = []
+    
+    for v in vehiculos:
+        distancia = calcular_distancia(v['ultima_latitud'], v['ultima_longitud'], v['base_latitud'], v['base_longitud'])
+        if distancia <= (v['radio_permitido_metros'] or 200):
+            vehiculos_a_desloguear.append(v['placa'])
+            
+    if vehiculos_a_desloguear:
+        format_strings = ','.join(['%s'] * len(vehiculos_a_desloguear))
+        cur.execute(f"UPDATE vehiculos SET estatus = 'No logueado' WHERE placa IN ({format_strings})", tuple(vehiculos_a_desloguear))
+        mysql.connection.commit()
+        
+    cur.close()
+    return jsonify({"status": "success", "total_deslogueados": len(vehiculos_a_desloguear)})

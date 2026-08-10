@@ -118,7 +118,7 @@ def dashboard_gestor():
             FROM usuarios u
             INNER JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
-                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
+                WHERE id_usuario = u.id
             )
             WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
             ORDER BY u.nombre ASC
@@ -214,7 +214,7 @@ def monitoreo_realtime():
             FROM usuarios u
             INNER JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
-                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
+                WHERE id_usuario = u.id
             )
             WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
             ORDER BY u.nombre ASC
@@ -824,7 +824,7 @@ def descargar_preoperacional_pdf(consecutivo):
     nit_empresa = session.get('nit')
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT * FROM inspeccion_preoperacional_carga WHERE consecutivo_anual = %s AND id_empresa = %s LIMIT 1", (consecutivo, empresa_id))
+    cur.execute("SELECT * FROM inspeccion_preoperacional_carga internal WHERE consecutivo_anual = %s AND id_empresa = %s LIMIT 1", (consecutivo, empresa_id))
     insp = cur.fetchone()
     cur.close()
 
