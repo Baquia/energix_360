@@ -1134,7 +1134,6 @@
       const tbody = document.getElementById('tablaAprobacionesGLP');
       tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
 
-      // CAMBIO CLAVE: Espejo exacto del Webmaster usando la constante EMPRESA_ID
       fetch('/glp/admin/obtener_solicitudes_pendientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1145,8 +1144,12 @@
         document.getElementById('msgSinAprobaciones').style.display = 'none';
 
         data.items.forEach(i => {
+          let maxNivel = 0; // NUEVO
           let tks = '<div class="d-flex gap-2">';
-          i.tanques.forEach(t => { tks += `<div class="border p-1 rounded text-center"><div class="small fw-bold">${t.numero}</div><div class="${t.nivel <= 25 ? 'text-danger' : ''}">${t.nivel}%</div></div>`; });
+          i.tanques.forEach(t => {
+            if (t.nivel > maxNivel) maxNivel = t.nivel; // NUEVO
+            tks += `<div class="border p-1 rounded text-center"><div class="small fw-bold">${t.numero}</div><div class="${t.nivel <= 25 ? 'text-danger' : ''}">${t.nivel}%</div></div>`;
+          });
           tks += '</div>';
 
           tbody.innerHTML += `<tr>
@@ -1157,7 +1160,7 @@
             <td><h5 class="text-success m-0">${i.nivel_solicitado}%</h5></td>
             <td class="text-center">
                 <div class="d-flex justify-content-center gap-2">
-                    <button class="btn btn-success btn-sm" title="Aprobar" onclick="aprobarSolicitudGLP(${i.id}, this)">👍</button>
+                    <button class="btn btn-success btn-sm" title="Aprobar" onclick="aprobarSolicitudGLP(${i.id}, this, ${i.nivel_solicitado}, ${maxNivel})">👍</button>
                     <button class="btn btn-danger btn-sm" title="Anular/Rechazar" onclick="rechazarSolicitudGLP(${i.id}, this)">❌</button>
                     <button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${i.id})">📈 Analizar</button>
                 </div>
@@ -1167,40 +1170,55 @@
       });
     }
 
-    function aprobarSolicitudGLP(id, btn) {
+    function aprobarSolicitudGLP(id, btn, solicitado, actual) {
+      if (solicitado !== undefined && actual !== undefined) {
+        if (solicitado <= actual) {
+          alert("⚠️ ERROR DE LÓGICA:\nEl nivel solicitado (" + solicitado + "%) es igual o menor al nivel actual (" + actual + "%).\n\nEl sistema no procesará un despacho de 0%. Por favor, use el botón rojo (❌) para RECHAZARLA.");
+          return;
+        }
+      }
       if (!confirm("¿Aprobar solicitud?")) return;
       btn.disabled = true;
       fetch('/glp/admin/aprobar_solicitud', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id })
-      }).then(r => r.json()).then(d => { if (d.success) { alert("Aprobada"); mostrarAprobaciones(); } else { alert(d.message); btn.disabled = false; } });
+      }).then(r => r.json()).then(d => {
+        if (d.success) {
+          alert("Aprobada");
+          const fila = btn.closest('tr');
+          if (fila) fila.remove();
+          if (document.getElementById('tablaAprobacionesGLP').children.length === 0) {
+            document.getElementById('msgSinAprobaciones').style.display = 'block';
+          }
+        } else {
+          alert(d.message); btn.disabled = false;
+        }
+      }).catch(e => { alert("Error"); btn.disabled = false; });
     }
 
     function rechazarSolicitudGLP(id, btn) {
       if (!confirm("¿Está seguro de anular esta solicitud? Desaparecerá de esta lista.")) return;
       btn.disabled = true;
       btn.textContent = "⏳";
-
       fetch('/glp/admin/rechazar_solicitud', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            alert("Solicitud anulada correctamente.");
-            mostrarAprobaciones(); // Recarga la tabla en la vista del supervisor
-          } else {
-            alert("Error: " + data.message);
-            btn.disabled = false;
-            btn.textContent = "❌";
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id })
+      }).then(r => r.json()).then(data => {
+        if (data.success) {
+          alert("Solicitud anulada correctamente.");
+          const fila = btn.closest('tr');
+          if (fila) fila.remove();
+          if (document.getElementById('tablaAprobacionesGLP').children.length === 0) {
+            document.getElementById('msgSinAprobaciones').style.display = 'block';
           }
-        })
-        .catch(e => {
-          alert("Error de red al intentar anular.");
+        } else {
+          alert("Error: " + data.message);
           btn.disabled = false;
           btn.textContent = "❌";
-        });
+        }
+      }).catch(e => {
+        alert("Error de red al intentar anular.");
+        btn.disabled = false;
+        btn.textContent = "❌";
+      });
     }
 
     function abrirSimuladorProyeccion(id) {
@@ -1277,7 +1295,20 @@
     function confirmarAprobacionSimulada() {
       fetch('/glp/admin/aprobar_solicitud', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idPedidoEnAnalisis, nivel_aprobado: document.getElementById('sim_input_solicita').value })
-      }).then(r => r.json()).then(d => { if (d.success) { alert("Aprobado"); bootstrap.Modal.getInstance(document.getElementById('modalProyeccion')).hide(); mostrarAprobaciones(); } });
+      }).then(r => r.json()).then(d => {
+        if (d.success) {
+          alert("Aprobado");
+          bootstrap.Modal.getInstance(document.getElementById('modalProyeccion')).hide();
+          const botonAprobar = document.querySelector(`button[onclick*="aprobarSolicitudGLP(${idPedidoEnAnalisis}"]`);
+          if (botonAprobar) {
+            const fila = botonAprobar.closest('tr');
+            if (fila) fila.remove();
+          }
+          if (document.getElementById('tablaAprobacionesGLP').children.length === 0) {
+            document.getElementById('msgSinAprobaciones').style.display = 'block';
+          }
+        }
+      });
     }
 
     // ==============================================

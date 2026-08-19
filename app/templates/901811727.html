@@ -2432,12 +2432,10 @@
       document.getElementById('seccionAprobacionesGLP').style.display = 'block';
       cargarAprobacionesGLP(empresaId);
     }
-
     function cargarAprobacionesGLP(empresaId) {
       const tbody = document.getElementById('tablaAprobacionesGLP');
       tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando...</td></tr>';
 
-      // CAMBIO CLAVE: Transformamos el GET en un POST con el empresa_id
       fetch('/glp/admin/obtener_solicitudes_pendientes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2453,8 +2451,10 @@
           document.getElementById('msgSinAprobaciones').style.display = 'none';
 
           data.items.forEach(item => {
+            let maxNivel = 0; // NUEVO: Extraer nivel máximo para validación
             let htmlTanques = '<div class="d-flex gap-2">';
             item.tanques.forEach(t => {
+              if (t.nivel > maxNivel) maxNivel = t.nivel; // NUEVO
               let color = t.nivel <= 25 ? 'text-danger fw-bold' : '';
               htmlTanques += `<div class="border p-1 rounded text-center" style="min-width:60px;"><div class="small fw-bold">${t.numero}</div><div class="${color}">${t.nivel}%</div></div>`;
             });
@@ -2469,7 +2469,7 @@
               <td class="text-center"><div class="fs-5 fw-bold text-success">${item.nivel_solicitado}%</div><div class="small text-muted">Llenar hasta</div></td>
               <td class="text-center">
                   <div class="d-flex justify-content-center gap-2">
-                      <button class="btn btn-success btn-sm" title="Aprobar" onclick="aprobarSolicitudGLP(${item.id}, this)">👍</button>
+                      <button class="btn btn-success btn-sm" title="Aprobar" onclick="aprobarSolicitudGLP(${item.id}, this, ${item.nivel_solicitado}, ${maxNivel})">👍</button>
                       <button class="btn btn-danger btn-sm" title="Anular" onclick="rechazarSolicitudGLP(${item.id}, this)">❌</button>
                       <button class="btn btn-primary btn-sm" onclick="abrirSimuladorProyeccion(${item.id})">📈 Analizar</button>
                   </div>
@@ -2478,36 +2478,69 @@
           });
         });
     }
-    function aprobarSolicitudGLP(id, btn) { if (!confirm("¿Aprobar esta solicitud para que el cliente pueda enviarla?")) return; btn.disabled = true; btn.textContent = "Procesando..."; fetch('/glp/admin/aprobar_solicitud', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) }).then(r => r.json()).then(data => { if (data.success) { alert("Aprobada correctamente."); cargarAprobacionesGLP(); } else { alert("Error: " + data.message); btn.disabled = false; btn.textContent = "👍"; } }); }
+
+    function aprobarSolicitudGLP(id, btn, solicitado, actual) {
+      // 1. VALIDACIÓN ANTI-ENGANCHE (Previene el error de Granja Horizonte)
+      if (solicitado !== undefined && actual !== undefined) {
+         if (solicitado <= actual) {
+             alert("⚠️ ERROR DE LÓGICA:\nEl nivel solicitado (" + solicitado + "%) es igual o menor al nivel actual (" + actual + "%).\n\nEl sistema no procesará un despacho de 0%. Por favor, use el botón rojo (❌) para RECHAZAR y limpiar esta solicitud.");
+             return;
+         }
+      }
+
+      if (!confirm("¿Aprobar esta solicitud para que el cliente pueda enviarla?")) return;
+      btn.disabled = true; 
+      btn.textContent = "Procesando...";
+      
+      fetch('/glp/admin/aprobar_solicitud', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ id: id }) 
+      })
+      .then(r => r.json()).then(data => { 
+          if (data.success) { 
+              alert("Aprobada correctamente."); 
+              // 2. ELIMINAR DEL DOM EN LUGAR DE RECARGAR
+              const fila = btn.closest('tr');
+              if (fila) fila.remove();
+              // Verificar si era la última
+              if (document.getElementById('tablaAprobacionesGLP').children.length === 0) {
+                  document.getElementById('msgSinAprobaciones').style.display = 'block';
+              }
+          } else { 
+              alert("Error: " + data.message); 
+              btn.disabled = false; btn.textContent = "👍"; 
+          } 
+      }).catch(e => { alert("Error de red."); btn.disabled = false; btn.textContent = "👍"; }); 
+    }
+
     function rechazarSolicitudGLP(id, btn) {
       if (!confirm("¿Está seguro de anular esta solicitud? Desaparecerá de la lista.")) return;
-      btn.disabled = true;
+      btn.disabled = true; 
       btn.textContent = "⏳";
-
-      fetch('/glp/admin/rechazar_solicitud', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id })
-      }).then(r => r.json()).then(data => {
+      
+      fetch('/glp/admin/rechazar_solicitud', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ id: id }) 
+      })
+      .then(r => r.json()).then(data => {
         if (data.success) {
           alert("Solicitud anulada correctamente.");
-          cargarAprobacionesGLP(); // Recarga la tabla para que desaparezca
-        } else {
-          alert("Error: " + data.message);
-          btn.disabled = false;
-          btn.textContent = "❌";
-        }
-      }).catch(e => {
-        alert("Error de red al intentar anular.");
-        btn.disabled = false;
-        btn.textContent = "❌";
-      });
+          // 2. ELIMINAR DEL DOM EN LUGAR DE RECARGAR
+          const fila = btn.closest('tr');
+          if (fila) fila.remove();
+          if (document.getElementById('tablaAprobacionesGLP').children.length === 0) {
+              document.getElementById('msgSinAprobaciones').style.display = 'block';
+          }
+        } else { alert("Error: " + data.message); btn.disabled = false; btn.textContent = "❌"; }
+      }).catch(e => { alert("Error de red."); btn.disabled = false; btn.textContent = "❌"; });
     }
+    
     let chartSimulador = null, datosSimulacion = null, idPedidoEnAnalisis = null;
     function abrirSimuladorProyeccion(idPedido) { idPedidoEnAnalisis = idPedido; const modal = new bootstrap.Modal(document.getElementById('modalProyeccion')); modal.show(); fetch('/glp/admin/analizar_proyeccion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: idPedido }) }).then(r => r.json()).then(data => { if (!data.success) return; datosSimulacion = data; document.getElementById('sim_nivel_actual').innerText = data.nivel_actual + "%"; document.getElementById('sim_tasa').innerText = "-" + data.tasa_descenso_diaria + "%"; document.getElementById('sim_input_solicita').value = data.solicitado_original; renderizarGraficaProyeccion(); }); }
     function actualizarGraficaSimulacion() { if (chartSimulador) renderizarGraficaProyeccion(); }
     function renderizarGraficaProyeccion() { const ctx = document.getElementById('chartProyeccion').getContext('2d'); let solicita = parseFloat(document.getElementById('sim_input_solicita').value) || 0; const labels = [], dataProyeccion = [], dataSeguridad = []; let nivelSimulado = datosSimulacion.nivel_actual + solicita; if (nivelSimulado > 100) nivelSimulado = 100; let diaInicio = datosSimulacion.dia_actual; let diaFin = 16; if (diaInicio >= 15) diaFin = diaInicio + 3; for (let d = diaInicio; d <= diaFin; d++) { labels.push("Día " + d); dataProyeccion.push(nivelSimulado.toFixed(1)); dataSeguridad.push(20); nivelSimulado -= datosSimulacion.tasa_descenso_diaria; if (nivelSimulado < 0) nivelSimulado = 0; } if (chartSimulador) chartSimulador.destroy(); chartSimulador = new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [{ label: 'Proyección Nivel (%)', data: dataProyeccion, borderColor: '#015249', backgroundColor: 'rgba(1, 82, 73, 0.1)', borderDash: [5, 5], pointRadius: 4, fill: true, tension: 0.1 }, { label: 'Mínimo Seguro (20%)', data: dataSeguridad, borderColor: '#dc3545', borderWidth: 2, pointRadius: 0, fill: false }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } } } }); }
-
 
     function confirmarAprobacionSimulada() {
       const valorFinal = document.getElementById('sim_input_solicita').value;
@@ -2515,7 +2548,7 @@
 
       fetch('/glp/admin/aprobar_solicitud', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, // <-- FUNDAMENTAL PARA EL BACKEND
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: idPedidoEnAnalisis,
           nivel_aprobado: valorFinal
@@ -2527,14 +2560,23 @@
             alert("✅ Solicitud aprobada con éxito.");
             const modal = bootstrap.Modal.getInstance(document.getElementById('modalProyeccion'));
             if (modal) modal.hide();
-            cargarAprobacionesGLP();
+            
+            // BORRAR FILA DEL DOM VÍA SELECTOR
+            const botonAprobar = document.querySelector(`button[onclick*="aprobarSolicitudGLP(${idPedidoEnAnalisis}"]`);
+            if (botonAprobar) {
+                const fila = botonAprobar.closest('tr');
+                if (fila) fila.remove();
+            }
+            if (document.getElementById('tablaAprobacionesGLP').children.length === 0) {
+                document.getElementById('msgSinAprobaciones').style.display = 'block';
+            }
           } else {
             alert("❌ Error: " + data.message);
           }
         })
         .catch(err => alert("Error de red al aprobar."));
     }
-
+    
   </script>
 
   <script id="empresas-data" type="application/json">
