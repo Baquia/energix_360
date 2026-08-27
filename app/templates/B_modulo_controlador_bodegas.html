@@ -611,6 +611,12 @@
                     </svg>
                     Cargar Picking (Excel)
                 </button>
+                <button onclick="abrirModalRutasPicking(); if(window.innerWidth<=768) toggleSidebar();" class="menu-item" style="background: #eef2ff; color: #4338ca;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 20l-5.5-5.5 1.5-1.5L9 17l9.5-9.5 1.5 1.5Z"></path>
+                    </svg>
+                    Rutas de Bodega (Pasillos)
+                </button>
             </div>
         </div>
 
@@ -929,6 +935,40 @@
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="closeUpload()">Cancelar</button>
                 <button class="btn-confirm" onclick="doUpload()">Subir Archivos</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- MODAL RUTAS PICKING (PASILLOS) -->
+    <!-- ============================================== -->
+    <div id="modalRutasPicking" class="modal-overlay" style="z-index: 3100;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>🗺️ Configurar Rutas de Bodega</h3>
+                <button class="btn-cancel" onclick="cerrarModalRutasPicking()" style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:#6b7280; font-size:0.9rem; margin-top:0; margin-bottom:15px;">
+                    Asigna un número (1, 2, 3...) para definir el orden físico de los pasillos. Las marcas sin número configurado caerán en el Pasillo Extra al final.
+                </p>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Marca / Fabricante</th>
+                                <th>Orden (Secuencia)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-rutas-picking-body">
+                            <!-- Inyectado vía JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="cerrarModalRutasPicking()">Cancelar</button>
+                <button class="btn-confirm" id="btnGuardarRutas" onclick="guardarRutasPicking()">Guardar Rutas</button>
             </div>
         </div>
     </div>
@@ -2334,6 +2374,62 @@
                 .catch(e => tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Error cargando historial.</td></tr>');
         }
         function cerrarModalHistorialActas() { document.getElementById('modalHistorialActas').style.display = 'none'; }
+
+        function abrirModalRutasPicking() {
+            document.getElementById('modalRutasPicking').style.display = 'flex';
+            const tbody = document.getElementById('tbl-rutas-picking-body');
+            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:2rem;">Cargando marcas y pasillos...</td></tr>';
+
+            fetch('/api/bodegas/rutas_picking?t=' + Date.now())
+                .then(r => r.json())
+                .then(data => {
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#9ca3af;">No hay marcas registradas.</td></tr>';
+                        return;
+                    }
+                    data.forEach(r => {
+                        let val = r.secuencia_picking === 9999 ? '' : r.secuencia_picking;
+                        tbody.innerHTML += `
+                        <tr style="background:white; border-bottom: 1px solid #f3f4f6;">
+                            <td data-label="Marca" style="font-weight:600; font-size:0.95rem; color:#1f2937;">${r.marca}</td>
+                            <td data-label="Secuencia">
+                                <input type="number" min="1" class="input-secuencia-ruta" data-marca="${r.marca}" value="${val}" 
+                                style="width:100%; max-width:120px; padding:10px; border-radius:6px; border:1px solid #cbd5e1; font-size:1rem; text-align:center;" placeholder="1, 2, 3...">
+                            </td>
+                        </tr>`;
+                    });
+                })
+                .catch(e => tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:red;">Error de conexión.</td></tr>');
+        }
+
+        function cerrarModalRutasPicking() { document.getElementById('modalRutasPicking').style.display = 'none'; }
+
+        function guardarRutasPicking() {
+            const btn = document.getElementById('btnGuardarRutas');
+            btn.textContent = 'Guardando...'; btn.disabled = true;
+
+            const inputs = document.querySelectorAll('.input-secuencia-ruta');
+            let rutas = [];
+            inputs.forEach(inp => {
+                let val = inp.value.trim();
+                let num = val === '' ? 9999 : parseInt(val);
+                rutas.push({marca: inp.dataset.marca, secuencia: num});
+            });
+
+            fetch('/api/bodegas/guardar_rutas_picking', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({rutas: rutas})
+            })
+            .then(r => r.json())
+            .then(d => {
+                alert(d.message);
+                if(d.status === 'success') cerrarModalRutasPicking();
+            })
+            .catch(e => alert("Error de red"))
+            .finally(() => { btn.textContent = 'Guardar Rutas'; btn.disabled = false; });
+        }
 
         function abrirModalAsignacionMarcas() {
             document.getElementById('modalAsignacionMarcas').style.display = 'flex';

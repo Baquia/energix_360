@@ -1,0 +1,255 @@
+<!-- app/templates/B_pdf_reporte_viaje_especial.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Recorrido Seguro - {{ viaje.id_viaje }}</title>
+    <style>
+        @page { 
+            margin: 20mm; 
+            size: letter;
+        }
+        body { 
+            font-family: 'Helvetica', 'Arial', sans-serif; 
+            color: #333; 
+            line-height: 1.4; 
+        }
+        .header { 
+            text-align: center; 
+            border-bottom: 3px solid #015249; 
+            padding-bottom: 15px; 
+            margin-bottom: 25px; 
+        }
+        .title { 
+            color: #015249; 
+            font-size: 22px; 
+            font-weight: bold; 
+            margin: 0; 
+            text-transform: uppercase;
+        }
+        .subtitle { 
+            font-size: 13px; 
+            color: #666; 
+            margin-top: 5px; 
+            font-weight: bold;
+        }
+        
+        .trip-id-box {
+            background-color: #f0fdf4;
+            border: 2px dashed #16a34a;
+            padding: 12px;
+            text-align: center;
+            margin-bottom: 25px;
+            border-radius: 8px;
+        }
+        .trip-id-box .lbl { font-size: 11px; color: #16a34a; text-transform: uppercase; letter-spacing: 1px; }
+        .trip-id-box .val { font-size: 26px; font-weight: bold; color: #015249; letter-spacing: 3px; font-family: monospace; }
+
+        .section-title { 
+            font-size: 12px; 
+            color: #ffffff; 
+            background-color: #015249; 
+            padding: 6px 12px; 
+            font-weight: bold; 
+            margin-bottom: 10px; 
+            border-radius: 4px;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 25px; 
+            font-size: 11px; 
+        }
+        th, td { 
+            border: 1px solid #e5e7eb; 
+            padding: 8px 10px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #f9fafb; 
+            width: 25%; 
+            color: #4b5563; 
+        }
+        td { color: #111827; }
+
+        .photos-container { 
+            width: 100%; 
+            text-align: center; 
+            margin-top: 15px; 
+        }
+        .photo-box { 
+            display: inline-block; 
+            width: 31%; 
+            margin: 1%; 
+            vertical-align: top; 
+        }
+        .photo-box img { 
+            width: 100%; 
+            max-height: 180px; 
+            object-fit: cover;
+            border: 1px solid #d1d5db; 
+            border-radius: 6px; 
+        }
+        .photo-label { 
+            font-size: 10px; 
+            font-weight: bold; 
+            margin-top: 8px; 
+            color: #015249; 
+            background: #eefcf9;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .no-photo {
+            height: 120px;
+            border: 1px dashed #ef4444;
+            color: #ef4444;
+            line-height: 120px;
+            font-size: 10px;
+            background: #fef2f2;
+            border-radius: 6px;
+        }
+
+        .signature-section {
+            margin-top: 40px;
+            text-align: center;
+        }
+        .signature-img { 
+            max-width: 280px; 
+            max-height: 120px;
+            border-bottom: 1px solid #111827; 
+            padding-bottom: 5px;
+        }
+        .signature-name { 
+            font-size: 14px; 
+            font-weight: bold; 
+            margin-top: 8px; 
+            color: #111827;
+        }
+        .signature-role { font-size: 11px; color: #6b7280; }
+
+        .footer { 
+            font-size: 10px; 
+            color: #6b7280; 
+            text-align: center; 
+            margin-top: 40px; 
+            border-top: 1px solid #e5e7eb; 
+            padding-top: 15px; 
+            word-break: break-all; 
+        }
+        .hash-string {
+            font-family: monospace;
+            color: #374151;
+            font-size: 12px;
+            font-weight: bold;
+            display: block;
+            margin-top: 5px;
+            background: #f3f4f6;
+            padding: 5px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">Reporte de Recorrido Seguro</h1>
+        <p class="subtitle">{{ viaje.empresa_transporte }}</p>
+    </div>
+
+    <div class="trip-id-box">
+        <div class="lbl">CÓDIGO DE IDENTIFICACIÓN DEL VIAJE</div>
+        <div class="val">{{ viaje.id_viaje }}</div>
+    </div>
+
+    <div class="section-title">1. DATOS DE LA AUTORIZACIÓN Y PACIENTE</div>
+    <table>
+        <tr>
+            <th>EPS / Cliente</th>
+            <td>{{ viaje.eps_cliente }}</td>
+            <th>No. Autorización</th>
+            <td><b>{{ viaje.numero_autorizacion }}</b></td>
+        </tr>
+        <tr>
+            <th>Paciente Transportado</th>
+            <td><b>{{ viaje.nombre_usuario }}</b></td>
+            <th>Documento / ID</th>
+            <td>{{ viaje.id_usuario }}</td>
+        </tr>
+        <tr>
+            <th>Dirección de Origen</th>
+            <td>{{ viaje.direccion_origen }}</td>
+            <th>Dirección de Destino</th>
+            <td>{{ viaje.direccion_destino }}</td>
+        </tr>
+        <tr>
+            <th>Servicio / Código</th>
+            <td colspan="3">{{ viaje.codigo_servicio }}</td>
+        </tr>
+    </table>
+
+    <div class="section-title">2. DETALLES DE EJECUCIÓN DEL SERVICIO</div>
+    <table>
+        <tr>
+            <th>Operador / Conductor Real</th>
+            <td><b>{{ viaje.conductor_nombre }}</b> (CC: {{ viaje.conductor_cedula }})</td>
+            <th>Vehículo (Placa)</th>
+            <td style="font-size: 14px;"><b>{{ viaje.placa_vehiculo }}</b></td>
+        </tr>
+        <tr>
+            <th>Fecha y Hora Inicio Real</th>
+            <td>{{ viaje.fecha_hora_inicio }}</td>
+            <th>Fecha y Hora Fin Real</th>
+            <td>{{ viaje.fecha_hora_fin }}</td>
+        </tr>
+        <tr>
+            <th>Consecutivo Físico Sistema</th>
+            <td colspan="3" style="font-family: monospace; color: #4b5563;">{{ viaje.consecutivo_viaje }}</td>
+        </tr>
+    </table>
+
+    <div class="section-title">3. EVIDENCIAS FOTOGRÁFICAS DE TRAZABILIDAD</div>
+    <div class="photos-container">
+        <div class="photo-box">
+            {% if viaje.foto_origen %}
+                <img src="{{ viaje.foto_origen }}" alt="Origen">
+            {% else %}
+                <div class="no-photo">SIN EVIDENCIA</div>
+            {% endif %}
+            <div class="photo-label">PUNTO 1: RECOGIDA (ORIGEN)</div>
+        </div>
+        <div class="photo-box">
+            {% if viaje.foto_destino %}
+                <img src="{{ viaje.foto_destino }}" alt="Destino">
+            {% else %}
+                <div class="no-photo">SIN EVIDENCIA</div>
+            {% endif %}
+            <div class="photo-label">PUNTO 2: LLEGADA (DESTINO)</div>
+        </div>
+        <div class="photo-box">
+            {% if viaje.foto_retorno %}
+                <img src="{{ viaje.foto_retorno }}" alt="Retorno">
+            {% else %}
+                <div class="no-photo">SIN EVIDENCIA</div>
+            {% endif %}
+            <div class="photo-label">PUNTO 3: DEVOLUCIÓN (RETORNO)</div>
+        </div>
+    </div>
+
+    <div class="signature-section">
+        {% if viaje.firma %}
+            <img class="signature-img" src="{{ viaje.firma }}" alt="Firma">
+        {% else %}
+            <div style="height: 80px; width: 250px; border-bottom: 1px dashed #9ca3af; margin: 0 auto;"></div>
+        {% endif %}
+        <div class="signature-name">{{ viaje.nombre_usuario }}</div>
+        <div class="signature-role">Firma de Conformidad (Paciente / Acudiente Responsable)</div>
+    </div>
+
+    <div class="footer">
+        <b>CERTIFICACIÓN CRIPTOGRÁFICA BQA-ONE</b><br>
+        Este documento certifica la correcta ejecución del servicio mediante GPS y evidencias fotográficas.<br>
+        Ningún dato reportado en este documento puede ser modificado post-ejecución.<br>
+        <b>Sello SHA-256 (Hash de Integridad):</b>
+        <span class="hash-string">{{ hash }}</span>
+    </div>
+</body>
+</html>

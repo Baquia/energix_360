@@ -99,34 +99,30 @@ def dashboard_gestor():
     except Exception as e:
         print(f"Aviso tablas monitoreo flota: {e}")
 
-    # 2. Consultar TODOS los operadores, su estado en vivo, vehículo, tiempos y coordenadas
+    # 2. Consultar operadores logueados, su estado en vivo, vehículo, tiempos y coordenadas
     operadores_en_linea = []
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # ESTADO DINÁMICO DE 3 NIVELES ORDENADO POR ESTADO Y LUEGO ALFABÉTICAMENTE
+        # ESTADO DINÁMICO: Aumento de tolerancia a 300 segundos (5 min) para soportar pausas de OS en móviles
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                CASE 
-                    WHEN hs.id IS NOT NULL AND ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300 THEN 2
-                    WHEN hs.id IS NOT NULL THEN 1
-                    ELSE 0
-                END as en_linea,
+                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300, 1, 0) as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,
                 hs.latitud,
                 hs.longitud
             FROM usuarios u
-            LEFT JOIN historial_sesiones_flota hs ON hs.id = (
+            INNER JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
-                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE() AND estado_sesion = 'ACTIVA'
+                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
             )
             LEFT JOIN monitoreo_actividad ma ON ma.id_usuario = u.id
-            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga'
-            ORDER BY en_linea DESC, u.nombre ASC
+            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
+            ORDER BY u.nombre ASC
         """, (empresa_id,))
         
         operadores_db = cur.fetchall()
@@ -135,16 +131,17 @@ def dashboard_gestor():
         PLANTA_LAT = 4.4134686
         PLANTA_LNG = -75.1797367
         
-        # AJUSTE HORA COLOMBIA (UTC-5)
+        # AJUSTE HORA COLOMBIA (UTC-5): Calculamos dinámicamente el desfase del servidor
         now_local = datetime.now()
         now_utc = datetime.utcnow()
         server_offset = round((now_local - now_utc).total_seconds() / 3600)
-        adj_hours = -5 - server_offset 
+        adj_hours = -5 - server_offset # Objetivo UTC-5 (Colombia)
         
         # 3. Formatear los datos para la vista
         for op in operadores_db:
             op_dict = dict(op)
             
+            # Aplicar ajuste horario a logueo y deslogueo
             if op_dict['fecha_login']:
                 op_dict['fecha_login'] += timedelta(hours=adj_hours)
                 op_dict['fecha_login_str'] = op_dict['fecha_login'].strftime('%H:%M:%S')
@@ -157,6 +154,7 @@ def dashboard_gestor():
             else:
                 op_dict['fecha_logout_str'] = '--:--'
                 
+            # Calcular sitio de logueo por geocerca (100 metros)
             op_dict['sitio_logueo'] = "No registrado"
             if op_dict.get('latitud') and op_dict.get('longitud'):
                 dist = calcular_distancia(op_dict['latitud'], op_dict['longitud'], PLANTA_LAT, PLANTA_LNG)
@@ -202,30 +200,26 @@ def monitoreo_realtime():
         cur_hb.close()
 
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # ESTADO DINÁMICO DE 3 NIVELES CON ORDENAMIENTO POR ACTIVIDAD
+        # Mostrar logueados activos e identificar cortes de señal con tolerancia de 300s (5 min)
         cur.execute("""
             SELECT 
                 u.id as id_operador,
                 u.nombre as nombre_operador,
                 u.perfil,
-                CASE 
-                    WHEN hs.id IS NOT NULL AND ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300 THEN 2
-                    WHEN hs.id IS NOT NULL THEN 1
-                    ELSE 0
-                END as en_linea,
+                IF(ma.ultima_actividad IS NOT NULL AND TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 300, 1, 0) as en_linea,
                 hs.placa_vehiculo,
                 hs.fecha_login,
                 hs.fecha_logout_manual,
                 hs.latitud,
                 hs.longitud
             FROM usuarios u
-            LEFT JOIN historial_sesiones_flota hs ON hs.id = (
+            INNER JOIN historial_sesiones_flota hs ON hs.id = (
                 SELECT MAX(id) FROM historial_sesiones_flota 
-                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE() AND estado_sesion = 'ACTIVA'
+                WHERE id_usuario = u.id AND DATE(fecha_login) = CURDATE()
             )
             LEFT JOIN monitoreo_actividad ma ON ma.id_usuario = u.id
-            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga'
-            ORDER BY en_linea DESC, u.nombre ASC
+            WHERE u.empresa_id = %s AND u.perfil = 'operador_flotacarga' AND hs.estado_sesion = 'ACTIVA'
+            ORDER BY u.nombre ASC
         """, (empresa_id,))
         
         operadores_db = cur.fetchall()
@@ -233,6 +227,7 @@ def monitoreo_realtime():
         PLANTA_LAT = 4.4134686
         PLANTA_LNG = -75.1797367
         
+        # AJUSTE HORA COLOMBIA (UTC-5) PARA AJAX
         now_local = datetime.now()
         now_utc = datetime.utcnow()
         server_offset = round((now_local - now_utc).total_seconds() / 3600)
@@ -261,8 +256,10 @@ def monitoreo_realtime():
                 else:
                     op_dict['sitio_logueo'] = f"Lat: {op_dict['latitud']}, Lng: {op_dict['longitud']}"
             
+            # Formatear el string del perfil
             op_dict['perfil_str'] = str(op_dict['perfil']).replace('_', ' ').title()
                 
+            # Limpiar los objetos datetime y decimal nativos
             op_dict.pop('fecha_login', None)
             op_dict.pop('fecha_logout_manual', None)
             op_dict.pop('latitud', None)
@@ -754,11 +751,11 @@ def historial_preoperacionales():
     cur.execute("SELECT DISTINCT placa FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
     vehiculos_historicos = cur.fetchall()
 
-    # 2. Consultar Preoperacionales según filtro
+    # 2. Consultar Preoperacionales según filtro en la tabla unificada
     query = """
         SELECT id_inspeccion, consecutivo_anual, fecha_inspeccion, hora_inspeccion, 
                placa_vehiculo, nombre_conductor, vehiculo_aprobado 
-        FROM inspeccion_preoperacional_carga 
+        FROM inspeccion_preoperacional 
         WHERE id_empresa = %s AND fecha_inspeccion BETWEEN %s AND %s
     """
     params = [empresa_id, fecha_inicio, fecha_fin]
@@ -784,61 +781,6 @@ def historial_preoperacionales():
         filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'placa': placa_filtro}
     )
 
-# =========================================================
-# MÓDULO 6: MONITOREO DE COMBUSTIBLE
-# =========================================================
-@bp_gestorflota.route('/monitoreo_combustible')
-@login_required_custom
-@gestor_flota_required
-def monitoreo_combustible():
-    empresa_id = session.get('empresa_id')
-    
-    fecha_inicio = request.args.get('fecha_inicio', (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'))
-    fecha_fin = request.args.get('fecha_fin', datetime.now().strftime('%Y-%m-%d'))
-    placa_filtro = request.args.get('placa', 'todas')
-
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    # 1. Extraer placas de la empresa para el selector del filtro
-    cur.execute("SELECT DISTINCT placa FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
-    vehiculos_historicos = cur.fetchall()
-
-    # 2. Consultar registros de combustible según filtro
-    # Usando el alias correcto: foto_voucher_path as ruta_comprobante
-    query = """
-        SELECT id, placa, tipo_combustible, fecha_tanqueo, kilometraje_actual, 
-               galones, valor_total, nombre_operador, foto_voucher_path as ruta_comprobante
-        FROM vehiculos_combustible_flota 
-        WHERE id_empresa = %s AND fecha_tanqueo BETWEEN %s AND %s
-    """
-    params = [empresa_id, fecha_inicio, fecha_fin]
-    
-    if placa_filtro != 'todas':
-        query += " AND placa = %s"
-        params.append(placa_filtro)
-        
-    query += " ORDER BY fecha_tanqueo DESC, id DESC"
-    
-    try:
-        cur.execute(query, tuple(params))
-        registros_combustible = cur.fetchall()
-    except Exception as e:
-        print(f"Error consultando combustible: {e}")
-        registros_combustible = []
-        
-    cur.close()
-
-    return render_template(
-        'B_modulo_controlador_flotacarga.html',
-        nit=session.get('nit'),
-        empresa=session.get('empresa'),
-        nombre=session.get('nombre'),
-        active_module='monitoreo_combustible',
-        registros_combustible=registros_combustible,
-        vehiculos_historicos=vehiculos_historicos,
-        filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'placa': placa_filtro}
-    )
-
 
 @bp_gestorflota.route('/cron/mantenimiento_bd', methods=['GET'])
 def cron_limpieza_datos():
@@ -852,9 +794,9 @@ def cron_limpieza_datos():
 
     cur = mysql.connection.cursor()
     try:
-        # Ejecuta el borrado masivo de registros con más de 1 año (12 meses)
+        # Ejecuta el borrado masivo de registros con más de 1 año (12 meses) en tabla unificada
         cur.execute("""
-            DELETE FROM inspeccion_preoperacional_carga 
+            DELETE FROM inspeccion_preoperacional 
             WHERE fecha_inspeccion < DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
         """)
         
@@ -884,7 +826,7 @@ def descargar_preoperacional_pdf(consecutivo):
     nit_empresa = session.get('nit')
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT * FROM inspeccion_preoperacional_carga WHERE consecutivo_anual = %s AND id_empresa = %s LIMIT 1", (consecutivo, empresa_id))
+    cur.execute("SELECT * FROM inspeccion_preoperacional WHERE consecutivo_anual = %s AND id_empresa = %s LIMIT 1", (consecutivo, empresa_id))
     insp = cur.fetchone()
     cur.close()
 
@@ -919,7 +861,7 @@ def descargar_preoperacional_pdf(consecutivo):
     story.append(Paragraph("<b>INSPECCIÓN PREOPERACIONAL DETALLADA - SEGURIDAD VIAL</b>", title_style))
 
     # 2. Metadatos
-    dictamen_texto = "APROBADO (OPERATIVO)" if insp['vehiculo_aprobado'] == 1 else "RECHAZADO (ALERTA CRÍTICA)"
+    dictamen_texto = "APROBADO (OPERATIVO)" if insp['vehiculo_aprobado'] == 1 else "ALERTA (CRÍTICA)"
     color_dictamen = colors.HexColor('#d1fae5') if insp['vehiculo_aprobado'] == 1 else colors.HexColor('#fee2e2')
 
     meta_data = [
@@ -939,18 +881,21 @@ def descargar_preoperacional_pdf(consecutivo):
     # Helper para renderizar estados
     def get_estado_html(valor, es_doc=False):
         if es_doc:
-            return "<font color='#16a34a'><b>AL DÍA</b></font>" if valor == 1 else "<font color='#dc2626'><b>FALTANTE/VENCIDO</b></font>"
+            return "<font color='#16a34a'><b>AL DÍA / PORTA</b></font>" if valor == 1 else "<font color='#dc2626'><b>FALTANTE / VENCIDO</b></font>"
         if valor == 1: return "<font color='#16a34a'>Operativo</font>"
         elif valor == 2: return "<font color='#d97706'><b>Ajuste</b></font>"
         elif valor == 3: return "<font color='#dc2626'><b>Crítico</b></font>"
         return "N/A"
 
-    # 3. Mapeo del Checklist Completo
+    # 3. Mapeo del Checklist Completo (Alineado con Paso 16, Resolución 40595 de 2022)
     checklist_config = [
         ("DOCUMENTACIÓN LEGAL", True, [
-            ('doc_licencia_conduccion', 'Licencia de Conducción'), ('doc_soat_vigente', 'SOAT Vigente'),
-            ('doc_tecnomecanica_vigente', 'Revisión Tecnomecánica'), ('doc_tarjeta_operacion', 'Tarjeta de Operación'),
-            ('doc_manifiesto_carga', 'Manifiesto de Carga')
+            ('doc_cedula', 'Cédula de Ciudadanía'),
+            ('doc_licencia_conduccion', 'Licencia de Conducción'), 
+            ('doc_licencia_transito', 'Licencia de Tránsito (Propiedad)'),
+            ('doc_soat_vigente', 'SOAT Vigente'),
+            ('doc_tecnomecanica_vigente', 'Revisión Tecnomecánica'), 
+            ('doc_tarjeta_operacion', 'Tarjeta de Operación')
         ]),
         ("ESTADO MECÁNICO Y MOTOR", False, [
             ('mec_nivel_aceite_motor', 'Nivel Aceite Motor'), ('mec_liquido_frenos', 'Líquido de Frenos/Embrague'),
@@ -1055,7 +1000,10 @@ def descargar_preoperacional_pdf(consecutivo):
 
     story.append(Spacer(1, 15))
     story.append(Paragraph("<b>AUTENTICACIÓN Y FIRMA</b>", sub_title_style))
-    story.append(Paragraph(f"Yo, <b>{insp['nombre_conductor']}</b>, declaro que la información contenida en este documento es veraz.", cell_style))
+    
+    # Declaración de Veracidad
+    declaracion_texto = "<b>Declaración de Veracidad y Cumplimiento Normativo:</b> Declaro bajo la gravedad de juramento que la información aquí registrada es veraz, exacta y ha sido recolectada mediante inspección física directa del vehículo. Este registro preoperacional da cumplimiento estricto al <b>Paso 16 de la Metodología del Plan Estratégico de Seguridad Vial (PESV)</b>, adoptada mediante la <b>Resolución 40595 de 2022 del Ministerio de Transporte de Colombia.</b>"
+    story.append(Paragraph(declaracion_texto, cell_style))
     story.append(Spacer(1, 10))
     
     img_firma = convertir_base64_rlimage(insp.get('firma_grafica_base64'), 2*inch, 1*inch)
@@ -1083,4 +1031,53 @@ def descargar_preoperacional_pdf(consecutivo):
         as_attachment=True, 
         download_name=f"Preoperacional_{consecutivo}.pdf", 
         mimetype='application/pdf'
+    )
+
+# =========================================================
+# MÓDULO 6: MONITOREO DE COMBUSTIBLE
+# =========================================================
+@bp_gestorflota.route('/monitoreo_combustible', methods=['GET'])
+@login_required_custom
+@gestor_flota_required
+def monitoreo_combustible():
+    empresa_id = session.get('empresa_id')
+    
+    # Filtros de búsqueda (Por defecto últimos 30 días)
+    fecha_inicio = request.args.get('fecha_inicio', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
+    fecha_fin = request.args.get('fecha_fin', datetime.now().strftime('%Y-%m-%d'))
+    placa_filtro = request.args.get('placa', 'todas')
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    # 1. Extraer placas para el selector de filtro
+    cur.execute("SELECT DISTINCT placa FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
+    vehiculos_historicos = cur.fetchall()
+
+    # 2. Consultar registros de combustible según filtro
+    query = """
+        SELECT id, placa, tipo_combustible, fecha_tanqueo, kilometraje_actual, galones, valor_total, nombre_operador, ruta_comprobante
+        FROM vehiculos_combustible_flota 
+        WHERE id_empresa = %s AND fecha_tanqueo BETWEEN %s AND %s
+    """
+    params = [empresa_id, fecha_inicio, fecha_fin]
+    
+    if placa_filtro != 'todas':
+        query += " AND placa = %s"
+        params.append(placa_filtro)
+        
+    query += " ORDER BY fecha_tanqueo DESC, id DESC"
+    
+    cur.execute(query, tuple(params))
+    registros_combustible = cur.fetchall()
+    cur.close()
+
+    return render_template(
+        'B_modulo_controlador_flotacarga.html',
+        nit=session.get('nit'),
+        empresa=session.get('empresa'),
+        nombre=session.get('nombre'),
+        active_module='monitoreo_combustible',
+        registros_combustible=registros_combustible,
+        vehiculos_historicos=vehiculos_historicos,
+        filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'placa': placa_filtro}
     )

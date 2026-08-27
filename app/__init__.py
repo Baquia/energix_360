@@ -83,6 +83,8 @@ def create_app():
     
     # --- NUEVO: Transporte Especial ---
     from app.blueprints.B_bp_controlador_flotaespecial import bp_controlador_flotaespecial
+    from app.blueprints.B_bp_flotaespecial_vehiculos import bp_flotaespecial_vehiculos
+    from app.blueprints.B_bp_flotaespecial_eps import bp_flotaespecial_eps
    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
@@ -96,6 +98,8 @@ def create_app():
     
     # --- NUEVO: Transporte Especial ---
     app.register_blueprint(bp_controlador_flotaespecial)
+    app.register_blueprint(bp_flotaespecial_vehiculos)
+    app.register_blueprint(bp_flotaespecial_eps)
 
     # ---------------------------------------------------------
     #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL

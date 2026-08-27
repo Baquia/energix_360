@@ -1,6 +1,7 @@
 # app/blueprints/B_bp_controlador_flotaespecial.py
 import os
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash, Response
+from datetime import datetime
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash
 from app import mysql, bcrypt
 from app.utils import login_required_custom
 from functools import wraps
@@ -21,240 +22,88 @@ def controlador_flotaespecial_required(f):
     return decorated_function
 
 # =========================================================
-# DASHBOARD PRINCIPAL
+# DASHBOARD PRINCIPAL (Sub-Dashboard Central)
 # =========================================================
 @bp_controlador_flotaespecial.route('/dashboard')
 @login_required_custom
 @controlador_flotaespecial_required
 def dashboard_controlador():
-    """
-    Dashboard principal del Controlador de Flota Especial.
-    """
-    return render_template(
-        'B_modulo_controlador_flotaespecial.html',
-        nit=session.get('nit'),
-        empresa=session.get('empresa'),
-        nombre=session.get('nombre'),
-        active_module='dashboard'
-    )
-
-# =========================================================
-# GESTIÓN DE VEHÍCULOS
-# =========================================================
-@bp_controlador_flotaespecial.route('/vehiculos', methods=['GET', 'POST'])
-@login_required_custom
-@controlador_flotaespecial_required
-def gestion_vehiculos():
     empresa_id = session.get('empresa_id')
-    empresa_nombre = session.get('empresa')
-
-    if request.method == 'POST':
-        accion = request.form.get('accion')
-        
-        if accion == 'crear':
-            placa = str(request.form.get('placa', '')).upper().strip()
-            tipo = request.form.get('tipo', '').strip()
-            caja_de_carga = request.form.get('caja_de_carga', '').strip()
-            referencia = request.form.get('referencia', '').strip()
-            peso_vacio = request.form.get('peso_vacio', 0)
-            capacidad = request.form.get('capacidad', 0)
-            propiedad = request.form.get('propiedad', 'Propio').strip()
-            
-            if placa and caja_de_carga and tipo:
-                cur = mysql.connection.cursor()
-                try:
-                    cur.execute("""
-                        INSERT INTO vehiculos (empresa, id_empresa, placa, tipo, caja_de_carga, referencia, peso_vacio, `capacidad (kg)`, propiedad) 
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (empresa_nombre, empresa_id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad))
-                    mysql.connection.commit()
-                    flash(f"Vehículo con placa {placa} registrado correctamente.", "success")
-                except Exception as e:
-                    flash(f"Error al registrar vehículo: {str(e)}", "danger")
-                finally:
-                    cur.close()
-
-        elif accion == 'editar':
-            vehiculo_id = request.form.get('vehiculo_id')
-            placa = str(request.form.get('placa', '')).upper().strip()
-            tipo = request.form.get('tipo', '').strip()
-            caja_de_carga = request.form.get('caja_de_carga', '').strip()
-            referencia = request.form.get('referencia', '').strip()
-            peso_vacio = request.form.get('peso_vacio', 0)
-            capacidad = request.form.get('capacidad', 0)
-            propiedad = request.form.get('propiedad', 'Propio').strip()
-            
-            if vehiculo_id and placa and caja_de_carga and tipo:
-                cur = mysql.connection.cursor()
-                try:
-                    cur.execute("""
-                        UPDATE vehiculos 
-                        SET placa = %s, tipo = %s, caja_de_carga = %s, referencia = %s, peso_vacio = %s, `capacidad (kg)` = %s, propiedad = %s
-                        WHERE id = %s AND id_empresa = %s
-                    """, (placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad, vehiculo_id, empresa_id))
-                    mysql.connection.commit()
-                    flash(f"Vehículo {placa} actualizado correctamente.", "success")
-                except Exception as e:
-                    flash(f"Error al actualizar vehículo: {str(e)}", "danger")
-                finally:
-                    cur.close()
-
-        elif accion == 'eliminar':
-            vehiculo_id = request.form.get('vehiculo_id')
-            cur = mysql.connection.cursor()
-            try:
-                cur.execute("DELETE FROM vehiculos WHERE id = %s AND id_empresa = %s", (vehiculo_id, empresa_id))
-                mysql.connection.commit()
-                flash("Vehículo eliminado de la base de datos.", "success")
-            except Exception as e:
-                flash("Error al eliminar vehículo.", "danger")
-            finally:
-                cur.close()
-
-        return redirect(url_for('controlador_flotaespecial.gestion_vehiculos'))
-
+    
+    hoy = datetime.now()
+    inicio_mes = hoy.replace(day=1).strftime('%Y-%m-%d')
+    fin_mes = hoy.strftime('%Y-%m-%d')
+    
+    fecha_inicio = request.args.get('fecha_inicio', inicio_mes)
+    fecha_fin = request.args.get('fecha_fin', fin_mes)
+    
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT * FROM vehiculos WHERE id_empresa = %s ORDER BY id DESC", (empresa_id,))
-    vehiculos_db = cur.fetchall()
+    
+    # 1. KPIs del rango de fechas
+    cur.execute("""
+        SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN estatus_servicio = 'CAPTURADO' THEN 1 ELSE 0 END) as capturados,
+            SUM(CASE WHEN estatus_servicio = 'PROGRAMADO' THEN 1 ELSE 0 END) as programados,
+            SUM(CASE WHEN estatus_servicio = 'VERIFICADO' THEN 1 ELSE 0 END) as verificados,
+            SUM(CASE WHEN estatus_servicio = 'ASIGNADO' THEN 1 ELSE 0 END) as asignados,
+            SUM(CASE WHEN estatus_servicio = 'EN EJECUCION' THEN 1 ELSE 0 END) as ejecucion,
+            SUM(CASE WHEN estatus_servicio IN ('TERMINADO-PDTE AUDITAR', 'AUDITADO') THEN 1 ELSE 0 END) as ejecutados
+        FROM control_viajes_flota_especial 
+        WHERE id_empresa = %s AND (fecha_servicio BETWEEN %s AND %s OR fecha_servicio IS NULL)
+    """, (empresa_id, fecha_inicio, fecha_fin))
+    kpis = cur.fetchone()
+    
+    if not kpis or kpis['total'] is None:
+        kpis = {'total': 0, 'capturados': 0, 'programados': 0, 'verificados': 0, 'asignados': 0, 'ejecucion': 0, 'ejecutados': 0}
+
+    # 2. Consultar todos los viajes del rango para distribuirlos a la vista
+    cur.execute("""
+        SELECT c.id_viaje, c.fecha_servicio, c.hora_inicio, c.vehiculo_asignado, c.conductor_asignado, 
+               c.nombre_usuario, c.telefono_usuario, c.direccion_origen, c.direccion_destino, c.estatus_servicio,
+               c.numero_prescripcion, c.id_eps_cliente AS ips,
+               COALESCE(c.ruta_documento, m.ruta_documento) as ruta_documento
+        FROM control_viajes_flota_especial c
+        LEFT JOIN (
+            SELECT numero_autorizacion, numero_prescripcion, id_empresa, MAX(ruta_documento) as ruta_documento 
+            FROM maestra_traslados_eps_tespecial 
+            GROUP BY numero_autorizacion, numero_prescripcion, id_empresa
+        ) m 
+          ON c.numero_autorizacion = m.numero_autorizacion 
+          AND (c.numero_prescripcion = m.numero_prescripcion OR c.numero_prescripcion IS NULL OR m.numero_prescripcion IS NULL) 
+          AND c.id_empresa = m.id_empresa
+        WHERE c.id_empresa = %s AND (c.fecha_servicio BETWEEN %s AND %s OR c.fecha_servicio IS NULL)
+        ORDER BY c.fecha_servicio ASC, c.hora_inicio ASC
+    """, (empresa_id, fecha_inicio, fecha_fin))
+    viajes = cur.fetchall()
     cur.close()
 
+    # Partición en las 6 categorías requeridas
+    viajes_capturados = [v for v in viajes if v['estatus_servicio'] == 'CAPTURADO']
+    viajes_programados = [v for v in viajes if v['estatus_servicio'] == 'PROGRAMADO']
+    viajes_verificados = [v for v in viajes if v['estatus_servicio'] == 'VERIFICADO']
+    viajes_asignados = [v for v in viajes if v['estatus_servicio'] == 'ASIGNADO']
+    viajes_ejecucion = [v for v in viajes if v['estatus_servicio'] == 'EN EJECUCION']
+    viajes_ejecutados = [v for v in viajes if v['estatus_servicio'] in ('TERMINADO-PDTE AUDITAR', 'AUDITADO')]
+
     return render_template(
         'B_modulo_controlador_flotaespecial.html',
         nit=session.get('nit'),
         empresa=session.get('empresa'),
         nombre=session.get('nombre'),
-        active_module='vehiculos', 
-        vehiculos=vehiculos_db
+        active_module='dashboard',
+        kpis=kpis,
+        filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin},
+        viajes_capturados=viajes_capturados,
+        viajes_programados=viajes_programados,
+        viajes_verificados=viajes_verificados,
+        viajes_asignados=viajes_asignados,
+        viajes_ejecucion=viajes_ejecucion,
+        viajes_ejecutados=viajes_ejecutados
     )
-
-@bp_controlador_flotaespecial.route('/vehiculos/plantilla', methods=['GET'])
-@login_required_custom
-@controlador_flotaespecial_required
-def descargar_plantilla_vehiculos():
-    """Genera y descarga la plantilla Excel (.xlsx) para carga masiva de Vehículos"""
-    import openpyxl
-    from io import BytesIO
-
-    wb = openpyxl.Workbook()
-    
-    # 1. Pestaña Principal (Plantilla)
-    ws1 = wb.active
-    ws1.title = "Plantilla"
-    encabezados = ['Placa', 'Tipo de Vehiculo', 'Adaptacion / Clase', 'Marca / Referencia', 'Propiedad', 'Peso Vacio (Kg)', 'Capacidad (Pasajeros)']
-    ws1.append(encabezados)
-    
-    # Ajustar ancho de columnas para mejor visibilidad
-    for col in ['A', 'B', 'C', 'D', 'E', 'F', 'G']:
-        ws1.column_dimensions[col].width = 20
-
-    # 2. Pestaña Guía y Ejemplos
-    ws2 = wb.create_sheet(title="Guía y Ejemplos")
-    ws2.append(["INSTRUCCIONES PARA LA CARGA MASIVA"])
-    ws2.append(["1. Llene los datos de los vehículos ÚNICAMENTE en la pestaña 'Plantilla'."])
-    ws2.append(["2. No modifique ni elimine los encabezados de la primera fila."])
-    ws2.append(["3. Copie y pegue EXACTAMENTE los valores permitidos para las listas desplegables."])
-    ws2.append([])
-    ws2.append(["COLUMNA", "VALORES PERMITIDOS EXACTOS (Copiar y Pegar)"])
-    ws2.append(["Tipo de Vehiculo", "van, buseta, bus, ambulancia, sedan, camioneta"])
-    ws2.append(["Adaptacion / Clase", "Transporte de Pacientes, Transporte Escolar, Transporte Empresarial, Turismo, Carga Especial, Otro"])
-    ws2.append(["Propiedad", "Propio, Tercero"])
-    ws2.append([])
-    ws2.append(["EJEMPLO DE LLENADO CORRECTO EN LA PESTAÑA 'Plantilla':"])
-    ws2.append(['AAA123', 'sedan', 'Transporte Empresarial', 'Chevrolet', 'Propio', 1200, 4])
-    ws2.append(['BBB456', 'van', 'Transporte Escolar', 'Renault', 'Tercero', 1500, 15])
-    
-    for col in ['A', 'B']:
-        ws2.column_dimensions[col].width = 30
-
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    
-    return Response(
-        output,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment;filename=plantilla_vehiculos.xlsx"}
-    )
-
-@bp_controlador_flotaespecial.route('/vehiculos/carga_masiva', methods=['POST'])
-@login_required_custom
-@controlador_flotaespecial_required
-def carga_masiva_vehiculos():
-    """Procesa el archivo Excel (.xlsx) subido para carga masiva de Vehículos"""
-    import openpyxl
-
-    empresa_id = session.get('empresa_id')
-    empresa_nombre = session.get('empresa')
-    
-    if 'archivo_excel' not in request.files:
-        flash('No se subió ningún archivo.', 'danger')
-        return redirect(url_for('controlador_flotaespecial.gestion_vehiculos'))
-        
-    file = request.files['archivo_excel']
-    if file.filename == '':
-        flash('Ningún archivo seleccionado.', 'danger')
-        return redirect(url_for('controlador_flotaespecial.gestion_vehiculos'))
-        
-    if not file.filename.endswith('.xlsx'):
-        flash('El archivo debe ser un formato Excel (.xlsx) válido.', 'danger')
-        return redirect(url_for('controlador_flotaespecial.gestion_vehiculos'))
-
-    try:
-        wb = openpyxl.load_workbook(file, data_only=True)
-        # Seleccionar la pestaña de la plantilla (evitar procesar la hoja de instrucciones)
-        if 'Plantilla' in wb.sheetnames:
-            ws = wb['Plantilla']
-        else:
-            ws = wb.active # Fallback
-            
-        cur = mysql.connection.cursor()
-        registros_exitosos = 0
-        
-        # Iterar filas (values_only=True extrae solo los datos, no las celdas como objeto)
-        for idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
-            if idx == 1: continue # Saltar fila de encabezados
-            if not any(row): continue # Saltar filas totalmente vacías
-            
-            # Aseguramos que la fila tenga al menos 7 columnas leyendo de forma segura
-            placa = str(row[0]).upper().strip() if len(row) > 0 and row[0] is not None else ""
-            tipo = str(row[1]).strip() if len(row) > 1 and row[1] is not None else ""
-            caja_de_carga = str(row[2]).strip() if len(row) > 2 and row[2] is not None else ""
-            referencia = str(row[3]).strip() if len(row) > 3 and row[3] is not None else ""
-            propiedad = str(row[4]).strip() if len(row) > 4 and row[4] is not None else "Propio"
-            
-            try:
-                peso_vacio = int(row[5]) if len(row) > 5 and row[5] is not None else 0
-            except (ValueError, TypeError):
-                peso_vacio = 0
-                
-            try:
-                capacidad = int(row[6]) if len(row) > 6 and row[6] is not None else 0
-            except (ValueError, TypeError):
-                capacidad = 0
-            
-            # Ignorar si no hay placa
-            if placa and not placa.startswith('EJ.'):
-                try:
-                    cur.execute("""
-                        INSERT INTO vehiculos (empresa, id_empresa, placa, tipo, caja_de_carga, referencia, peso_vacio, `capacidad (kg)`, propiedad) 
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (empresa_nombre, empresa_id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad))
-                    registros_exitosos += 1
-                except Exception as inner_e:
-                    # Falla silenciosa si la placa ya existe para que el ciclo continúe
-                    print(f"Error insertando vehículo {placa}: {inner_e}")
-                    pass
-
-        mysql.connection.commit()
-        cur.close()
-        flash(f"Carga masiva completada: Se registraron {registros_exitosos} vehículos exitosamente.", "success")
-    except Exception as e:
-        flash(f"Error procesando el archivo Excel: {str(e)}", "danger")
-
-    return redirect(url_for('controlador_flotaespecial.gestion_vehiculos'))
 
 # =========================================================
-# GESTIÓN DE OPERADORES
+# GESTIÓN DE OPERADORES (Mantenido intacto para su propio CRUD)
 # =========================================================
 @bp_controlador_flotaespecial.route('/operadores', methods=['GET', 'POST'])
 @login_required_custom
@@ -351,7 +200,6 @@ def gestion_operadores():
         return redirect(url_for('controlador_flotaespecial.gestion_operadores'))
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    # Filtrar solo el personal de transporte especial
     cur.execute("""
         SELECT id, nombre, cedula, perfil 
         FROM usuarios 
@@ -368,95 +216,4 @@ def gestion_operadores():
         nombre=session.get('nombre'),
         active_module='operadores', 
         operadores=operadores_db
-    )
-
-# =========================================================
-# GESTIÓN EPS Y AUTORIZACIONES
-# =========================================================
-@bp_controlador_flotaespecial.route('/gestion_eps', methods=['GET', 'POST'])
-@login_required_custom
-@controlador_flotaespecial_required
-def gestion_eps():
-    empresa_id = session.get('empresa_id')
-    empresa_nombre = session.get('empresa')
-
-    if request.method == 'POST':
-        accion = request.form.get('accion')
-        
-        if accion == 'crear':
-            cliente_empresa = request.form.get('cliente_empresa', '').strip()
-            id_cliente_empresa = request.form.get('id_cliente_empresa', '').strip()
-            
-            if cliente_empresa and id_cliente_empresa:
-                cur = mysql.connection.cursor()
-                try:
-                    cur.execute("""
-                        INSERT INTO clientes_empresa (empresa, id_empresa, cliente_empresa, id_cliente_empresa) 
-                        VALUES (%s, %s, %s, %s)
-                    """, (empresa_nombre, empresa_id, cliente_empresa, id_cliente_empresa))
-                    mysql.connection.commit()
-                    flash(f"EPS '{cliente_empresa}' registrada correctamente.", "success")
-                except Exception as e:
-                    flash(f"Error al registrar la EPS: {str(e)}", "danger")
-                finally:
-                    cur.close()
-
-        elif accion == 'editar':
-            eps_id = request.form.get('eps_id')
-            cliente_empresa = request.form.get('cliente_empresa', '').strip()
-            id_cliente_empresa = request.form.get('id_cliente_empresa', '').strip()
-            
-            if eps_id and cliente_empresa and id_cliente_empresa:
-                cur = mysql.connection.cursor()
-                try:
-                    cur.execute("""
-                        UPDATE clientes_empresa 
-                        SET cliente_empresa = %s, id_cliente_empresa = %s
-                        WHERE id = %s AND id_empresa = %s
-                    """, (cliente_empresa, id_cliente_empresa, eps_id, empresa_id))
-                    mysql.connection.commit()
-                    flash(f"EPS '{cliente_empresa}' actualizada correctamente.", "success")
-                except Exception as e:
-                    flash(f"Error al actualizar la EPS: {str(e)}", "danger")
-                finally:
-                    cur.close()
-
-        elif accion == 'eliminar':
-            eps_id = request.form.get('eps_id')
-            cur = mysql.connection.cursor()
-            try:
-                cur.execute("DELETE FROM clientes_empresa WHERE id = %s AND id_empresa = %s", (eps_id, empresa_id))
-                mysql.connection.commit()
-                flash("EPS eliminada del sistema.", "success")
-            except Exception as e:
-                flash("Error al eliminar la EPS.", "danger")
-            finally:
-                cur.close()
-
-        return redirect(url_for('controlador_flotaespecial.gestion_eps'))
-
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT * FROM clientes_empresa WHERE id_empresa = %s ORDER BY id DESC", (empresa_id,))
-    eps_db = cur.fetchall()
-    cur.close()
-
-    return render_template(
-        'B_modulo_controlador_flotaespecial.html',
-        nit=session.get('nit'),
-        empresa=session.get('empresa'),
-        nombre=session.get('nombre'),
-        active_module='gestion_eps', 
-        lista_eps=eps_db
-    )
-
-@bp_controlador_flotaespecial.route('/gestion_autorizaciones', methods=['GET'])
-@login_required_custom
-@controlador_flotaespecial_required
-def gestion_autorizaciones():
-    return render_template(
-        'B_modulo_controlador_flotaespecial.html',
-        nit=session.get('nit'),
-        empresa=session.get('empresa'),
-        nombre=session.get('nombre'),
-        active_module='gestion_autorizaciones'
     )

@@ -140,8 +140,10 @@ def operario_items_orden(orden):
                 ON (p.codigo_producto = prod.ean OR p.codigo_producto = prod.sku) 
                 AND p.id_empresa = prod.id_empresa
             LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            LEFT JOIN configuracion_rutas_picking crp ON p.marca = crp.marca AND p.id_empresa = crp.id_empresa
             WHERE p.id_empresa=%s AND p.numero_orden_origen=%s AND (fp.operador_asignado=%s OR p.id_auxiliar_asignado=%s) AND p.puerta_asignada IS NOT NULL
             ORDER BY 
+                IFNULL(crp.secuencia_picking, 9999) ASC,
                 CASE 
                     WHEN p.marca = 'NO EN BASE DE DATOS' THEN 99
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 1
@@ -241,18 +243,20 @@ def operario_mis_marcas():
             SELECT 
                 p.marca, 
                 MAX(p.secuencia_alistamiento) as secuencia,
+                MAX(crp.secuencia_picking) as ruta_fisica,
                 COUNT(DISTINCT p.numero_orden_origen) as total_ordenes,
                 COUNT(*) as total_items, 
                 CAST(SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) AS SIGNED) as items_listos
             FROM picking_importacion_raw p
             LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            LEFT JOIN configuracion_rutas_picking crp ON p.marca = crp.marca AND p.id_empresa = crp.id_empresa
             WHERE p.id_empresa=%s 
               AND (fp.operador_asignado=%s OR p.id_auxiliar_asignado=%s)
               AND p.puerta_asignada IS NOT NULL
               AND (p.estado_actividad IS NULL OR p.estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'FINALIZADO_TOTAL', 'TERMINADO'))
             GROUP BY p.marca
             HAVING items_listos < total_items
-            ORDER BY secuencia ASC, p.marca ASC
+            ORDER BY IFNULL(ruta_fisica, 9999) ASC, secuencia ASC, p.marca ASC
         """, (empresa_id, uid, uid))
         data = cur.fetchall()
         cur.close()
@@ -294,8 +298,10 @@ def operario_items_lote(marca):
                 ON (p.codigo_producto = prod.ean OR p.codigo_producto = prod.sku) 
                 AND p.id_empresa = prod.id_empresa
             LEFT JOIN fabricantes_proveedores fp ON p.marca = fp.marca AND p.id_empresa = fp.id_empresa
+            LEFT JOIN configuracion_rutas_picking crp ON p.marca = crp.marca AND p.id_empresa = crp.id_empresa
             WHERE p.id_empresa=%s AND p.marca=%s AND (fp.operador_asignado=%s OR p.id_auxiliar_asignado=%s) AND p.puerta_asignada IS NOT NULL
             ORDER BY 
+                IFNULL(crp.secuencia_picking, 9999) ASC,
                 CASE 
                     WHEN p.marca = 'NO EN BASE DE DATOS' THEN 99
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 1

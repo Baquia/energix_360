@@ -6,10 +6,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Dashboard Trans. Especial | {{ empresa }}</title>
+    <title>Operación Trans. Especial | {{ empresa }}</title>
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#015249">
+
+    <!-- Librería para el escáner QR -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
         /* PALETA CORPORATIVA BQA-ONE */
@@ -66,17 +69,32 @@
         .logout-btn { display: inline-block; margin-top: 8px; color: var(--verde); font-weight: bold; font-size: 12px; border: 1px solid currentColor; padding: 4px 12px; border-radius: 20px; transition: all 0.2s; }
         .logout-btn:hover { background: var(--verde); color: white; }
 
-        /* MODAL DE PARADA */
+        /* MODALES */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.85); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
         .modal-box { background: var(--surface); width: 90%; max-width: 400px; border-radius: var(--radius); padding: 30px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
-        .modal-title { color: var(--verde); margin-bottom: 10px; font-size: 20px; }
+        .modal-title { color: var(--verde); margin-bottom: 10px; font-size: 20px; display: flex; justify-content: space-between; align-items: center;}
         .modal-text { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
         .form-group { text-align: left; margin-bottom: 15px; }
         .form-group label { font-size: 13px; font-weight: bold; color: var(--text); }
         .form-group select, .form-group input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); margin-top: 5px; font-size: 14px; outline: none;}
         .form-group select:focus, .form-group input:focus { border-color: var(--verde); }
         .btn-submit { background: var(--verde); color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
+        .btn-cancel { background: #f3f4f6; color: #4b5563; border: 1px solid var(--border); padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
         .timer-text { font-size: 12px; color: #ef4444; margin-top: 15px; font-weight: bold;}
+
+        /* HITOS Y FIRMA */
+        .hitos-container { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .btn-hito { background: #f3f4f6; color: #4b5563; border: 1px dashed #cbd5e1; padding: 15px; border-radius: 10px; font-size: 14px; font-weight: bold; text-align: left; transition: 0.3s; display: flex; justify-content: space-between; align-items: center;}
+        .btn-hito.active { background: #eefcf9; border-color: var(--verde); color: var(--verde); cursor: pointer; }
+        .btn-hito.done { background: #d1fae5; border-color: #10b981; color: #065f46; cursor: pointer; }
+        .btn-hito:disabled { opacity: 0.6; cursor: not-allowed; }
+        .hito-icon { font-size: 18px; }
+        
+        #signaturePad { border: 2px dashed var(--border); border-radius: 8px; width: 100%; background: #f9fafb; cursor: crosshair; touch-action: none; margin-bottom: 10px; }
+        
+        /* Personalización Lector QR */
+        #qr-reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 15px; border: 2px solid var(--verde); }
+        #qr-reader__dashboard_section_csr span { color: var(--verde); font-weight: bold; }
 
         @media (max-width: 600px) {
             .header { flex-direction: column; align-items: flex-start; gap: 15px; }
@@ -96,7 +114,7 @@
         </div>
         <div class="user-info">
             <span class="user-name">{{ nombre }}</span>
-            <span class="user-role">Transporte Especial</span>
+            <span class="user-role">Operador Especial</span>
             {% if session.get('placa_prelogueada_especial') %}
                 <span class="user-role" style="background-color: var(--verde); color: white; margin-top: 5px; font-size: 11px;">Vehículo: {{ session.get('placa_prelogueada_especial') }}</span>
             {% endif %}
@@ -113,7 +131,7 @@
 
     <main class="wrap">
         <h2 class="welcome-title">
-            Panel de Operación
+            Consola Operativa
             {% if session.get('viaje_activo_especial') %}
                 <div id="indicador_gps" class="gps-status">⚪ Iniciando GPS...</div>
             {% endif %}
@@ -125,15 +143,41 @@
                 {% if session.get('viaje_activo_especial') %}
                     <!-- MÓDULOS DE OPERACIÓN: Solo visibles si hay viaje activo -->
                     <div style="grid-column: 1 / -1; margin-bottom: 10px;">
-                        <div style="background: #eefcf9; color: var(--verde-osc); padding: 12px; border-radius: 8px; border: 1px solid var(--verde); font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 15px;">
-                            🚀 Consecutivo de viaje: {{ session.get('consecutivo_viaje_especial') }}
+                        <div style="background: #eefcf9; color: var(--verde-osc); padding: 12px; border-radius: 8px; border: 1px solid var(--verde); font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 15px; display: flex; flex-direction: column; gap: 5px;">
+                            <span>🚀 Consecutivo: {{ session.get('consecutivo_viaje_especial') }}</span>
+                            <span style="font-size: 12px; color: #10b981;">Token Enlazado: {{ session.get('codigo_viaje_alfanumerico') }}</span>
                         </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button id="btnPausarViaje" onclick="togglePausarViaje()" class="btn-card" style="background: #f59e0b; color: white; width: 50%; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);">
-                                ⏸ Pausar Datos
+                        
+                        <!-- PANEL DE HITOS OBLIGATORIOS -->
+                        <div style="background: var(--surface); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow);">
+                            <h3 style="font-size: 16px; color: var(--verde); margin-bottom: 5px;">Evidencias de Recorrido</h3>
+                            <p style="font-size: 12px; color: var(--text-muted);">Adjunte las evidencias fotográficas en cada punto para poder finalizar el viaje y generar el reporte seguro.</p>
+                            
+                            <div class="hitos-container">
+                                <!-- Inputs Ocultos de Cámara -->
+                                <input type="file" id="camOrigen" capture="environment" accept="image/*" style="display:none;" onchange="procesarFoto(event, 'origen')">
+                                <input type="file" id="camDestino" capture="environment" accept="image/*" style="display:none;" onchange="procesarFoto(event, 'destino')">
+                                <input type="file" id="camRetorno" capture="environment" accept="image/*" style="display:none;" onchange="procesarFoto(event, 'retorno')">
+
+                                <button id="btnHito1" class="btn-hito active" onclick="document.getElementById('camOrigen').click()">
+                                    <span>📸 1. Recogida (Origen)</span> <span class="hito-icon" id="iconHito1">⏳</span>
+                                </button>
+                                <button id="btnHito2" class="btn-hito" disabled onclick="document.getElementById('camDestino').click()">
+                                    <span>📸 2. Llegada (Destino)</span> <span class="hito-icon" id="iconHito2">🔒</span>
+                                </button>
+                                <button id="btnHito3" class="btn-hito" disabled onclick="document.getElementById('camRetorno').click()">
+                                    <span>📸 3. Retorno (Origen)</span> <span class="hito-icon" id="iconHito3">🔒</span>
+                                </button>
+                            </div>
+                            
+                            <button id="btnFirmarCerrar" onclick="abrirModalFirma()" class="btn-submit" style="background: #ef4444; margin-top: 20px; display: none;">
+                                ✍️ Firmar y Finalizar Viaje
                             </button>
-                            <button onclick="finalizarViaje()" class="btn-card" style="background: #ef4444; color: white; width: 50%; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);">
-                                ⏹ Finalizar Viaje
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button id="btnPausarViaje" onclick="togglePausarViaje()" class="btn-card" style="background: #f59e0b; color: white; width: 100%; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);">
+                                ⏸ Pausar Envío de Datos GPS
                             </button>
                         </div>
                     </div>
@@ -145,29 +189,33 @@
                         <div class="btn-card">Notificar Parada &rarr;</div>
                     </a>
 
-                    <a href="{{ url_for('combustible_flota.registrar_combustible') }}" class="module-card">
-                        <div class="card-icon">⛽</div>
-                        <h3 class="card-title">Combustible</h3>
-                        <p class="card-desc">Monitoreo de consumo y eficiencia de combustible.</p>
-                        <div class="btn-card">Gestionar &rarr;</div>
-                    </a>
                 {% else %}
                     <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE (Oculta el resto) -->
                     <div style="width: 100%; text-align: center; grid-column: 1 / -1; padding: 30px 10px;">
                         <h3 style="color: var(--verde); margin-bottom: 15px;">Vehículo enlazado: {{ session.get('placa_prelogueada_especial') }}</h3>
-                        <p style="color: var(--text-muted); margin-bottom: 25px;">Habilite su consola de operación e inicie el rastreo satelital marcando el inicio de su viaje.</p>
-                        <button onclick="iniciarViaje()" class="btn-card" style="background: var(--verde); color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(1, 82, 73, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto;">
-                            <span style="font-size: 24px;">▶</span> INICIAR VIAJE
-                        </button>
+                        
+                        {% if estatus_vehiculo == 'Prelogueado' %}
+                            <p style="color: var(--text-muted); margin-bottom: 25px;">Por seguridad y exigencia PESV, debe diligenciar y aprobar la inspección preoperacional antes de iniciar la operación.</p>
+                            <a href="{{ url_for('preoperacional.preoperacional_tc') }}" class="btn-card" style="background: #f59e0b; color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto; text-decoration: none;">
+                                <span style="font-size: 24px;">📋</span> Diligenciar Preoperacional
+                            </a>
+                        {% elif estatus_vehiculo == 'Logueado' %}
+                            <p style="color: var(--text-muted); margin-bottom: 25px;">El vehículo está listo. Inicie el rastreo satelital asociando el Token de 6 caracteres asignado por el controlador.</p>
+                            <button onclick="document.getElementById('modalIniciarViaje').style.display='flex'" class="btn-card" style="background: var(--verde); color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(1, 82, 73, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto;">
+                                <span style="font-size: 24px;">▶</span> VINCULAR Y EMPEZAR
+                            </button>
+                        {% else %}
+                            <p style="color: var(--text-muted); margin-bottom: 25px;">El estado del vehículo no permite iniciar viaje en este momento.</p>
+                        {% endif %}
                     </div>
                 {% endif %}
                 
             {% else %}
                 <!-- MÓDULOS DE PRE-LOGUEO: (Vehículo NO logueado, redirige al scanner QR) -->
-                <a href="{{ url_for('preoperacional.preoperacional_tc', nit=nit) }}" class="module-card">
-                    <div class="card-icon">🚧</div>
-                    <h3 class="card-title">Preoperacional de seguridad vial</h3>
-                    <p class="card-desc">Reporte de novedades del vehículo y documentos. Autenticación Biométrica.</p>
+                <a href="#" onclick="abrirScannerQR(event)" class="module-card">
+                    <div class="card-icon">📱</div>
+                    <h3 class="card-title">Pre-Logueo Cabina</h3>
+                    <p class="card-desc">Enlace su usuario con la unidad de transporte escaneando el código QR impreso en el vehículo.</p>
                     <div class="btn-card">Escanear QR Cabina &rarr;</div>
                 </a>
             {% endif %}
@@ -177,11 +225,56 @@
     <footer class="footer">
         <p>&copy; 2026 BQA ONE Technology. Transporte Especial.</p>
         {% if session.get('viaje_activo_especial') %}
-            <div style="margin-top: 10px; color: #ef4444; font-weight: bold; background: #fee2e2; display: inline-block; padding: 5px 15px; border-radius: 12px;">Cierre de sesión bloqueado en ruta. Finalice el viaje primero.</div>
+            <div style="margin-top: 10px; color: #ef4444; font-weight: bold; background: #fee2e2; display: inline-block; padding: 5px 15px; border-radius: 12px;">Cierre de sesión bloqueado en ruta. Finalice el viaje completando los hitos.</div>
         {% else %}
             <a href="{{ url_for('logout') }}" class="logout-btn" id="btnLogout">Cerrar Sesión</a>
         {% endif %}
     </footer>
+
+    <!-- MODAL ESCÁNER QR DE CABINA -->
+    <div id="modalScannerQR" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-title">
+                <span>📷 Lector Vehicular</span>
+                <button onclick="cerrarScannerQR()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <p class="modal-text">Apunte la cámara al código QR ubicado en la cabina de la unidad.</p>
+            
+            <div id="qr-reader"></div>
+            
+            <button onclick="cerrarScannerQR()" class="btn-cancel">Cancelar Escaneo</button>
+        </div>
+    </div>
+
+    <!-- MODAL DE INICIO DE VIAJE (VINCULACIÓN TOKEN) -->
+    <div id="modalIniciarViaje" class="modal-overlay">
+        <div class="modal-box">
+            <h3 class="modal-title">Iniciar Servicio</h3>
+            <p class="modal-text">Ingrese el Token (ID Viaje) alfanumérico de 6 caracteres recibido en Telegram para validar la asignación y arrancar telemetría.</p>
+            <div class="form-group">
+                <label>Token del Viaje Asignado:</label>
+                <input type="text" id="id_traslado_eps_input" placeholder="Ej. 62D9GI" maxlength="6" required style="text-transform: uppercase; font-family: monospace; font-size: 18px; text-align: center; letter-spacing: 2px;">
+            </div>
+            <button onclick="iniciarViaje()" class="btn-submit" id="btnProcesarInicio">Validar y Empezar</button>
+            <button onclick="document.getElementById('modalIniciarViaje').style.display='none'" class="btn-cancel">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- MODAL DE FIRMA Y FINALIZACIÓN -->
+    <div id="modalFirma" class="modal-overlay">
+        <div class="modal-box" style="max-width: 500px;">
+            <h3 class="modal-title">Firma de Conformidad</h3>
+            <p class="modal-text" style="font-size: 12px;">El paciente o su acudiente debe firmar en pantalla para validar la finalización del recorrido seguro.</p>
+            
+            <canvas id="signaturePad" width="300" height="150"></canvas>
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button onclick="limpiarFirma()" class="btn-cancel" style="margin-top: 0;">🧹 Limpiar</button>
+                <button onclick="enviarEvidenciasYFinalizar()" class="btn-submit" id="btnProcesarFin" style="margin-top: 0;">Generar Sello y Cerrar</button>
+            </div>
+            <button onclick="document.getElementById('modalFirma').style.display='none'" class="btn-cancel" style="background: transparent; border: none; margin-top: 5px;">Volver</button>
+        </div>
+    </div>
 
     <!-- MODAL DE CLASIFICACIÓN DE PARADA -->
     <div id="modalParada" class="modal-overlay">
@@ -192,8 +285,8 @@
             <div class="form-group">
                 <label>Actividad / Motivo:</label>
                 <select id="tipo_parada">
-                    <option value="Recogida Pasajeros">Recogida de Pasajeros</option>
-                    <option value="Descenso Pasajeros">Descenso de Pasajeros</option>
+                    <option value="Recogida Pasajeros">Recogida de Paciente</option>
+                    <option value="Descenso Pasajeros">Descenso en Destino</option>
                     <option value="Tanqueo Combustible">Tanqueo / Combustible</option>
                     <option value="Alimentación">Alimentación / Comida</option>
                     <option value="Descanso / Pernoctada">Descanso / Pernoctada</option>
@@ -204,7 +297,7 @@
             </div>
             <div class="form-group">
                 <label>Nombre del Lugar / Novedad (Opcional):</label>
-                <input type="text" id="nombre_punto_parada" placeholder="Ej. Hotel XYZ, Restaurante El Paso">
+                <input type="text" id="nombre_punto_parada" placeholder="Ej. Clínica XYZ, Retén Policía">
             </div>
             
             <button onclick="registrarParadaManual()" class="btn-submit">Registrar Parada</button>
@@ -212,7 +305,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT GLOBAL Y VIAJES -->
+    <!-- SCRIPT GLOBAL, VIAJES, HITOS Y QR SCANNER -->
     <script>
         let isNavigatingLegally = false;
         let isTransmitting = true; 
@@ -231,12 +324,12 @@
             const btn = document.getElementById('btnPausarViaje');
             const indicadorGPS = document.getElementById('indicador_gps');
             if (isTransmitting) {
-                btn.innerHTML = '⏸ Pausar Datos';
+                btn.innerHTML = '⏸ Pausar Envío de Datos GPS';
                 btn.style.background = '#f59e0b';
                 btn.style.boxShadow = '0 4px 10px rgba(245, 158, 11, 0.3)';
                 if (indicadorGPS) { indicadorGPS.innerText = '🟢 Transmisión Reanudada'; indicadorGPS.className = 'gps-status active'; }
             } else {
-                btn.innerHTML = '▶ Reanudar Datos';
+                btn.innerHTML = '▶ Reanudar Envío de Datos GPS';
                 btn.style.background = '#10b981';
                 btn.style.boxShadow = '0 4px 10px rgba(16, 185, 129, 0.3)';
                 if (indicadorGPS) { indicadorGPS.innerText = '⏸ Transmisión Pausada'; indicadorGPS.className = 'gps-status paused'; }
@@ -245,14 +338,18 @@
 
         document.addEventListener("DOMContentLoaded", function () {
             
-            // Inicializar Medidor de Datos en la UI
+            // UI Hitos Restauración desde LocalStorage
+            if ({% if session.get('viaje_activo_especial') %}true{% else %}false{% endif %}) {
+                verificarHitosUI();
+                initFirmaCanvas();
+            }
+
             const dataMeter = document.getElementById('dataMeter');
             if (dataMeter) {
                 const mb = (totalDataBytes / (1024 * 1024)).toFixed(2);
                 dataMeter.innerText = `📶 ${mb} MB`;
             }
 
-            // Inicializar Medidor de Batería Nativos
             if ('getBattery' in navigator) {
                 navigator.getBattery().then(function(battery) {
                     function updateBatteryUI() {
@@ -274,7 +371,6 @@
                 });
             }
 
-            // Navegación legal
             document.querySelectorAll('a, button').forEach(el => {
                 el.addEventListener('click', () => {
                     isNavigatingLegally = true;
@@ -282,10 +378,8 @@
                 });
             });
 
-            // Motor de Latidos (Heartbeat) - Envíos condicionados a isTransmitting
             function sendHeartbeat() {
-                if (!isTransmitting) return; // Ahorro de datos cuando está pausado
-                
+                if (!isTransmitting) return; 
                 const csrfMeta = document.querySelector('meta[name="csrf-token"]');
                 const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
                 
@@ -297,7 +391,6 @@
             setInterval(sendHeartbeat, 15000);
             sendHeartbeat();
 
-            // Recuperación Automática (Offline-First)
             function intentarRecuperarSesion() {
                 const placaGuardada = localStorage.getItem('bqa_placa_activa_especial');
                 const viajeGuardado = localStorage.getItem('bqa_viaje_activo_especial');
@@ -317,9 +410,7 @@
                         if(data.status === 'success') {
                             window.location.reload();
                         } else {
-                            localStorage.removeItem('bqa_viaje_activo_especial');
-                            localStorage.removeItem('bqa_placa_activa_especial');
-                            localStorage.removeItem('bqa_data_bytes_especial');
+                            limpiarViajeLocal();
                         }
                     }).catch(e => console.error("Error en reconexión silenciosa:", e));
                 }
@@ -327,7 +418,6 @@
             intentarRecuperarSesion();
             window.addEventListener('online', intentarRecuperarSesion);
 
-            // Logout Manual interceptado
             const btnLogout = document.getElementById('btnLogout');
             if (btnLogout) {
                 btnLogout.addEventListener('click', function(e) {
@@ -346,7 +436,6 @@
                 });
             }
 
-            // Modo Quiosco Anti-Navegación
             history.pushState(null, null, location.href);
             window.addEventListener('popstate', function(event) {
                 history.pushState(null, null, location.href);
@@ -370,67 +459,314 @@
         });
 
         // ============================================
+        // LÓGICA DE ESCANEO DE QR (PRE-LOGUEO)
+        // ============================================
+        let html5QrcodeScanner = null;
+
+        function abrirScannerQR(e) {
+            if(e) e.preventDefault();
+            document.getElementById('modalScannerQR').style.display = 'flex';
+            
+            if (!html5QrcodeScanner) {
+                html5QrcodeScanner = new Html5Qrcode("qr-reader");
+            }
+
+            const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+            
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                config,
+                onScanSuccess,
+                (errorMessage) => { /* Ignorar errores continuos de búsqueda */ }
+            ).catch(err => {
+                alert("Error al iniciar cámara: " + err + ". Por favor verifique los permisos de cámara en su navegador.");
+            });
+        }
+
+        function cerrarScannerQR() {
+            document.getElementById('modalScannerQR').style.display = 'none';
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().catch(err => console.log("Error al detener scanner:", err));
+            }
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            try {
+                // Se espera un payload JSON generado por el backend de vehículos {"placa": "XYZ123"}
+                const data = JSON.parse(decodedText);
+                if (data.placa) {
+                    cerrarScannerQR();
+                    ejecutarPreLogin(data.placa);
+                } else {
+                    alert("QR no válido para este sistema. Placa no encontrada en el código.");
+                }
+            } catch(e) {
+                // Fallback por si el QR fue generado solo con el texto plano de la placa
+                if(decodedText && decodedText.length > 2 && decodedText.length < 15 && !decodedText.includes("http")) {
+                    cerrarScannerQR();
+                    ejecutarPreLogin(decodedText.trim().toUpperCase());
+                } else {
+                    alert("Formato de código QR no reconocido para la operación vehicular.");
+                }
+            }
+        }
+
+        function ejecutarPreLogin(placa) {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            
+            fetch("{{ url_for('operador_flotaespecial.prelogin_flotaespecial') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ placa: placa })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    window.location.reload();
+                } else {
+                    alert("Error en validación: " + data.message);
+                }
+            })
+            .catch(e => {
+                alert("Error de conexión al servidor. Verifique su señal de internet.");
+            });
+        }
+
+
+        // ============================================
+        // LÓGICA DE HITOS Y FOTOS EN BASE 64 COMPRIMIDO + WATERMARK
+        // ============================================
+        function procesarFoto(event, hito) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    const MAX_HEIGHT = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    } else {
+                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const dateStr = new Date().toLocaleString('es-CO', { hour12: false });
+                    const latStr = window.ultimaUbicacion ? window.ultimaUbicacion.lat.toFixed(6) : 'N/D';
+                    const lngStr = window.ultimaUbicacion ? window.ultimaUbicacion.lng.toFixed(6) : 'N/D';
+                    
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+                    ctx.fillRect(0, height - 60, width, 60);
+
+                    ctx.font = "bold 14px Arial";
+                    ctx.fillStyle = "white";
+                    ctx.fillText("BQA-ONE | Auditoría de Telemetría", 10, height - 40);
+                    ctx.font = "12px Arial";
+                    ctx.fillText(`Fecha/Hora: ${dateStr}`, 10, height - 20);
+                    ctx.fillText(`Coordenadas: ${latStr}, ${lngStr}`, 10, height - 5);
+
+                    const base64Str = canvas.toDataURL('image/jpeg', 0.8);
+                    localStorage.setItem(`bqa_foto_${hito}`, base64Str);
+                    
+                    const telemetria = {
+                        lat: window.ultimaUbicacion ? window.ultimaUbicacion.lat : null,
+                        lng: window.ultimaUbicacion ? window.ultimaUbicacion.lng : null,
+                        hora: new Date().toISOString().slice(0, 19).replace('T', ' ')
+                    };
+                    localStorage.setItem(`bqa_telemetria_${hito}`, JSON.stringify(telemetria));
+
+                    verificarHitosUI();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function verificarHitosUI() {
+            const fOrigen = localStorage.getItem('bqa_foto_origen');
+            const fDestino = localStorage.getItem('bqa_foto_destino');
+            const fRetorno = localStorage.getItem('bqa_foto_retorno');
+
+            const btn1 = document.getElementById('btnHito1');
+            const btn2 = document.getElementById('btnHito2');
+            const btn3 = document.getElementById('btnHito3');
+            const icon1 = document.getElementById('iconHito1');
+            const icon2 = document.getElementById('iconHito2');
+            const icon3 = document.getElementById('iconHito3');
+            const btnCerrar = document.getElementById('btnFirmarCerrar');
+
+            if (!btn1) return;
+
+            if (fOrigen) {
+                btn1.classList.remove('active'); btn1.classList.add('done');
+                icon1.innerText = '✔️';
+                btn2.disabled = false; btn2.classList.add('active');
+                icon2.innerText = '⏳';
+            }
+            if (fDestino) {
+                btn2.classList.remove('active'); btn2.classList.add('done');
+                icon2.innerText = '✔️';
+                btn3.disabled = false; btn3.classList.add('active');
+                icon3.innerText = '⏳';
+            }
+            if (fRetorno) {
+                btn3.classList.remove('active'); btn3.classList.add('done');
+                icon3.innerText = '✔️';
+                btnCerrar.style.display = 'block';
+            }
+        }
+
+        // ============================================
+        // LÓGICA DE FIRMA CANVAS
+        // ============================================
+        let ctxFirma = null;
+        let isDrawing = false;
+        
+        function initFirmaCanvas() {
+            const canvas = document.getElementById('signaturePad');
+            if (!canvas) return;
+            ctxFirma = canvas.getContext('2d');
+            ctxFirma.lineWidth = 3;
+            ctxFirma.lineCap = 'round';
+            ctxFirma.strokeStyle = '#003b35';
+
+            function getCoordinates(event) {
+                const rect = canvas.getBoundingClientRect();
+                if (event.touches && event.touches.length > 0) {
+                    return { x: event.touches[0].clientX - rect.left, y: event.touches[0].clientY - rect.top };
+                }
+                return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+            }
+
+            canvas.addEventListener('mousedown', (e) => { isDrawing = true; const coords = getCoordinates(e); ctxFirma.beginPath(); ctxFirma.moveTo(coords.x, coords.y); });
+            canvas.addEventListener('mousemove', (e) => { if (isDrawing) { const coords = getCoordinates(e); ctxFirma.lineTo(coords.x, coords.y); ctxFirma.stroke(); } });
+            canvas.addEventListener('mouseup', () => isDrawing = false);
+            canvas.addEventListener('mouseleave', () => isDrawing = false);
+
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); isDrawing = true; const coords = getCoordinates(e); ctxFirma.beginPath(); ctxFirma.moveTo(coords.x, coords.y); });
+            canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (isDrawing) { const coords = getCoordinates(e); ctxFirma.lineTo(coords.x, coords.y); ctxFirma.stroke(); } });
+            canvas.addEventListener('touchend', () => isDrawing = false);
+        }
+
+        function limpiarFirma() {
+            const canvas = document.getElementById('signaturePad');
+            if (ctxFirma && canvas) ctxFirma.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function abrirModalFirma() {
+            document.getElementById('modalFirma').style.display = 'flex';
+        }
+
+        // ============================================
         // API CALLS: INICIAR / FINALIZAR VIAJE
         // ============================================
+        function limpiarViajeLocal() {
+            localStorage.removeItem('bqa_viaje_activo_especial');
+            localStorage.removeItem('bqa_placa_activa_especial');
+            localStorage.removeItem('bqa_data_bytes_especial');
+            localStorage.removeItem('bqa_foto_origen');
+            localStorage.removeItem('bqa_foto_destino');
+            localStorage.removeItem('bqa_foto_retorno');
+            localStorage.removeItem('bqa_telemetria_origen');
+            localStorage.removeItem('bqa_telemetria_destino');
+            localStorage.removeItem('bqa_telemetria_retorno');
+            localStorage.removeItem('bqa_flotaespecial_queue');
+        }
+
         function iniciarViaje() {
-            const btn = event.currentTarget;
+            const idTraslado = document.getElementById('id_traslado_eps_input').value.trim().toUpperCase();
+            if (!idTraslado || idTraslado.length !== 6) {
+                alert("Por favor ingrese un Token de viaje válido (6 caracteres).");
+                return;
+            }
+
+            const btn = document.getElementById('btnProcesarInicio');
             btn.disabled = true;
-            btn.innerHTML = '⏱ Iniciando...';
+            btn.innerHTML = '⏱ Validando y Enlazando...';
 
             const csrfMeta = document.querySelector('meta[name="csrf-token"]');
             const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
             
             fetch("{{ url_for('operador_flotaespecial.iniciar_viaje_especial') }}", {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ id_traslado_eps: idTraslado })
             }).then(res => res.json())
               .then(data => {
                   if(data.status === 'success') {
                       localStorage.setItem('bqa_viaje_activo_especial', 'true');
                       localStorage.setItem('bqa_placa_activa_especial', '{{ session.get("placa_prelogueada_especial") }}');
-                      localStorage.setItem('bqa_data_bytes_especial', '0'); // Resetear datos en nuevo viaje
+                      localStorage.setItem('bqa_data_bytes_especial', '0'); 
                       window.location.reload();
                   } else {
-                      alert("Error al iniciar viaje: " + data.message);
+                      alert("Error al validar el Token: " + data.message);
                       btn.disabled = false;
-                      btn.innerHTML = '<span style="font-size: 24px;">▶</span> INICIAR VIAJE';
+                      btn.innerHTML = 'Validar y Empezar';
                   }
               }).catch(e => {
                   alert("Error de conexión. Intente nuevamente.");
                   btn.disabled = false;
-                  btn.innerHTML = '<span style="font-size: 24px;">▶</span> INICIAR VIAJE';
+                  btn.innerHTML = 'Validar y Empezar';
               });
         }
 
-        function finalizarViaje() {
-            if(!confirm("⚠️ ¿Está absolutamente seguro de finalizar el viaje actual?\n\nEsto detendrá el rastreo satelital inmediatamente y cerrará los reportes operacionales.")) return;
+        function enviarEvidenciasYFinalizar() {
+            const canvas = document.getElementById('signaturePad');
+            const firmaB64 = canvas.toDataURL("image/png");
             
-            const btn = event.currentTarget;
+            let telOrigen = JSON.parse(localStorage.getItem('bqa_telemetria_origen') || '{}');
+            let telDestino = JSON.parse(localStorage.getItem('bqa_telemetria_destino') || '{}');
+            let telRetorno = JSON.parse(localStorage.getItem('bqa_telemetria_retorno') || '{}');
+
+            const payload = {
+                foto_origen: localStorage.getItem('bqa_foto_origen'),
+                foto_destino: localStorage.getItem('bqa_foto_destino'),
+                foto_retorno: localStorage.getItem('bqa_foto_retorno'),
+                firma: firmaB64,
+                telemetria: {
+                    lat_origen: telOrigen.lat, lng_origen: telOrigen.lng, hora_origen: telOrigen.hora,
+                    lat_destino: telDestino.lat, lng_destino: telDestino.lng, hora_destino: telDestino.hora,
+                    lat_retorno: telRetorno.lat, lng_retorno: telRetorno.lng, hora_retorno: telRetorno.hora
+                }
+            };
+
+            const btn = document.getElementById('btnProcesarFin');
             btn.disabled = true;
-            btn.innerHTML = '⏱ Finalizando...';
+            btn.innerHTML = '⏱ Procesando Cierre...';
 
             const csrfMeta = document.querySelector('meta[name="csrf-token"]');
             const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
             
             fetch("{{ url_for('operador_flotaespecial.finalizar_viaje_especial') }}", {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
             }).then(res => res.json())
               .then(data => {
                   if(data.status === 'success') {
-                      localStorage.removeItem('bqa_viaje_activo_especial');
-                      localStorage.removeItem('bqa_placa_activa_especial');
-                      localStorage.removeItem('bqa_data_bytes_especial');
+                      limpiarViajeLocal();
+                      alert("Servicio finalizado exitosamente. Las evidencias se han enviado a la central y el sello criptográfico ha sido generado.");
                       window.location.reload();
                   } else {
                       alert("Error al finalizar viaje: " + data.message);
                       btn.disabled = false;
-                      btn.innerHTML = '⏹ Finalizar Viaje';
+                      btn.innerHTML = 'Generar Sello y Cerrar';
                   }
               }).catch(e => {
-                  alert("Error de conexión.");
+                  alert("Error de conexión al enviar evidencias. Intente de nuevo.");
                   btn.disabled = false;
-                  btn.innerHTML = '⏹ Finalizar Viaje';
+                  btn.innerHTML = 'Generar Sello y Cerrar';
               });
         }
     </script>
@@ -438,6 +774,9 @@
     <!-- EL RASTREO GPS SÓLO SE EJECUTA DURANTE EL VIAJE -->
     {% if session.get('viaje_activo_especial') %}
     <script>
+        let ultimaUbicacion = null;
+        window.ultimaUbicacion = ultimaUbicacion;
+
         document.addEventListener("DOMContentLoaded", function () {
             
             const FRECUENCIA_SONDEO = 60000;      
@@ -446,7 +785,6 @@
             const TIEMPO_PARA_PARADA = 5;         
             const TIMEOUT_ALERTA = 180;           
 
-            let ultimaUbicacion = null;
             let minutosInmovil = 0;
             let paradaActiva = null; 
             let modalAbierto = false;
@@ -495,9 +833,6 @@
             function procesarLecturaGPS() {
                 if (!navigator.geolocation) return;
                 
-                // Seguir leyendo GPS offline para no perder la ruta, 
-                // la variable isTransmitting detiene el FETCH no el SENSOR.
-
                 navigator.geolocation.getCurrentPosition(
                     function (pos) {
                         if (pos.coords.accuracy > PRECISION_MINIMA) {
@@ -525,6 +860,7 @@
                             } else {
                                 minutosInmovil = 0;
                                 ultimaUbicacion = { lat: lat, lng: lng };
+                                window.ultimaUbicacion = ultimaUbicacion;
                                 if (paradaActiva) {
                                     paradaActiva.hora_fin = momento.hora;
                                     paradaActiva = null; 
@@ -532,6 +868,7 @@
                             }
                         } else {
                             ultimaUbicacion = { lat: lat, lng: lng };
+                            window.ultimaUbicacion = ultimaUbicacion;
                         }
                         
                         guardarCola();
@@ -608,7 +945,6 @@
             }
 
             function sincronizarDatosOffline() {
-                // Si no hay red o si el operador pausó la transmisión, NO enviamos
                 if (!navigator.onLine || !isTransmitting) {
                     if (indicadorGPS && isTransmitting) indicadorGPS.innerText = '🟠 Guardando Offline';
                     return; 
@@ -620,7 +956,7 @@
                 if (syncQueue.ubicaciones.length > 0) {
                     let payloadUbi = [...syncQueue.ubicaciones];
                     let bodyStr = JSON.stringify({ ubicaciones: payloadUbi });
-                    let estimatedBytes = new Blob([bodyStr]).size + 500; // body + headers
+                    let estimatedBytes = new Blob([bodyStr]).size + 500; 
                     
                     fetch('/api/flotaespecial/actualizar_ubicacion', {
                         method: 'POST',

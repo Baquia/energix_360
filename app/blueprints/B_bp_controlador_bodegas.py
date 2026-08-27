@@ -31,10 +31,19 @@ def control_logistica():
                 UNIQUE KEY unique_marca_empresa (id_empresa, marca)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS configuracion_rutas_picking (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                id_empresa INT NOT NULL,
+                marca VARCHAR(100) NOT NULL,
+                secuencia_picking INT NOT NULL DEFAULT 9999,
+                UNIQUE KEY unique_ruta_marca (id_empresa, marca)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
         mysql.connection.commit()
         cur.close()
     except Exception as e:
-        print(f"Aviso tabla fabricantes_proveedores: {e}")
+        print(f"Aviso tabla fabricantes_proveedores / configuracion_rutas_picking: {e}")
     
     kpis = {
         'pedidos_totales': 0, 
@@ -2352,5 +2361,52 @@ def set_offline():
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@bp_bodegas.route('/api/bodegas/rutas_picking', methods=['GET'])
+def get_rutas_picking():
+    if 'usuario_id' not in session: return jsonify([])
+    empresa_id = session.get('empresa_id')
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # Obtener todas las marcas distintas (de productos y picking) cruzadas con configuracion
+        cur.execute("""
+            SELECT m.marca, IFNULL(crp.secuencia_picking, 9999) as secuencia_picking
+            FROM (
+                SELECT UPPER(fabricante) as marca FROM productos WHERE id_empresa = %s AND fabricante IS NOT NULL AND fabricante != ''
+                UNION
+                SELECT UPPER(marca) as marca FROM picking_importacion_raw WHERE id_empresa = %s AND marca IS NOT NULL AND marca != ''
+            ) m
+            LEFT JOIN configuracion_rutas_picking crp ON m.marca = crp.marca AND crp.id_empresa = %s
+            ORDER BY secuencia_picking ASC, m.marca ASC
+        """, (empresa_id, empresa_id, empresa_id))
+        data = cur.fetchall()
+        cur.close()
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error rutas picking: {e}")
+        return jsonify([])
+
+@bp_bodegas.route('/api/bodegas/guardar_rutas_picking', methods=['POST'])
+@csrf.exempt
+def guardar_rutas_picking():
+    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
+    empresa_id = session.get('empresa_id')
+    d = request.json
+    rutas = d.get('rutas', [])
+    
+    try:
+        cur = mysql.connection.cursor()
+        if rutas:
+            data_to_insert = [(empresa_id, str(r['marca']).upper(), int(r['secuencia'])) for r in rutas]
+            cur.executemany("""
+                INSERT INTO configuracion_rutas_picking (id_empresa, marca, secuencia_picking)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE secuencia_picking = VALUES(secuencia_picking)
+            """, data_to_insert)
+            mysql.connection.commit()
+        cur.close()
+        return jsonify({'status': 'success', 'message': 'Rutas de picking guardadas correctamente.'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})

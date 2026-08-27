@@ -102,7 +102,7 @@
         .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-width: 1000px; overflow-x: auto; }
         .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;}
         .data-table th { background: #f9fafb; padding: 15px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
-        .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); vertical-align: middle;}
+        .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); }
         .data-table tr:hover { background-color: #fdfdfd; }
         
         .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
@@ -177,6 +177,7 @@
             <a href="{{ url_for('gestorflota.historial_preoperacionales') }}" class="nav-item {% if active_module == 'preoperacionales' %}active{% endif %}">
                 <span class="nav-icon">📋</span> Preoperacionales
             </a>
+            <!-- NUEVO ENLACE AL MÓDULO DE COMBUSTIBLE -->
             <a href="{{ url_for('gestorflota.monitoreo_combustible') }}" class="nav-item {% if active_module == 'monitoreo_combustible' %}active{% endif %}">
                 <span class="nav-icon">⛽</span> Combustible
             </a>
@@ -494,11 +495,12 @@
                     </table>
                 </div>
 
+            <!-- NUEVO MÓDULO: AUDITORÍA DE COMBUSTIBLE -->
             {% elif active_module == 'monitoreo_combustible' %}
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Monitoreo de Combustible</h2>
+                        <h2>Auditoría de Combustible</h2>
                     </div>
                 </div>
 
@@ -527,37 +529,37 @@
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Fecha</th>
+                                <th>Fecha Tanqueo</th>
                                 <th>Placa</th>
                                 <th>Operador</th>
                                 <th>Combustible</th>
-                                <th>Galones</th>
+                                <th>Galones/M3</th>
+                                <th>Kilometraje</th>
                                 <th>Valor Total</th>
-                                <th>Odómetro</th>
-                                <th>Voucher</th>
+                                <th>Comprobante</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for rc in registros_combustible %}
+                            {% for reg in registros_combustible %}
                             <tr>
-                                <td>{{ rc.fecha_tanqueo }}</td>
-                                <td style="font-weight: bold; color: var(--verde);">{{ rc.placa }}</td>
-                                <td>{{ rc.nombre_operador }}</td>
-                                <td>{{ rc.tipo_combustible }}</td>
-                                <td>{{ rc.galones }}</td>
-                                <td>$ {{ rc.valor_total }}</td>
-                                <td>{{ rc.kilometraje_actual }} km</td>
+                                <td>{{ reg.fecha_tanqueo }}</td>
+                                <td style="font-weight: bold; color: var(--verde);">{{ reg.placa }}</td>
+                                <td>{{ reg.nombre_operador }}</td>
+                                <td>{{ reg.tipo_combustible }}</td>
+                                <td>{{ reg.galones }}</td>
+                                <td>{{ reg.kilometraje_actual }} KM</td>
+                                <td style="font-weight: bold;">${{ "{:,.2f}".format(reg.valor_total) }}</td>
                                 <td>
-                                    {% if rc.ruta_comprobante %}
-                                        <a href="{{ url_for('static', filename=rc.ruta_comprobante) }}" target="_blank" class="btn-icon edit" title="Ver Voucher">👁️ Ver</a>
+                                    {% if reg.ruta_comprobante %}
+                                        <a href="{{ url_for('static', filename=reg.ruta_comprobante) }}" target="_blank" class="btn-icon edit" title="Ver Voucher" style="text-decoration: none;">📸 Ver</a>
                                     {% else %}
-                                        <span class="badge badge-gray">N/A</span>
+                                        <span class="badge badge-gray">No adjunto</span>
                                     {% endif %}
                                 </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">No se encontraron registros en el rango seleccionado.</td>
+                                <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">No se encontraron registros de combustible en el rango seleccionado.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -570,24 +572,54 @@
                         <h2>Monitor de Operadores en Línea</h2>
                     </div>
                 </div>
+                
+                <!-- NUEVA GRÁFICA DE HEARTBEAT (Chart.js) -->
+                <div class="table-card" style="margin-bottom: 25px; padding: 20px; height: 350px;">
+                    <canvas id="heartbeatChart"></canvas>
+                </div>
 
                 <div class="table-card" style="margin-bottom: 25px;">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th style="text-align: center; width: 60px;">Estado</th>
+                                <th style="text-align: center;">Estado</th>
                                 <th>Operador</th>
                                 <th>Vehículo Asignado</th>
                                 <th>Sitio de Logueo</th>
                                 <th>Hora de Logueo</th>
-                                <th>Histórico Señal (5m)</th>
+                                <th>Hora Deslogueo (Manual)</th>
                             </tr>
                         </thead>
                         <tbody id="tabla-operadores-body">
-                            <!-- Inyección dinámica vía AJAX -->
+                            {% for op in operadores_en_linea %}
                             <tr>
-                                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">Sincronizando operadores en tiempo real...</td>
+                                <td style="text-align: center;">
+                                    {% if op.en_linea == 1 %}
+                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="En línea"></div>
+                                    {% else %}
+                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Fuera de línea"></div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div style="font-weight: bold; color: var(--verde);">{{ op.nombre_operador }}</div>
+                                    <div style="font-size: 11px; color: var(--text-muted);">{{ op.perfil.replace('_', ' ').title() }}</div>
+                                </td>
+                                <td>
+                                    {% if op.placa_vehiculo %}
+                                        <span class="badge badge-success" style="font-size: 13px;">{{ op.placa_vehiculo }}</span>
+                                    {% else %}
+                                        <span class="badge badge-gray">Sin asignar</span>
+                                    {% endif %}
+                                </td>
+                                <td style="font-size: 12px; font-weight: bold; color: var(--verde-osc);">{{ op.sitio_logueo }}</td>
+                                <td>{{ op.fecha_login_str }}</td>
+                                <td>{{ op.fecha_logout_str }}</td>
                             </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td>
+                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -595,7 +627,7 @@
                 <div class="table-card" style="padding: 30px; border-left: 5px solid var(--verde);">
                     <h2 style="color: var(--verde); font-size: 20px; margin-bottom: 10px;">Bienvenido, {{ nombre }}</h2>
                     <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6;">
-                        Estás en el <b>Centro de Control de Flota</b> de {{ empresa }}. Utiliza el menú lateral para administrar la base de datos de vehículos, gestionar las rutas de distribución urbana o viajera, controlar los conductores autorizados, emitir las credenciales QR para la cabina, visualizar los trazados satelitales o auditar el historial de inspecciones preoperacionales.
+                        Estás en el <b>Centro de Control de Flota</b> de {{ empresa }}. Utiliza el menú lateral para administrar la base de datos de vehículos, gestionar las rutas de distribución urbana o viajera, controlar los conductores autorizados, emitir las credenciales QR para la cabina, visualizar los trazados satelitales o auditar el historial de inspecciones preoperacionales y registros de combustible.
                     </p>
                 </div>
             {% endif %}
@@ -1060,14 +1092,73 @@
     <!-- SCRIPT AJAX PARA AUTOREFRESCAR EL PANEL DE OPERADORES Y CHART.JS (DASHBOARD) -->
     {% if not active_module or active_module == 'dashboard' %}
     <script>
+        // Función auxiliar para generar un color único basado en el nombre del operador
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+            return '#' + '00000'.substring(0, 6 - c.length) + c;
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
             const tablaBody = document.getElementById("tabla-operadores-body");
             if (!tablaBody) return;
 
-            // Variables de configuración de las mini-gráficas (Sparklines)
-            let historyData = {}; // Diccionario para guardar el historial { 'id_operador': [datos...] }
-            let sparkCharts = {}; // Diccionario para gestionar las instancias de Chart.js
-            const MAX_POINTS = 30; // 5 minutos de historial a 10s por ciclo
+            // Variables de Chart.js
+            let heartbeatChart = null;
+            const MAX_DATAPOINTS = 30; // 5 minutos de historial a 10s por ciclo
+
+            // Inicializar Gráfica
+            function initChart() {
+                const ctx = document.getElementById('heartbeatChart').getContext('2d');
+                heartbeatChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: []
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 1.2,
+                                ticks: {
+                                    stepSize: 1,
+                                    callback: function(value) {
+                                        if (value === 1) return 'Transmitiendo';
+                                        if (value === 0) return 'Corte / Pausa';
+                                        return '';
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: { 
+                                position: 'bottom',
+                                labels: { boxWidth: 12 }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + (context.raw >= 1 ? 'En línea' : 'Sin señal');
+                                    }
+                                }
+                            }
+                        },
+                        animation: false, // Desactivar para evitar saltos visuales en tiempo real
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    }
+                });
+            }
+
+            initChart();
 
             function actualizarOperadores() {
                 const timeStamp = new Date().getTime();
@@ -1076,36 +1167,15 @@
                     .then(data => {
                         if (data.status === 'success') {
                             
-                            // 1. Destruir las gráficas anteriores para evitar fugas de memoria
-                            Object.values(sparkCharts).forEach(chart => chart.destroy());
-                            sparkCharts = {};
-                            
+                            // 1. ACTUALIZAR TABLA HTML
                             let html = "";
-                            
                             if (data.operadores.length === 0) {
                                 html = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td></tr>`;
                             } else {
-                                // 2. Actualizar el historial de datos para cada operador
                                 data.operadores.forEach(op => {
-                                    if (!historyData[op.id_operador]) {
-                                        historyData[op.id_operador] = new Array(MAX_POINTS).fill(null);
-                                    }
-                                    historyData[op.id_operador].push(op.en_linea);
-                                    if (historyData[op.id_operador].length > MAX_POINTS) {
-                                        historyData[op.id_operador].shift();
-                                    }
-                                });
-
-                                // 3. Construir la tabla HTML (El backend ya los entrega ordenados: Verde, Amarillo, Gris)
-                                data.operadores.forEach(op => {
-                                    let circulo = '';
-                                    if (op.en_linea === 2) {
-                                        circulo = `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="Transmitiendo"></div>`;
-                                    } else if (op.en_linea === 1) {
-                                        circulo = `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #d97706; margin: 0 auto; box-shadow: 0 0 5px rgba(217, 119, 6, 0.5);" title="Corte / Pausa"></div>`;
-                                    } else {
-                                        circulo = `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Desconectado"></div>`;
-                                    }
+                                    let circulo = op.en_linea === 1 
+                                        ? `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="En línea"></div>`
+                                        : `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #ef4444; margin: 0 auto;" title="Corte de Señal"></div>`;
                                         
                                     let placa = op.placa_vehiculo 
                                         ? `<span class="badge badge-success" style="font-size: 13px;">${op.placa_vehiculo}</span>`
@@ -1121,53 +1191,52 @@
                                         <td>${placa}</td>
                                         <td style="font-size: 12px; font-weight: bold; color: var(--verde-osc);">${op.sitio_logueo}</td>
                                         <td>${op.fecha_login_str}</td>
-                                        <td>
-                                            <div style="width: 120px; height: 35px;">
-                                                <canvas id="spark_${op.id_operador}"></canvas>
-                                            </div>
-                                        </td>
+                                        <td>${op.fecha_logout_str}</td>
                                     </tr>`;
                                 });
                             }
-                            
-                            // Inyectar el HTML ordenado en el DOM
                             tablaBody.innerHTML = html;
 
-                            // 4. Instanciar las nuevas mini-gráficas en los canvas recién creados
-                            data.operadores.forEach(op => {
-                                const canvasElement = document.getElementById(`spark_${op.id_operador}`);
-                                if (canvasElement) {
-                                    const ctx = canvasElement.getContext('2d');
-                                    let lineColor = op.en_linea === 2 ? '#10b981' : (op.en_linea === 1 ? '#d97706' : '#9ca3af');
-                                    
-                                    sparkCharts[op.id_operador] = new Chart(ctx, {
-                                        type: 'line',
-                                        data: {
-                                            labels: new Array(MAX_POINTS).fill(''),
-                                            datasets: [{
-                                                data: historyData[op.id_operador],
-                                                borderColor: lineColor,
-                                                borderWidth: 2,
-                                                stepped: true,
-                                                pointRadius: 0
-                                            }]
-                                        },
-                                        options: {
-                                            responsive: true,
-                                            maintainAspectRatio: false,
-                                            animation: false,
-                                            plugins: { 
-                                                legend: { display: false }, 
-                                                tooltip: { enabled: false } 
-                                            },
-                                            scales: { 
-                                                x: { display: false }, 
-                                                y: { display: false, min: -0.5, max: 2.5 } 
-                                            }
-                                        }
-                                    });
+                            // 2. ACTUALIZAR GRÁFICA LINEAL (HEARTBEAT)
+                            if (heartbeatChart) {
+                                const now = new Date();
+                                const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
+                                                now.getMinutes().toString().padStart(2, '0') + ':' + 
+                                                now.getSeconds().toString().padStart(2, '0');
+                                
+                                heartbeatChart.data.labels.push(timeStr);
+                                if (heartbeatChart.data.labels.length > MAX_DATAPOINTS) {
+                                    heartbeatChart.data.labels.shift();
                                 }
-                            });
+
+                                data.operadores.forEach(op => {
+                                    let dataset = heartbeatChart.data.datasets.find(ds => ds.label === op.nombre_operador);
+                                    
+                                    if (!dataset) {
+                                        dataset = {
+                                            label: op.nombre_operador,
+                                            data: new Array(heartbeatChart.data.labels.length - 1).fill(null), // rellenar histórico en blanco
+                                            borderColor: stringToColor(op.nombre_operador),
+                                            borderWidth: 2,
+                                            stepped: true, // Línea escalonada para simular señal digital
+                                            tension: 0
+                                        };
+                                        heartbeatChart.data.datasets.push(dataset);
+                                    }
+                                    
+                                    // Separar visualmente las líneas si coinciden en 1 o 0 (Offset visual)
+                                    // Para evitar que se superpongan todas en el valor exacto
+                                    let baseValue = op.en_linea;
+                                    let visualOffset = (Math.random() * 0.08) - 0.04; 
+                                    dataset.data.push(baseValue + visualOffset);
+                                    
+                                    if (dataset.data.length > MAX_DATAPOINTS) {
+                                        dataset.data.shift();
+                                    }
+                                });
+
+                                heartbeatChart.update();
+                            }
                         }
                     })
                     .catch(err => console.error("Error actualizando panel:", err));

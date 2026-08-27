@@ -184,13 +184,6 @@
                         <div class="col-6 mb-2"><span style="color: var(--text-muted);">Ref/Tipo:</span> <br><strong><span id="tipo_vehiculo_label">{{ vehiculo.tipo|title }}</span></strong></div>
                     </div>
                     <div class="form-group">
-                        <label>Ruta Destino <span style="color:#ef4444;">*</span></label>
-                        <select name="ruta_destino" class="form-control" required>
-                            <option value="">Seleccione una ruta...</option>
-                            {% for ruta in rutas %}<option value="{{ ruta.nombre_ruta }}">{{ ruta.nombre_ruta }}</option>{% endfor %}
-                        </select>
-                    </div>
-                    <div class="form-group">
                         <label>Kilometraje Inicial <span style="color:#ef4444;">*</span></label>
                         <input type="number" name="kilometraje" class="form-control" required>
                     </div>
@@ -205,9 +198,24 @@
                 <div class="card-body">
                     <div class="form-group"><label>Venc. Licencia Conducción <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_licencia" class="form-control" required></div>
                     <div class="form-group"><label>Venc. SOAT <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_soat" class="form-control" required></div>
-                    <div class="form-group"><label>Venc. Tecnomecánica <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_tecno" class="form-control" required></div>
+                    <div class="form-group"><label>Venc. Tecnomecánica <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_tecnomecanica" class="form-control" required></div>
                     <div class="form-group"><label>Venc. Tarjeta Operación <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_tarjeta_operacion" class="form-control" required></div>
-                    <div class="form-group"><label>Venc. Manifiesto Carga <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_manifiesto" class="form-control" required></div>
+                    
+                    <div class="form-group">
+                        <label>¿Porta Cédula de Ciudadanía? <span style="color:#ef4444;">*</span></label>
+                        <div class="radio-group">
+                            <label class="radio-option" style="width: 50%;"><input type="radio" name="doc_cedula" value="1" required><span class="text-op">Sí Porta</span></label>
+                            <label class="radio-option" style="width: 50%;"><input type="radio" name="doc_cedula" value="0" required><span class="text-ro">No Porta</span></label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>¿Porta Licencia de Tránsito (Propiedad)? <span style="color:#ef4444;">*</span></label>
+                        <div class="radio-group">
+                            <label class="radio-option" style="width: 50%;"><input type="radio" name="doc_licencia_transito" value="1" required><span class="text-op">Sí Porta</span></label>
+                            <label class="radio-option" style="width: 50%;"><input type="radio" name="doc_licencia_transito" value="0" required><span class="text-ro">No Porta</span></label>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="row">
@@ -355,6 +363,10 @@
                             <button type="button" class="btn btn-light btn-sm" onclick="limpiarFirma()" style="border:1px solid #ccc;">Limpiar Firma</button>
                         </div>
                     </div>
+                    
+                    <div style="font-size:11px; color:var(--text-muted); text-align:justify; margin-top:15px; border:1px solid #cbd5e1; padding:10px; border-radius:8px; background:#f8fafc;">
+                        <strong>Declaración de Veracidad y Cumplimiento Normativo:</strong> Declaro bajo la gravedad de juramento que la información aquí registrada es veraz, exacta y ha sido recolectada mediante inspección física directa del vehículo. Este registro preoperacional da cumplimiento estricto al <strong>Paso 16 de la Metodología del Plan Estratégico de Seguridad Vial (PESV)</strong>, adoptada mediante la <strong>Resolución 40595 de 2022 del Ministerio de Transporte de Colombia</strong>.
+                    </div>
 
                 </div>
             </div>
@@ -444,7 +456,6 @@
 
         if (isValid) {
             if(currentStep === 8) {
-                // Al llegar al paso 9, inicializa el canvas de firma
                 setTimeout(redimensionarCanvasFirma, 300);
             }
             showToast();
@@ -462,11 +473,6 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // ============================================
-    // LÓGICA DE FOTO Y FIRMA (COMPRESIÓN)
-    // ============================================
-
-    // 1. CÁMARA FRONTAL
     async function iniciarCamaraSelfie() {
         const video = document.getElementById('video-selfie');
         try {
@@ -486,14 +492,12 @@
         const canvas = document.getElementById('canvas-foto');
         const preview = document.getElementById('preview-selfie');
         
-        // Configurar compresión a 400x400 max
         canvas.width = 400;
         canvas.height = (video.videoHeight / video.videoWidth) * 400;
         
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // Exportar a JPEG con 60% de calidad para no saturar BD
         const base64Photo = canvas.toDataURL('image/jpeg', 0.6);
         document.getElementById('foto_conductor_base64').value = base64Photo;
         
@@ -501,7 +505,6 @@
         preview.style.display = 'block';
         video.style.display = 'none';
         
-        // Apagar cámara
         if(streamMedia) streamMedia.getTracks().forEach(track => track.stop());
         
         document.getElementById('btn-group-captura').style.display = 'none';
@@ -509,14 +512,12 @@
         document.querySelector('#btn-group-camara button').innerText = "Volver a Tomar";
     }
 
-    // 2. LIENZO DE FIRMA (CANVAS)
     const canvasFirma = document.getElementById('canvas-firma');
     const ctxFirma = canvasFirma.getContext('2d');
     let dibujando = false;
     let firmaAlterada = false;
 
     function redimensionarCanvasFirma() {
-        // Ajusta la resolución del canvas interno para evitar trazos borrosos
         const rect = canvasFirma.getBoundingClientRect();
         canvasFirma.width = rect.width;
         canvasFirma.height = rect.height;
@@ -569,27 +570,20 @@
         document.getElementById('firma_grafica_base64').value = "";
     }
 
-    // ============================================
-    // PREPARAR ENVÍO CON GEOLOCALIZACIÓN ASÍNCRONA
-    // ============================================
     function prepararEnvio(e) {
-        // Si el proceso GPS ya terminó, se envía el formulario directamente
         if (window.gpsTerminado) return true;
 
-        e.preventDefault(); // Detener el envío nativo inicial
+        e.preventDefault();
 
-        // Valida que tomaron foto
         if(!document.getElementById('foto_conductor_base64').value) {
             alert("⚠️ Debe capturar la Fotografía de Auditoría para finalizar.");
             return false;
         }
-        // Valida que firmaron
         if(!firmaAlterada) {
             alert("⚠️ Debe dibujar su firma en el recuadro blanco para finalizar.");
             return false;
         }
         
-        // Guardar firma comprimida en el input hidden
         document.getElementById('firma_grafica_base64').value = canvasFirma.toDataURL('image/png');
         
         const btn = document.querySelector('#step-9 button[type="submit"]');
@@ -602,7 +596,6 @@
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    // ÉXITO: Inyectar Coordenadas
                     document.getElementById('input_latitud').value = position.coords.latitude;
                     document.getElementById('input_longitud').value = position.coords.longitude;
                     
@@ -612,10 +605,9 @@
                     isSubmitting = true;
                     localStorage.clear();
                     window.gpsTerminado = true;
-                    document.getElementById('formPreoperacional').submit(); // Forzar el envío programático
+                    document.getElementById('formPreoperacional').submit(); 
                 },
                 function(error) {
-                    // ERROR: Enviar de todas formas, el backend lo manejará sin coordenadas
                     console.warn("Error GPS: ", error.message);
                     statusText.innerText = "No se pudo obtener el GPS. Enviando de todas formas...";
                     statusText.style.color = "#b45309";
@@ -633,7 +625,6 @@
                 }
             );
         } else {
-            // NAVEGADOR NO SOPORTADO
             statusText.innerText = "Geolocalización no soportada. Enviando...";
             isSubmitting = true;
             localStorage.clear();
@@ -644,10 +635,6 @@
         return false;
     }
 
-
-    // ============================================
-    // RESTO DE CÓDIGO (CHASIS Y ESTADOS)
-    // ============================================
     let objetoNovedades = {}; let objetoLlantas = {}; let arrayLlantasRequeridas = [];
 
     document.addEventListener("DOMContentLoaded", function() {
@@ -767,7 +754,6 @@
         document.getElementById('modalNovedad').style.display = 'none';
     }
 
-    // QR LOGIC
     function iniciarEscaner() {
         document.getElementById('qr-placeholder').style.display = 'none';
         document.getElementById('btnActivarCamara').style.display = 'none';

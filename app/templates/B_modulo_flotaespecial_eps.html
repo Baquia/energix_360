@@ -1,0 +1,1128 @@
+<!-- app/templates/B_modulo_flotaespecial_eps.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gestión EPS y Traslados | Transporte Especial | {{ empresa }}</title>
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#015249">
+
+    <style>
+        /* PALETA CORPORATIVA BQA-ONE */
+        :root {
+            --verde: #015249;        
+            --verde-osc: #003b35;    
+            --bg-grad-start: #d7f2ec; 
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --radius: 10px;
+            --sidebar-width: 260px;
+            --topbar-height: 70px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Verdana, Geneva, Tahoma, sans-serif;
+            background-color: #f3f4f6; 
+            color: var(--text);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        a { text-decoration: none; color: inherit; }
+
+        /* ================= SIDEBAR Y MENÚ ================= */
+        .sidebar {
+            width: var(--sidebar-width); background: var(--surface);
+            border-right: 1px solid var(--border); display: flex;
+            flex-direction: column; transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+        .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
+        .logo-app { max-height: 35px; width: auto; }
+        .nav-menu { flex-grow: 1; padding: 20px 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        
+        .nav-item {
+            display: flex; align-items: center; justify-content: space-between; padding: 12px 15px;
+            border-radius: var(--radius); color: var(--text-muted);
+            font-size: 14px; font-weight: 600; transition: all 0.2s; cursor: pointer;
+        }
+        .nav-item-content { display: flex; align-items: center; gap: 12px; }
+        .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
+        .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
+        .nav-item.back-btn { color: #f59e0b; border-bottom: 1px solid var(--border); border-radius: 0; margin-bottom: 10px; padding-bottom: 15px;}
+        .nav-icon { font-size: 18px; }
+
+        /* Dropdown Menu Estilos */
+        .dropdown-container { display: none; flex-direction: column; padding-left: 35px; margin-top: 5px; gap: 5px; }
+        .dropdown-container.open { display: flex; animation: slideDown 0.3s ease; }
+        .dropdown-item { padding: 8px 15px; font-size: 13px; color: var(--text-muted); border-radius: 8px; transition: 0.2s; }
+        .dropdown-item:hover { background: #f3f4f6; color: var(--verde); }
+        .dropdown-item.active { color: var(--verde); font-weight: bold; }
+        .dropdown-arrow { font-size: 10px; transition: transform 0.3s; }
+        .nav-item.open .dropdown-arrow { transform: rotate(180deg); }
+        
+        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
+        .logout-btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444;
+            font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2;
+        }
+
+        /* ================= MAIN CONTENT ================= */
+        .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; flex-shrink: 0; }
+        .topbar-left { display: flex; align-items: center; gap: 15px; }
+        .menu-toggle { display: none; background: none; border: none; font-size: 24px; color: var(--verde); cursor: pointer; }
+        .logo-cliente { max-height: 40px; width: auto; object-fit: contain; }
+        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
+        .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
+
+        .content-area { flex-grow: 1; padding: 25px; overflow-y: auto; background: radial-gradient(circle at top left, var(--bg-grad-start) 0, #f3f4f6 60%, #f3f4f6 100%); }
+
+        /* Alertas Flash */
+        .flash-messages { width: 100%; max-width: 1000px; margin-bottom: 20px; }
+        .flash-alert { padding: 12px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; border: 1px solid currentColor; margin-bottom: 10px; }
+        .flash-success { background-color: #d1fae5; color: #065f46; }
+        .flash-danger { background-color: #fee2e2; color: #991b1b; }
+        .flash-warning { background-color: #fef3c7; color: #92400e; }
+
+        /* Panel Superior Acción */
+        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;}
+        .action-title-group { display: flex; align-items: center; gap: 15px; }
+        .action-header h2 { color: var(--verde); font-size: 20px; margin: 0;}
+        .btn-close-view { background: #e5e7eb; color: #4b5563; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; font-weight: bold;}
+        .btn-close-view:hover { background: #d1d5db; color: #111827; }
+        
+        .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 6px;}
+        .btn-primary:hover { background: var(--verde-osc); }
+        .btn-success { background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;}
+        .btn-warning { background: #f59e0b; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;}
+        .btn-danger { background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;}
+        .btn-info { background: #0ea5e9; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;}
+
+        /* Tablas */
+        .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-width: 1000px; overflow-x: auto; margin-bottom: 25px;}
+        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;}
+        .data-table th { background: #f9fafb; padding: 15px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+        .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); }
+        .data-table tr:hover { background-color: #fdfdfd; }
+        
+        .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        .badge-gray { background: #f3f4f6; color: #4b5563; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #e0f2fe; color: #075985; }
+        .badge-purple { background: #f3e8ff; color: #6b21a8; }
+        
+        /* Formularios Integrados */
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
+        .grid-form.full { grid-template-columns: 1fr; }
+
+        /* ================= MODALES ================= */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
+        .modal-box { background: var(--surface); width: 90%; max-width: 450px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;}
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .modal-header h3 { color: var(--verde); font-size: 18px; }
+        .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;}
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; font-family: inherit;}
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--verde); }
+        
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-cancel { padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); background: #f9fafb; cursor: pointer; font-weight: bold; color: var(--text);}
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; height: 100vh; left: 0; top: 0; transform: translateX(-100%); box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+            .sidebar.open { transform: translateX(0); }
+            .menu-toggle { display: block; }
+            .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 999; }
+            .sidebar-overlay.active { display: block; }
+            .grid-form { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+        </div>
+        
+        <nav class="nav-menu">
+            <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="nav-item back-btn">
+                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Volver al Panel Central</div>
+            </a>
+            
+            <div class="nav-item open" onclick="toggleDropdown('epsMenu', this)">
+                <div class="nav-item-content"><span class="nav-icon">🏥</span> Gestión Operativa</div>
+                <span class="dropdown-arrow">▼</span>
+            </div>
+            <div class="dropdown-container open" id="epsMenu">
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" class="dropdown-item {% if active_module == 'traslados_captura' %}active{% endif %}">1. Captura de Autorización</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}" class="dropdown-item {% if active_module == 'traslados_asignacion' %}active{% endif %}">2. Desglose de Viajes</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_programacion') }}" class="dropdown-item {% if active_module == 'traslados_programacion' %}active{% endif %}">3. Programar Viajes</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" class="dropdown-item {% if active_module == 'traslados_verificacion' %}active{% endif %}">4. Verificación de Datos</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" class="dropdown-item {% if active_module == 'traslados_asignacion_flota' %}active{% endif %}">5. Asignación de Flota</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" class="dropdown-item {% if active_module == 'traslados_auditoria' %}active{% endif %}">6. Auditoría de Viajes</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditados') }}" class="dropdown-item {% if active_module == 'traslados_auditados' %}active{% endif %}">7. Historial Auditados</a>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="logout-btn">
+                <span>🚪</span> Cerrar Sesión
+            </a>
+        </div>
+    </aside>
+
+    <main class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="menu-toggle" id="menuToggle">☰</button>
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            </div>
+            
+            <div class="user-info">
+                <span class="user-name">{{ nombre }}</span>
+                <span class="user-role">Controlador Transporte Especial</span>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div class="flash-messages">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash-alert {% if category == 'success' %}flash-success{% elif category == 'warning' %}flash-warning{% else %}flash-danger{% endif %}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            {% if active_module == 'traslados_captura' %}
+                <!-- ================= ETAPA 1: CAPTURA DE ÓRDENES MAESTRAS ================= -->
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Etapa 1: Captura de Orden Maestra</h2>
+                    </div>
+                </div>
+
+                <div class="table-card" style="padding: 20px; margin-bottom: 20px; border-top: 4px solid var(--verde);">
+                    <h3 style="margin-bottom: 15px; font-size: 16px; color: var(--verde);">Paso 1: Subir Archivo (Extracción Automática)</h3>
+                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" method="POST" enctype="multipart/form-data" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="accion" value="subir_pdf">
+                        <input type="file" name="archivo_pdf" accept=".pdf" required style="border: 1px dashed var(--border); padding: 10px; border-radius: 8px; flex-grow: 1; max-width: 400px;">
+                        <button type="submit" class="btn-primary" style="background: #0ea5e9;">Leer y Extraer PDF</button>
+                    </form>
+                </div>
+
+                <div class="table-card" style="padding: 0;">
+                    <h3 style="padding: 20px 20px 0 20px; font-size: 16px; color: var(--verde);">Paso 2: Validar y Guardar (Generar Maestra)</h3>
+                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" method="POST" class="grid-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="accion" value="guardar_captura">
+                        <input type="hidden" name="ruta_documento" value="{{ datos_extraidos.ruta_documento if datos_extraidos else '' }}">
+                        
+                        <!-- Campos Ocultos Normativos JSON -->
+                        <input type="hidden" name="TipoTec" value="S">
+                        <input type="hidden" name="ConTec" value="1">
+                        <input type="hidden" name="NoEntrega" value="1">
+                        <input type="hidden" name="NoSubEntrega" value="0">
+                        <input type="hidden" name="TipoIDProv" value="NI">
+                        <input type="hidden" name="CodMunEnt" value="{{ datos_extraidos.cod_mun_ent if datos_extraidos else '' }}">
+                        <input type="hidden" id="hidden_dep_captura" value="{{ datos_extraidos.departamento if datos_extraidos else '' }}">
+                        <input type="hidden" id="hidden_mun_captura" value="{{ datos_extraidos.municipio if datos_extraidos else '' }}">
+
+                        <div style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
+                            <h4 style="color: var(--verde-osc); font-size: 14px;">📄 Datos de la Autorización</h4>
+                        </div>
+                        <div class="form-group"><label>EPS Cliente</label><input type="text" name="eps_cliente" value="{{ datos_extraidos.eps_nombre if datos_extraidos else '' }}" required></div>
+                        <div class="form-group"><label>ID EPS Cliente (NIT)</label><input type="text" name="IDProv" value="{{ datos_extraidos.eps_nit if datos_extraidos else '' }}" required></div>
+                        <div class="form-group"><label>Número de Prescripción</label><input type="text" name="NoPrescripcion" value="{{ datos_extraidos.numero_prescripcion if datos_extraidos else '' }}"></div>
+                        <div class="form-group"><label>Número de Autorización</label><input type="text" name="numero_autorizacion" value="{{ datos_extraidos.numero_autorizacion if datos_extraidos else '' }}" required></div>
+                        
+                        <div class="form-group"><label>Fecha de Entrega</label><input type="date" name="fecha_entrega_servicio" value="{{ datos_extraidos.fecha_entrega_servicio if datos_extraidos else '' }}" required></div>
+
+                        <div style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
+                            <h4 style="color: var(--verde-osc); font-size: 14px;">👤 Datos del Paciente</h4>
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo Documento</label>
+                            <select name="tipo_documento" required>
+                                <option value="">Seleccione...</option>
+                                <option value="CC" {% if datos_extraidos and datos_extraidos.tipo_documento == 'CC' %}selected{% endif %}>Cédula de Ciudadanía (CC)</option>
+                                <option value="TI" {% if datos_extraidos and datos_extraidos.tipo_documento == 'TI' %}selected{% endif %}>Tarjeta de Identidad (TI)</option>
+                                <option value="RC" {% if datos_extraidos and datos_extraidos.tipo_documento == 'RC' %}selected{% endif %}>Registro Civil (RC)</option>
+                                <option value="CE" {% if datos_extraidos and datos_extraidos.tipo_documento == 'CE' %}selected{% endif %}>Cédula de Extranjería (CE)</option>
+                                <option value="PA" {% if datos_extraidos and datos_extraidos.tipo_documento == 'PA' %}selected{% endif %}>Pasaporte (PA)</option>
+                                <option value="PPT" {% if datos_extraidos and datos_extraidos.tipo_documento == 'PPT' %}selected{% endif %}>Permiso de Protección Temporal (PPT)</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Número Documento (ID Paciente)</label><input type="text" name="NoIDPaciente" value="{{ datos_extraidos.id_usuario if datos_extraidos else '' }}" required></div>
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Nombre Completo Paciente</label><input type="text" name="nombre_usuario" value="{{ datos_extraidos.nombre_usuario if datos_extraidos else '' }}" required></div>
+                        <div class="form-group"><label>Fecha Nacimiento</label><input type="date" name="fecha_nacimiento" value="{{ datos_extraidos.fecha_nacimiento if datos_extraidos else '' }}"></div>
+                        <div class="form-group"><label>Edad</label><input type="text" name="edad" value="{{ datos_extraidos.edad if datos_extraidos else '' }}"></div>
+                        <div class="form-group"><label>Sexo</label><input type="text" name="sexo" value="{{ datos_extraidos.sexo if datos_extraidos else '' }}"></div>
+                        <div class="form-group"><label>Número Carné</label><input type="text" name="numero_carne" value="{{ datos_extraidos.numero_carne if datos_extraidos else '' }}"></div>
+                        <div class="form-group"><label>Tipo Usuario</label><input type="text" name="tipo_usuario" value="{{ datos_extraidos.tipo_usuario if datos_extraidos else '' }}"></div>
+                        <div class="form-group"><label>Nivel Sisbén</label><input type="text" name="nivel_sisben" value="{{ datos_extraidos.nivel_sisben if datos_extraidos else '' }}"></div>
+                        <div class="form-group"><label>Teléfono Paciente</label><input type="text" name="telefono_usuario" value="{{ datos_extraidos.telefono_usuario if datos_extraidos else '' }}"></div>
+                        <div class="form-group"><label>Email Paciente</label><input type="text" name="email_usuario" value="{{ datos_extraidos.email_usuario if datos_extraidos else '' }}"></div>
+
+                        <div style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
+                            <h4 style="color: var(--verde-osc); font-size: 14px;">📍 Datos de Origen y Servicio</h4>
+                        </div>
+                        <div class="form-group">
+                            <label>Departamento Origen</label>
+                            <select name="departamento" id="cap_dep_ori" onchange="cargarMunicipios('cap_dep_ori', 'cap_mun_ori')"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Municipio Origen</label>
+                            <select name="municipio" id="cap_mun_ori"></select>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Dirección Origen Exacta</label><input type="text" name="DirPaciente" value="{{ datos_extraidos.direccion_origen if datos_extraidos else '' }}" required></div>
+                        
+                        <div style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
+                            <h4 style="color: var(--verde-osc); font-size: 14px;">🏁 Datos de Destino</h4>
+                        </div>
+                        <div class="form-group">
+                            <label>Departamento Destino</label>
+                            <select name="departamento_destino" id="cap_dep_des" onchange="cargarMunicipios('cap_dep_des', 'cap_mun_des')"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Municipio Destino</label>
+                            <select name="municipio_destino" id="cap_mun_des"></select>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Dirección Destino Exacta</label><input type="text" name="direccion_destino"></div>
+                        
+                        <div class="form-group"><label>Código Servicio</label><input type="text" name="CodSerTecAEntregar" value="{{ datos_extraidos.codigo_servicio if datos_extraidos else '' }}" required></div>
+                        <div class="form-group"><label>Total Traslados Aprobados</label><input type="number" name="CantTotAEntregar" value="{{ datos_extraidos.cantidad if datos_extraidos else '1' }}" required></div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Tipo de Servicio (Requiere Turnos especiales si es Diálisis)</label>
+                            <select name="tipo_servicio">
+                                <option value="AMBULATORIA">Ambulatoria (Citas Médicas)</option>
+                                <option value="TERAPIAS">Terapias</option>
+                                <option value="DIALISIS">Diálisis</option>
+                                <option value="URGENCIAS">Urgencias</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Observaciones</label><textarea name="observaciones" rows="2"></textarea></div>
+                        
+                        <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--border);">
+                            <button type="submit" class="btn-primary">Guardar Orden Maestra</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <h3 style="margin-bottom: 10px; font-size: 16px; color: var(--text);">Órdenes Maestras con Traslados Disponibles</h3>
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Auth #</th>
+                                <th>Paciente</th>
+                                <th>Origen</th>
+                                <th>Servicio</th>
+                                <th>Aprobados</th>
+                                <th>Disponibles</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in traslados_capturados %}
+                            <tr>
+                                <td><b>{{ t.numero_autorizacion }}</b></td>
+                                <td>{{ t.nombre_usuario }}</td>
+                                <td>{{ t.direccion_origen }}</td>
+                                <td><span class="badge badge-gray">{{ t.tipo_servicio }}</span></td>
+                                <td style="text-align: center;">{{ t.numero_traslados_aporbados }}</td>
+                                <td style="text-align: center;"><span class="badge badge-success" style="font-size: 12px;">+{{ t.diferencia }}</span></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" style="text-align: center; padding: 20px;">No hay órdenes maestras con traslados pendientes.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'traslados_asignacion' %}
+                <!-- ================= ETAPA 2: DESGLOSE DE VIAJES ================= -->
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Etapa 2: Desglose Automático de Viajes</h2>
+                    </div>
+                </div>
+                
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Seleccione una orden maestra para desglosar el saldo en viajes individuales.</p>
+
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Paciente / Contacto</th>
+                                <th>Auth #</th>
+                                <th>Tipo Servicio</th>
+                                <th>Ruta (Origen - Destino)</th>
+                                <th>Disponibles</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in ordenes_maestras %}
+                            <tr>
+                                <td><b>{{ t.nombre_usuario }}</b><br><small>{{ t.telefono_usuario }}</small></td>
+                                <td>{{ t.numero_autorizacion }}</td>
+                                <td><span class="badge badge-purple">{{ t.tipo_servicio }}</span></td>
+                                <td>O: {{ t.direccion_origen }}<br>D: {{ t.direccion_destino }}</td>
+                                <td style="text-align: center;"><span class="badge badge-success" style="font-size: 12px;">{{ t.diferencia }}</span></td>
+                                <td>
+                                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Confirma que desea desglosar automáticamente los {{ t.diferencia }} viajes pendientes para esta orden?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <input type="hidden" name="maestra_id" value="{{ t.id }}">
+                                        <button type="submit" class="btn-primary" style="padding: 6px 12px; font-size: 12px; background: #0ea5e9;">⚡ Desglosar Viajes</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay órdenes maestras con traslados disponibles para desglosar.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'traslados_programacion' %}
+                <!-- ================= ETAPA 3: PROGRAMACIÓN DE VIAJES ================= -->
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Etapa 3: Programación de Fechas y Turnos</h2>
+                    </div>
+                </div>
+                
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Seleccione la fecha y turno para programar el o los viajes. Si es Diálisis, el sistema auto-programará los consecutivos.</p>
+
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Paciente / Teléfono</th>
+                                <th>Auth #</th>
+                                <th>Servicio</th>
+                                <th>Estado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for v in viajes %}
+                            <tr>
+                                <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.telefono_usuario }}</small></td>
+                                <td>{{ v.numero_autorizacion }}</td>
+                                <td><span class="badge badge-gray">{{ v.tipo_servicio }}</span></td>
+                                <td><span class="badge badge-gray">Capturado</span></td>
+                                <td>
+                                    <button type="button" class="btn-info" style="padding: 6px 10px; font-size: 11px;"
+                                        onclick="abrirProgramacion('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}', '{{ v.fecha_servicio or '' }}', '{{ v.hora_inicio or '' }}')">
+                                        📅 Programar
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes en estado capturado para programar.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'traslados_verificacion' %}
+                <!-- ================= ETAPA 4: VERIFICACIÓN DE DATOS ================= -->
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Etapa 4: Verificación de Datos de Viajes Programados</h2>
+                    </div>
+                </div>
+                
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Audite la información del paciente contra el PDF original. Al guardar, el viaje quedará validado para asignación.</p>
+
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Paciente / Teléfono</th>
+                                <th>Auth #</th>
+                                <th>Servicio</th>
+                                <th>Fecha Programada</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for v in viajes %}
+                            <tr>
+                                <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.telefono_usuario }}</small></td>
+                                <td>{{ v.numero_autorizacion }}</td>
+                                <td><span class="badge badge-gray">{{ v.tipo_servicio }}</span></td>
+                                <td>{{ v.fecha_servicio or 'N/D' }}<br><small>{{ v.hora_inicio or '' }}</small></td>
+                                <td>
+                                    <!-- Supresión del botón 'Verificar Directo' -->
+                                    <button type="button" class="btn-primary" style="padding: 6px 10px; font-size: 11px;"
+                                        onclick="abrirRevision(this)"
+                                        data-id="{{ v.id }}"
+                                        data-ruta="{{ v.ruta_documento }}"
+                                        data-nombre="{{ v.nombre_usuario }}"
+                                        data-tipodoc="{{ v.tipo_documento }}"
+                                        data-idusr="{{ v.id_usuario }}"
+                                        data-tel="{{ v.telefono_usuario }}"
+                                        data-dep="{{ v.departamento }}"
+                                        data-mun="{{ v.municipio }}"
+                                        data-ori="{{ v.direccion_origen }}"
+                                        data-dep-des="{{ v.departamento_destino }}"
+                                        data-mun-des="{{ v.municipio_destino }}"
+                                        data-des="{{ v.direccion_destino }}">
+                                        👁️ Revisar PDF
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes programados pendientes de verificación.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'traslados_asignacion_flota' %}
+                <!-- ================= ETAPA 5: ASIGNACIÓN DE FLOTA (TELEGRAM) ================= -->
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Etapa 5: Asignación de Flota</h2>
+                    </div>
+                </div>
+                
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Asigne vehículo y conductor a los viajes verificados. Esto notificará inmediatamente al operador vía Telegram.</p>
+
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID Viaje (Código)</th>
+                                <th>Paciente / Teléfono</th>
+                                <th>Fechas Prog.</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for v in viajes %}
+                            <tr>
+                                <td><span style="font-family: monospace; font-size: 15px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span><br><small>Auth: {{ v.numero_autorizacion }}</small></td>
+                                <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.telefono_usuario }}</small></td>
+                                <td>{{ v.fecha_servicio or 'N/D' }}<br><small>{{ v.hora_inicio or '' }}</small></td>
+                                <td><span class="badge badge-purple">Verificado (Pdte. Flota)</span></td>
+                                <td>
+                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                        <button type="button" class="btn-success" style="padding: 6px 10px; font-size: 11px;"
+                                            onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}', '{{ v.numero_autorizacion }}')">
+                                            🚐 Asignar Flota (TG)
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes en cola de asignación de flota.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'traslados_auditoria' %}
+                <!-- ================= ETAPA 6: AUDITORÍA DE VIAJES INDIVIDUALES ================= -->
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Auditoría de Viajes Ejecutados</h2>
+                    </div>
+                </div>
+                
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID Viaje</th>
+                                <th>Paciente / EPS</th>
+                                <th>Operador Real</th>
+                                <th>Fin Real</th>
+                                <th>Evidencias y Reporte</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in viajes %}
+                            <tr>
+                                <td><span style="font-family: monospace; font-weight: bold; color: var(--verde);">{{ t.id_viaje }}</span></td>
+                                <td>{{ t.nombre_usuario }}<br><small>{{ t.id_eps_cliente }}</small></td>
+                                <td>{{ t.operador_ejecucion }}<br><small>{{ t.vehiculo_asignado }}</small></td>
+                                <td>{{ t.fecha_fin_real }}</td>
+                                <td>
+                                    <div style="display: flex; gap: 5px; flex-direction: column;">
+                                        <button class="btn-primary" style="background: #8b5cf6;" onclick="abrirAuditoriaPDF('{{ t.ruta_documento }}')">📄 Ver Reporte</button>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="display: flex; gap: 5px;">
+                                        <button class="btn-success" onclick="abrirModalAprobarAuditoria('{{ t.id }}', '{{ t.id_viaje }}')" title="Validar y Aprobar">✔️ Aprobar</button>
+                                        <button class="btn-danger" onclick="abrirRechazoAuditoria('{{ t.id }}', '{{ t.id_viaje }}')">❌ Rechazar</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes pendientes de auditoría en este momento.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'traslados_auditados' %}
+                <!-- ================= ETAPA 7: HISTORIAL AUDITADOS ================= -->
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Historial de Viajes Auditados (Listos para Facturación)</h2>
+                    </div>
+                </div>
+                
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID Viaje</th>
+                                <th>Auth #</th>
+                                <th>Paciente</th>
+                                <th>EPS</th>
+                                <th>Operador / Vehículo</th>
+                                <th>Ejecución Real</th>
+                                <th>Auditor / Fecha</th>
+                                <th>Reporte PDF</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in viajes %}
+                            <tr>
+                                <td><span style="font-family: monospace; font-weight: bold;">{{ t.id_viaje }}</span></td>
+                                <td><b>{{ t.numero_autorizacion }}</b></td>
+                                <td>{{ t.nombre_usuario }}</td>
+                                <td>{{ t.eps_cliente }}</td>
+                                <td>{{ t.operador_ejecucion }} ({{ t.vehiculo_asignado }})</td>
+                                <td>{{ t.fecha_fin_real }}</td>
+                                <td><small><b>{{ t.auditor_nombre or 'N/A' }}</b><br>{{ t.fecha_auditoria or '' }}</small></td>
+                                <td><button onclick="abrirPDF('{{ t.ruta_documento }}')" class="btn-pdf">📄 Ver PDF</button></td>
+                                <td><span class="badge badge-success">Auditado</span></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes auditados en el historial reciente.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+            
+            <div style="margin-top: 30px; font-size: 11px; color: #9ca3af; border-top: 1px solid var(--border); padding-top: 15px; max-width: 1000px;">
+                <p>&copy; 2026 BQA ONE Technology. Sistema Multiusuario Seguro.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- ================= MODALES TRASLADOS Y OPERATIVOS ================= -->
+    <div id="modalRevisionVerificacion" class="modal-overlay">
+        <div class="modal-box" style="max-width: 1000px; width: 95%;">
+            <div class="modal-header">
+                <h3>Revisión y Ajuste de Datos 📞</h3>
+                <button class="close-btn" onclick="closeModal('modalRevisionVerificacion')">&times;</button>
+            </div>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 300px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; height: 60vh; position: relative;">
+                    <button type="button" onclick="ampliarPDF()" style="position: absolute; top: 10px; right: 15px; background: var(--verde); color: white; border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; font-weight: bold; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 6px; transition: 0.2s;" title="Abrir en pantalla completa">
+                        🔍 Ampliar
+                    </button>
+                    <iframe id="visor_pdf" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+                </div>
+                
+                <div style="flex: 1; min-width: 300px; overflow-y: auto; height: 60vh; padding-right: 10px;">
+                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="accion" value="editar_y_verificar">
+                        <input type="hidden" name="viaje_id" id="rev_traslado_id">
+
+                        <h4 style="color: var(--verde-osc); margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">Datos Editables del Paciente</h4>
+                        <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre_usuario" id="rev_nombre" required></div>
+                        <div style="display: flex; gap: 10px;">
+                            <div class="form-group" style="flex: 1;">
+                                <label>Tipo Doc.</label>
+                                <select name="tipo_documento" id="rev_tipodoc" required>
+                                    <option value="">Seleccione...</option>
+                                    <option value="CC">CC - Cédula de Ciudadanía</option>
+                                    <option value="TI">TI - Tarjeta de Identidad</option>
+                                    <option value="CE">CE - Cédula de Extranjería</option>
+                                    <option value="RC">RC - Registro Civil</option>
+                                    <option value="PA">PA - Pasaporte</option>
+                                    <option value="PPT">PPT - Permiso Prot. Temporal</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1;"><label>Número Doc.</label><input type="text" name="id_usuario" id="rev_idusr" required></div>
+                        </div>
+                        <div class="form-group"><label>Teléfono Contacto</label><input type="text" name="telefono_usuario" id="rev_tel"></div>
+
+                        <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">📍 Origen del Viaje</h4>
+                        <div style="display: flex; gap: 10px;">
+                            <div class="form-group" style="flex: 1;">
+                                <label>Departamento Origen</label>
+                                <select name="departamento" id="rev_dep_ori" onchange="cargarMunicipios('rev_dep_ori', 'rev_mun_ori')"></select>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>Municipio Origen</label>
+                                <select name="municipio" id="rev_mun_ori"></select>
+                            </div>
+                        </div>
+                        <div class="form-group"><label>Dirección Origen Exacta</label><input type="text" name="direccion_origen" id="rev_ori" required></div>
+                        
+                        <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">🏁 Destino del Viaje</h4>
+                        <div style="display: flex; gap: 10px;">
+                            <div class="form-group" style="flex: 1;">
+                                <label>Departamento Destino</label>
+                                <select name="departamento_destino" id="rev_dep_des" onchange="cargarMunicipios('rev_dep_des', 'rev_mun_des')"></select>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>Municipio Destino</label>
+                                <select name="municipio_destino" id="rev_mun_des"></select>
+                            </div>
+                        </div>
+                        <div class="form-group"><label>Dirección Destino Exacta</label><input type="text" name="direccion_destino" id="rev_des"></div>
+
+                        <div class="modal-footer" style="position: sticky; bottom: 0; background: var(--surface); padding-top: 10px; border-top: 1px solid var(--border); z-index: 10;">
+                            <button type="button" class="btn-cancel" onclick="closeModal('modalRevisionVerificacion')">Cancelar</button>
+                            <button type="submit" class="btn-primary" style="background: #10b981;">Guardar y Verificar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE PROGRAMACIÓN Y TURNOS -->
+    <div id="modalProgramacion" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Programar Fechas y Turnos 📅</h3>
+                <button class="close-btn" onclick="closeModal('modalProgramacion')">&times;</button>
+            </div>
+            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_programacion') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="programar">
+                <input type="hidden" name="viaje_id" id="prog_viaje_id">
+                
+                <p style="font-size: 13px; margin-bottom: 15px;">Viaje ID: <b id="prog_alfa" style="font-family: monospace; color: var(--verde);"></b><br>Paciente: <span id="prog_paciente"></span></p>
+                
+                <div class="form-group">
+                    <label>Tipo de Programación (Turno)</label>
+                    <select name="turno" required>
+                        <option value="manual">Citas / Terapias (Manual por cada viaje)</option>
+                        <option value="1">Diálisis - Turno 1 (Lunes, Miércoles, Viernes)</option>
+                        <option value="2">Diálisis - Turno 2 (Martes, Jueves, Sábado)</option>
+                    </select>
+                </div>
+
+                <div class="form-group"><label>Fecha Exacta del Primer Viaje</label><input type="date" name="fecha_servicio" id="prog_fecha" required></div>
+                <div class="form-group"><label>Hora de Recogida</label><input type="time" name="hora_inicio" id="prog_hini" required></div>
+                
+                <p style="font-size: 11px; color: #6b7280; margin-top: 10px;">ℹ️ Si elige Turno 1 o 2, los viajes sucesivos de esta orden maestra se auto-programarán en los días correspondientes a la misma hora.</p>
+                
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalProgramacion')">Cancelar</button><button type="submit" class="btn-primary" style="background: #0ea5e9;">Programar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE ASIGNACIÓN DE FLOTA (TELEGRAM) -->
+    <div id="modalAsignacionFlota" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Asignar Flota Definitiva 🚐</h3>
+                <button class="close-btn" onclick="closeModal('modalAsignacionFlota')">&times;</button>
+            </div>
+            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="asignar_flota">
+                <input type="hidden" name="viaje_id" id="asig_flota_viaje_id">
+                
+                <p style="font-size: 13px; margin-bottom: 15px;">Viaje ID: <b id="asig_flota_alfa" style="font-family: monospace; color: var(--verde);"></b><br>Auth: <span id="asig_flota_auth"></span><br>Paciente: <span id="asig_flota_paciente"></span></p>
+                
+                <div class="form-group">
+                    <label>Vehículo (Placa)</label>
+                    <select name="vehiculo" required>
+                        <option value="">Seleccione vehículo...</option>
+                        {% if vehiculos is defined %}
+                            {% for v in vehiculos %}
+                            <option value="{{ v.placa }}">{{ v.placa }} ({{ v.tipo }})</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Conductor (Operador)</label>
+                    <select name="conductor" required>
+                        <option value="">Seleccione conductor...</option>
+                        {% if conductores is defined %}
+                            {% for c in conductores %}
+                            <option value="{{ c.nombre }}">{{ c.nombre }} ({{ c.cedula }})</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                
+                <p style="font-size: 11px; color: #f59e0b; margin-top: 10px;">🔔 Al confirmar, el viaje quedará ASIGNADO y se enviará la notificación automática vía Telegram al dispositivo del conductor.</p>
+                
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalAsignacionFlota')">Cancelar</button><button type="submit" class="btn-primary" style="background: #10b981;">Asignar y Notificar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL REPORTE DE NOVEDAD -->
+    <div id="modalNovedadVerificacion" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Reportar Novedad</h3>
+                <button class="close-btn" onclick="closeModal('modalNovedadVerificacion')">&times;</button>
+            </div>
+            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="novedad">
+                <input type="hidden" name="viaje_id" id="novedad_traslado_id">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">Auth: <b id="novedad_auth"></b></p>
+                <div class="form-group">
+                    <label>Observación / Motivo de la Novedad</label>
+                    <textarea name="observacion" rows="4" required placeholder="Ej. Datos inconsistentes, paciente no contesta..."></textarea>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalNovedadVerificacion')">Cancelar</button><button type="submit" class="btn-warning">Guardar Novedad</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL VISOR DE AUDITORÍA PDF -->
+    <div id="modalAuditoriaPDF" class="modal-overlay">
+        <div class="modal-box" style="max-width: 800px; width: 95%; height: 80vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3>Reporte de Recorrido Seguro</h3>
+                <button class="close-btn" onclick="closeModal('modalAuditoriaPDF')">&times;</button>
+            </div>
+            <div id="contenedor_pdf_auditoria" style="flex: 1; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
+                <iframe id="iframe_auditoria_pdf" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+            <div class="modal-footer" style="margin-top: 0;">
+                <button type="button" class="btn-cancel" onclick="closeModal('modalAuditoriaPDF')">Cerrar Visor</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MODAL DE CERTIFICACIÓN Y VALIDACIÓN (AUTOMATIZADO) -->
+    <div id="modalAprobarAuditoria" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 style="color: var(--verde);">Certificación de Auditoría</h3>
+                <button class="close-btn" onclick="closeModal('modalAprobarAuditoria')">&times;</button>
+            </div>
+            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="aprobar_auditoria">
+                <input type="hidden" name="viaje_id" id="aprobar_viaje_id">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">ID Viaje: <b id="aprobar_alfa" style="font-family: monospace;"></b></p>
+                <p style="font-size: 13px; color: var(--text); margin-bottom: 15px;">¿Desea confirmar la validación automática del Sello SHA-256 y certificar este viaje finalizado?</p>
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" onclick="closeModal('modalAprobarAuditoria')">Cancelar</button>
+                    <button type="submit" class="btn-success" style="padding: 10px 15px;">Confirmar y Aprobar Auditoría</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL RECHAZO DE AUDITORÍA -->
+    <div id="modalRechazoAuditoria" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 style="color: #ef4444;">Rechazar Auditoría</h3>
+                <button class="close-btn" onclick="closeModal('modalRechazoAuditoria')">&times;</button>
+            </div>
+            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="rechazar_auditoria">
+                <input type="hidden" name="viaje_id" id="rechazo_viaje_id">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">ID Viaje: <b id="rechazo_alfa" style="font-family: monospace;"></b></p>
+                <div class="form-group">
+                    <label>Motivo del Rechazo (Devolución a estado ASIGNADO)</label>
+                    <textarea name="observacion" rows="4" required placeholder="Ej. La foto del destino no es clara, falta la firma del paciente..."></textarea>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalRechazoAuditoria')">Cancelar</button><button type="submit" class="btn-danger">Confirmar Rechazo</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ================= SEGURIDAD Y NAVEGACIÓN =================
+        let isNavigatingLegally = false;
+
+        document.querySelectorAll('a, button').forEach(el => {
+            el.addEventListener('click', () => {
+                isNavigatingLegally = true;
+                setTimeout(() => { isNavigatingLegally = false; }, 1000);
+            });
+        });
+
+        history.pushState(null, null, location.href);
+        window.addEventListener('popstate', function(event) {
+            history.pushState(null, null, location.href);
+            alert("⚠️ Acción denegada: Utilice el botón 'Volver al Panel Central' del menú para salir de esta vista de forma segura.");
+        });
+
+        // ================= LÓGICA DE INTERFAZ =================
+        function ampliarPDF() {
+            const iframe = document.getElementById('visor_pdf');
+            let src = iframe.getAttribute('src');
+            if (src && src.trim() !== '') {
+                window.open(src, '_blank');
+            } else {
+                alert('No hay un documento disponible para ampliar.');
+            }
+        }
+
+        // Corrección del Error 404 para archivos PDF
+        function abrirPDF(rutaRelativa) {
+            if (rutaRelativa && rutaRelativa !== 'None' && rutaRelativa.trim() !== '') {
+                let finalRoute = rutaRelativa.startsWith('static/') ? '/' + rutaRelativa : '/static/' + rutaRelativa;
+                window.open(finalRoute, '_blank');
+            } else {
+                alert('No se adjuntó un documento PDF para esta orden.');
+            }
+        }
+
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+        menuToggle.addEventListener('click', toggleSidebar);
+        overlay.addEventListener('click', toggleSidebar);
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        
+        function toggleDropdown(menuId, el) {
+            const dropdown = document.getElementById(menuId);
+            dropdown.classList.toggle('open');
+            el.classList.toggle('open');
+        }
+
+        // ================= DICCIONARIO DIVIPOLA: DEPARTAMENTOS Y MUNICIPIOS =================
+        const divipolaColombia = {
+            "AMAZONAS": ["LETICIA", "PUERTO NARIÑO", "EL ENCANTO", "LA CHORRERA", "LA PEDRERA", "MIRITI - PARANA", "PUERTO ALEGRIA", "PUERTO ARICA", "PUERTO SANTANDER", "TARAPACA"],
+            "ANTIOQUIA": ["MEDELLIN", "ABEJORRAL", "ABRIAQUI", "ALEJANDRIA", "AMAGA", "AMALFI", "ANDES", "ANGELOPOLIS", "ANGOSTURA", "ANORI", "SANTAFE DE ANTIOQUIA", "ANZA", "APARTADO", "ARBOLETES", "ARGELIA", "ARMENIA", "BARBOSA", "BELMIRA", "BELLO", "BETANIA", "BETULIA", "CIUDAD BOLIVAR", "BRICEÑO", "BURITICA", "CACERES", "CAICEDO", "CALDAS", "CAMPAMENTO", "CAÑASGORDAS", "CARACOLI", "CARAMANTA", "CAREPA", "EL CARMEN DE VIBORAL", "CAROLINA", "CAUCASIA", "CHIGORODO", "CISNEROS", "COCORNA", "CONCEPCION", "CONCORDIA", "COPACABANA", "DABEIBA", "DONMATIAS", "EBEJICO", "EL BAGRE", "ENTRERRIOS", "ENVIGADO", "FREDONIA", "FRONTINO", "GIRALDO", "GIRARDOTA", "GOMEZ PLATA", "GRANADA", "GUADALUPE", "GUARNE", "GUATAPE", "HELICONIA", "HISPANIA", "ITAGUI", "ITUANGO", "JARDIN", "JERICO", "LA CEJA", "LA ESTRELLA", "LA PINTADA", "LA UNION", "LIBORINA", "MACEO", "MARINILLA", "MONTEBELLO", "MURINDO", "MUTATA", "NARIÑO", "NECOCLI", "NECHI", "OLAYA", "PEÑOL", "PEQUE", "PUEBLORRICO", "PUERTO BERRIO", "PUERTO NARE", "PUERTO TRIUNFO", "REMEDIOS", "RETIRO", "RIONEGRO", "SABANALARGA", "SABANETA", "SALGAR", "SAN ANDRES DE CUERQUIA", "SAN CARLOS", "SAN FRANCISCO", "SAN JERONIMO", "SAN JOSE DE LA MONTAÑA", "SAN JUAN DE URABA", "SAN LUIS", "SAN PEDRO DE LOS MILAGROS", "SAN PEDRO DE URABA", "SAN RAFAEL", "SAN ROQUE", "SAN VICENTE FERRER", "SANTA BARBARA", "SANTA ROSA DE OSOS", "SANTO DOMINGO", "EL SANTUARIO", "SEGOVIA", "SONSON", "SOPETRAN", "TAMESIS", "TARAZA", "TARSO", "TITIRIBI", "TOLEDO", "TURBO", "URAMITA", "URRAO", "VALDIVIA", "VALPARAISO", "VEGACHI", "VENECIA", "VIGIA DEL FUERTE", "YALI", "YARUMAL", "YOLOMBO", "YONDO", "ZARAGOZA"],
+            "ARAUCA": ["ARAUCA", "ARAUQUITA", "CRAVO NORTE", "FORTUL", "PUERTO RONDON", "SARAVENA", "TAME"],
+            "ATLANTICO": ["BARRANQUILLA", "BARANOA", "CAMPO DE LA CRUZ", "CANDELARIA", "GALAPA", "JUAN DE ACOSTA", "LURUACO", "MALAMBO", "MANATI", "PALMAR DE VARELA", "PIOJO", "POLONUEVO", "PONEDERA", "PUERTO COLOMBIA", "REPELON", "SABANAGRANDE", "SABANALARGA", "SANTA LUCIA", "SANTO TOMAS", "SOLEDAD", "SUAN", "TUBARA", "USIACURI"],
+            "BOGOTA D.C.": ["BOGOTA, D.C."],
+            "BOLIVAR": ["CARTAGENA DE INDIAS", "ACHI", "ALTOS DEL ROSARIO", "ARENAL", "ARJONA", "ARROYOHONDO", "BARRANCO DE LOBA", "CALAMAR", "CANTAGALLO", "CICUCO", "CORDOBA", "CLEMENCIA", "EL CARMEN DE BOLIVAR", "EL GUAMO", "EL PEÑON", "HATILLO DE LOBA", "MAGANGUE", "MAHATES", "MARGARITA", "MARIA LA BAJA", "MONTECRISTO", "MOMPOS", "MORALES", "NOROSI", "PINILLOS", "REGIDOR", "RIO VIEJO", "SAN CRISTOBAL", "SAN ESTANISLAO", "SAN FERNANDO", "SAN JACINTO", "SAN JACINTO DEL CAUCA", "SAN JUAN NEPOMUCENO", "SAN MARTIN DE LOBA", "SAN PABLO", "SANTA CATALINA", "SANTA ROSA", "SANTA ROSA DEL SUR", "SIMITI", "SOPLAVIENTO", "TALAIGUA NUEVO", "TIQUISIO", "TURBACO", "TURBANA", "VILLANUEVA", "ZAMBRANO"],
+            "BOYACA": ["TUNJA", "ALMEIDA", "AQUITANIA", "ARCABUCO", "BELEN", "BERBEO", "BETEITIVA", "BOAVITA", "BOYACA", "BRICEÑO", "BUENAVISTA", "BUSBANZA", "CALDAS", "CAMPOHERMOSO", "CERINZA", "CHINAVITA", "CHIQUINQUIRA", "CHISCAS", "CHITA", "CHITARAQUE", "CHIVATA", "CIENEGA", "COMBITA", "COPER", "CORRALES", "COVARACHIA", "CUBARA", "CUCAITA", "CUITIVA", "CHIQUIZA", "CHIVOR", "DUITAMA", "EL COCUY", "EL ESPINO", "FIRAVITOBA", "FLORESTA", "GACHANTIVA", "GAMEZA", "GARAGOA", "GUACAMAYAS", "GUATEQUE", "GUAYATA", "GsICAN", "IZA", "JENESANO", "JERICO", "LABRANZAGRANDE", "LA CAPILLA", "LA VICTORIA", "LA UVITA", "VILLA DE LEYVA", "MACANAL", "MARIPI", "MIRAFLORES", "MONGUA", "MONGUI", "MONIQUIRA", "MOTAVITA", "MUZO", "NOBSA", "NUEVO COLON", "OICATA", "OTANCHE", "PACHAVITA", "PAEZ", "PAIPA", "PAJARITO", "PANQUEBA", "PAUNA", "PAYA", "PAZ DE RIO", "PESCA", "PISBA", "PUERTO BOYACA", "QUIPAMA", "RAMIRIQUI", "RAQUIRA", "RONDON", "SABOYA", "SACHICA", "SAMACA", "SAN EDUARDO", "SAN JOSE DE PARE", "SAN LUIS DE GACENO", "SAN MATEO", "SAN MIGUEL DE SEMA", "SAN PEDRO DE IGUAQUE", "SANTA MARIA", "SANTA ROSA DE VITERBO", "SANTA SOFIA", "SANTANA", "SATIVANORTE", "SATIVASUR", "SOATA", "SOCOTA", "SOCHA", "SOGAMOSO", "SOMONDOCO", "SORA", "SOTAQUIRA", "SORACA", "SUSACON", "SUTAMARCHAN", "SUTATENZA", "TASCO", "TEORAMA", "TIBANÁ", "TIBASOSA", "TINJACA", "TIPACOQUE", "TOCA", "TOGsI", "TOPAGA", "TOTA", "TUNUNGUA", "TURMEQUE", "TUTA", "TUTAZA", "UMBITA", "VENTAQUEMADA", "VIRACACHA", "ZETAQUIRA"],
+            "CALDAS": ["MANIZALES", "AGUADAS", "ANSERMA", "ARANZAZU", "BELALCAZAR", "CHINCHINA", "FILADELFIA", "LA DORADA", "LA MERCED", "MANZANARES", "MARMATO", "MARQUETALIA", "MARULANDA", "NEIRA", "NORCASIA", "PACORA", "PALESTINA", "PENSILVANIA", "RIOSUCIO", "RISARALDA", "SALAMINA", "SAMANA", "SAN JOSE", "SUPIA", "VICTORIA", "VILLAMARIA", "VITERBO"],
+            "CAQUETA": ["FLORENCIA", "ALBANIA", "BELEN DE LOS ANDAQUIES", "CARTAGENA DEL CHAIRA", "CURILLO", "EL ELDON", "EL PAUTIL", "LA MONTAÑITA", "MILAN", "MORELIA", "PUERTO RICO", "SAN JOSE DEL FRAGUA", "SAN VICENTE DEL CAGUAN", "SOLANO", "SOLITA", "VALPARAISO"],
+            "CASANARE": ["YOPAL", "AGUAZUL", "CHAMEZA", "HATO COROZAL", "LA SALINA", "MANI", "MONTERREY", "NUNCHIA", "OROCUE", "PAZ DE ARIPORO", "PORE", "RECETOR", "SABANALARGA", "SACAMA", "SAN LUIS DE PALENQUE", "TAMARA", "TAURAMENA", "TRINIDAD", "VILLANUEVA"],
+            "CAUCA": ["POPAYAN", "ALMAGUER", "ARGELIA", "BALBOA", "BOLIVAR", "BUENOS AIRES", "CAJIBIO", "CALDono", "CALOTO", "CORINTO", "EL TAMBO", "FLORENCIA", "GUACHENE", "GUAPI", "INZA", "JAMBALO", "LA SIERRA", "LA VEGA", "LOPEZ DE MICAY", "MERCADERES", "MIRANDA", "MORALES", "PADILLA", "PAEZ", "PATIA", "PIAMONTE", "PIENDAMO", "PUERTO TEJADA", "PURACE", "ROSAS", "SAN SEBASTIAN", "SANTANDER DE QUILICHAO", "SANTA ROSA", "SILVIA", "SOTARA", "SUAREZ", "SUCRE", "TIMBIO", "TIMBIQUI", "TORIBIO", "TOTORO", "VILLA RICA"],
+            "CESAR": ["VALLEDUPAR", "AGUACHICA", "AGUSTIN CODAZZI", "ASTREA", "BECERRIL", "BOSCONIA", "CHIMICHAGUA", "CHIRIGUANA", "CURUMANI", "EL COPEY", "EL PASO", "GAMARRA", "GONZALEZ", "LA GLORIA", "LA JAGUA DE IBIRICO", "MANAURE BALCON DEL CESAR", "PAILITAS", "PELAYA", "PUEBLO BELLO", "RIO DE ORO", "LA PAZ", "SAN ALBERTO", "SAN DIEGO", "SAN MARTIN", "TAMALAMEQUE"],
+            "CHOCO": ["QUIBDO", "ACANDI", "ALTO BAUDO", "BAGADO", "BAHIA SOLANO", "BAJO BAUDO", "BOJAYA", "EL CANTON DEL SAN PABLO", "CARMEN DEL DARIEN", "CERTEGUI", "CONDOTO", "EL CARMEN DE ATRATO", "EL LITORAL DEL SAN JUAN", "ISTMINA", "JURADO", "LLORO", "MEDIO ATRATO", "MEDIO BAUDO", "MEDIO SAN JUAN", "NOVITA", "NUQUI", "RACIOPARADO", "RIO IRO", "RIO QUITO", "RIOSUCIO", "SAN JOSE DEL PALMAR", "SIPÍ", "TADO", "UNGUIA", "UNION PANAMERICANA"],
+            "CORDOBA": ["MONTERIA", "AYAPEL", "BUENAVISTA", "CANALETE", "CERETE", "CHIMA", "CHINU", "CIENAGA DE ORO", "COTECOR", "LA APARTADA", "LORICA", "LOS CORDOBAS", "MOMIL", "MONTELIBANO", "MONTERIA", "MOÑITOS", "PLANETA RICA", "PUEBLO NUEVO", "PUERTO ESCONDIDO", "PUERTO LIBERTADOR", "PURISSIMA DE LA CONCEPCION", "SAHAGUN", "SAN ANDRES DE SOTAVENTO", "SAN ANTERO", "SAN BERNARDO DEL VIENTO", "SAN CARLOS", "SAN JOSE DE URE", "SAN PELAYO", "TIERRALTA", "TUCHIN", "VALENCIA"],
+            "CUNDINAMARCA": ["BOGOTA", "AGUA DE DIOS", "ALBAN", "ANAPOIMA", "ANOLAIMA", "ARBELAEZ", "BELTRAN", "BITUIMA", "BOJACA", "CABRERA", "CACHIPAY", "CAJICA", "CAPARRAPI", "CAQUEZA", "CARMEN DE CARUPA", "CHAGUANI", "CHIA", "CHIPAQUE", "CHOACHI", "CHOCONTA", "COGUA", "COTEBA", "CUCUNUBA", "EL COLEGIO", "EL PEÑON", "EL ROSAL", "FACATATIVA", "FOMEQUE", "FOSCA", "FUNZA", "FUQUENE", "FUSAGASUGA", "GACHALA", "GACHANCIPA", "GACHETA", "GIRARDOT", "GRANADA", "GUACHETA", "GUADUAS", "GUASCA", "GUATAVITA", "GUAYABAL DE SIQUIMA", "GUAYABETAL", "GUTIERREZ", "JERUSALEN", "JUNIN", "LA CALERA", "LA MESA", "LA PALMA", "LA PEÑA", "LA VEGA", "LENGUAZAQUE", "MACHETA", "MADRID", "MANTA", "MEDINA", "MOSQUERA", "NARIÑO", "NEMOCON", "NILO", "NIMAIMA", "NOCAIMA", "VENECIA", "PACHO", "PAIME", "PANDI", "PARATEBUENO", "PASCA", "PUERTO SALGAR", "PULI", "QUEBRADANEGRA", "QUETAME", "QUIPILE", "APULO", "RICAURTE", "SAN ANTONIO DEL TEQUENDAMA", "SAN BERNARDO", "SAN CAYETANO", "SAN FRANCISCO", "SAN JUAN DE RIOSECO", "SOTATA", "SOACHA", "SOPO", "SUBACHOQUE", "SUESCA", "SUPATA", "SUSA", "SUTATAUSA", "TABIO", "TAUSA", "TENA", "TENJO", "TIBACUY", "TIBIRITA", "TOCAIMA", "TOCANCIPA", "TOPAIPI", "UBALA", "UBAQUE", "VILLA DE SAN DIEGO DE UBATE", "UNE", "UTICA", "VERGARA", "VIANI", "VILLAGOMEZ", "VILLAPINZON", "VILLETA", "VIOTA", "YACOPI", "YAPO", "ZIPACON", "ZIPAQUIRA"],
+            "GUAVIARE": ["SAN JOSE DEL GUAVIARE", "CALAMAR", "EL RETORNO", "MIRAFLORES"],
+            "HUILA": ["NEIVA", "ACEVEDO", "AGRADO", "AIPE", "ALGECIRAS", "ALTAMIRA", "BARAYA", "CAMPOALEGRE", "COLOMBIA", "ELIAS", "GARZON", "GIGANTE", "GUADALUPE", "HOBO", "IQUIRA", "ISNOS", "LA ARGENTINA", "LA PLATA", "NATAGA", "OPORAPA", "PAICOL", "PALERMO", "PALESTINA", "PITAL", "PITALITO", "RIVERA", "SALADOBLANCO", "SAN AGUSTIN", "SANTA MARIA", "SUAZA", "TARQUI", "TESALIA", "TELLO", "TERUEL", "TIMANA", "VILLAVIEJA", "YAGUARA"],
+            "LA GUAJIRA": ["RIOHACHA", "ALBANIA", "BARRANCAS", "DIBULLA", "DISTRACCION", "EL MOLINO", "FONSECA", "HATONUEVO", "LA JAGUA DEL PILAR", "MAICAO", "MANAURE", "SAN JUAN DEL CESAR", "URIBIA", "URUMITA", "VILLANUEVA"],
+            "MAGDALENA": ["SANTA MARTA", "ALGARROBO", "ARACATACA", "ARIGUANI", "CERRO DE SAN ANTONIO", "CHIBOLO", "CIENAGA", "CONCORDIA", "EL BANCO", "EL PIÑON", "EL RETEN", "FUNDACION", "GUAMAL", "NUEVA GRANADA", "PEDRAZA", "PIJIÑO DEL CARMEN", "PIVIJAY", "PLAATO", "PUEBLOVIEJO", "REMOLINO", "SABANAS DE SAN ANGEL", "SALAMINA", "SAN ZENON", "SAN SEBASTIAN DE BUENAVISTA", "SANTA ANA", "SANTA BARBARA DE PINTO", "SITIONUEVO", "TENERIFE", "ZAPAYAN", "ZONA BANANERA"],
+            "META": ["VILLAVICENCIO", "ACACIAS", "BARRANCA DE UPÍA", "CABUYARO", "CASTILLA LA NUEVA", "CUBARRAL", "CUMARAL", "EL CALVARIO", "EL CASTILLO", "EL DORADO", "FUENTE DE ORO", "GRANADA", "GUAMAL", "MAPIRIPAN", "MESETAS", "LA MACARENA", "URIBE", "LEJANIAS", "PUERTO CONCORDIA", "PUERTO GAITAN", "PUERTO LOPEZ", "PUERTO LLERAS", "PUERTO RICO", "RESTREPO", "SAN CARLOS DE GUAROA", "SAN JUAN DE ARAMA", "SAN JUANITO", "SAN MARTIN", "VISTAHERMOSA"],
+            "NARIÑO": ["PASTO", "ALBAN", "ALDANA", "ANCUYA", "ARBOLEDA", "BARBACOAS", "BELEN", "BUESACO", "COLON", "CONSACA", "CONTADERO", "CORDOBA", "CUASPUD", "CUMBAL", "CUMBITARA", "CHACHAGsI", "EL CHARCO", "EL PEÑOL", "EL ROSARIO", "EL TABLON DE GOMEZ", "EL TAMBO", "FUNES", "GUACHUCAL", "GUAITARILLA", "GUALMATAN", "ILES", "IMUES", "IPIALES", "LA CRUZ", "LA FLORIDA", "LA LLANADA", "LA TOLA", "LA UNION", "LEIVA", "LINARES", "LOS ANDES", "MAGsI", "MALLAMA", "MOSQUERA", "NARIÑO", "OLAYA HERRERA", "OSPINA", "FRANCISCO PIZARRO", "POLICARPA", "POTOSI", "PROVIDENCIA", "PUERRES", "PUPIALES", "RICAURTE", "ROBERTO PAYAN", "SAMANIEGO", "SAN BERNARDO", "SAN LORENZO", "SAN PABLO", "SAN PEDRO DE CARTAGO", "SANDONA", "SANTA BARBARA", "SANTACRUZ", "SAPUYES", "TAMINANGO", "TANGUA", "TUMACO", "TUQUERRES", "YACUANQUER"],
+            "NORTE DE SANTANDER": ["CUCUTA", "ABREGO", "ARBOLEDAS", "BOCHALEMA", "BUCARASICA", "CACOTA", "CACHIRA", "CHINACOTA", "CHITAGA", "CONVENCION", "CUCUTILLA", "DURANIA", "EL CARMEN", "EL ZULIA", "GRAMALOTE", "HACARI", "HERRAN", "LABATECA", "LA ESPERANZA", "LA PLAYA", "LOS PATIOS", "LURDES", "MUTISCUA", "OCAÑA", "PAMPLONA", "PAMPLONITA", "PUERTO SANTANDER", "RAGONVALIA", "SALAZAR", "SAN CALIXTO", "SAN CAYETANO", "SANTIAGO", "SARDINATA", "SILOS", "TEORAMA", "TIBU", "TOLEDO", "VILLA CARO", "VILLA DEL ROSARIO"],
+            "PUTUMAYO": ["MOCOA", "COLON", "ORITO", "PUERTO ASIS", "PUERTO CAICEDO", "PUERTO GUZMAN", "PUERTO LEGUIZAMO", "SIBUNDOY", "SAN FRANCISCO", "SAN MIGUEL", "SANTIAGO", "VALLE DEL GUAMUEZ", "VILLAGARZON"],
+            "QUINDIO": ["ARMENIA", "BUENAVISTA", "CALARCA", "CIRCASIA", "CORDOBA", "FILANDIA", "GENOVA", "LA TEBAIDA", "MONTENEGRO", "PIJAO", "QUIMBAYA", "SALENTO"],
+            "RISARALDA": ["PEREIRA", "APIA", "BALBOA", "BELEN DE UMBRIA", "DOSQUEBRADAS", "GUATICA", "LA CELIA", "LA VIRGINIA", "MARSELLA", "MISTRATO", "PUEBLO RICO", "QUINCHIA", "SANTA ROSA DE CABAL", "SANTUARIO"],
+            "SAN ANDRES": ["SAN ANDRES", "PROVIDENCIA"],
+            "SANTANDER": ["BUCARAMANGA", "AGUADA", "ALBANIA", "ARATOCA", "BARBOSA", "BARICHARA", "BARRANCABERMEJA", "BETULIA", "BOLIVAR", "CABRERA", "CALIFORNIA", "CAPITANEJO", "CARCASI", "CEPITA", "CERRITO", "CHARALA", "CHARTA", "CHIMA", "CHIPATA", "CIMITARRA", "CONCEPCION", "CONFINES", "CONTRATACION", "COROMORO", "CURITI", "EL CARMEN DE CHUCURI", "EL GUACAMAYO", "EL PEÑON", "EL PLAYON", "ENCINO", "ENCISO", "FLORIAN", "FLORIDABLANCA", "GALAN", "GAMBITA", "GIRON", "GUACA", "GUADALUPE", "GUAPOTA", "GUAVATA", "GUEPSA", "HATO", "JESUS MARIA", "JORDAN", "LA BELLEZA", "LANDAZURI", "LA PAZ", "LEBRIJA", "LOS SANTOS", "MACARAVITA", "MALAGA", "MATANZA", "MOGOTES", "MOLAGAVITA", "OCAMONTE", "OIBA", "ONZAGA", "PALMAR", "PALMAS DEL SOCORRO", "PIEDECUESTA", "PINCHOTE", "PUENTE NACIONAL", "PUERTO PARRA", "PUERTO WILCHES", "RIONEGRO", "SABANA DE TORRES", "SAN ANDRES", "SAN BENITO", "SAN GIL", "SAN JOAQUIN", "SAN JOSE DE MIRANDA", "SAN MIGUEL", "SAN VICENTE DE CHUCURI", "SANTA BARBARA", "SANTA HELENA DEL OPON", "SIMACOTA", "SOCORRO", "SUAITA", "SUCRE", "SURATA", "TONA", "VALLE DE SAN JOSE", "VELEZ", "VETAS", "VILLANUEVA", "ZAPATOCA"],
+            "SUCRE": ["SINCELEJO", "BUENAVISTA", "CAJAS", "COLOSO", "COROZAL", "COVEÑAS", "CHALAN", "EL ROBLE", "GALERAS", "GUARANDA", "LA UNION", "LOS PALMITOS", "MAJAGUAL", "MORROA", "OVEJAS", "PALMITO", "SAMPUES", "SAN BENITO ABAD", "SAN JUAN DE BETULIA", "SAN MARCOS", "SAN ONofre", "SAN PEDRO", "SINCE", "SUCRE", "TOLU", "TOLUVIEJO"],
+            "TOLIMA": ["IBAGUE", "ALPUJARRA", "ALVARADO", "AMBALEMA", "ANZOATEGUI", "ARMERO", "ATACO", "CAJAMARCA", "CARMEN DE APICALA", "CASABIANCA", "CHAPARRAL", "COELLO", "COYAIMA", "CUNDAY", "DOLORES", "ESPINAL", "FALAN", "FLANDES", "FRESNO", "GUAMO", "HERVEO", "HONDA", "ICONONZO", "LERIDA", "LIBANO", "MARIQUITA", "MELGAR", "MURILLO", "NATAGAIMA", "ORTEGA", "PALOCABILDO", "PIEDRAS", "PLANADAS", "PRADO", "PURIFICACION", "RIOBLANCO", "RONCESVALLES", "ROVIRA", "SALDAÑA", "SAN ANTONIO", "SAN LUIS", "SANTA ISABEL", "SUAREZ", "VALLE DE SAN JUAN", "VENADILLO", "VILLAHERMOSA", "VILLARRICA"],
+            "VALLE DEL CAUCA": ["CALI", "ALCALA", "ANDALUCIA", "ANSERMANUEVO", "ARGELIA", "BOLIVAR", "BUENAVENTURA", "GUADALAJARA DE BUGA", "BUGALAGRANDE", "CAICEDONIA", "CALIMA", "CANDELARIA", "CARTAGO", "DAGUA", "EL AGUILA", "EL CAIRO", "EL CERRITO", "EL DOVIO", "FLORIDA", "GINEBRA", "GUACARI", "JAMUNDI", "LA CUMBRE", "LA UNION", "LA VICTORIA", "VIJES", "OBANDO", "PALMIRA", "PRADERA", "RESTREPO", "RIOFRIO", "ROLDANILLO", "SAN PEDRO", "SEVILLA", "TORO", "TRUJILLO", "TULUA", "ULLOA", "VERSALLES", "YOTOCO", "YUMBO", "ZARZAL"],
+            "VAUPES": ["MITU", "CARURU", "TARAIRA", "PAPUNAHUA", "YAVARATE"],
+            "VICHADA": ["PUERTO CARREÑO", "LA PRIMAVERA", "SAN JOSE DE OCUNE", "CUMARIBO"]
+        };
+
+        function cargarMunicipios(depSelectId, munSelectId) {
+            const depSelect = document.getElementById(depSelectId);
+            const munSelect = document.getElementById(munSelectId);
+            if (!depSelect || !munSelect) return;
+
+            const dep = depSelect.value;
+            munSelect.innerHTML = '<option value="">Seleccione Municipio...</option>';
+            
+            if (dep && divipolaColombia[dep]) {
+                divipolaColombia[dep].sort().forEach(mun => {
+                    let option = document.createElement('option');
+                    option.value = mun;
+                    option.text = mun;
+                    munSelect.appendChild(option);
+                });
+            }
+        }
+
+        function initSelectoresDivipola() {
+            const selectIds = ['cap_dep_ori', 'cap_dep_des', 'rev_dep_ori', 'rev_dep_des'];
+            let optionsHTML = '<option value="">Seleccione Departamento...</option>';
+            
+            Object.keys(divipolaColombia).sort().forEach(dep => {
+                optionsHTML += `<option value="${dep}">${dep}</option>`;
+            });
+
+            selectIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = optionsHTML;
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            initSelectoresDivipola();
+        });
+
+        // Funciones Traslados y Operativos Corregidas (Mantenimiento de IDs exactos)
+        function abrirRevision(btn) {
+            document.getElementById('rev_traslado_id').value = btn.getAttribute('data-id');
+            document.getElementById('rev_nombre').value = btn.getAttribute('data-nombre');
+            
+            let tipoDocValue = (btn.getAttribute('data-tipodoc') || "").trim();
+            let tipoDocSelect = document.getElementById('rev_tipodoc');
+            if (tipoDocValue && Array.from(tipoDocSelect.options).some(opt => opt.value === tipoDocValue)) {
+                tipoDocSelect.value = tipoDocValue;
+            }
+
+            document.getElementById('rev_idusr').value = btn.getAttribute('data-idusr');
+            document.getElementById('rev_tel').value = btn.getAttribute('data-tel');
+            
+            // Cargar Origen
+            let depOriValue = (btn.getAttribute('data-dep') || "").toUpperCase().trim();
+            let munOriValue = (btn.getAttribute('data-mun') || "").toUpperCase().trim();
+            let depOriSelect = document.getElementById('rev_dep_ori');
+            let munOriSelect = document.getElementById('rev_mun_ori');
+            
+            if (depOriSelect && divipolaColombia[depOriValue]) {
+                depOriSelect.value = depOriValue;
+                cargarMunicipios('rev_dep_ori', 'rev_mun_ori');
+                if (munOriSelect && Array.from(munOriSelect.options).some(opt => opt.value === munOriValue)) {
+                    munOriSelect.value = munOriValue;
+                }
+            }
+
+            document.getElementById('rev_ori').value = btn.getAttribute('data-ori');
+
+            // Cargar Destino
+            let depDesValue = (btn.getAttribute('data-dep-des') || "").toUpperCase().trim();
+            let munDesValue = (btn.getAttribute('data-mun-des') || "").toUpperCase().trim();
+            let depDesSelect = document.getElementById('rev_dep_des');
+            let munDesSelect = document.getElementById('rev_mun_des');
+
+            if (depDesSelect && divipolaColombia[depDesValue]) {
+                depDesSelect.value = depDesValue;
+                cargarMunicipios('rev_dep_des', 'rev_mun_des');
+                if (munDesSelect && Array.from(munDesSelect.options).some(opt => opt.value === munDesValue)) {
+                    munDesSelect.value = munDesValue;
+                }
+            }
+
+            document.getElementById('rev_des').value = btn.getAttribute('data-des');
+
+            let ruta = btn.getAttribute('data-ruta');
+            let iframe = document.getElementById('visor_pdf');
+            if (ruta && ruta !== 'None' && ruta !== '') {
+                iframe.src = ruta.startsWith('static/') ? '/' + ruta : '/static/' + ruta;
+            } else {
+                iframe.src = "";
+            }
+
+            openModal('modalRevisionVerificacion');
+        }
+
+        function abrirNovedadVerificacion(id, auth) {
+            document.getElementById('novedad_traslado_id').value = id;
+            document.getElementById('novedad_auth').innerText = auth;
+            openModal('modalNovedadVerificacion');
+        }
+
+        function abrirProgramacion(id, alfa, paciente, fecha, hini) {
+            document.getElementById('prog_viaje_id').value = id;
+            document.getElementById('prog_alfa').innerText = alfa;
+            document.getElementById('prog_paciente').innerText = paciente;
+            
+            if(fecha && fecha !== 'None') document.getElementById('prog_fecha').value = fecha;
+            if(hini && hini !== 'None') document.getElementById('prog_hini').value = hini;
+
+            openModal('modalProgramacion');
+        }
+
+        function abrirAsignacionFlota(id, alfa, paciente, auth) {
+            document.getElementById('asig_flota_viaje_id').value = id;
+            document.getElementById('asig_flota_alfa').innerText = alfa;
+            document.getElementById('asig_flota_paciente').innerText = paciente;
+            document.getElementById('asig_flota_auth').innerText = auth;
+            openModal('modalAsignacionFlota');
+        }
+        
+        function abrirAuditoriaPDF(ruta) {
+            let iframe = document.getElementById('iframe_auditoria_pdf');
+            let contenedorPdf = document.getElementById('contenedor_pdf_auditoria');
+            
+            if (ruta && ruta !== 'None' && ruta !== '') {
+                contenedorPdf.style.display = 'block';
+                iframe.src = ruta.startsWith('static/') ? '/' + ruta : '/static/' + ruta;
+            } else {
+                contenedorPdf.style.display = 'none';
+                iframe.src = "";
+                alert("El reporte PDF no pudo ser generado o no está disponible en el servidor.");
+            }
+            openModal('modalAuditoriaPDF');
+        }
+
+        function abrirRechazoAuditoria(id, alfa) {
+            document.getElementById('rechazo_viaje_id').value = id;
+            document.getElementById('rechazo_alfa').innerText = alfa;
+            openModal('modalRechazoAuditoria');
+        }
+
+        function abrirModalAprobarAuditoria(id, alfa) {
+            document.getElementById('aprobar_viaje_id').value = id;
+            document.getElementById('aprobar_alfa').innerText = alfa;
+            openModal('modalAprobarAuditoria');
+        }
+    </script>
+</body>
+</html>
