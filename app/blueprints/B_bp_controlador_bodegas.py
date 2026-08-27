@@ -1240,15 +1240,17 @@ def upload_productos_masivo():
 
     try:
         ext = file.filename.lower()
+        file_bytes = file.read()
         if ext.endswith(('.xlsx', '.xls')):
             try:
-                df = pd.read_excel(file, dtype=str)
+                engine_val = 'openpyxl' if ext.endswith('.xlsx') else ('xlrd' if ext.endswith('.xls') else None)
+                df = pd.read_excel(io.BytesIO(file_bytes), dtype=str, engine=engine_val)
             except Exception as e:
                 if 'xlrd' in str(e):
                     return jsonify({'error': 'Falta la librería xlrd en el servidor para leer archivos .xls antiguos. Ejecute: pip install xlrd>=2.0.1 y REINICIE EL SERVIDOR.'}), 500
                 raise e
         else:
-            df = pd.read_csv(file, dtype=str, sep=None, engine='python')
+            df = pd.read_csv(io.BytesIO(file_bytes), dtype=str, sep=None, engine='python')
             
         df.columns = df.columns.str.strip().str.upper()
         empresa_id = str(session.get('empresa_id'))
@@ -1976,11 +1978,13 @@ def upload_excel():
             
             try:
                 ext = file.filename.lower()
+                file_bytes = file.read()
                 if ext.endswith('.csv'):
-                    df_raw = pd.read_csv(file, header=None, sep=None, engine='python', dtype=str)
+                    df_raw = pd.read_csv(io.BytesIO(file_bytes), header=None, sep=None, engine='python', dtype=str)
                 else:
                     try:
-                        df_raw = pd.read_excel(file, header=None, dtype=str)
+                        engine_val = 'openpyxl' if ext.endswith('.xlsx') else ('xlrd' if ext.endswith('.xls') else None)
+                        df_raw = pd.read_excel(io.BytesIO(file_bytes), header=None, dtype=str, engine=engine_val)
                     except Exception as e:
                         if 'xlrd' in str(e):
                             resultados_error.append(f"❌ {filename}: Falta la librería 'xlrd' en el servidor para leer archivos .xls antiguos. Por favor instálela y REINICIE EL SERVIDOR.")
