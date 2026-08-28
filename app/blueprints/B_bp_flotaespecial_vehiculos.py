@@ -4,7 +4,6 @@ import io
 import json
 import re
 import uuid
-import pdfplumber
 from flask import Blueprint, render_template, session, redirect, url_for, request, flash, send_file, current_app
 from werkzeug.utils import secure_filename
 from app import mysql
@@ -13,7 +12,6 @@ from functools import wraps
 import MySQLdb.cursors
 from datetime import datetime, timedelta
 import base64
-from PIL import Image as PILImage
 
 # Librerías PDF (Reportes Platypus)
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
@@ -40,7 +38,6 @@ def controlador_flotaespecial_required(f):
 # HELPER: MIGRACIÓN DE COLUMNAS NUEVAS DE VEHÍCULOS
 # =========================================================
 def asegurar_columnas_vehiculos(cur):
-    # Capa de seguridad por si no se ejecutan los scripts SQL manualmente
     columnas = [
         ("vin", "VARCHAR(100)"), ("numero_serie", "VARCHAR(100)"), ("restriccion_movilidad", "VARCHAR(100)"),
         ("blindaje", "VARCHAR(50)"), ("potencia_hp", "VARCHAR(50)"), ("declaracion_importacion", "VARCHAR(100)"),
@@ -69,14 +66,27 @@ def asegurar_columnas_vehiculos(cur):
     """)
 
 # =========================================================
-# HELPER: CONVERSIÓN DE FECHA HTML
+# HELPER: CONVERSIÓN DE FECHA HTML MULTI-FORMATO
 # =========================================================
 def _formatear_fecha(cadena_fecha):
     if not cadena_fecha: return None
-    m = re.search(r'([0-9]{1,2})[\-\/]([0-9]{1,2})[\-\/]([0-9]{4})', cadena_fecha)
-    if m:
-        dia, mes, anio = m.group(1).zfill(2), m.group(2).zfill(2), m.group(3)
+    m1 = re.search(r'([0-9]{1,2})[\-\/\s]+([0-9]{1,2})[\-\/\s]+([0-9]{4})', cadena_fecha)
+    if m1 and len(m1.group(3)) == 4:
+        dia, mes, anio = m1.group(1).zfill(2), m1.group(2).zfill(2), m1.group(3)
         return f"{anio}-{mes}-{dia}"
+    m2 = re.search(r'([0-9]{4})[\-\/\s]+([0-9]{1,2})[\-\/\s]+([0-9]{1,2})', cadena_fecha)
+    if m2:
+        anio, mes, dia = m2.group(1), m2.group(2).zfill(2), m2.group(3).zfill(2)
+        return f"{anio}-{mes}-{dia}"
+    return None
+
+def guardar_pdf_manual(file_obj, prefix):
+    if file_obj and file_obj.filename.endswith('.pdf'):
+        filename = secure_filename(f"{prefix}_{uuid.uuid4().hex[:8]}.pdf")
+        ruta_base = os.path.join(current_app.static_folder, 'uploads', 'flotaespecial', 'vehiculos')
+        os.makedirs(ruta_base, exist_ok=True)
+        file_obj.save(os.path.join(ruta_base, filename))
+        return f"uploads/flotaespecial/vehiculos/{filename}"
     return None
 
 # =========================================================
@@ -88,7 +98,6 @@ def _formatear_fecha(cadena_fecha):
 def gestion_vehiculos():
     empresa_id = session.get('empresa_id')
     active_module = request.args.get('active_module', 'vehiculos')
-    datos_extraidos = None
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     asegurar_columnas_vehiculos(cur)
@@ -155,183 +164,6 @@ def gestion_vehiculos():
             return redirect(url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='terceros'))
 
         # ----------------------------------------------------
-        # EXTRACCIÓN DE EXPEDIENTES (OCR)
-        # ----------------------------------------------------
-        elif accion == 'extraer_pdfs':
-            active_module = 'crear_vehiculo'
-            datos_extraidos = {}
-            
-            tipo_vinculacion_ext = request.form.get('tipo_vinculacion_ext', 'Propio')
-            empresa_tercera_id = request.form.get('empresa_tercera_ext', '')
-            
-            datos_extraidos['tipo_vinculacion'] = tipo_vinculacion_ext
-            if tipo_vinculacion_ext == 'Tercero' and empresa_tercera_id:
-                cur.execute("SELECT nombre, nit FROM empresas_transporte_especial WHERE id=%s AND id_empresa=%s", (empresa_tercera_id, empresa_id))
-                emp_terc = cur.fetchone()
-                if emp_terc:
-                    datos_extraidos['empresa_vinculadora'] = emp_terc['nombre']
-                    datos_extraidos['nit_empresa_vinculadora'] = emp_terc['nit']
-
-            ruta_base = os.path.join(current_app.static_folder, 'uploads', 'flotaespecial', 'vehiculos')
-            os.makedirs(ruta_base, exist_ok=True)
-
-            # 1. Extracción Licencia de Tránsito
-            pdf_prop = request.files.get('pdf_propiedad')
-            if pdf_prop and pdf_prop.filename.endswith('.pdf'):
-                filename = secure_filename(f"prop_{uuid.uuid4().hex[:8]}.pdf")
-                ruta_guardado = os.path.join(ruta_base, filename)
-                pdf_prop.save(ruta_guardado)
-                datos_extraidos['ruta_pdf_tarjeta_propiedad'] = f"uploads/flotaespecial/vehiculos/{filename}"
-                
-                try:
-                    with pdfplumber.open(ruta_guardado) as pdf:
-                        texto_prop = "\n".join([p.extract_text() or "" for p in pdf.pages])
-                    
-                    m_placa = re.search(r'PLACA[\s\n]*([A-Z0-9]{6})', texto_prop, flags=re.IGNORECASE)
-                    if m_placa: datos_extraidos['placa'] = m_placa.group(1)
-                    
-                    m_marca = re.search(r'MARCA[\s\n]+([A-Za-z0-9]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_marca: datos_extraidos['marca'] = m_marca.group(1)
-                    
-                    m_linea = re.search(r'LINEA[\s\n]+([A-Za-z0-9]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_linea: datos_extraidos['linea'] = m_linea.group(1)
-                    
-                    m_modelo = re.search(r'MODELO[\s\n]*([0-9]{4})', texto_prop, flags=re.IGNORECASE)
-                    if m_modelo: datos_extraidos['modelo'] = m_modelo.group(1)
-                    
-                    m_motor = re.search(r'N[UÚ]MERO DE MOTOR[\s\n]+([A-Z0-9]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_motor: datos_extraidos['motor'] = m_motor.group(1)
-                    
-                    m_chasis = re.search(r'N[UÚ]MERO DE CHASIS[\s\n]+([A-Z0-9]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_chasis: datos_extraidos['chasis'] = m_chasis.group(1)
-                    
-                    m_vin = re.search(r'VIN[\s\n]+([A-Z0-9]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_vin: datos_extraidos['vin'] = m_vin.group(1)
-                    
-                    m_serie = re.search(r'N[UÚ]MERO DE SERIE[\s\n]+([A-Z0-9]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_serie: datos_extraidos['numero_serie'] = m_serie.group(1)
-                    
-                    m_clase = re.search(r'CLASE DE VEH[ÍI]CULO[\s\n]+([A-Za-z]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_clase: datos_extraidos['clase'] = m_clase.group(1)
-                    
-                    m_carroceria = re.search(r'TIPO CARROCER[ÍI]A[\s\n]+([A-Za-z]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_carroceria: datos_extraidos['carroceria'] = m_carroceria.group(1)
-                    
-                    m_color = re.search(r'COLOR[\s\n]+([A-Za-z\s]+)(?:N[UÚ]MERO|TIPO)', texto_prop, flags=re.IGNORECASE)
-                    if m_color: datos_extraidos['color'] = m_color.group(1).strip()
-                    
-                    m_cilind = re.search(r'CILINDRADA CC[\s\n]+([0-9\.]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_cilind: datos_extraidos['cilindraje'] = m_cilind.group(1).replace('.', '')
-                    
-                    m_cap = re.search(r'CAPACIDAD Kg/PSJ[\s\n]+([0-9]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_cap: datos_extraidos['capacidad'] = m_cap.group(1)
-                    
-                    m_comb = re.search(r'COMBUSTIBLE[\s\n]+([A-Za-z]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_comb: datos_extraidos['combustible'] = m_comb.group(1)
-                    
-                    m_serv = re.search(r'SERVICIO[\s\n]+([A-Za-zÚú]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_serv: datos_extraidos['servicio'] = m_serv.group(1)
-                    
-                    m_puertas = re.search(r'PUERTAS[\s\n]+([0-9]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_puertas: datos_extraidos['puertas'] = m_puertas.group(1)
-
-                    m_hp = re.search(r'POTENCIA HP[\s\n]+([0-9]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_hp: datos_extraidos['potencia_hp'] = m_hp.group(1)
-                    
-                    m_org = re.search(r'ORGANISMO DE TRANSITO[\s\n]+([A-Za-z\s]+)', texto_prop, flags=re.IGNORECASE)
-                    if m_org: datos_extraidos['organismo_transito'] = m_org.group(1).strip()
-
-                    m_f_mat = re.search(r'FECHA MATRICULA[\s\n]+([0-9]{2}/[0-9]{2}/[0-9]{4})', texto_prop, flags=re.IGNORECASE)
-                    if m_f_mat: datos_extraidos['fecha_matricula'] = _formatear_fecha(m_f_mat.group(1))
-
-                    m_f_exp = re.search(r'FECHA EXP. LIC. TTO.[\s\n]+([0-9]{2}/[0-9]{2}/[0-9]{4})', texto_prop, flags=re.IGNORECASE)
-                    if m_f_exp: datos_extraidos['fecha_expedicion_licencia'] = _formatear_fecha(m_f_exp.group(1))
-
-                    m_lim = re.search(r'LIMITACI[OÓ]N A LA PROPIEDAD[\s\n]+([A-Za-z0-9\-\.\s]+?)(?:FECHA|$)', texto_prop, flags=re.IGNORECASE)
-                    if m_lim: datos_extraidos['limitacion_propiedad'] = m_lim.group(1).strip()
-                    
-                except Exception as e:
-                    flash(f"Error procesando Licencia de Tránsito: {e}", "warning")
-
-            # 2. Extracción Tarjeta de Operación
-            pdf_ope = request.files.get('pdf_operacion')
-            if pdf_ope and pdf_ope.filename.endswith('.pdf'):
-                filename = secure_filename(f"ope_{uuid.uuid4().hex[:8]}.pdf")
-                ruta_guardado = os.path.join(ruta_base, filename)
-                pdf_ope.save(ruta_guardado)
-                datos_extraidos['ruta_pdf_tarjeta_operacion'] = f"uploads/flotaespecial/vehiculos/{filename}"
-                
-                try:
-                    with pdfplumber.open(ruta_guardado) as pdf:
-                        texto_ope = "\n".join([p.extract_text() or "" for p in pdf.pages])
-                    
-                    m_placa = re.search(r'PLACA:[\s\n]*([A-Z0-9]{6})', texto_ope, flags=re.IGNORECASE)
-                    if m_placa and not datos_extraidos.get('placa'): datos_extraidos['placa'] = m_placa.group(1)
-                    
-                    m_no_to = re.search(r'TARJETA DE OPERACI[OÓ]N\s*No\.?\s*([A-Z0-9]+)', texto_ope, flags=re.IGNORECASE)
-                    if m_no_to: datos_extraidos['numero_tarjeta_operacion'] = m_no_to.group(1)
-
-                    m_mod = re.search(r'MODALIDAD DE SERVICIO:[\s\n]*([A-Za-z]+)', texto_ope, flags=re.IGNORECASE)
-                    if m_mod: datos_extraidos['modalidad_servicio'] = m_mod.group(1)
-
-                    m_radio = re.search(r'RADIO DE ACCI[OÓ]N:[\s\n]*([A-Za-z]+)', texto_ope, flags=re.IGNORECASE)
-                    if m_radio: datos_extraidos['radio_accion'] = m_radio.group(1)
-
-                    # Si NO es tercero explícito por select, intentamos sacar la empresa vinculadora del PDF
-                    if tipo_vinculacion_ext != 'Tercero':
-                        m_emp = re.search(r'RAZ[OÓ]N SOCIAL EMPRESA:[\s\n]*([A-Za-z\.\s]+)NIT:', texto_ope, flags=re.IGNORECASE)
-                        if m_emp: datos_extraidos['empresa_vinculadora'] = m_emp.group(1).strip()
-
-                        m_nit = re.search(r'NIT:[\s\n]*([0-9\-]+)', texto_ope, flags=re.IGNORECASE)
-                        if m_nit: datos_extraidos['nit_empresa_vinculadora'] = m_nit.group(1)
-
-                    m_f_exp = re.search(r'FECHA DE EXPEDICI[OÓ]N:[\s\n]*([0-9]{2}[\-\/][0-9]{2}[\-\/][0-9]{4})', texto_ope, flags=re.IGNORECASE)
-                    if m_f_exp: datos_extraidos['fecha_expedicion_tarjeta_operacion'] = _formatear_fecha(m_f_exp.group(1))
-
-                    m_f_ini = re.search(r'DESDE:[\s\n]*([0-9]{2}[\-\/][0-9]{2}[\-\/][0-9]{4})', texto_ope, flags=re.IGNORECASE)
-                    if m_f_ini: datos_extraidos['fecha_inicio_tarjeta_operacion'] = _formatear_fecha(m_f_ini.group(1))
-
-                    m_f_fin = re.search(r'HASTA:[\s\n]*([0-9]{2}[\-\/][0-9]{2}[\-\/][0-9]{4})', texto_ope, flags=re.IGNORECASE)
-                    if m_f_fin: datos_extraidos['vencimiento_tarjeta_operacion'] = _formatear_fecha(m_f_fin.group(1))
-
-                except Exception as e:
-                    flash(f"Error procesando Tarjeta de Operación: {e}", "warning")
-
-            # 3. Extracción Póliza RCC-RCE
-            pdf_pol = request.files.get('pdf_poliza')
-            if pdf_pol and pdf_pol.filename.endswith('.pdf'):
-                filename = secure_filename(f"rcc_{uuid.uuid4().hex[:8]}.pdf")
-                ruta_guardado = os.path.join(ruta_base, filename)
-                pdf_pol.save(ruta_guardado)
-                datos_extraidos['ruta_pdf_rcc_rce'] = f"uploads/flotaespecial/vehiculos/{filename}"
-                
-                try:
-                    with pdfplumber.open(ruta_guardado) as pdf:
-                        texto_pol = "\n".join([p.extract_text() or "" for p in pdf.pages])
-                    
-                    m_placa = re.search(r'PLACA:[\s\n]*([A-Z0-9]{6})', texto_pol, flags=re.IGNORECASE)
-                    if m_placa and not datos_extraidos.get('placa'): datos_extraidos['placa'] = m_placa.group(1)
-
-                    m_no_pol = re.search(r'No\.\s*P[oó]liza[\s\n]+([0-9\-]+)', texto_pol, flags=re.IGNORECASE)
-                    if m_no_pol: datos_extraidos['numero_poliza_rcc_rce'] = m_no_pol.group(1)
-
-                    # Captura Aseguradora genérica por cabecera
-                    datos_extraidos['aseguradora_rcc_rce'] = "Seguros del Estado S.A." if "SEGUROS DEL ESTADO" in texto_pol.upper() else "Otra"
-
-                    fechas_poliza = re.findall(r'([0-9]{2}[\s\-\/]*[0-9]{2}[\s\-\/]*[0-9]{4})', texto_pol)
-                    if len(fechas_poliza) >= 2:
-                        datos_extraidos['fecha_inicio_rcc_rce'] = _formatear_fecha(fechas_poliza[0].replace(' ', '-'))
-                        datos_extraidos['vencimiento_rcc_rce'] = _formatear_fecha(fechas_poliza[1].replace(' ', '-'))
-
-                except Exception as e:
-                    flash(f"Error procesando Pólizas: {e}", "warning")
-
-            if datos_extraidos:
-                flash("Documentos escaneados con éxito. Revise y complete la información en el formulario.", "success")
-            else:
-                flash("No se subieron PDFs o no se pudo extraer información legible.", "info")
-
-        # ----------------------------------------------------
         # CRUD DE VEHÍCULOS (Guardar Manual / Edit)
         # ----------------------------------------------------
         elif accion in ['crear', 'editar']:
@@ -368,7 +200,6 @@ def gestion_vehiculos():
             tipo_vinculacion = request.form.get('tipo_vinculacion', 'Propio').strip()
             empresa_vinculadora = request.form.get('empresa_vinculadora', '').strip()
             
-            # LÓGICA DE ASIGNACIÓN EMPRESA TRANSPORTE
             if tipo_vinculacion == 'Propio':
                 empresa_transporte = session.get('empresa')
                 empresa_vinculadora = session.get('empresa')
@@ -376,7 +207,6 @@ def gestion_vehiculos():
             else:
                 empresa_transporte = empresa_vinculadora
                 nit_empresa_vinculadora = request.form.get('nit_empresa_vinculadora', '').strip()
-                # Extraer NIT automáticamente si se seleccionó del desplegable
                 if empresa_vinculadora:
                     cur.execute("SELECT nit FROM empresas_transporte_especial WHERE nombre=%s AND id_empresa=%s", (empresa_vinculadora, empresa_id))
                     t_data = cur.fetchone()
@@ -397,11 +227,18 @@ def gestion_vehiculos():
             vencimiento_rcc_rce = request.form.get('vencimiento_rcc_rce') or None
             
             numero_poliza_soat = request.form.get('numero_poliza_soat', '').strip()
+            aseguradora_soat = request.form.get('aseguradora_soat', '').strip()
             vencimiento_soat = request.form.get('vencimiento_soat') or None
             
-            r_prop = request.form.get('ruta_pdf_tarjeta_propiedad', '')
-            r_ope = request.form.get('ruta_pdf_tarjeta_operacion', '')
-            r_rcc = request.form.get('ruta_pdf_rcc_rce', '')
+            numero_certificado_rtm = request.form.get('numero_certificado_rtm', '').strip()
+            vencimiento_rtm = request.form.get('vencimiento_rtm') or None
+
+            # Carga manual de archivos PDF desde el formulario
+            r_prop = guardar_pdf_manual(request.files.get('file_pdf_propiedad'), 'prop')
+            r_ope = guardar_pdf_manual(request.files.get('file_pdf_operacion'), 'ope')
+            r_rcc = guardar_pdf_manual(request.files.get('file_pdf_poliza'), 'rcc')
+            r_soat = guardar_pdf_manual(request.files.get('file_pdf_soat'), 'soat')
+            r_rtm = guardar_pdf_manual(request.files.get('file_pdf_rtm'), 'rtm')
             
             if placa and clase:
                 try:
@@ -417,11 +254,12 @@ def gestion_vehiculos():
                              nit_empresa_vinculadora, empresa_transporte, fecha_expedicion_tarjeta_operacion,
                              fecha_inicio_tarjeta_operacion, vencimiento_tarjeta_operacion,
                              numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
-                             numero_poliza_soat, vencimiento_soat,
-                             ruta_pdf_tarjeta_propiedad, ruta_pdf_tarjeta_operacion, ruta_pdf_rcc_rce) 
+                             numero_poliza_soat, aseguradora_soat, vencimiento_soat,
+                             numero_certificado_rtm, vencimiento_rtm,
+                             ruta_pdf_tarjeta_propiedad, ruta_pdf_tarjeta_operacion, ruta_pdf_rcc_rce, ruta_pdf_soat, ruta_pdf_tecnomecanica) 
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, (
                             empresa_id, placa, clase, carroceria, marca, linea, modelo, color, combustible,
                             cilindraje, capacidad, potencia_hp, puertas, vin, chasis, motor, numero_serie,
@@ -432,10 +270,12 @@ def gestion_vehiculos():
                             nit_empresa_vinculadora, empresa_transporte, fecha_expedicion_tarjeta_operacion,
                             fecha_inicio_tarjeta_operacion, vencimiento_tarjeta_operacion,
                             numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
-                            numero_poliza_soat, vencimiento_soat, r_prop, r_ope, r_rcc
+                            numero_poliza_soat, aseguradora_soat, vencimiento_soat,
+                            numero_certificado_rtm, vencimiento_rtm,
+                            r_prop or '', r_ope or '', r_rcc or '', r_soat or '', r_rtm or ''
                         ))
                         mysql.connection.commit()
-                        flash(f"Vehículo especial {placa} registrado con todo el expediente.", "success")
+                        flash(f"Vehículo especial {placa} registrado manualmente con éxito.", "success")
                         
                     elif accion == 'editar' and v_id:
                         cur.execute("""
@@ -450,7 +290,8 @@ def gestion_vehiculos():
                                 nit_empresa_vinculadora=%s, empresa_transporte=%s, fecha_expedicion_tarjeta_operacion=%s,
                                 fecha_inicio_tarjeta_operacion=%s, vencimiento_tarjeta_operacion=%s,
                                 numero_poliza_rcc_rce=%s, aseguradora_rcc_rce=%s, fecha_inicio_rcc_rce=%s, vencimiento_rcc_rce=%s,
-                                numero_poliza_soat=%s, vencimiento_soat=%s
+                                numero_poliza_soat=%s, aseguradora_soat=%s, vencimiento_soat=%s,
+                                numero_certificado_rtm=%s, vencimiento_rtm=%s
                             WHERE id=%s AND id_empresa=%s
                         """, (
                             placa, clase, carroceria, marca, linea, modelo, color, combustible,
@@ -462,12 +303,15 @@ def gestion_vehiculos():
                             nit_empresa_vinculadora, empresa_transporte, fecha_expedicion_tarjeta_operacion,
                             fecha_inicio_tarjeta_operacion, vencimiento_tarjeta_operacion,
                             numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
-                            numero_poliza_soat, vencimiento_soat,
+                            numero_poliza_soat, aseguradora_soat, vencimiento_soat,
+                            numero_certificado_rtm, vencimiento_rtm,
                             v_id, empresa_id
                         ))
                         if r_prop: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_tarjeta_propiedad=%s WHERE id=%s", (r_prop, v_id))
                         if r_ope: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_tarjeta_operacion=%s WHERE id=%s", (r_ope, v_id))
                         if r_rcc: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_rcc_rce=%s WHERE id=%s", (r_rcc, v_id))
+                        if r_soat: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_soat=%s WHERE id=%s", (r_soat, v_id))
+                        if r_rtm: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_tecnomecanica=%s WHERE id=%s", (r_rtm, v_id))
                         
                         mysql.connection.commit()
                         flash(f"Expediente del vehículo {placa} actualizado correctamente.", "success")
@@ -548,7 +392,7 @@ def gestion_vehiculos():
         return render_template(
             'B_modulo_flotaespecial_vehiculos.html',
             nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
-            active_module='vehiculos', vehiculos=vehiculos_db, terceros=terceros_db, datos_extraidos=datos_extraidos
+            active_module='vehiculos', vehiculos=vehiculos_db, terceros=terceros_db
         )
 
 @bp_flotaespecial_vehiculos.route('/preoperacionales/pdf/<consecutivo>', methods=['GET'])

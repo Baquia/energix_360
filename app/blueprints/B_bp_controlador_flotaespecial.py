@@ -22,12 +22,29 @@ def controlador_flotaespecial_required(f):
     return decorated_function
 
 # =========================================================
-# DASHBOARD PRINCIPAL (Sub-Dashboard Central)
+# 1. SUB-MENÚ INTERMEDIO DE SELECCIÓN (EL ENRUTADOR CAE AQUÍ)
 # =========================================================
 @bp_controlador_flotaespecial.route('/dashboard')
 @login_required_custom
 @controlador_flotaespecial_required
 def dashboard_controlador():
+    # Renderiza exclusivamente el menú de tarjetas intermedio
+    return render_template(
+        'B_modulo_controlador_flotaespecial.html',
+        nit=session.get('nit'),
+        empresa=session.get('empresa'),
+        usuario=session.get('nombre'),
+        modulos_activos=session.get('modulos_activos', []),
+        perfil=session.get('perfil')
+    )
+
+# =========================================================
+# 2. DASHBOARD DE KPIS OPERATIVOS (NUEVO ARCHIVO)
+# =========================================================
+@bp_controlador_flotaespecial.route('/operativa')
+@login_required_custom
+@controlador_flotaespecial_required
+def dashboard_operativo():
     empresa_id = session.get('empresa_id')
     
     hoy = datetime.now()
@@ -39,7 +56,7 @@ def dashboard_controlador():
     
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
-    # 1. KPIs del rango de fechas
+    # KPIs del rango de fechas
     cur.execute("""
         SELECT 
             COUNT(*) as total,
@@ -57,7 +74,7 @@ def dashboard_controlador():
     if not kpis or kpis['total'] is None:
         kpis = {'total': 0, 'capturados': 0, 'programados': 0, 'verificados': 0, 'asignados': 0, 'ejecucion': 0, 'ejecutados': 0}
 
-    # 2. Consultar todos los viajes del rango para distribuirlos a la vista
+    # Consultar todos los viajes del rango para distribuirlos a la vista
     cur.execute("""
         SELECT c.id_viaje, c.fecha_servicio, c.hora_inicio, c.vehiculo_asignado, c.conductor_asignado, 
                c.nombre_usuario, c.telefono_usuario, c.direccion_origen, c.direccion_destino, c.estatus_servicio,
@@ -87,7 +104,7 @@ def dashboard_controlador():
     viajes_ejecutados = [v for v in viajes if v['estatus_servicio'] in ('TERMINADO-PDTE AUDITAR', 'AUDITADO')]
 
     return render_template(
-        'B_modulo_controlador_flotaespecial.html',
+        'B_dashboard_operativo_eps.html',
         nit=session.get('nit'),
         empresa=session.get('empresa'),
         nombre=session.get('nombre'),
@@ -103,7 +120,7 @@ def dashboard_controlador():
     )
 
 # =========================================================
-# GESTIÓN DE OPERADORES (Mantenido intacto para su propio CRUD)
+# 3. GESTIÓN DE OPERADORES
 # =========================================================
 @bp_controlador_flotaespecial.route('/operadores', methods=['GET', 'POST'])
 @login_required_custom
@@ -210,7 +227,7 @@ def gestion_operadores():
     cur.close()
 
     return render_template(
-        'B_modulo_controlador_flotaespecial.html',
+        'B_dashboard_operativo_eps.html',
         nit=session.get('nit'),
         empresa=session.get('empresa'),
         nombre=session.get('nombre'),

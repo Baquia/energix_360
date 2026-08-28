@@ -166,12 +166,19 @@
         </div>
         
         <nav class="nav-menu">
+            <!-- Botón de retroceso al sub-menú intermedio -->
             <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="nav-item back-btn">
-                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Volver al Panel Central</div>
+                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Menú Transporte Especial</div>
             </a>
-            
+
+            <!-- Tablero Operativo de KPIs -->
+            <a href="{{ url_for('controlador_flotaespecial.dashboard_operativo') }}" class="nav-item">
+                <div class="nav-item-content"><span class="nav-icon">📊</span> Tablero Operativo</div>
+            </a>
+
+            <!-- Submenú Operativo Desplegable -->
             <div class="nav-item open" onclick="toggleDropdown('epsMenu', this)">
-                <div class="nav-item-content"><span class="nav-icon">🏥</span> Gestión Operativa</div>
+                <div class="nav-item-content"><span class="nav-icon">🏥</span> Gestión Operativa EPS</div>
                 <span class="dropdown-arrow">▼</span>
             </div>
             <div class="dropdown-container open" id="epsMenu">
@@ -183,6 +190,16 @@
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" class="dropdown-item {% if active_module == 'traslados_auditoria' %}active{% endif %}">6. Auditoría de Viajes</a>
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditados') }}" class="dropdown-item {% if active_module == 'traslados_auditados' %}active{% endif %}">7. Historial Auditados</a>
             </div>
+            
+            <!-- Gestión de Flota -->
+            <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" class="nav-item">
+                <div class="nav-item-content"><span class="nav-icon">🚐</span> Gestión de Flota</div>
+            </a>
+
+            <!-- Enlace fijo a Panel Principal BQA -->
+            <a href="{{ url_for('panel_principal') }}" class="nav-item" style="margin-top: 15px; border-top: 1px solid var(--border); border-radius: 0; padding-top: 15px;">
+                <div class="nav-item-content"><span class="nav-icon">🏠</span> Menú Principal BQA</div>
+            </a>
         </nav>
 
         <div class="sidebar-footer">

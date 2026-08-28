@@ -2,381 +2,217 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Centro de Control | Transporte Especial | {{ empresa }}</title>
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#015249">
+  <meta charset="UTF-8" />
+  <title>Submenú Transporte Especial | BQA-ONE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#015249">
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f4f6f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
 
-    <style>
-        /* PALETA CORPORATIVA BQA-ONE */
-        :root {
-            --verde: #015249;        
-            --verde-osc: #003b35;    
-            --bg-grad-start: #d7f2ec; 
-            --surface: #ffffff;
-            --text: #111827;
-            --text-muted: #6b7280;
-            --border: #e5e7eb;
-            --radius: 10px;
-            --sidebar-width: 260px;
-            --topbar-height: 70px;
-        }
+    .navbar {
+      background-color: #015249;
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+    .navbar-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
 
-        body {
-            font-family: Verdana, Geneva, Tahoma, sans-serif;
-            background-color: #f3f4f6; 
-            color: var(--text);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
+    .navbar-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background-color: #ffffff22;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
 
-        a { text-decoration: none; color: inherit; }
+    .navbar-info {
+      display: flex;
+      flex-direction: column;
+    }
 
-        /* ================= SIDEBAR Y MENÚ ================= */
-        .sidebar {
-            width: var(--sidebar-width); background: var(--surface);
-            border-right: 1px solid var(--border); display: flex;
-            flex-direction: column; transition: transform 0.3s ease;
-            z-index: 1000;
-        }
-        .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
-        .logo-app { max-height: 35px; width: auto; }
-        .nav-menu { flex-grow: 1; padding: 20px 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
-        
-        .nav-item {
-            display: flex; align-items: center; justify-content: space-between; padding: 12px 15px;
-            border-radius: var(--radius); color: var(--text-muted);
-            font-size: 14px; font-weight: 600; transition: all 0.2s; cursor: pointer;
-        }
-        .nav-item-content { display: flex; align-items: center; gap: 12px; }
-        .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
-        .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
-        .nav-icon { font-size: 18px; }
+    .navbar-info .user-name {
+      font-weight: bold;
+      font-size: 14px;
+    }
 
-        /* Dropdown Menu Estilos */
-        .dropdown-container { display: none; flex-direction: column; padding-left: 35px; margin-top: 5px; gap: 5px; }
-        .dropdown-container.open { display: flex; animation: slideDown 0.3s ease; }
-        .dropdown-item { padding: 8px 15px; font-size: 13px; color: var(--text-muted); border-radius: 8px; transition: 0.2s; }
-        .dropdown-item:hover { background: #f3f4f6; color: var(--verde); }
-        .dropdown-item.active { color: var(--verde); font-weight: bold; }
-        .dropdown-arrow { font-size: 10px; transition: transform 0.3s; }
-        .nav-item.open .dropdown-arrow { transform: rotate(180deg); }
-        
-        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
-        .logout-btn {
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444;
-            font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2;
-        }
+    .navbar-info .company-name {
+      font-size: 11px;
+      opacity: 0.8;
+    }
 
-        /* ================= MAIN CONTENT ================= */
-        .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; flex-shrink: 0; }
-        .topbar-left { display: flex; align-items: center; gap: 15px; }
-        .menu-toggle { display: none; background: none; border: none; font-size: 24px; color: var(--verde); cursor: pointer; }
-        .logo-cliente { max-height: 40px; width: auto; object-fit: contain; }
-        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
-        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
-        .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
+    .btn-logout {
+      background-color: #ffffff22;
+      color: white;
+      text-decoration: none;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
 
-        .content-area { flex-grow: 1; padding: 25px; overflow-y: auto; background: radial-gradient(circle at top left, var(--bg-grad-start) 0, #f3f4f6 60%, #f3f4f6 100%); }
+    .btn-logout:hover {
+      background-color: #ffffff44;
+    }
 
-        /* ================= CARDS & DASHBOARD ================= */
-        .filter-bar { background: var(--surface); padding: 15px; border-radius: 12px; margin-bottom: 20px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); }
-        .filter-bar .form-group { margin-bottom: 0; min-width: 150px; flex: 1; }
-        .filter-bar label { display: block; font-size: 12px; font-weight: bold; color: var(--text-muted); margin-bottom: 5px; }
-        .filter-bar input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; }
-        .filter-btn { background: var(--verde); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; height: 36px; display: flex; align-items: center; gap: 5px; }
+    .dashboard-container {
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 20px;
+      text-align: center;
+    }
 
-        .kpi-container { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 25px; }
-        .kpi-card { background: var(--surface); flex: 1; min-width: 150px; padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.03); text-align: center; }
-        .kpi-value { font-size: 24px; font-weight: bold; color: var(--verde); }
-        .kpi-label { font-size: 11px; color: var(--text-muted); margin-top: 5px; font-weight: 600; text-transform: uppercase; }
+    .dashboard-title {
+      color: #015249;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
 
-        .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 25px; overflow-x: auto; border: 1px solid var(--border); }
-        .card-header { padding: 15px 20px; border-bottom: 1px solid var(--border); font-weight: bold; font-size: 14px; background: #f9fafb; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center;}
-        
-        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;}
-        .data-table th { background: #ffffff; padding: 12px 20px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); font-size: 12px; }
-        .data-table td { padding: 12px 20px; border-bottom: 1px solid #f3f4f6; color: var(--text); }
-        .data-table tr:hover { background-color: #fdfdfd; }
-        
-        .btn-pdf { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.2s;}
-        .btn-pdf:hover { background: #bae6fd; }
+    .dashboard-subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-top: 0;
+      margin-bottom: 35px;
+    }
 
-        .id-token { font-family: monospace; font-weight: bold; background: #f3f4f6; padding: 3px 6px; border-radius: 4px; letter-spacing: 1px; color: var(--verde); }
+    .cards-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
 
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    .card-link {
+      text-decoration: none;
+      color: inherit;
+      flex: 1 1 260px;
+      max-width: 320px;
+      min-width: 250px;
+    }
 
-        @media (max-width: 768px) {
-            .sidebar { position: fixed; height: 100vh; left: 0; top: 0; transform: translateX(-100%); box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
-            .sidebar.open { transform: translateX(0); }
-            .menu-toggle { display: block; }
-            .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 999; }
-            .sidebar-overlay.active { display: block; }
-        }
-    </style>
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 28px 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      border: 1px solid #eef2f3;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.09);
+    }
+
+    .card-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #2c3e50;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-top: 40px;
+      color: #f59e0b;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 1px solid #f59e0b;
+      padding-bottom: 2px;
+      transition: 0.2s;
+    }
+
+    .back-link:hover {
+      color: #d97706;
+      border-color: #d97706;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: #999;
+      margin-top: 60px;
+    }
+  </style>
 </head>
 <body>
 
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <!-- BARRA SUPERIOR -->
+  <div class="navbar">
+    <div class="navbar-user">
+      <div class="navbar-avatar">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo" style="height: 24px;" onerror="this.style.display='none'">
+      </div>
+      <div class="navbar-info">
+        <span class="user-name">{{ nombre }}</span>
+        <span class="company-name">{{ empresa }}</span>
+      </div>
+    </div>
+    <a href="{{ url_for('logout') }}" class="btn-logout">Salir</a>
+  </div>
 
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+  <!-- CONTENIDO PRINCIPAL -->
+  <div class="dashboard-container">
+    <h1 class="dashboard-title">Módulo de Transporte Especial</h1>
+    <p class="dashboard-subtitle">Seleccione el área operativa a gestionar</p>
+
+    <div class="cards-grid">
+
+      <!-- TARJETA 1: GESTIÓN DE FLOTA -->
+      <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" class="card-link">
+        <div class="card">
+          <div class="card-icon">🚐</div>
+          <div class="card-title">Gestión de Flota</div>
         </div>
-        
-        <nav class="nav-menu">
-            <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="nav-item active">
-                <div class="nav-item-content"><span class="nav-icon">📊</span> Panel Central</div>
-            </a>
+      </a>
 
-            <!-- Submenú Operativo Desplegable (Sincronizado) -->
-            <div class="nav-item" onclick="toggleDropdown('epsMenu', this)">
-                <div class="nav-item-content"><span class="nav-icon">🏥</span> Gestión Operativa EPS</div>
-                <span class="dropdown-arrow">▼</span>
-            </div>
-            <div class="dropdown-container" id="epsMenu">
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" class="dropdown-item">1. Captura de Autorización</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}" class="dropdown-item">2. Desglose de Viajes</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_programacion') }}" class="dropdown-item">3. Programar Viajes</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" class="dropdown-item">4. Verificación de Datos</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" class="dropdown-item">5. Asignación de Flota</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" class="dropdown-item">6. Auditoría de Viajes</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditados') }}" class="dropdown-item">7. Historial Auditados</a>
-            </div>
-            
-            <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" class="nav-item">
-                <div class="nav-item-content"><span class="nav-icon">🚐</span> Gestión de Flota</div>
-            </a>
-
-            <a href="{{ url_for('panel_principal') }}" class="nav-item" style="margin-top: 15px; border-top: 1px solid var(--border); border-radius: 0; padding-top: 15px;">
-                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Menú Principal</div>
-            </a>
-        </nav>
-
-        <div class="sidebar-footer">
-            <a href="{{ url_for('logout') }}" class="logout-btn">
-                <span>🚪</span> Cerrar Sesión
-            </a>
+      <!-- TARJETA 2: OPERATIVIDAD EPS -->
+      <a href="{{ url_for('controlador_flotaespecial.dashboard_operativo') }}" class="card-link">
+        <div class="card">
+          <div class="card-icon">🏥</div>
+          <div class="card-title">Gestión Operativa EPS</div>
         </div>
-    </aside>
+      </a>
 
-    <main class="main-wrapper">
-        <header class="topbar">
-            <div class="topbar-left">
-                <button class="menu-toggle" id="menuToggle">☰</button>
-                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
-            </div>
-            
-            <div class="user-info">
-                <span class="user-name">{{ nombre }}</span>
-                <span class="user-role">Controlador Transporte Especial</span>
-            </div>
-        </header>
+    </div>
 
-        <div class="content-area">
+    <!-- BOTÓN DE RETROCESO -->
+    <a href="{{ url_for('panel_principal') }}" class="back-link">⬅️ Volver al Menú Principal BQA</a>
 
-            <!-- ================= FILTRO Y KPIS ================= -->
-            <div style="margin-bottom: 20px;">
-                <h2 style="color: var(--verde); font-size: 20px;">Tablero de Control Operativo</h2>
-                <p style="color: var(--text-muted); font-size: 13px;">Supervise el ciclo completo de los servicios según el rango de fechas.</p>
-            </div>
+  </div>
 
-            <form class="filter-bar" method="GET" action="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}">
-                <div class="form-group">
-                    <label>Fecha Inicio</label>
-                    <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
-                </div>
-                <div class="form-group">
-                    <label>Fecha Fin</label>
-                    <input type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}">
-                </div>
-                <button type="submit" class="filter-btn">🔍 Aplicar Filtro</button>
-            </form>
+  <div class="footer">
+    BQA ONE - Energix360 © 2026
+  </div>
 
-            <div class="kpi-container">
-                <div class="kpi-card"><div class="kpi-value" style="color: #6b7280;">{{ kpis.capturados }}</div><div class="kpi-label">Capturados</div></div>
-                <div class="kpi-card"><div class="kpi-value" style="color: #0ea5e9;">{{ kpis.programados }}</div><div class="kpi-label">Programados</div></div>
-                <div class="kpi-card"><div class="kpi-value" style="color: #8b5cf6;">{{ kpis.verificados }}</div><div class="kpi-label">Verificados</div></div>
-                <div class="kpi-card"><div class="kpi-value" style="color: #10b981;">{{ kpis.asignados }}</div><div class="kpi-label">Vehículo Asignado</div></div>
-                <div class="kpi-card"><div class="kpi-value" style="color: #f59e0b;">{{ kpis.ejecucion }}</div><div class="kpi-label">En Ejecución</div></div>
-                <div class="kpi-card"><div class="kpi-value" style="color: #ef4444;">{{ kpis.ejecutados }}</div><div class="kpi-label">Ejecutados</div></div>
-            </div>
-
-            <!-- ================= FASE 1: CAPTURADOS ================= -->
-            <div class="table-card" style="border-left: 4px solid #6b7280;">
-                <div class="card-header" style="color: #4b5563;">1. VIAJES CAPTURADOS, PENDIENTES DE VERIFICACIÓN <span style="background: #e5e7eb; padding: 2px 8px; border-radius: 12px; font-size: 12px;">{{ viajes_capturados|length }}</span></div>
-                <table class="data-table">
-                    <thead><tr><th>Paciente</th><th>Contacto</th><th>IPS (Cliente)</th><th>Prescripción</th><th>Evidencia Original</th></tr></thead>
-                    <tbody>
-                        {% for v in viajes_capturados %}
-                        <tr>
-                            <td><b>{{ v.nombre_usuario }}</b></td>
-                            <td>{{ v.telefono_usuario }}</td>
-                            <td>{{ v.ips }}</td>
-                            <td>{{ v.numero_prescripcion }}</td>
-                            <td><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 Ver Orden PDF</button></td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No hay viajes en esta etapa.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- ================= FASE 2: PROGRAMADOS ================= -->
-            <div class="table-card" style="border-left: 4px solid #0ea5e9;">
-                <div class="card-header" style="color: #0369a1;">2. VIAJES PROGRAMADOS <span style="background: #e0f2fe; padding: 2px 8px; border-radius: 12px; font-size: 12px;">{{ viajes_programados|length }}</span></div>
-                <table class="data-table">
-                    <thead><tr><th>Paciente</th><th>Contacto</th><th>IPS (Cliente)</th><th>Prescripción</th><th>Fecha Prog.</th><th>Evidencia Original</th></tr></thead>
-                    <tbody>
-                        {% for v in viajes_programados %}
-                        <tr>
-                            <td><b>{{ v.nombre_usuario }}</b></td>
-                            <td>{{ v.telefono_usuario }}</td>
-                            <td>{{ v.ips }}</td>
-                            <td>{{ v.numero_prescripcion }}</td>
-                            <td>{{ v.fecha_servicio }} {{ v.hora_inicio }}</td>
-                            <td><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 Ver Orden PDF</button></td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay viajes en esta etapa.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- ================= FASE 3: VERIFICADOS ================= -->
-            <div class="table-card" style="border-left: 4px solid #8b5cf6;">
-                <div class="card-header" style="color: #6d28d9;">3. VIAJES VERIFICADOS. <span style="background: #ede9fe; padding: 2px 8px; border-radius: 12px; font-size: 12px;">{{ viajes_verificados|length }}</span></div>
-                <table class="data-table">
-                    <thead><tr><th>Paciente</th><th>Contacto</th><th>IPS (Cliente)</th><th>Prescripción</th><th>Fecha Confirmada</th><th>Evidencia Original</th></tr></thead>
-                    <tbody>
-                        {% for v in viajes_verificados %}
-                        <tr>
-                            <td><b>{{ v.nombre_usuario }}</b></td>
-                            <td>{{ v.telefono_usuario }}</td>
-                            <td>{{ v.ips }}</td>
-                            <td>{{ v.numero_prescripcion }}</td>
-                            <td><b>{{ v.fecha_servicio }}</b> {{ v.hora_inicio }}</td>
-                            <td><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 Ver Orden PDF</button></td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay viajes en esta etapa.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- ================= FASE 4: VEHÍCULO ASIGNADO ================= -->
-            <div class="table-card" style="border-left: 4px solid #10b981;">
-                <div class="card-header" style="color: #047857;">4. VIAJES CON VEHICULO ASIGNADO ( YA SE PROGRAMO Y SE VERIFICO) <span style="background: #d1fae5; padding: 2px 8px; border-radius: 12px; font-size: 12px;">{{ viajes_asignados|length }}</span></div>
-                <table class="data-table">
-                    <thead><tr><th>ID Viaje</th><th>Paciente / Teléfono</th><th>IPS (Cliente)</th><th>Prescripción</th><th>Conductor / Vehículo</th><th>Evidencia Original</th></tr></thead>
-                    <tbody>
-                        {% for v in viajes_asignados %}
-                        <tr>
-                            <td><span class="id-token">{{ v.id_viaje }}</span></td>
-                            <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.telefono_usuario }}</small></td>
-                            <td>{{ v.ips }}</td>
-                            <td>{{ v.numero_prescripcion }}</td>
-                            <td>{{ v.conductor_asignado }}<br><small>Placa: {{ v.vehiculo_asignado }}</small></td>
-                            <td><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 Ver Orden PDF</button></td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay viajes en esta etapa.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- ================= FASE 5: EN EJECUCIÓN ================= -->
-            <div class="table-card" style="border-left: 4px solid #f59e0b;">
-                <div class="card-header" style="color: #b45309;">5. VIAJES EN EJECUCIÓN <span style="background: #fef3c7; padding: 2px 8px; border-radius: 12px; font-size: 12px;">{{ viajes_ejecucion|length }}</span></div>
-                <table class="data-table">
-                    <thead><tr><th>ID Viaje</th><th>Paciente / Teléfono</th><th>IPS (Cliente)</th><th>Prescripción</th><th>Conductor / Vehículo</th><th>Evidencia Original</th></tr></thead>
-                    <tbody>
-                        {% for v in viajes_ejecucion %}
-                        <tr>
-                            <td><span class="id-token">{{ v.id_viaje }}</span></td>
-                            <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.telefono_usuario }}</small></td>
-                            <td>{{ v.ips }}</td>
-                            <td>{{ v.numero_prescripcion }}</td>
-                            <td>{{ v.conductor_asignado }}<br><small>Placa: {{ v.vehiculo_asignado }}</small></td>
-                            <td><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 Ver Orden PDF</button></td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay viajes en ejecución.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- ================= FASE 6: EJECUTADOS ================= -->
-            <div class="table-card" style="border-left: 4px solid #ef4444;">
-                <div class="card-header" style="color: #b91c1c;">6. VIAJES EJECUTADOS. <span style="background: #fee2e2; padding: 2px 8px; border-radius: 12px; font-size: 12px;">{{ viajes_ejecutados|length }}</span></div>
-                <table class="data-table">
-                    <thead><tr><th>ID Viaje</th><th>Paciente / Teléfono</th><th>IPS (Cliente)</th><th>Prescripción</th><th>Estado Final</th><th>Evidencia Original</th></tr></thead>
-                    <tbody>
-                        {% for v in viajes_ejecutados %}
-                        <tr>
-                            <td><span class="id-token">{{ v.id_viaje }}</span></td>
-                            <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.telefono_usuario }}</small></td>
-                            <td>{{ v.ips }}</td>
-                            <td>{{ v.numero_prescripcion }}</td>
-                            <td>
-                                {% if v.estatus_servicio == 'AUDITADO' %}
-                                    <span style="color: #10b981; font-weight: bold;">✔️ Auditado</span>
-                                {% else %}
-                                    <span style="color: #ef4444; font-weight: bold;">⚠️ Pdte. Auditar</span>
-                                {% endif %}
-                            </td>
-                            <td><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 Ver Orden PDF</button></td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay viajes ejecutados en este periodo.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-
-        </div>
-    </main>
-
-    <script>
-        const menuToggle = document.getElementById('menuToggle');
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebarOverlay');
-
-        function toggleSidebar() {
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('active');
-        }
-        
-        menuToggle.addEventListener('click', toggleSidebar);
-        overlay.addEventListener('click', toggleSidebar);
-
-        function toggleDropdown(menuId, el) {
-            const dropdown = document.getElementById(menuId);
-            dropdown.classList.toggle('open');
-            el.classList.toggle('open');
-        }
-
-        function abrirPDF(rutaRelativa) {
-            if (rutaRelativa && rutaRelativa !== 'None' && rutaRelativa.trim() !== '') {
-                // Solución al Error 404: Se fuerza el enrutamiento al directorio estático de Flask
-                let finalRoute = rutaRelativa.startsWith('static/') ? '/' + rutaRelativa : '/static/' + rutaRelativa;
-                window.open(finalRoute, '_blank');
-            } else {
-                alert('No se adjuntó un documento PDF para esta orden.');
-            }
-        }
-    </script>
 </body>
 </html>

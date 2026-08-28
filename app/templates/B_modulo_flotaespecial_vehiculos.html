@@ -95,6 +95,8 @@
         
         .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 6px;}
         .btn-primary:hover { background: var(--verde-osc); }
+        .btn-info { background: #0ea5e9; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; transition: 0.2s;}
+        .btn-info:hover { background: #0284c7; }
 
         /* Tablas y Cards */
         .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-width: 1200px; overflow-x: auto; margin-bottom: 25px; border: 1px solid var(--border);}
@@ -118,6 +120,8 @@
         /* Formularios Integrados */
         .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
         .grid-form.full { grid-template-columns: 1fr; }
+        
+        .readonly-box { background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px; color: var(--text); min-height: 34px; display: flex; align-items: center; }
 
         /* ================= MODALES ================= */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
@@ -181,7 +185,6 @@
                 <div class="nav-item-content"><span class="nav-icon">📋</span> Preoperacionales</div>
             </a>
 
-            <!-- Módulo Nuevo de Empresas Terceras -->
             <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='terceros') }}" class="nav-item {% if active_module == 'terceros' %}active{% endif %}">
                 <div class="nav-item-content"><span class="nav-icon">🏢</span> Empresas Terceras</div>
             </a>
@@ -222,7 +225,6 @@
 
             {% if active_module == 'preoperacionales' %}
             
-                <!-- VISTA DE PREOPERACIONALES -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Volver al Panel Central">&times;</a>
@@ -284,7 +286,6 @@
 
             {% elif active_module == 'terceros' %}
                 
-                <!-- ================= VISTA EMPRESAS TERCERAS (CRUD) ================= -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Volver al Panel Central">&times;</a>
@@ -318,7 +319,7 @@
             {% else %}
             
                 <!-- ================= VISTA VEHÍCULOS ================= -->
-                <div class="action-header">
+                <div class="action-header" style="margin-bottom: 10px;">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Volver al Panel Central">&times;</a>
                         <h2>Gestión de Vehículos Especiales</h2>
@@ -326,47 +327,15 @@
                     <button class="btn-primary" onclick="openModal('modalVehiculo')"><span>➕</span> Ingresar Manualmente</button>
                 </div>
 
-                <!-- SECCIÓN DE EXTRACCIÓN INTELIGENTE (OCR) -->
-                <div class="table-card" style="padding: 20px; border-top: 4px solid var(--verde);">
-                    <h3 style="margin-bottom: 10px; font-size: 16px; color: var(--verde);">⚡ Extracción Rápida de Expediente</h3>
-                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Suba los PDFs oficiales para extraer los datos y pre-llenar la ficha del vehículo automáticamente.</p>
-                    
-                    <form action="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" method="POST" enctype="multipart/form-data" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="accion" value="extraer_pdfs">
-                        
-                        <div class="form-group" style="flex: 1; min-width: 150px; margin-bottom: 0;">
-                            <label>Tipo Vinculación</label>
-                            <select name="tipo_vinculacion_ext" id="tipo_vinculacion_ext" onchange="toggleTerceroExt()" style="padding: 6px;">
-                                <option value="Propio">Propio</option>
-                                <option value="Tercero">Tercero / Afiliado</option>
-                            </select>
+                <!-- BUSCADOR VISOR -->
+                <div class="table-card" style="padding: 15px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1; max-width: 400px;">
+                        <label style="color: var(--verde);">🔎 Consultar Expediente Vehicular (Visor)</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="input_consulta_placa" placeholder="Ingrese placa..." style="text-transform: uppercase;">
+                            <button class="btn-primary" onclick="buscarYMostrarVisor()" style="height: 38px;">Consultar</button>
                         </div>
-
-                        <div class="form-group" id="div_empresa_tercera" style="display: none; flex: 1; min-width: 200px; margin-bottom: 0;">
-                            <label>Empresa Vinculadora</label>
-                            <select name="empresa_tercera_ext" style="padding: 6px;">
-                                <option value="">Seleccione empresa...</option>
-                                {% for t in terceros %}
-                                    <option value="{{ t.id }}">{{ t.nombre }} (NIT: {{ t.nit }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
-                            <label>📄 Lic. Tránsito (Propiedad)</label>
-                            <input type="file" name="pdf_propiedad" accept=".pdf" style="padding: 6px;">
-                        </div>
-                        <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
-                            <label>📄 Tarjeta de Operación</label>
-                            <input type="file" name="pdf_operacion" accept=".pdf" style="padding: 6px;">
-                        </div>
-                        <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
-                            <label>📄 Póliza RCC / RCE</label>
-                            <input type="file" name="pdf_poliza" accept=".pdf" style="padding: 6px;">
-                        </div>
-                        <button type="submit" class="btn-primary" style="background: #0ea5e9; height: 38px;">Procesar PDFs</button>
-                    </form>
+                    </div>
                 </div>
 
                 <div class="table-card">
@@ -393,7 +362,9 @@
                                         {% if v.ruta_pdf_tarjeta_propiedad %} <a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_tarjeta_propiedad }}')" class="btn-pdf-mini">📄 Lic. Tránsito</a> {% endif %}
                                         {% if v.ruta_pdf_tarjeta_operacion %} <a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_tarjeta_operacion }}')" class="btn-pdf-mini">📄 Tarj. Operación</a> {% endif %}
                                         {% if v.ruta_pdf_rcc_rce %} <a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_rcc_rce }}')" class="btn-pdf-mini">📄 Póliza RCC</a> {% endif %}
-                                        {% if not v.ruta_pdf_tarjeta_propiedad and not v.ruta_pdf_tarjeta_operacion and not v.ruta_pdf_rcc_rce %}
+                                        {% if v.ruta_pdf_soat %} <a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_soat }}')" class="btn-pdf-mini">📄 SOAT</a> {% endif %}
+                                        {% if v.ruta_pdf_tecnomecanica %} <a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_tecnomecanica }}')" class="btn-pdf-mini">📄 Tecnomecánica</a> {% endif %}
+                                        {% if not v.ruta_pdf_tarjeta_propiedad and not v.ruta_pdf_tarjeta_operacion and not v.ruta_pdf_rcc_rce and not v.ruta_pdf_soat and not v.ruta_pdf_tecnomecanica %}
                                             <span style="font-size: 11px; color: #9ca3af;">Sin documentos</span>
                                         {% endif %}
                                     </div>
@@ -442,7 +413,15 @@
                                             data-finir="{{ v.fecha_inicio_rcc_rce }}"
                                             data-fvenr="{{ v.vencimiento_rcc_rce }}"
                                             data-npols="{{ v.numero_poliza_soat }}"
+                                            data-asers="{{ v.aseguradora_soat }}"
                                             data-fvens="{{ v.vencimiento_soat }}"
+                                            data-nrtm="{{ v.numero_certificado_rtm }}"
+                                            data-fvenrtm="{{ v.vencimiento_rtm }}"
+                                            data-rprop="{{ v.ruta_pdf_tarjeta_propiedad }}"
+                                            data-rope="{{ v.ruta_pdf_tarjeta_operacion }}"
+                                            data-rrcc="{{ v.ruta_pdf_rcc_rce }}"
+                                            data-rsoat="{{ v.ruta_pdf_soat }}"
+                                            data-rrtm="{{ v.ruta_pdf_tecnomecanica }}"
                                             onclick="abrirEditarVehiculo(this)">✏️</button>
                                     <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarVehiculo('{{ v.id }}', '{{ v.placa }}')">🗑️</button>
                                 </td>
@@ -462,70 +441,59 @@
         </div>
     </main>
 
-    <!-- ================= MODAL CREAR VEHÍCULO (INTEGRAL OCR) ================= -->
+    <!-- ================= MODAL CREAR VEHÍCULO (INGRESO MANUAL) ================= -->
     <div id="modalVehiculo" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>Expediente del Vehículo</h3>
+                <h3>Expediente del Vehículo (Ingreso Manual)</h3>
                 <button class="close-btn" onclick="closeModal('modalVehiculo')">&times;</button>
             </div>
-            
-            {% if datos_extraidos %}
-            <div class="flash-alert flash-info" style="font-size: 12px; margin-bottom: 15px;">
-                <b>¡Extracción Exitosa!</b> Por favor revise los campos llenados automáticamente y complete los faltantes antes de guardar.
-            </div>
-            {% endif %}
 
-            <form action="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" method="POST" class="grid-form">
+            <form action="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" method="POST" class="grid-form" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="crear">
-                
-                <!-- Ocultos para Rutas PDF -->
-                <input type="hidden" name="ruta_pdf_tarjeta_propiedad" value="{{ datos_extraidos.ruta_pdf_tarjeta_propiedad if datos_extraidos else '' }}">
-                <input type="hidden" name="ruta_pdf_tarjeta_operacion" value="{{ datos_extraidos.ruta_pdf_tarjeta_operacion if datos_extraidos else '' }}">
-                <input type="hidden" name="ruta_pdf_rcc_rce" value="{{ datos_extraidos.ruta_pdf_rcc_rce if datos_extraidos else '' }}">
 
                 <!-- SECCIÓN A -->
-                <div class="section-divider"><h4>🛡️ SECCIÓN A: Identificación y Registro (Licencia de Tránsito)</h4></div>
-                <div class="form-group"><label>Placa *</label><input type="text" name="placa" value="{{ datos_extraidos.placa if datos_extraidos else '' }}" required style="text-transform: uppercase; font-weight: bold; color: var(--verde);"></div>
-                <div class="form-group"><label>Servicio</label><input type="text" name="servicio" value="{{ datos_extraidos.servicio if datos_extraidos else 'PÚBLICO' }}"></div>
+                <div class="section-divider"><h4>🛡️ SECCIÓN A: Identificación y Registro</h4></div>
+                <div class="form-group"><label>Placa *</label><input type="text" name="placa" required style="text-transform: uppercase; font-weight: bold; color: var(--verde);"></div>
+                <div class="form-group"><label>Servicio</label><input type="text" name="servicio" value="PÚBLICO"></div>
                 <div class="form-group">
                     <label>Tipo de Vinculación</label>
                     <select name="tipo_vinculacion">
-                        <option value="Propio" {% if datos_extraidos and datos_extraidos.tipo_vinculacion == 'Propio' %}selected{% endif %}>Propio</option>
-                        <option value="Tercero" {% if datos_extraidos and datos_extraidos.tipo_vinculacion == 'Tercero' %}selected{% endif %}>Tercero / Afiliado</option>
+                        <option value="Propio">Propio</option>
+                        <option value="Tercero">Tercero / Afiliado</option>
                     </select>
                 </div>
-                <div class="form-group"><label>Organismo de Tránsito</label><input type="text" name="organismo_transito" value="{{ datos_extraidos.organismo_transito if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Fecha Matrícula</label><input type="date" name="fecha_matricula" value="{{ datos_extraidos.fecha_matricula if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Fecha Exp. Licencia</label><input type="date" name="fecha_expedicion_licencia" value="{{ datos_extraidos.fecha_expedicion_licencia if datos_extraidos else '' }}"></div>
-                <div class="form-group" style="grid-column: 1 / -1;"><label>Limitación a la Propiedad (Prenda)</label><input type="text" name="limitacion_propiedad" value="{{ datos_extraidos.limitacion_propiedad if datos_extraidos else '' }}"></div>
+                <div class="form-group"><label>Organismo de Tránsito</label><input type="text" name="organismo_transito"></div>
+                <div class="form-group"><label>Fecha Matrícula</label><input type="date" name="fecha_matricula"></div>
+                <div class="form-group"><label>Fecha Exp. Licencia</label><input type="date" name="fecha_expedicion_licencia"></div>
+                <div class="form-group" style="grid-column: 1 / -1;"><label>Limitación a la Propiedad (Prenda)</label><input type="text" name="limitacion_propiedad"></div>
                 
                 <!-- SECCIÓN B -->
                 <div class="section-divider"><h4>⚙️ SECCIÓN B: Especificaciones Técnicas</h4></div>
-                <div class="form-group"><label>VIN</label><input type="text" name="vin" value="{{ datos_extraidos.vin if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Chasis</label><input type="text" name="chasis" value="{{ datos_extraidos.chasis if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Motor</label><input type="text" name="motor" value="{{ datos_extraidos.motor if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>N° Serie</label><input type="text" name="numero_serie" value="{{ datos_extraidos.numero_serie if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Marca *</label><input type="text" name="marca" value="{{ datos_extraidos.marca if datos_extraidos else '' }}" required></div>
-                <div class="form-group"><label>Línea</label><input type="text" name="linea" value="{{ datos_extraidos.linea if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Modelo *</label><input type="text" name="modelo" value="{{ datos_extraidos.modelo if datos_extraidos else '' }}" required></div>
-                <div class="form-group"><label>Clase de Vehículo *</label><input type="text" name="clase" value="{{ datos_extraidos.clase if datos_extraidos else '' }}" required></div>
-                <div class="form-group"><label>Carrocería</label><input type="text" name="carroceria" value="{{ datos_extraidos.carroceria if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Color</label><input type="text" name="color" value="{{ datos_extraidos.color if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Cilindraje (cc)</label><input type="text" name="cilindraje" value="{{ datos_extraidos.cilindraje if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Combustible</label><input type="text" name="combustible" value="{{ datos_extraidos.combustible if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Capacidad (Pas. o Kg) *</label><input type="number" name="capacidad" value="{{ datos_extraidos.capacidad if datos_extraidos else '0' }}" required></div>
-                <div class="form-group"><label>Potencia (HP)</label><input type="text" name="potencia_hp" value="{{ datos_extraidos.potencia_hp if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Puertas</label><input type="number" name="puertas" value="{{ datos_extraidos.puertas if datos_extraidos else '0' }}"></div>
-                <div class="form-group"><label>Blindaje</label><input type="text" name="blindaje" value="{{ datos_extraidos.blindaje if datos_extraidos else '' }}"></div>
+                <div class="form-group"><label>VIN</label><input type="text" name="vin"></div>
+                <div class="form-group"><label>Chasis</label><input type="text" name="chasis"></div>
+                <div class="form-group"><label>Motor</label><input type="text" name="motor"></div>
+                <div class="form-group"><label>N° Serie</label><input type="text" name="numero_serie"></div>
+                <div class="form-group"><label>Marca *</label><input type="text" name="marca" required></div>
+                <div class="form-group"><label>Línea</label><input type="text" name="linea"></div>
+                <div class="form-group"><label>Modelo *</label><input type="text" name="modelo" required></div>
+                <div class="form-group"><label>Clase de Vehículo *</label><input type="text" name="clase" required></div>
+                <div class="form-group"><label>Carrocería</label><input type="text" name="carroceria"></div>
+                <div class="form-group"><label>Color</label><input type="text" name="color"></div>
+                <div class="form-group"><label>Cilindraje (cc)</label><input type="text" name="cilindraje"></div>
+                <div class="form-group"><label>Combustible</label><input type="text" name="combustible"></div>
+                <div class="form-group"><label>Capacidad (Pas. o Kg) *</label><input type="number" name="capacidad" value="0" required></div>
+                <div class="form-group"><label>Potencia (HP)</label><input type="text" name="potencia_hp"></div>
+                <div class="form-group"><label>Puertas</label><input type="number" name="puertas" value="0"></div>
+                <div class="form-group"><label>Blindaje</label><input type="text" name="blindaje"></div>
 
                 <!-- SECCIÓN C -->
                 <div class="section-divider"><h4>📄 SECCIÓN C: Tarjeta de Operación</h4></div>
-                <div class="form-group"><label>N° Tarjeta de Operación</label><input type="text" name="numero_tarjeta_operacion" value="{{ datos_extraidos.numero_tarjeta_operacion if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Modalidad</label><input type="text" name="modalidad_servicio" value="{{ datos_extraidos.modalidad_servicio if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Radio de Acción</label><input type="text" name="radio_accion" value="{{ datos_extraidos.radio_accion if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Nivel de Servicio</label><input type="text" name="nivel_servicio" value="{{ datos_extraidos.nivel_servicio if datos_extraidos else '' }}"></div>
+                <div class="form-group"><label>N° Tarjeta de Operación</label><input type="text" name="numero_tarjeta_operacion"></div>
+                <div class="form-group"><label>Modalidad</label><input type="text" name="modalidad_servicio"></div>
+                <div class="form-group"><label>Radio de Acción</label><input type="text" name="radio_accion"></div>
+                <div class="form-group"><label>Nivel de Servicio</label><input type="text" name="nivel_servicio"></div>
                 
                 <div class="form-group">
                     <label>Empresa Vinculadora (Si es Tercero)</label>
@@ -533,25 +501,38 @@
                         <option value="">Seleccione empresa...</option>
                         {% if terceros %}
                             {% for t in terceros %}
-                                <option value="{{ t.nombre }}" {% if datos_extraidos and datos_extraidos.empresa_vinculadora == t.nombre %}selected{% endif %}>{{ t.nombre }}</option>
+                                <option value="{{ t.nombre }}">{{ t.nombre }}</option>
                             {% endfor %}
                         {% endif %}
                     </select>
                 </div>
 
-                <div class="form-group"><label>NIT Empresa Vinculadora</label><input type="text" name="nit_empresa_vinculadora" value="{{ datos_extraidos.nit_empresa_vinculadora if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Fecha Inicio Operación</label><input type="date" name="fecha_inicio_tarjeta_operacion" value="{{ datos_extraidos.fecha_inicio_tarjeta_operacion if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Vencimiento Operación</label><input type="date" name="vencimiento_tarjeta_operacion" value="{{ datos_extraidos.vencimiento_tarjeta_operacion if datos_extraidos else '' }}"></div>
+                <div class="form-group"><label>NIT Empresa Vinculadora</label><input type="text" name="nit_empresa_vinculadora"></div>
+                <div class="form-group"><label>Fecha Inicio Operación</label><input type="date" name="fecha_inicio_tarjeta_operacion"></div>
+                <div class="form-group"><label>Vencimiento Operación</label><input type="date" name="vencimiento_tarjeta_operacion"></div>
 
                 <!-- SECCIÓN D -->
                 <div class="section-divider"><h4>📑 SECCIÓN D: Pólizas y Seguros</h4></div>
-                <div class="form-group"><label>Aseguradora RCC/RCE</label><input type="text" name="aseguradora_rcc_rce" value="{{ datos_extraidos.aseguradora_rcc_rce if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>N° Póliza RCC/RCE</label><input type="text" name="numero_poliza_rcc_rce" value="{{ datos_extraidos.numero_poliza_rcc_rce if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Inicio Vigencia RCC/RCE</label><input type="date" name="fecha_inicio_rcc_rce" value="{{ datos_extraidos.fecha_inicio_rcc_rce if datos_extraidos else '' }}"></div>
-                <div class="form-group"><label>Vencimiento RCC/RCE</label><input type="date" name="vencimiento_rcc_rce" value="{{ datos_extraidos.vencimiento_rcc_rce if datos_extraidos else '' }}"></div>
+                <div class="form-group"><label>Aseguradora RCC/RCE</label><input type="text" name="aseguradora_rcc_rce"></div>
+                <div class="form-group"><label>N° Póliza RCC/RCE</label><input type="text" name="numero_poliza_rcc_rce"></div>
+                <div class="form-group"><label>Inicio Vigencia RCC/RCE</label><input type="date" name="fecha_inicio_rcc_rce"></div>
+                <div class="form-group"><label>Vencimiento RCC/RCE</label><input type="date" name="vencimiento_rcc_rce"></div>
                 
+                <div class="form-group"><label>Aseguradora SOAT</label><input type="text" name="aseguradora_soat"></div>
                 <div class="form-group"><label>N° Póliza SOAT</label><input type="text" name="numero_poliza_soat"></div>
                 <div class="form-group"><label>Vencimiento SOAT</label><input type="date" name="vencimiento_soat"></div>
+
+                <div class="form-group"><label>N° Certificado RTM</label><input type="text" name="numero_certificado_rtm"></div>
+                <div class="form-group"><label>Vencimiento RTM</label><input type="date" name="vencimiento_rtm"></div>
+
+                <!-- SECCIÓN E -->
+                <div class="section-divider"><h4>📂 SECCIÓN E: Carga Manual de Documentos</h4></div>
+                <p style="grid-column: 1 / -1; font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Adjunte los PDFs oficiales del vehículo para digitalizarlos en el expediente.</p>
+                <div class="form-group"><label>Licencia de Tránsito</label><input type="file" name="file_pdf_propiedad" accept=".pdf"></div>
+                <div class="form-group"><label>Tarjeta de Operación</label><input type="file" name="file_pdf_operacion" accept=".pdf"></div>
+                <div class="form-group"><label>Póliza RCC/RCE</label><input type="file" name="file_pdf_poliza" accept=".pdf"></div>
+                <div class="form-group"><label>SOAT</label><input type="file" name="file_pdf_soat" accept=".pdf"></div>
+                <div class="form-group"><label>Tecnomecánica (RTM)</label><input type="file" name="file_pdf_rtm" accept=".pdf"></div>
 
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalVehiculo')">Cancelar</button><button type="submit" class="btn-primary">Guardar Expediente</button></div>
             </form>
@@ -565,7 +546,7 @@
                 <h3>Editar Expediente Vehicular</h3>
                 <button class="close-btn" onclick="closeModal('modalEditarVehiculo')">&times;</button>
             </div>
-            <form action="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" method="POST" class="grid-form">
+            <form action="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" method="POST" class="grid-form" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="editar">
                 <input type="hidden" name="vehiculo_id" id="edit_vehiculo_id">
@@ -624,11 +605,60 @@
                 <div class="form-group"><label>N° Póliza RCC</label><input type="text" name="numero_poliza_rcc_rce" id="edit_npolr"></div>
                 <div class="form-group"><label>Inicio RCC</label><input type="date" name="fecha_inicio_rcc_rce" id="edit_finir"></div>
                 <div class="form-group"><label>Venc. RCC</label><input type="date" name="vencimiento_rcc_rce" id="edit_fvenr"></div>
+                
+                <div class="form-group"><label>Aseguradora SOAT</label><input type="text" name="aseguradora_soat" id="edit_asers"></div>
                 <div class="form-group"><label>N° SOAT</label><input type="text" name="numero_poliza_soat" id="edit_npols"></div>
                 <div class="form-group"><label>Venc. SOAT</label><input type="date" name="vencimiento_soat" id="edit_fvens"></div>
 
+                <div class="form-group"><label>N° Certificado RTM</label><input type="text" name="numero_certificado_rtm" id="edit_nrtm"></div>
+                <div class="form-group"><label>Vencimiento RTM</label><input type="date" name="vencimiento_rtm" id="edit_fvenrtm"></div>
+
+                <div class="section-divider"><h4>📂 SECCIÓN E: Actualizar Documentos</h4></div>
+                <p style="grid-column: 1 / -1; font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Deje en blanco si no desea sobreescribir los archivos actuales.</p>
+                <div class="form-group"><label>Licencia de Tránsito</label><input type="file" name="file_pdf_propiedad" accept=".pdf"></div>
+                <div class="form-group"><label>Tarjeta de Operación</label><input type="file" name="file_pdf_operacion" accept=".pdf"></div>
+                <div class="form-group"><label>Póliza RCC/RCE</label><input type="file" name="file_pdf_poliza" accept=".pdf"></div>
+                <div class="form-group"><label>SOAT</label><input type="file" name="file_pdf_soat" accept=".pdf"></div>
+                <div class="form-group"><label>Tecnomecánica (RTM)</label><input type="file" name="file_pdf_rtm" accept=".pdf"></div>
+
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarVehiculo')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b;">Guardar Cambios</button></div>
             </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL VISOR VEHÍCULO (CONSULTA RÁPIDA) ================= -->
+    <div id="modalVisorVehiculo" class="modal-overlay">
+        <div class="modal-box" style="max-width: 900px; width: 95%;">
+            <div class="modal-header">
+                <h3>🔍 Expediente Vehicular: <span id="visor_placa_titulo" style="color: var(--verde);"></span></h3>
+                <button class="close-btn" onclick="closeModal('modalVisorVehiculo')">&times;</button>
+            </div>
+            
+            <div class="grid-form" style="background: #f9fafb; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
+                <div class="form-group"><label>Placa</label><div id="vis_placa" class="readonly-box" style="font-weight: bold; color: var(--verde); font-size: 15px;"></div></div>
+                <div class="form-group"><label>Clase / Servicio</label><div id="vis_clase" class="readonly-box"></div></div>
+                <div class="form-group"><label>Marca / Línea / Modelo</label><div id="vis_marca" class="readonly-box"></div></div>
+                <div class="form-group"><label>Vinculación / Empresa</label><div id="vis_vinculacion" class="readonly-box"></div></div>
+                <div class="form-group"><label>Capacidad / Puertas</label><div id="vis_capacidad" class="readonly-box"></div></div>
+                <div class="form-group"><label>VIN / Chasis / Motor</label><div id="vis_identificacion" class="readonly-box"></div></div>
+                <div class="form-group"><label>Tarjeta Operación (Venc.)</label><div id="vis_tarjeta_op" class="readonly-box"></div></div>
+                <div class="form-group"><label>Póliza RCC (Aseguradora / Venc.)</label><div id="vis_rcc" class="readonly-box"></div></div>
+                <div class="form-group"><label>SOAT (Aseguradora / Venc.)</label><div id="vis_soat" class="readonly-box"></div></div>
+                <div class="form-group"><label>RTM (Certificado / Venc.)</label><div id="vis_rtm" class="readonly-box"></div></div>
+            </div>
+
+            <div class="section-divider"><h4>📄 Documentos Digitalizados</h4></div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                <button id="btnVisRprop" class="btn-info">Licencia de Tránsito</button>
+                <button id="btnVisRope" class="btn-info">Tarjeta Operación</button>
+                <button id="btnVisRrcc" class="btn-info">Póliza RCC/RCE</button>
+                <button id="btnVisRsoat" class="btn-info">SOAT</button>
+                <button id="btnVisRrtm" class="btn-info">Tecnomecánica</button>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeModal('modalVisorVehiculo')">Cerrar Visor</button>
+            </div>
         </div>
     </div>
 
@@ -729,11 +759,6 @@
 
         function openModal(id) { document.getElementById(id).classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-        
-        // Auto Open on Extraction
-        {% if datos_extraidos %}
-            window.onload = function() { openModal('modalVehiculo'); };
-        {% endif %}
 
         // PDF Viewer
         function verPDF(rutaRelativa) {
@@ -745,14 +770,56 @@
             }
         }
 
-        // Mostrar Select de Empresa Tercera
-        function toggleTerceroExt() {
-            const selectVinculacion = document.getElementById('tipo_vinculacion_ext').value;
-            const divTercero = document.getElementById('div_empresa_tercera');
-            if (selectVinculacion === 'Tercero') {
-                divTercero.style.display = 'block';
+        // ================= VISOR DE EXPEDIENTE (CONSULTA RÁPIDA) =================
+        function buscarYMostrarVisor() {
+            let placaBusqueda = document.getElementById('input_consulta_placa').value.trim().toUpperCase();
+            if (!placaBusqueda) {
+                alert("Ingrese una placa válida para consultar.");
+                return;
+            }
+
+            let btnEdit = document.querySelector(`button.edit[data-placa="${placaBusqueda}"]`);
+            
+            if (btnEdit) {
+                abrirVisorVehiculo(btnEdit);
             } else {
-                divTercero.style.display = 'none';
+                alert("El vehículo con placa " + placaBusqueda + " no se encuentra registrado en el sistema.");
+            }
+        }
+
+        function abrirVisorVehiculo(btn) {
+            const d = btn.dataset;
+            document.getElementById('visor_placa_titulo').innerText = d.placa;
+            document.getElementById('vis_placa').innerText = d.placa;
+            document.getElementById('vis_clase').innerText = `${d.clase || 'N/D'} - ${d.servicio || 'N/D'}`;
+            document.getElementById('vis_marca').innerText = `${d.marca || 'N/D'} / ${d.linea || 'N/D'} / ${d.modelo || 'N/D'}`;
+            document.getElementById('vis_vinculacion').innerText = `${d.prop || 'N/D'} - ${d.empv || 'N/D'} (NIT: ${d.nitv || 'N/D'})`;
+            document.getElementById('vis_capacidad').innerText = `${d.capacidad || '0'} Pas. / ${d.puertas || '0'} Puertas`;
+            document.getElementById('vis_identificacion').innerText = `VIN: ${d.vin || 'N/D'} | CH: ${d.chasis || 'N/D'} | MO: ${d.motor || 'N/D'}`;
+            document.getElementById('vis_tarjeta_op').innerText = `N° ${d.ntar || 'N/D'} | Vence: ${d.fvent || 'N/D'}`;
+            document.getElementById('vis_rcc').innerText = `N° ${d.npolr || 'N/D'} | ${d.aser || 'N/D'} | Vence: ${d.fvenr || 'N/D'}`;
+            document.getElementById('vis_soat').innerText = `N° ${d.npols || 'N/D'} | ${d.asers || 'N/D'} | Vence: ${d.fvens || 'N/D'}`;
+            document.getElementById('vis_rtm').innerText = `N° ${d.nrtm || 'N/D'} | Vence: ${d.fvenrtm || 'N/D'}`;
+
+            configurarBotonVisor('btnVisRprop', d.rprop);
+            configurarBotonVisor('btnVisRope', d.rope);
+            configurarBotonVisor('btnVisRrcc', d.rrcc);
+            configurarBotonVisor('btnVisRsoat', d.rsoat);
+            configurarBotonVisor('btnVisRrtm', d.rrtm);
+
+            openModal('modalVisorVehiculo');
+        }
+
+        function configurarBotonVisor(idBtn, ruta) {
+            const btn = document.getElementById(idBtn);
+            if (ruta && ruta !== 'None' && ruta.trim() !== '') {
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                btn.onclick = function() { verPDF(ruta); };
+            } else {
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+                btn.onclick = function() { alert("El documento PDF no está disponible o no se ha cargado en el expediente."); };
             }
         }
 
@@ -794,38 +861,44 @@
             document.getElementById('edit_clase').value = d.clase;
             document.getElementById('edit_carroceria').value = d.carroceria;
             document.getElementById('edit_marca').value = d.marca;
-            document.getElementById('edit_linea').value = (d.linea !== 'None') ? d.linea : '';
-            document.getElementById('edit_modelo').value = (d.modelo !== 'None') ? d.modelo : '';
-            document.getElementById('edit_color').value = (d.color !== 'None') ? d.color : '';
-            document.getElementById('edit_combustible').value = (d.combustible !== 'None') ? d.combustible : '';
-            document.getElementById('edit_cilindraje').value = (d.cilindraje !== 'None') ? d.cilindraje : '';
+            document.getElementById('edit_linea').value = (d.linea !== 'None' && d.linea) ? d.linea : '';
+            document.getElementById('edit_modelo').value = (d.modelo !== 'None' && d.modelo) ? d.modelo : '';
+            document.getElementById('edit_color').value = (d.color !== 'None' && d.color) ? d.color : '';
+            document.getElementById('edit_combustible').value = (d.combustible !== 'None' && d.combustible) ? d.combustible : '';
+            document.getElementById('edit_cilindraje').value = (d.cilindraje !== 'None' && d.cilindraje) ? d.cilindraje : '';
             document.getElementById('edit_capacidad').value = d.capacidad;
-            document.getElementById('edit_hp').value = (d.hp !== 'None') ? d.hp : '';
-            document.getElementById('edit_puertas').value = (d.puertas !== 'None') ? d.puertas : '';
-            document.getElementById('edit_vin').value = (d.vin !== 'None') ? d.vin : '';
-            document.getElementById('edit_chasis').value = (d.chasis !== 'None') ? d.chasis : '';
-            document.getElementById('edit_motor').value = (d.motor !== 'None') ? d.motor : '';
-            document.getElementById('edit_serie').value = (d.serie !== 'None') ? d.serie : '';
-            document.getElementById('edit_servicio').value = (d.servicio !== 'None') ? d.servicio : '';
-            document.getElementById('edit_org').value = (d.org !== 'None') ? d.org : '';
-            document.getElementById('edit_fmat').value = (d.fmat !== 'None') ? d.fmat : '';
-            document.getElementById('edit_flic').value = (d.flic !== 'None') ? d.flic : '';
-            document.getElementById('edit_lim').value = (d.lim !== 'None') ? d.lim : '';
+            document.getElementById('edit_hp').value = (d.hp !== 'None' && d.hp) ? d.hp : '';
+            document.getElementById('edit_puertas').value = (d.puertas !== 'None' && d.puertas) ? d.puertas : '';
+            document.getElementById('edit_vin').value = (d.vin !== 'None' && d.vin) ? d.vin : '';
+            document.getElementById('edit_chasis').value = (d.chasis !== 'None' && d.chasis) ? d.chasis : '';
+            document.getElementById('edit_motor').value = (d.motor !== 'None' && d.motor) ? d.motor : '';
+            document.getElementById('edit_serie').value = (d.serie !== 'None' && d.serie) ? d.serie : '';
+            document.getElementById('edit_servicio').value = (d.servicio !== 'None' && d.servicio) ? d.servicio : '';
+            document.getElementById('edit_org').value = (d.org !== 'None' && d.org) ? d.org : '';
+            document.getElementById('edit_fmat').value = (d.fmat !== 'None' && d.fmat) ? d.fmat : '';
+            document.getElementById('edit_flic').value = (d.flic !== 'None' && d.flic) ? d.flic : '';
+            document.getElementById('edit_lim').value = (d.lim !== 'None' && d.lim) ? d.lim : '';
             document.getElementById('edit_prop').value = d.prop;
-            document.getElementById('edit_ntar').value = (d.ntar !== 'None') ? d.ntar : '';
-            document.getElementById('edit_mod').value = (d.mod !== 'None') ? d.mod : '';
-            document.getElementById('edit_niv').value = (d.niv !== 'None') ? d.niv : '';
-            document.getElementById('edit_rad').value = (d.rad !== 'None') ? d.rad : '';
-            document.getElementById('edit_empv').value = (d.empv !== 'None') ? d.empv : '';
-            document.getElementById('edit_nitv').value = (d.nitv !== 'None') ? d.nitv : '';
-            document.getElementById('edit_finit').value = (d.finit !== 'None') ? d.finit : '';
-            document.getElementById('edit_fvent').value = (d.fvent !== 'None') ? d.fvent : '';
-            document.getElementById('edit_npolr').value = (d.npolr !== 'None') ? d.npolr : '';
-            document.getElementById('edit_aser').value = (d.aser !== 'None') ? d.aser : '';
-            document.getElementById('edit_finir').value = (d.finir !== 'None') ? d.finir : '';
-            document.getElementById('edit_fvenr').value = (d.fvenr !== 'None') ? d.fvenr : '';
-            document.getElementById('edit_npols').value = (d.npols !== 'None') ? d.npols : '';
-            document.getElementById('edit_fvens').value = (d.fvens !== 'None') ? d.fvens : '';
+            document.getElementById('edit_ntar').value = (d.ntar !== 'None' && d.ntar) ? d.ntar : '';
+            document.getElementById('edit_mod').value = (d.mod !== 'None' && d.mod) ? d.mod : '';
+            document.getElementById('edit_niv').value = (d.niv !== 'None' && d.niv) ? d.niv : '';
+            document.getElementById('edit_rad').value = (d.rad !== 'None' && d.rad) ? d.rad : '';
+            document.getElementById('edit_empv').value = (d.empv !== 'None' && d.empv) ? d.empv : '';
+            document.getElementById('edit_nitv').value = (d.nitv !== 'None' && d.nitv) ? d.nitv : '';
+            document.getElementById('edit_finit').value = (d.finit !== 'None' && d.finit) ? d.finit : '';
+            document.getElementById('edit_fvent').value = (d.fvent !== 'None' && d.fvent) ? d.fvent : '';
+            
+            document.getElementById('edit_npolr').value = (d.npolr !== 'None' && d.npolr) ? d.npolr : '';
+            document.getElementById('edit_aser').value = (d.aser !== 'None' && d.aser) ? d.aser : '';
+            document.getElementById('edit_finir').value = (d.finir !== 'None' && d.finir) ? d.finir : '';
+            document.getElementById('edit_fvenr').value = (d.fvenr !== 'None' && d.fvenr) ? d.fvenr : '';
+            
+            document.getElementById('edit_npols').value = (d.npols !== 'None' && d.npols) ? d.npols : '';
+            document.getElementById('edit_asers').value = (d.asers !== 'None' && d.asers) ? d.asers : '';
+            document.getElementById('edit_fvens').value = (d.fvens !== 'None' && d.fvens) ? d.fvens : '';
+            
+            document.getElementById('edit_nrtm').value = (d.nrtm !== 'None' && d.nrtm) ? d.nrtm : '';
+            document.getElementById('edit_fvenrtm').value = (d.fvenrtm !== 'None' && d.fvenrtm) ? d.fvenrtm : '';
             
             openModal('modalEditarVehiculo');
         }
