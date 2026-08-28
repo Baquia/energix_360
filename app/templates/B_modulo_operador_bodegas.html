@@ -660,7 +660,7 @@
                 d.forEach(m => {
                     const p = m.total_items > 0 ? Math.round((m.items_listos / m.total_items) * 100) : 0;
                     html += `
-                    <div class="order-card" style="border-left-color: var(--secondary);" onclick="abrirMarca('${m.marca}')">
+                    <div class="order-card" style="border-left-color: var(--secondary);" onclick="abrirMarca('${m.marca.replace(/'/g, "\\'")}')">
                         <div class="oc-top">
                             <span class="oc-number">LOTE: ${m.marca}</span>
                             <span class="oc-badge" style="background:#fef3c7; color:#b45309;">${m.total_ordenes} Peds</span>
@@ -681,7 +681,7 @@
                 d.forEach(o => {
                     const p = o.total_items > 0 ? Math.round((o.items_listos / o.total_items) * 100) : 0;
                     html += `
-                    <div class="order-card" onclick="abrirOrden('${o.orden}')">
+                    <div class="order-card" onclick="abrirOrden('${String(o.orden).replace(/'/g, "\\'")}')">
                         <div class="oc-top">
                             <span class="oc-number">#${o.orden}</span>
                             <span class="oc-badge">${o.zona || 'General'}</span>
@@ -711,7 +711,7 @@
         // POLLING PRINCIPAL DE ITEMS (Escucha resolución del Controlador)
         function cargarItemsSilencioso() {
             if (!ordenActual) return;
-            const url = isLoteMode ? `/api/operario/items_lote/${ordenActual}` : `/api/operario/items_orden/${ordenActual}`;
+            const url = isLoteMode ? `/api/operario/items_lote/${encodeURIComponent(ordenActual)}` : `/api/operario/items_orden/${encodeURIComponent(ordenActual)}`;
             
             fetch(url + '?v=' + new Date().getTime()).then(r => r.json()).then(d => {
                 listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
@@ -777,7 +777,7 @@
             const c = document.getElementById('items-container');
             c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando inventario del lote...</div>';
 
-            fetch(`/api/operario/items_lote/${marca}?v=` + new Date().getTime()).then(r => r.json()).then(d => {
+            fetch(`/api/operario/items_lote/${encodeURIComponent(marca)}?v=` + new Date().getTime()).then(r => r.json()).then(d => {
                 listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
                 renderizarItems();
             });
@@ -793,7 +793,7 @@
             const c = document.getElementById('items-container');
             c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando lista de picking...</div>';
             
-            fetch(`/api/operario/items_orden/${ordenActual}`).then(r => r.json()).then(d => {
+            fetch(`/api/operario/items_orden/${encodeURIComponent(ordenActual)}`).then(r => r.json()).then(d => {
                 listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
                 renderizarItems();
             });

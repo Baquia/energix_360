@@ -473,6 +473,32 @@
             display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
         }
 
+        /* ESTILOS PARA LA TABLA REORDENABLE DRAG & DROP Y BOTONES */
+        .row-draggable {
+            cursor: grab;
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+        .row-draggable:active {
+            cursor: grabbing;
+        }
+        .row-draggable.dragging {
+            opacity: 0.4;
+            background: #e0f2fe !important;
+        }
+        .btn-order-move {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin: 0 2px;
+            transition: background 0.2s;
+        }
+        .btn-order-move:hover {
+            background: #e2e8f0;
+        }
+
         /* =======================================================
            MEDIA QUERIES - DISEÑO INDUSTRIAL MÓVIL (THUMB-ZONE)
            ======================================================= */
@@ -940,7 +966,7 @@
     </div>
 
     <!-- ============================================== -->
-    <!-- MODAL RUTAS PICKING (PASILLOS) -->
+    <!-- MODAL RUTAS PICKING (PASILLOS - REORDENABLE) -->
     <!-- ============================================== -->
     <div id="modalRutasPicking" class="modal-overlay" style="z-index: 3100;">
         <div class="modal-card">
@@ -950,18 +976,19 @@
             </div>
             <div class="modal-body">
                 <p style="color:#6b7280; font-size:0.9rem; margin-top:0; margin-bottom:15px;">
-                    Asigna un número (1, 2, 3...) para definir el orden físico de los pasillos. Las marcas sin número configurado caerán en el Pasillo Extra al final.
+                    Arrastra las marcas o usa los botones ⬆️ / ⬇️ para definir la secuencia física del recorrido en el pasillo. El sistema asignará el número ordenadamente de arriba a abajo.
                 </p>
                 <div style="max-height: 400px; overflow-y: auto;">
                     <table class="data-table">
                         <thead>
                             <tr>
+                                <th style="width: 80px; text-align: center;">Pasillo</th>
                                 <th>Marca / Fabricante</th>
-                                <th>Orden (Secuencia)</th>
+                                <th style="width: 110px; text-align: center;">Reordenar</th>
                             </tr>
                         </thead>
                         <tbody id="tbl-rutas-picking-body">
-                            <!-- Inyectado vía JS -->
+                            <!-- Inyectado vía JS con soporte Drag & Drop y botones UP/DOWN -->
                         </tbody>
                     </table>
                 </div>
@@ -1160,7 +1187,7 @@
                     </div>
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Escribe "ELIMINAR" para confirmar</label>
                     <input type="text" id="del-input-seguridad" onkeyup="validarPalabraSeguridad()" placeholder="ELIMINAR" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                    <button id="btn-ejecutar-bulk" class="btn-confirm" onclick="prepararEliminacion('bulk')" disabled style="width:100%; background:#9ca3af; cursor:not-allowed;">Destruir Marca Completa</button>
+                    <button id="btn-ejecutar-bulk" class="btn-confirm" onclick="prepararEliminacion('bulk')" disabled style="width:100%; background:#e5e7eb; cursor:not-allowed;">Destruir Marca Completa</button>
                 </div>
             </div>
         </div>
@@ -2375,32 +2402,87 @@
         }
         function cerrarModalHistorialActas() { document.getElementById('modalHistorialActas').style.display = 'none'; }
 
+        // FUNCIONES DE RUTAS DE BODEGA REORDENABLES (DRAG & DROP + BOTONES UP/DOWN)
+        let draggedRowRutas = null;
+
         function abrirModalRutasPicking() {
             document.getElementById('modalRutasPicking').style.display = 'flex';
             const tbody = document.getElementById('tbl-rutas-picking-body');
-            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:2rem;">Cargando marcas y pasillos...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:2rem;">Cargando marcas y pasillos...</td></tr>';
 
             fetch('/api/bodegas/rutas_picking?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     tbody.innerHTML = '';
                     if (data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#9ca3af;">No hay marcas registradas.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#9ca3af;">No hay marcas registradas.</td></tr>';
                         return;
                     }
-                    data.forEach(r => {
-                        let val = r.secuencia_picking === 9999 ? '' : r.secuencia_picking;
-                        tbody.innerHTML += `
-                        <tr style="background:white; border-bottom: 1px solid #f3f4f6;">
+
+                    data.forEach((r, idx) => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'row-draggable';
+                        tr.draggable = true;
+                        tr.style.background = 'white';
+                        tr.style.borderBottom = '1px solid #f3f4f6';
+                        tr.dataset.marca = r.marca;
+
+                        tr.innerHTML = `
+                            <td data-label="Pasillo" style="text-align:center; font-weight:800; color:var(--color-primary);" class="cell-num-pasillo">${idx + 1}</td>
                             <td data-label="Marca" style="font-weight:600; font-size:0.95rem; color:#1f2937;">${r.marca}</td>
-                            <td data-label="Secuencia">
-                                <input type="number" min="1" class="input-secuencia-ruta" data-marca="${r.marca}" value="${val}" 
-                                style="width:100%; max-width:120px; padding:10px; border-radius:6px; border:1px solid #cbd5e1; font-size:1rem; text-align:center;" placeholder="1, 2, 3...">
+                            <td data-label="Reordenar" style="text-align:center;">
+                                <button type="button" class="btn-order-move" onclick="moverFilaRuta(this, -1)" title="Subir">⬆️</button>
+                                <button type="button" class="btn-order-move" onclick="moverFilaRuta(this, 1)" title="Bajar">⬇️</button>
                             </td>
-                        </tr>`;
+                        `;
+
+                        // Eventos Drag & Drop nativos HTML5
+                        tr.addEventListener('dragstart', function (e) {
+                            draggedRowRutas = this;
+                            this.classList.add('dragging');
+                            e.dataTransfer.effectAllowed = 'move';
+                        });
+
+                        tr.addEventListener('dragend', function () {
+                            this.classList.remove('dragging');
+                            draggedRowRutas = null;
+                            reindexarSecuenciasRutas();
+                        });
+
+                        tr.addEventListener('dragover', function (e) {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            if (draggedRowRutas && draggedRowRutas !== this) {
+                                const rect = this.getBoundingClientRect();
+                                const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                                tbody.insertBefore(draggedRowRutas, next ? this.nextSibling : this);
+                                reindexarSecuenciasRutas();
+                            }
+                        });
+
+                        tbody.appendChild(tr);
                     });
                 })
-                .catch(e => tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:red;">Error de conexión.</td></tr>');
+                .catch(e => tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:red;">Error de conexión.</td></tr>');
+        }
+
+        function moverFilaRuta(btn, direccion) {
+            const tr = btn.closest('tr');
+            const tbody = tr.parentNode;
+            if (direccion === -1 && tr.previousElementSibling) {
+                tbody.insertBefore(tr, tr.previousElementSibling);
+            } else if (direccion === 1 && tr.nextElementSibling) {
+                tbody.insertBefore(tr.nextElementSibling, tr);
+            }
+            reindexarSecuenciasRutas();
+        }
+
+        function reindexarSecuenciasRutas() {
+            const filas = document.querySelectorAll('#tbl-rutas-picking-body .row-draggable');
+            filas.forEach((tr, index) => {
+                const cellNum = tr.querySelector('.cell-num-pasillo');
+                if (cellNum) cellNum.textContent = index + 1;
+            });
         }
 
         function cerrarModalRutasPicking() { document.getElementById('modalRutasPicking').style.display = 'none'; }
@@ -2409,12 +2491,14 @@
             const btn = document.getElementById('btnGuardarRutas');
             btn.textContent = 'Guardando...'; btn.disabled = true;
 
-            const inputs = document.querySelectorAll('.input-secuencia-ruta');
+            const filas = document.querySelectorAll('#tbl-rutas-picking-body .row-draggable');
             let rutas = [];
-            inputs.forEach(inp => {
-                let val = inp.value.trim();
-                let num = val === '' ? 9999 : parseInt(val);
-                rutas.push({marca: inp.dataset.marca, secuencia: num});
+            
+            filas.forEach((tr, index) => {
+                rutas.push({
+                    marca: tr.dataset.marca,
+                    secuencia: index + 1
+                });
             });
 
             fetch('/api/bodegas/guardar_rutas_picking', {
