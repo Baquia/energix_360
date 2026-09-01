@@ -1164,7 +1164,7 @@ def crear_producto_manual():
     
     data = request.json
     nit_empresa = str(session.get('empresa_id', ''))
-    nombre_empresa = str(session.get('nombre_empresa', ''))
+    nombre_empresa = str(session.get('nombre_empresa', session.get('empresa', 'Empresa')))
     
     try:
         cur = mysql.connection.cursor()
@@ -1461,7 +1461,7 @@ def guardar_promocion():
     try:
         data = request.json
         empresa_id = session.get('empresa_id')
-        nombre_empresa = session.get('nombre_empresa', 'Empresa')
+        nombre_empresa = session.get('nombre_empresa', session.get('empresa', 'Empresa'))
         ean_promo = data.get('ean_promo')
         nombre_promo = data.get('nombre_promo')
         componentes = data.get('componentes', [])
@@ -2222,6 +2222,10 @@ def upload_excel():
                         desc_upper = str(final_desc).upper() if final_desc else ""
                         es_huerfana = any(k in desc_upper for k in palabras_clave_promo)
                         
+                        # NUEVA REGLA: Si cruzó en BD, NO es huérfana
+                        if match_encontrado:
+                            es_huerfana = False
+                        
                         estado_insert = 'PROMO_HUERFANA' if es_huerfana else 'PENDIENTE'
                         auth_insert = False if es_huerfana else auth
 
@@ -2412,5 +2416,126 @@ def guardar_rutas_picking():
             mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Rutas de picking guardadas correctamente.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+# ==============================================================================
+# NUEVO: CRUD DE USUARIOS PARA CONTROLADOR (LÍMITE DE 8, SOLO WMS)
+# ==============================================================================
+@bp_bodegas.route('/api/bodegas/usuarios', methods=['GET'])
+def listar_usuarios():
+    if 'usuario_id' not in session: return jsonify([])
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # Mostrar solo los usuarios del mismo inquilino Y que sean perfiles WMS
+        cur.execute("""
+            SELECT id, cedula, nombre, perfil 
+            FROM usuarios 
+            WHERE empresa_id = %s AND perfil IN ('operador_logistica', 'controlador_logistica', 'verificador_bodegas')
+            ORDER BY id DESC
+        """, (session.get('empresa_id'),))
+        usuarios = cur.fetchall()
+        cur.close()
+        return jsonify(usuarios)
+    except Exception as e:
+        print(f"Error listando usuarios: {e}")
+        return jsonify([])
+
+@bp_bodegas.route('/api/bodegas/usuarios', methods=['POST'])
+@csrf.exempt
+def crear_usuario():
+    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
+    empresa_id = session.get('empresa_id')
+    empresa_nombre = session.get('nombre_empresa', session.get('empresa', 'Empresa'))
+    
+    data = request.json
+    perfil = data.get('perfil')
+    
+    if perfil not in ['operador_logistica', 'controlador_logistica', 'verificador_bodegas']:
+        return jsonify({'status': 'error', 'message': 'Perfil no permitido desde este módulo.'})
+    
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # CANDADO DE INQUILINO: Límite de 8 usuarios WMS por empresa
+        cur.execute("SELECT COUNT(*) as total FROM usuarios WHERE empresa_id = %s AND perfil IN ('operador_logistica', 'controlador_logistica', 'verificador_bodegas')", (empresa_id,))
+        total = cur.fetchone()['total']
+        if total >= 8:
+            cur.close()
+            return jsonify({'status': 'error', 'message': 'Límite alcanzado: Su empresa ya cuenta con el máximo de 8 usuarios WMS permitidos en este módulo.'})
+        
+        cedula = data.get('cedula')
+        nombre = data.get('nombre')
+        password = data.get('password')
+        
+        if not all([cedula, nombre, password, perfil]):
+            cur.close()
+            return jsonify({'status': 'error', 'message': 'Faltan datos obligatorios'})
+        
+        # Verificar que la cédula no exista globalmente
+        cur.execute("SELECT id FROM usuarios WHERE cedula = %s", (cedula,))
+        if cur.fetchone():
+            cur.close()
+            return jsonify({'status': 'error', 'message': 'La cédula/usuario ya existe en el sistema.'})
+            
+        from app import bcrypt
+        hash_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+        
+        # Crear usuario
+        cur.execute("""
+            INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa)
+            VALUES (%s, %s, %s, 'cliente', 'op', %s, %s, %s)
+        """, (cedula, nombre, hash_pw, perfil, empresa_id, empresa_nombre))
+        mysql.connection.commit()
+        cur.close()
+        
+        return jsonify({'status': 'success', 'message': 'Usuario creado correctamente.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@bp_bodegas.route('/api/bodegas/usuarios/<int:id_user>', methods=['PUT'])
+@csrf.exempt
+def editar_usuario_crud(id_user):
+    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
+    data = request.json
+    empresa_id = session.get('empresa_id')
+    
+    nombre = data.get('nombre')
+    perfil = data.get('perfil')
+    password = data.get('password')
+    
+    if perfil not in ['operador_logistica', 'controlador_logistica', 'verificador_bodegas']:
+        return jsonify({'status': 'error', 'message': 'Perfil no permitido desde este módulo.'})
+    
+    try:
+        cur = mysql.connection.cursor()
+        # Verificar pertenencia al inquilino implícita en la consulta
+        if password:
+            from app import bcrypt
+            hash_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+            cur.execute("UPDATE usuarios SET nombre=%s, perfil=%s, password=%s WHERE id=%s AND empresa_id=%s", 
+                        (nombre, perfil, hash_pw, id_user, empresa_id))
+        else:
+            cur.execute("UPDATE usuarios SET nombre=%s, perfil=%s WHERE id=%s AND empresa_id=%s", 
+                        (nombre, perfil, id_user, empresa_id))
+        
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'status': 'success', 'message': 'Usuario actualizado correctamente.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@bp_bodegas.route('/api/bodegas/usuarios/<int:id_user>', methods=['DELETE'])
+@csrf.exempt
+def eliminar_usuario_crud(id_user):
+    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
+    
+    try:
+        cur = mysql.connection.cursor()
+        # El AND empresa_id garantiza la seguridad multiempresa
+        cur.execute("DELETE FROM usuarios WHERE id=%s AND empresa_id=%s", (id_user, session.get('empresa_id')))
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'status': 'success', 'message': 'Usuario eliminado del sistema.'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})

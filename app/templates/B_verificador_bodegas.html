@@ -231,7 +231,7 @@
             box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
         }
 
-        #embedded-reader { width: 100%; height: 100%; }
+        #embedded-reader { width: 100%; height: 100%; transition: opacity 0.3s ease; }
 
         .btn-start-cam {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -240,6 +240,17 @@
             display: flex; align-items: center; gap: 10px; cursor: pointer; backdrop-filter: blur(4px); z-index: 5;
         }
         .btn-start-cam:active { background: rgba(255, 255, 255, 0.4); }
+
+        /* Botón de reanudar inteligente (Ahorro de batería) */
+        .btn-resume-cam {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6); color: white; display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+            z-index: 20; cursor: pointer; text-align: center;
+        }
+        .btn-resume-cam span.icon { font-size: 3rem; margin-bottom: 10px; }
+        .btn-resume-cam span.text { font-size: 1.2rem; font-weight: 800; }
+        .btn-resume-cam span.sub { font-size: 0.85rem; color: #cbd5e1; margin-top: 5px; }
 
         .action-area { background: #eef2ff; border-radius: 16px; padding: 15px; border: 1px solid #e0e7ff; text-align: center; margin-bottom: 15px; flex-shrink: 0; }
         .counter-big { font-size: 3.5rem; font-weight: 900; color: var(--primary); line-height: 1; display: block; margin-bottom: 5px; }
@@ -368,6 +379,13 @@
                     </svg>
                     ACTIVAR LECTOR
                 </div>
+                
+                <!-- Botón de reanudar cuando la cámara está en modo suspensión -->
+                <div id="cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamara()">
+                    <span class="icon">▶️</span>
+                    <span class="text">Tocar para reanudar</span>
+                    <span class="sub">Pausado para ahorrar batería</span>
+                </div>
             </div>
 
             <div class="picking-scroll-area">
@@ -430,6 +448,7 @@
         let lastScanTime = 0;
         let audioCtx = null;
         let wakeLock = null;
+        let sleepTimer = null;
 
         function cerrarSesionInstantanea(e) {
             if (e) e.preventDefault();
@@ -494,6 +513,36 @@
                     oscillator.stop(audioCtx.currentTime + 0.12); 
                 }
             } catch (e) { console.log("Audio play error", e); }
+        }
+
+        // FUNCIONES DE AHORRO DE BATERÍA (SLEEP MODE)
+        function iniciarTemporizadorInactividad() {
+            clearTimeout(sleepTimer);
+            // Si pasan 20 segundos sin leer código, pausamos la cámara
+            sleepTimer = setTimeout(pausarCamaraPorInactividad, 20000);
+        }
+
+        function pausarCamaraPorInactividad() {
+            if (scanner) {
+                try {
+                    scanner.pause(true); // Pausa el consumo de CPU/Video
+                    document.getElementById('embedded-reader').style.opacity = '0.3';
+                    document.getElementById('scanner-mira').style.display = 'none';
+                    document.getElementById('cam-resume-btn').style.display = 'flex';
+                } catch(e) {}
+            }
+        }
+
+        function reanudarCamara() {
+            if (scanner) {
+                try {
+                    scanner.resume();
+                    document.getElementById('embedded-reader').style.opacity = '1';
+                    document.getElementById('cam-resume-btn').style.display = 'none';
+                    document.getElementById('scanner-mira').style.display = 'block';
+                    iniciarTemporizadorInactividad();
+                } catch(e) {}
+            }
         }
 
         function mostrarMenu() { toggleView('view-menu'); }
@@ -695,6 +744,7 @@
                 if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS' || item.novedad_alistamiento === 'SIN_EAN') {
                     document.getElementById('embedded-reader').style.opacity = '0.3';
                     document.getElementById('cam-overlay-btn').style.display = 'none';
+                    document.getElementById('cam-resume-btn').style.display = 'none';
 
                     if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS') {
                         itemActivo.act_cajas = 0;
@@ -711,6 +761,7 @@
                 novAlert.classList.add('hidden');
                 document.getElementById('cam-overlay-btn').style.display = 'flex';
                 document.getElementById('embedded-reader').style.opacity = '1';
+                document.getElementById('cam-resume-btn').style.display = 'none';
             }
 
             if (itemActivo.req_cajas > 0) document.getElementById('area-conteo-cajas').classList.remove('hidden');
@@ -741,6 +792,8 @@
                     try {
                         scanner.resume(); 
                         document.getElementById('embedded-reader').style.opacity = '1';
+                        document.getElementById('cam-resume-btn').style.display = 'none';
+                        iniciarTemporizadorInactividad();
                     } catch(e) {}
                 }
             }
@@ -762,9 +815,11 @@
                         if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
                             scanner.pause(true);
                             document.getElementById('embedded-reader').style.opacity = '0.5';
+                            detenerCamara();
                         } else {
-                            scanner.resume();
                             document.getElementById('embedded-reader').style.opacity = '1';
+                            document.getElementById('cam-resume-btn').style.display = 'none';
+                            iniciarTemporizadorInactividad();
                         }
                     } catch(e) {}
                 }
@@ -787,6 +842,7 @@
         function iniciarCamaraIncrustada() {
             if (!itemActivo) return;
             document.getElementById('cam-overlay-btn').style.display = 'none';
+            document.getElementById('cam-resume-btn').style.display = 'none';
 
             initAudio();
 
@@ -820,12 +876,13 @@
 
             scanner = new Html5Qrcode("embedded-reader", configScanner);
             scanner.start(
-                { facingMode: "environment" },
+                { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
                 { 
-                    fps: 10, 
+                    fps: 4, 
                     qrbox: { width: targetWidth, height: targetHeight }
                 },
                 (decodedText) => {
+                    iniciarTemporizadorInactividad();
                     const now = Date.now();
                     if (now - lastScanTime < 1500) return; 
 
@@ -874,7 +931,9 @@
                     }
                 },
                 (err) => { }
-            ).catch(err => {
+            ).then(() => {
+                iniciarTemporizadorInactividad();
+            }).catch(err => {
                 console.error(err);
                 alert("Error cámara. Verifica permisos.");
                 document.getElementById('cam-overlay-btn').style.display = 'flex';
@@ -883,12 +942,14 @@
         }
 
         function detenerCamara() {
+            clearTimeout(sleepTimer);
             if (scanner) {
-                scanner.stop().catch(e => console.log(e));
+                scanner.stop().then(() => { scanner.clear(); }).catch(e => console.log(e));
                 scanner = null;
             }
             const mira = document.getElementById('scanner-mira');
             if(mira) mira.style.display = 'none';
+            document.getElementById('cam-resume-btn').style.display = 'none';
         }
 
         function intentarVerificarItem() {

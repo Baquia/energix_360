@@ -752,7 +752,7 @@
                 </svg>
             </div>
             <div id="menu-usuarios" class="menu-items-container collapsed">
-                <button onclick="alert('Módulo en construcción 🛠️'); if(window.innerWidth<=768) toggleSidebar();" class="menu-item" style="background: #f1f5f9; color: #475569;">
+                <button onclick="abrirModalUsuarios(); if(window.innerWidth<=768) toggleSidebar();" class="menu-item" style="background: #f1f5f9; color: #475569;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                         <circle cx="9" cy="7" r="4"></circle>
@@ -849,6 +849,76 @@
             <p style="font-size: 1.1rem; margin: 0;">Para gestionar pedidos y ver la actividad en vivo,<br>despliega <b>Gestión Logística</b> en el menú y haz clic en <b>"Alistamiento en Vivo"</b>.</p>
         </div>
     </main>
+
+
+    <!-- ============================================== -->
+    <!-- MODAL DE USUARIOS (CRUD LÍMITE DE 8 WMS) -->
+    <!-- ============================================== -->
+    <div id="modalUsuarios" class="modal-overlay" style="z-index: 3100;">
+        <div class="modal-large">
+            <div class="modal-header">
+                <h3>👥 Perfiles Operativos (WMS)</h3>
+                <button class="btn-cancel" onclick="cerrarModalUsuarios()" style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
+            </div>
+            <div class="modal-body" style="background: #f9fafb;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap:wrap; gap:10px;">
+                    <div style="background: #e0f2fe; color: #0369a1; padding: 10px 15px; border-radius: 8px; font-weight: 700; font-size: 0.95rem; border: 1px solid #bae6fd;">
+                        Usuarios WMS Registrados: <span id="user-count">0</span> / 8 | Cupos disponibles: <span id="user-available">8</span>
+                    </div>
+                    <button id="btn-add-user" onclick="abrirFormUsuario(false)" class="btn-confirm" style="background: #0ea5e9; display: flex; align-items: center; gap: 8px;">
+                        ➕ Crear Usuario
+                    </button>
+                </div>
+                <div class="section-box" style="border:none; box-shadow:none; background:transparent;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Cédula/Usuario</th>
+                                <th>Nombre Completo</th>
+                                <th>Perfil Asignado</th>
+                                <th style="text-align:right;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-usuarios-body">
+                            <tr><td colspan="4" style="text-align:center; padding:2rem;">Cargando usuarios...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUB-MODAL FORMULARIO DE USUARIO -->
+    <div id="modalUsuarioForm" class="modal-overlay" style="z-index: 3200;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="title-user-form">Nuevo Usuario</h3>
+                <button class="btn-cancel" onclick="cerrarFormUsuario()" style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Cédula (Usada para Login)</label>
+                <input type="number" id="u-cedula" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
+                
+                <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Nombre Completo</label>
+                <input type="text" id="u-nombre" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
+                
+                <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Perfil Operativo</label>
+                <select id="u-perfil" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;">
+                    <option value="operador_logistica">Operador de Bodega (Picking)</option>
+                    <option value="verificador_bodegas">Verificador de Bodega (Auditor)</option>
+                    <option value="controlador_logistica">Controlador de Logística</option>
+                </select>
+
+                <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Contraseña <span id="req-pass" style="color:#ef4444;">*</span></label>
+                <input type="password" id="u-password" placeholder="Escriba la clave..." style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
+                
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="cerrarFormUsuario()">Cancelar</button>
+                <button class="btn-confirm" onclick="guardarUsuario()">💾 Guardar Usuario</button>
+            </div>
+        </div>
+    </div>
 
 
     <!-- ============================================== -->
@@ -1516,7 +1586,7 @@
                                     {% if op.estado_visual == 'VERIFICADO' %}
                                     <button onclick="abrirModalDespacho('{{ op.orden }}')" class="btn-assign" style="background:#10b981; color:white; border:none; width: 100%; padding:12px;">🚚 Vehículo</button>
                                     {% elif op.estado_visual == 'DESPACHADO' or op.estado_visual == 'TERMINADO' %}
-                                    <button onclick="window.open('/bodegas/imprimir_acta/{{ op.orden }}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>
+                                    <button onclick="window.open('/bodegas/imprimir_acta/${op.orden}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>
                                     {% elif op.estado_visual == 'ALISTADO' %}
                                     <span style="color:#f59e0b; font-size:0.85rem; display: block; text-align: center; font-weight:700;">En Auditoría</span>
                                     {% else %}
@@ -1892,6 +1962,8 @@
         let intervaloDetalle = null;
         let monitoreoInterval = null;
         let kpiChartInstance = null;
+        let isEditUser = false;
+        let currentUserId = null;
 
         window.tempInputs = window.tempInputs || {};
         function guardarInputTemp(el) { window.tempInputs[el.id] = el.value; }
@@ -1927,6 +1999,144 @@
                 container.classList.add('collapsed');
                 chevron.classList.remove('open');
             }
+        }
+
+        // ==============================================
+        // LÓGICA CRUD DE USUARIOS (FRONTEND)
+        // ==============================================
+        function abrirModalUsuarios() {
+            document.getElementById('modalUsuarios').style.display = 'flex';
+            cargarUsuarios();
+        }
+
+        function cerrarModalUsuarios() {
+            document.getElementById('modalUsuarios').style.display = 'none';
+        }
+
+        function cargarUsuarios() {
+            const tbody = document.getElementById('tbl-usuarios-body');
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando...</td></tr>';
+            
+            fetch('/api/bodegas/usuarios?t=' + Date.now())
+            .then(r => r.json())
+            .then(data => {
+                tbody.innerHTML = '';
+                document.getElementById('user-count').textContent = data.length;
+                document.getElementById('user-available').textContent = Math.max(0, 8 - data.length);
+                
+                const btnAdd = document.getElementById('btn-add-user');
+                if (data.length >= 8) {
+                    btnAdd.disabled = true;
+                    btnAdd.style.opacity = '0.5';
+                    btnAdd.style.cursor = 'not-allowed';
+                    btnAdd.title = "Límite de 8 usuarios WMS alcanzado.";
+                } else {
+                    btnAdd.disabled = false;
+                    btnAdd.style.opacity = '1';
+                    btnAdd.style.cursor = 'pointer';
+                    btnAdd.title = "";
+                }
+
+                if(data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#6b7280;">No hay usuarios registrados.</td></tr>';
+                    return;
+                }
+
+                data.forEach(u => {
+                    let colorBadge = 'badge-blue';
+                    if(u.perfil === 'controlador_logistica') colorBadge = 'badge-purple';
+                    if(u.perfil === 'verificador_bodegas') colorBadge = 'badge-green';
+                    
+                    tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${u.cedula}</strong></td>
+                        <td>${u.nombre}</td>
+                        <td><span class="badge ${colorBadge}">${u.perfil}</span></td>
+                        <td style="text-align:right;">
+                            <button onclick="abrirFormUsuario(true, ${u.id}, '${u.cedula}', '${u.nombre}', '${u.perfil}')" style="background:none;border:none;cursor:pointer;font-size:1.2rem;margin-right:10px;" title="Editar">✏️</button>
+                            <button onclick="eliminarUsuario(${u.id})" style="background:none;border:none;cursor:pointer;font-size:1.2rem;" title="Eliminar">🗑️</button>
+                        </td>
+                    </tr>`;
+                });
+            })
+            .catch(e => {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:red;">Error de conexión.</td></tr>';
+            });
+        }
+
+        function abrirFormUsuario(isEdit, id=null, cedula='', nombre='', perfil='') {
+            isEditUser = isEdit;
+            currentUserId = id;
+            
+            document.getElementById('u-cedula').value = cedula;
+            document.getElementById('u-cedula').disabled = isEdit; 
+            document.getElementById('u-nombre').value = nombre;
+            document.getElementById('u-perfil').value = perfil || 'operador_logistica';
+            document.getElementById('u-password').value = '';
+            
+            document.getElementById('title-user-form').textContent = isEdit ? '✏️ Editar Usuario' : '➕ Nuevo Usuario';
+            document.getElementById('req-pass').style.display = isEdit ? 'none' : 'inline';
+            document.getElementById('u-password').placeholder = isEdit ? 'Déjelo en blanco si no desea cambiar la clave' : 'Escriba la clave...';
+            
+            document.getElementById('modalUsuarioForm').style.display = 'flex';
+        }
+
+        function cerrarFormUsuario() {
+            document.getElementById('modalUsuarioForm').style.display = 'none';
+        }
+
+        function guardarUsuario() {
+            const cedula = document.getElementById('u-cedula').value.trim();
+            const nombre = document.getElementById('u-nombre').value.trim();
+            const perfil = document.getElementById('u-perfil').value;
+            const password = document.getElementById('u-password').value;
+
+            if(!cedula || !nombre || !perfil) {
+                return alert("⚠️ La Cédula, Nombre y Perfil son campos obligatorios.");
+            }
+            if(!isEditUser && !password) {
+                return alert("⚠️ La contraseña es obligatoria para usuarios nuevos.");
+            }
+
+            const payload = { cedula, nombre, perfil, password };
+            const url = isEditUser ? '/api/bodegas/usuarios/' + currentUserId : '/api/bodegas/usuarios';
+            const method = isEditUser ? 'PUT' : 'POST';
+
+            const btn = document.querySelector('#modalUsuarioForm .btn-confirm');
+            btn.disabled = true; btn.textContent = 'Guardando...';
+
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(d => {
+                if(d.status === 'success') {
+                    cerrarFormUsuario();
+                    cargarUsuarios();
+                    alert("✅ " + d.message);
+                } else {
+                    alert("❌ Error: " + d.message);
+                }
+            })
+            .catch(e => alert("Error de red."))
+            .finally(() => { btn.disabled = false; btn.textContent = '💾 Guardar Usuario'; });
+        }
+
+        function eliminarUsuario(id) {
+            if(!confirm("⚠️ ¿Estás completamente seguro de que deseas eliminar este usuario del sistema? Esta acción no se puede deshacer.")) return;
+            
+            fetch('/api/bodegas/usuarios/' + id, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(d => {
+                if(d.status === 'success') {
+                    cargarUsuarios();
+                } else {
+                    alert("❌ Error: " + d.message);
+                }
+            })
+            .catch(e => alert("Error de conexión."));
         }
 
         function abrirModalKPIs() {
