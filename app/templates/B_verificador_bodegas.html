@@ -876,7 +876,7 @@
 
             scanner = new Html5Qrcode("embedded-reader", configScanner);
             scanner.start(
-                { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+                { facingMode: "environment" }, // Límite de resolución REMOVIDO para evitar error en Android
                 { 
                     fps: 4, 
                     qrbox: { width: targetWidth, height: targetHeight }
@@ -935,7 +935,7 @@
                 iniciarTemporizadorInactividad();
             }).catch(err => {
                 console.error(err);
-                alert("Error cámara. Verifica permisos.");
+                alert("Error cámara: " + (err.message || err));
                 document.getElementById('cam-overlay-btn').style.display = 'flex';
                 document.getElementById('scanner-mira').style.display = 'none';
             });
