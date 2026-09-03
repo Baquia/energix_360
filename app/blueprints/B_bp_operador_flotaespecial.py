@@ -185,6 +185,10 @@ def iniciar_viaje_especial():
         try: cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN lat_origen DECIMAL(10,8) NULL, ADD COLUMN lng_origen DECIMAL(11,8) NULL, ADD COLUMN hora_origen DATETIME NULL, ADD COLUMN lat_destino DECIMAL(10,8) NULL, ADD COLUMN lng_destino DECIMAL(11,8) NULL, ADD COLUMN hora_destino DATETIME NULL, ADD COLUMN lat_retorno DECIMAL(10,8) NULL, ADD COLUMN lng_retorno DECIMAL(11,8) NULL, ADD COLUMN hora_retorno DATETIME NULL;")
         except: pass
         
+        # MIGRACIÓN: Control de tiempos de pausa y conducción efectiva
+        try: cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN hora_reinicio DATETIME NULL, ADD COLUMN tiempo_efectivo_minutos INT DEFAULT 0;")
+        except: pass
+
         try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN operador_ejecucion VARCHAR(100) NULL, ADD COLUMN fecha_ejecucion_real DATETIME NULL, ADD COLUMN fecha_fin_real DATETIME NULL;")
         except: pass
 
@@ -253,6 +257,25 @@ def finalizar_viaje_especial():
     firma = datos.get('firma')
     telemetria = datos.get('telemetria', {})
 
+    # CALCULAR TIEMPO EFECTIVO DE CONDUCCIÓN (Descontando la pausa)
+    tiempo_efectivo_minutos = 0
+    try:
+        fmt = '%Y-%m-%d %H:%M:%S'
+        h_ori = datetime.strptime(telemetria.get('hora_origen'), fmt) if telemetria.get('hora_origen') else None
+        h_des = datetime.strptime(telemetria.get('hora_destino'), fmt) if telemetria.get('hora_destino') else None
+        h_rei = datetime.strptime(telemetria.get('hora_reinicio'), fmt) if telemetria.get('hora_reinicio') else None
+        h_ret = datetime.strptime(telemetria.get('hora_retorno'), fmt) if telemetria.get('hora_retorno') else None
+        
+        t_total = 0
+        if h_ori and h_des: 
+            t_total += max(0, (h_des - h_ori).total_seconds())
+        if h_rei and h_ret: 
+            t_total += max(0, (h_ret - h_rei).total_seconds())
+            
+        tiempo_efectivo_minutos = int(t_total / 60)
+    except Exception as calc_err:
+        print(f"Error en cálculo de tiempo efectivo: {calc_err}")
+
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
         ruta_origen = _guardar_testigo_base64(foto_origen, 'viajes', f"origen_{id_viaje_fisico}")
@@ -266,12 +289,16 @@ def finalizar_viaje_especial():
                 foto_origen = %s, foto_destino = %s, foto_retorno = %s, firma = %s,
                 lat_origen = %s, lng_origen = %s, hora_origen = %s,
                 lat_destino = %s, lng_destino = %s, hora_destino = %s,
-                lat_retorno = %s, lng_retorno = %s, hora_retorno = %s
+                hora_reinicio = %s,
+                lat_retorno = %s, lng_retorno = %s, hora_retorno = %s,
+                tiempo_efectivo_minutos = %s
             WHERE id = %s AND id_empresa = %s
         """, (ruta_origen, ruta_destino, ruta_retorno, ruta_firma, 
               telemetria.get('lat_origen'), telemetria.get('lng_origen'), telemetria.get('hora_origen'),
               telemetria.get('lat_destino'), telemetria.get('lng_destino'), telemetria.get('hora_destino'),
+              telemetria.get('hora_reinicio'),
               telemetria.get('lat_retorno'), telemetria.get('lng_retorno'), telemetria.get('hora_retorno'),
+              tiempo_efectivo_minutos,
               id_viaje_fisico, empresa_id))
         
         cur.execute("""

@@ -41,17 +41,9 @@
         .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
         .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
         .user-role { font-size: 10px; color: var(--text-muted); background: rgba(255, 255, 255, 0.6); padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
-        
-        .telemetry-bar { display: flex; gap: 10px; font-size: 11px; background: rgba(1, 82, 73, 0.1); padding: 4px 10px; border-radius: 20px; color: var(--verde); font-weight: bold; margin-top: 5px; border: 1px solid rgba(1, 82, 73, 0.2); }
 
         .wrap { width: 100%; max-width: 900px; margin: 20px auto 40px; padding: 0 20px; }
         .welcome-title { color: var(--verde); font-size: 22px; font-weight: 700; margin-bottom: 25px; text-align: left; border-bottom: 2px solid rgba(1, 82, 73, 0.1); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
-        
-        /* Indicador de Estado GPS */
-        .gps-status { font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: bold; background: #e5e7eb; color: #4b5563; display: flex; align-items: center; gap: 6px;}
-        .gps-status.active { background: #d1fae5; color: #065f46; }
-        .gps-status.offline { background: #fee2e2; color: #991b1b; }
-        .gps-status.paused { background: #fef3c7; color: #b45309; }
 
         .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
         .module-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; height: 100%; cursor: pointer; border: 1px solid transparent; position: relative; overflow: hidden; }
@@ -80,7 +72,6 @@
         .form-group select:focus, .form-group input:focus { border-color: var(--verde); }
         .btn-submit { background: var(--verde); color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
         .btn-cancel { background: #f3f4f6; color: #4b5563; border: 1px solid var(--border); padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
-        .timer-text { font-size: 12px; color: #ef4444; margin-top: 15px; font-weight: bold;}
 
         /* HITOS Y FIRMA */
         .hitos-container { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
@@ -118,30 +109,19 @@
             {% if session.get('placa_prelogueada_especial') %}
                 <span class="user-role" style="background-color: var(--verde); color: white; margin-top: 5px; font-size: 11px;">Vehículo: {{ session.get('placa_prelogueada_especial') }}</span>
             {% endif %}
-            
-            {% if session.get('viaje_activo_especial') %}
-                <div class="telemetry-bar">
-                    <span id="batteryMeter" title="Nivel de batería local">🔋 --%</span>
-                    <span style="color: #cbd5e1;">|</span>
-                    <span id="dataMeter" title="Datos móviles consumidos en esta sesión">📶 0.00 MB</span>
-                </div>
-            {% endif %}
         </div>
     </header>
 
     <main class="wrap">
         <h2 class="welcome-title">
             Consola Operativa
-            {% if session.get('viaje_activo_especial') %}
-                <div id="indicador_gps" class="gps-status">⚪ Iniciando GPS...</div>
-            {% endif %}
         </h2>
         
         <div class="modules-grid">
             {% if session.get('placa_prelogueada_especial') %}
                 
                 {% if session.get('viaje_activo_especial') %}
-                    <!-- MÓDULOS DE OPERACIÓN: Solo visibles si hay viaje activo -->
+                    <!-- MÓDULO DE OPERACIÓN: Solo visible si hay viaje activo -->
                     <div style="grid-column: 1 / -1; margin-bottom: 10px;">
                         <div style="background: #eefcf9; color: var(--verde-osc); padding: 12px; border-radius: 8px; border: 1px solid var(--verde); font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 15px; display: flex; flex-direction: column; gap: 5px;">
                             <span>🚀 Consecutivo: {{ session.get('consecutivo_viaje_especial') }}</span>
@@ -162,9 +142,16 @@
                                 <button id="btnHito1" class="btn-hito active" onclick="document.getElementById('camOrigen').click()">
                                     <span>📸 1. Recogida (Origen)</span> <span class="hito-icon" id="iconHito1">⏳</span>
                                 </button>
+                                
                                 <button id="btnHito2" class="btn-hito" disabled onclick="document.getElementById('camDestino').click()">
                                     <span>📸 2. Llegada (Destino)</span> <span class="hito-icon" id="iconHito2">🔒</span>
                                 </button>
+                                
+                                <!-- BOTÓN INTERMEDIO DE REANUDACIÓN DE VIAJE (PAUSAS EPS) -->
+                                <button id="btnReanudar" class="btn-submit" onclick="procesarReinicio()" style="display:none; background: #0ea5e9; font-size: 14px; margin-top: 10px; margin-bottom: 10px;">
+                                    ▶️ Reanudar Viaje (Paciente a Bordo)
+                                </button>
+
                                 <button id="btnHito3" class="btn-hito" disabled onclick="document.getElementById('camRetorno').click()">
                                     <span>📸 3. Retorno (Origen)</span> <span class="hito-icon" id="iconHito3">🔒</span>
                                 </button>
@@ -174,23 +161,10 @@
                                 ✍️ Firmar y Finalizar Viaje
                             </button>
                         </div>
-                        
-                        <div style="display: flex; gap: 10px; margin-top: 15px;">
-                            <button id="btnPausarViaje" onclick="togglePausarViaje()" class="btn-card" style="background: #f59e0b; color: white; width: 100%; padding: 15px; font-size: 16px; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);">
-                                ⏸ Pausar Envío de Datos GPS
-                            </button>
-                        </div>
                     </div>
 
-                    <a href="#" onclick="triggerParadaManual(event)" class="module-card">
-                        <div class="card-icon">📍</div>
-                        <h3 class="card-title">Registrar Parada</h3>
-                        <p class="card-desc">Registre proactivamente un evento, novedad de ruta o punto de interés.</p>
-                        <div class="btn-card">Notificar Parada &rarr;</div>
-                    </a>
-
                 {% else %}
-                    <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE (Oculta el resto) -->
+                    <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE -->
                     <div style="width: 100%; text-align: center; grid-column: 1 / -1; padding: 30px 10px;">
                         <h3 style="color: var(--verde); margin-bottom: 15px;">Vehículo enlazado: {{ session.get('placa_prelogueada_especial') }}</h3>
                         
@@ -200,7 +174,7 @@
                                 <span style="font-size: 24px;">📋</span> Diligenciar Preoperacional
                             </a>
                         {% elif estatus_vehiculo == 'Logueado' %}
-                            <p style="color: var(--text-muted); margin-bottom: 25px;">El vehículo está listo. Inicie el rastreo satelital asociando el Token de 6 caracteres asignado por el controlador.</p>
+                            <p style="color: var(--text-muted); margin-bottom: 25px;">El vehículo está listo. Inicie el servicio asociando el Token de 6 caracteres asignado por el controlador.</p>
                             <button onclick="document.getElementById('modalIniciarViaje').style.display='flex'" class="btn-card" style="background: var(--verde); color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(1, 82, 73, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto;">
                                 <span style="font-size: 24px;">▶</span> VINCULAR Y EMPEZAR
                             </button>
@@ -211,7 +185,7 @@
                 {% endif %}
                 
             {% else %}
-                <!-- MÓDULOS DE PRE-LOGUEO: (Vehículo NO logueado, redirige al scanner QR) -->
+                <!-- MÓDULO DE PRE-LOGUEO -->
                 <a href="#" onclick="abrirScannerQR(event)" class="module-card">
                     <div class="card-icon">📱</div>
                     <h3 class="card-title">Pre-Logueo Cabina</h3>
@@ -239,9 +213,7 @@
                 <button onclick="cerrarScannerQR()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
             </div>
             <p class="modal-text">Apunte la cámara al código QR ubicado en la cabina de la unidad.</p>
-            
             <div id="qr-reader"></div>
-            
             <button onclick="cerrarScannerQR()" class="btn-cancel">Cancelar Escaneo</button>
         </div>
     </div>
@@ -250,7 +222,7 @@
     <div id="modalIniciarViaje" class="modal-overlay">
         <div class="modal-box">
             <h3 class="modal-title">Iniciar Servicio</h3>
-            <p class="modal-text">Ingrese el Token (ID Viaje) alfanumérico de 6 caracteres recibido en Telegram para validar la asignación y arrancar telemetría.</p>
+            <p class="modal-text">Ingrese el Token (ID Viaje) alfanumérico de 6 caracteres recibido en Telegram para validar la asignación y empezar.</p>
             <div class="form-group">
                 <label>Token del Viaje Asignado:</label>
                 <input type="text" id="id_traslado_eps_input" placeholder="Ej. 62D9GI" maxlength="6" required style="text-transform: uppercase; font-family: monospace; font-size: 18px; text-align: center; letter-spacing: 2px;">
@@ -276,99 +248,14 @@
         </div>
     </div>
 
-    <!-- MODAL DE CLASIFICACIÓN DE PARADA -->
-    <div id="modalParada" class="modal-overlay">
-        <div class="modal-box">
-            <h3 class="modal-title">🛑 Vehículo Detenido</h3>
-            <p class="modal-text">Por favor clasifique la actividad que se realiza en este punto:</p>
-            
-            <div class="form-group">
-                <label>Actividad / Motivo:</label>
-                <select id="tipo_parada">
-                    <option value="Recogida Pasajeros">Recogida de Paciente</option>
-                    <option value="Descenso Pasajeros">Descenso en Destino</option>
-                    <option value="Tanqueo Combustible">Tanqueo / Combustible</option>
-                    <option value="Alimentación">Alimentación / Comida</option>
-                    <option value="Descanso / Pernoctada">Descanso / Pernoctada</option>
-                    <option value="Falla Mecánica">Falla Mecánica</option>
-                    <option value="Trancón / Retén">Trancón / Retén</option>
-                    <option value="Otra">Otra...</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Nombre del Lugar / Novedad (Opcional):</label>
-                <input type="text" id="nombre_punto_parada" placeholder="Ej. Clínica XYZ, Retén Policía">
-            </div>
-            
-            <button onclick="registrarParadaManual()" class="btn-submit">Registrar Parada</button>
-            <p class="timer-text">Autoguardado en <span id="countdown_parada">180</span>s...</p>
-        </div>
-    </div>
-
     <!-- SCRIPT GLOBAL, VIAJES, HITOS Y QR SCANNER -->
     <script>
         let isNavigatingLegally = false;
-        let isTransmitting = true; 
-        let totalDataBytes = parseInt(localStorage.getItem('bqa_data_bytes_especial') || '0');
-
-        function addDataUsage(bytes) {
-            totalDataBytes += bytes;
-            localStorage.setItem('bqa_data_bytes_especial', totalDataBytes.toString());
-            const mb = (totalDataBytes / (1024 * 1024)).toFixed(2);
-            const dataMeter = document.getElementById('dataMeter');
-            if (dataMeter) dataMeter.innerText = `📶 ${mb} MB`;
-        }
-
-        function togglePausarViaje() {
-            isTransmitting = !isTransmitting;
-            const btn = document.getElementById('btnPausarViaje');
-            const indicadorGPS = document.getElementById('indicador_gps');
-            if (isTransmitting) {
-                btn.innerHTML = '⏸ Pausar Envío de Datos GPS';
-                btn.style.background = '#f59e0b';
-                btn.style.boxShadow = '0 4px 10px rgba(245, 158, 11, 0.3)';
-                if (indicadorGPS) { indicadorGPS.innerText = '🟢 Transmisión Reanudada'; indicadorGPS.className = 'gps-status active'; }
-            } else {
-                btn.innerHTML = '▶ Reanudar Envío de Datos GPS';
-                btn.style.background = '#10b981';
-                btn.style.boxShadow = '0 4px 10px rgba(16, 185, 129, 0.3)';
-                if (indicadorGPS) { indicadorGPS.innerText = '⏸ Transmisión Pausada'; indicadorGPS.className = 'gps-status paused'; }
-            }
-        }
 
         document.addEventListener("DOMContentLoaded", function () {
-            
-            // UI Hitos Restauración desde LocalStorage
             if ({% if session.get('viaje_activo_especial') %}true{% else %}false{% endif %}) {
                 verificarHitosUI();
                 initFirmaCanvas();
-            }
-
-            const dataMeter = document.getElementById('dataMeter');
-            if (dataMeter) {
-                const mb = (totalDataBytes / (1024 * 1024)).toFixed(2);
-                dataMeter.innerText = `📶 ${mb} MB`;
-            }
-
-            if ('getBattery' in navigator) {
-                navigator.getBattery().then(function(battery) {
-                    function updateBatteryUI() {
-                        const level = Math.round(battery.level * 100);
-                        const batteryMeter = document.getElementById('batteryMeter');
-                        if (batteryMeter) {
-                            batteryMeter.innerText = `${battery.charging ? '⚡' : '🔋'} ${level}%`;
-                            if (level <= 20 && !battery.charging) {
-                                batteryMeter.style.color = '#ef4444';
-                                alert("⚠️ BATERÍA BAJA: El nivel de batería ha caído por debajo del 20%. Por favor conecte el celular al cargador del vehículo para no perder el rastreo satelital.");
-                            } else {
-                                batteryMeter.style.color = 'inherit';
-                            }
-                        }
-                    }
-                    updateBatteryUI();
-                    battery.addEventListener('levelchange', updateBatteryUI);
-                    battery.addEventListener('chargingchange', updateBatteryUI);
-                });
             }
 
             document.querySelectorAll('a, button').forEach(el => {
@@ -377,19 +264,6 @@
                     setTimeout(() => { isNavigatingLegally = false; }, 1000);
                 });
             });
-
-            function sendHeartbeat() {
-                if (!isTransmitting) return; 
-                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-                const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
-                
-                fetch("{{ url_for('operador_flotaespecial.heartbeat_flotaespecial') }}", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
-                }).then(() => addDataUsage(600)).catch(e => console.log('Heartbeat offline'));
-            }
-            setInterval(sendHeartbeat, 15000);
-            sendHeartbeat();
 
             function intentarRecuperarSesion() {
                 const placaGuardada = localStorage.getItem('bqa_placa_activa_especial');
@@ -453,7 +327,7 @@
                 const isViajeActivo = {% if session.get('viaje_activo_especial') %}true{% else %}false{% endif %};
                 if (!isNavigatingLegally && isViajeActivo) {
                     e.preventDefault();
-                    e.returnValue = 'Tiene un VIAJE ACTIVO en progreso. No debe cerrar el navegador o evadirá el rastreo de control de flota.';
+                    e.returnValue = 'Tiene un VIAJE ACTIVO en progreso. No cierre el navegador.';
                 }
             });
         });
@@ -492,7 +366,6 @@
 
         function onScanSuccess(decodedText, decodedResult) {
             try {
-                // Se espera un payload JSON generado por el backend de vehículos {"placa": "XYZ123"}
                 const data = JSON.parse(decodedText);
                 if (data.placa) {
                     cerrarScannerQR();
@@ -501,7 +374,6 @@
                     alert("QR no válido para este sistema. Placa no encontrada en el código.");
                 }
             } catch(e) {
-                // Fallback por si el QR fue generado solo con el texto plano de la placa
                 if(decodedText && decodedText.length > 2 && decodedText.length < 15 && !decodedText.includes("http")) {
                     cerrarScannerQR();
                     ejecutarPreLogin(decodedText.trim().toUpperCase());
@@ -533,14 +405,39 @@
             });
         }
 
-
         // ============================================
-        // LÓGICA DE HITOS Y FOTOS EN BASE 64 COMPRIMIDO + WATERMARK
+        // CAPTURA DE GPS Y FOTO POR EVENTO (SINTONIZADO)
         // ============================================
         function procesarFoto(event, hito) {
             const file = event.target.files[0];
             if (!file) return;
 
+            const iconId = 'iconHito' + (hito === 'origen' ? '1' : (hito === 'destino' ? '2' : '3'));
+            const iconEl = document.getElementById(iconId);
+            const originalIcon = iconEl.innerText;
+            iconEl.innerText = '⏳';
+
+            if (!navigator.geolocation) {
+                alert("Su navegador no soporta geolocalización. Se requiere GPS para validar los hitos.");
+                iconEl.innerText = originalIcon;
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    _dibujarYGuardar(file, hito, lat, lng, iconEl, originalIcon);
+                },
+                function(err) {
+                    alert("No se pudo obtener la ubicación GPS. Verifique que el GPS de su celular esté encendido y otorgue permisos.");
+                    iconEl.innerText = originalIcon;
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        }
+
+        function _dibujarYGuardar(file, hito, lat, lng, iconEl, originalIcon) {
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
@@ -563,8 +460,8 @@
                     ctx.drawImage(img, 0, 0, width, height);
 
                     const dateStr = new Date().toLocaleString('es-CO', { hour12: false });
-                    const latStr = window.ultimaUbicacion ? window.ultimaUbicacion.lat.toFixed(6) : 'N/D';
-                    const lngStr = window.ultimaUbicacion ? window.ultimaUbicacion.lng.toFixed(6) : 'N/D';
+                    const latStr = lat.toFixed(6);
+                    const lngStr = lng.toFixed(6);
                     
                     ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
                     ctx.fillRect(0, height - 60, width, 60);
@@ -580,12 +477,13 @@
                     localStorage.setItem(`bqa_foto_${hito}`, base64Str);
                     
                     const telemetria = {
-                        lat: window.ultimaUbicacion ? window.ultimaUbicacion.lat : null,
-                        lng: window.ultimaUbicacion ? window.ultimaUbicacion.lng : null,
+                        lat: lat,
+                        lng: lng,
                         hora: new Date().toISOString().slice(0, 19).replace('T', ' ')
                     };
                     localStorage.setItem(`bqa_telemetria_${hito}`, JSON.stringify(telemetria));
 
+                    iconEl.innerText = originalIcon;
                     verificarHitosUI();
                 };
                 img.src = e.target.result;
@@ -593,14 +491,50 @@
             reader.readAsDataURL(file);
         }
 
+        // ============================================
+        // EVENTO: REANUDACIÓN DE VIAJE (PAUSA PACIENTE)
+        // ============================================
+        window.procesarReinicio = function() {
+            const btn = document.getElementById('btnReanudar');
+            btn.disabled = true;
+            btn.innerText = "⏳ Capturando GPS de Reanudación...";
+
+            if (!navigator.geolocation) {
+                alert("Su navegador no soporta geolocalización.");
+                btn.disabled = false;
+                btn.innerText = "▶️ Reanudar Viaje (Paciente a Bordo)";
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    const telemetria = {
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude,
+                        hora: new Date().toISOString().slice(0, 19).replace('T', ' ')
+                    };
+                    localStorage.setItem('bqa_telemetria_reinicio', JSON.stringify(telemetria));
+                    verificarHitosUI();
+                },
+                function(err) {
+                    alert("Error al obtener GPS para reanudar el viaje. Asegúrese de tener el GPS activo.");
+                    btn.disabled = false;
+                    btn.innerText = "▶️ Reanudar Viaje (Paciente a Bordo)";
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        };
+
         function verificarHitosUI() {
             const fOrigen = localStorage.getItem('bqa_foto_origen');
             const fDestino = localStorage.getItem('bqa_foto_destino');
             const fRetorno = localStorage.getItem('bqa_foto_retorno');
+            const tReinicio = localStorage.getItem('bqa_telemetria_reinicio');
 
             const btn1 = document.getElementById('btnHito1');
             const btn2 = document.getElementById('btnHito2');
             const btn3 = document.getElementById('btnHito3');
+            const btnReanudar = document.getElementById('btnReanudar');
             const icon1 = document.getElementById('iconHito1');
             const icon2 = document.getElementById('iconHito2');
             const icon3 = document.getElementById('iconHito3');
@@ -608,18 +542,39 @@
 
             if (!btn1) return;
 
+            // Hito 1: Recogida
             if (fOrigen) {
                 btn1.classList.remove('active'); btn1.classList.add('done');
                 icon1.innerText = '✔️';
-                btn2.disabled = false; btn2.classList.add('active');
-                icon2.innerText = '⏳';
+                if (!fDestino) {
+                    btn2.disabled = false; btn2.classList.add('active');
+                    icon2.innerText = '⏳';
+                }
             }
+            
+            // Hito 2: Llegada a Destino y Pausa EPS
             if (fDestino) {
                 btn2.classList.remove('active'); btn2.classList.add('done');
                 icon2.innerText = '✔️';
-                btn3.disabled = false; btn3.classList.add('active');
-                icon3.innerText = '⏳';
+                
+                if (!tReinicio) {
+                    if(btnReanudar) {
+                        btnReanudar.style.display = 'block';
+                        btnReanudar.disabled = false;
+                        btnReanudar.innerText = "▶️ Reanudar Viaje (Paciente a Bordo)";
+                    }
+                    btn3.disabled = true; btn3.classList.remove('active');
+                    icon3.innerText = '🔒';
+                } else {
+                    if(btnReanudar) btnReanudar.style.display = 'none';
+                    if (!fRetorno) {
+                        btn3.disabled = false; btn3.classList.add('active');
+                        icon3.innerText = '⏳';
+                    }
+                }
             }
+
+            // Hito 3: Retorno
             if (fRetorno) {
                 btn3.classList.remove('active'); btn3.classList.add('done');
                 icon3.innerText = '✔️';
@@ -674,14 +629,13 @@
         function limpiarViajeLocal() {
             localStorage.removeItem('bqa_viaje_activo_especial');
             localStorage.removeItem('bqa_placa_activa_especial');
-            localStorage.removeItem('bqa_data_bytes_especial');
             localStorage.removeItem('bqa_foto_origen');
             localStorage.removeItem('bqa_foto_destino');
             localStorage.removeItem('bqa_foto_retorno');
             localStorage.removeItem('bqa_telemetria_origen');
             localStorage.removeItem('bqa_telemetria_destino');
             localStorage.removeItem('bqa_telemetria_retorno');
-            localStorage.removeItem('bqa_flotaespecial_queue');
+            localStorage.removeItem('bqa_telemetria_reinicio');
         }
 
         function iniciarViaje() {
@@ -707,7 +661,6 @@
                   if(data.status === 'success') {
                       localStorage.setItem('bqa_viaje_activo_especial', 'true');
                       localStorage.setItem('bqa_placa_activa_especial', '{{ session.get("placa_prelogueada_especial") }}');
-                      localStorage.setItem('bqa_data_bytes_especial', '0'); 
                       window.location.reload();
                   } else {
                       alert("Error al validar el Token: " + data.message);
@@ -727,6 +680,7 @@
             
             let telOrigen = JSON.parse(localStorage.getItem('bqa_telemetria_origen') || '{}');
             let telDestino = JSON.parse(localStorage.getItem('bqa_telemetria_destino') || '{}');
+            let telReinicio = JSON.parse(localStorage.getItem('bqa_telemetria_reinicio') || '{}');
             let telRetorno = JSON.parse(localStorage.getItem('bqa_telemetria_retorno') || '{}');
 
             const payload = {
@@ -737,6 +691,7 @@
                 telemetria: {
                     lat_origen: telOrigen.lat, lng_origen: telOrigen.lng, hora_origen: telOrigen.hora,
                     lat_destino: telDestino.lat, lng_destino: telDestino.lng, hora_destino: telDestino.hora,
+                    hora_reinicio: telReinicio.hora,
                     lat_retorno: telRetorno.lat, lng_retorno: telRetorno.lng, hora_retorno: telRetorno.hora
                 }
             };
@@ -770,253 +725,5 @@
               });
         }
     </script>
-
-    <!-- EL RASTREO GPS SÓLO SE EJECUTA DURANTE EL VIAJE -->
-    {% if session.get('viaje_activo_especial') %}
-    <script>
-        let ultimaUbicacion = null;
-        window.ultimaUbicacion = ultimaUbicacion;
-
-        document.addEventListener("DOMContentLoaded", function () {
-            
-            const FRECUENCIA_SONDEO = 60000;      
-            const TOLERANCIA_METROS = 30;         
-            const PRECISION_MINIMA = 40;          
-            const TIEMPO_PARA_PARADA = 5;         
-            const TIMEOUT_ALERTA = 180;           
-
-            let minutosInmovil = 0;
-            let paradaActiva = null; 
-            let modalAbierto = false;
-            let timerModal = null;
-            let tiempoRestante = TIMEOUT_ALERTA;
-            let wakeLock = null;
-
-            let syncQueue = JSON.parse(localStorage.getItem('bqa_flotaespecial_queue') || '{"ubicaciones":[], "paradas":[]}');
-            const indicadorGPS = document.getElementById('indicador_gps');
-
-            async function solicitarWakeLock() {
-                try {
-                    if ('wakeLock' in navigator) {
-                        wakeLock = await navigator.wakeLock.request('screen');
-                        wakeLock.addEventListener('release', () => console.log('Wake Lock liberado (Pantalla apagada)'));
-                    }
-                } catch (err) { console.warn('Wake Lock no soportado o denegado:', err); }
-            }
-            
-            document.addEventListener('visibilitychange', async () => {
-                if (wakeLock !== null && document.visibilityState === 'visible') solicitarWakeLock();
-                if (document.visibilityState === 'visible') sincronizarDatosOffline();
-            });
-            solicitarWakeLock();
-
-            function guardarCola() { localStorage.setItem('bqa_flotaespecial_queue', JSON.stringify(syncQueue)); }
-            
-            function obtenerFechaHoraActual() {
-                let d = new Date();
-                return {
-                    fecha: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'),
-                    hora: String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0'),
-                    full: d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + 
-                          String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0')
-                };
-            }
-
-            function calcularDistancia(lat1, lon1, lat2, lon2) {
-                const R = 6371e3;
-                const r1 = lat1 * Math.PI/180, r2 = lat2 * Math.PI/180;
-                const dLat = (lat2-lat1) * Math.PI/180, dLon = (lon2-lon1) * Math.PI/180;
-                const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(r1)*Math.cos(r2)*Math.sin(dLon/2)*Math.sin(dLon/2);
-                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            }
-
-            function procesarLecturaGPS() {
-                if (!navigator.geolocation) return;
-                
-                navigator.geolocation.getCurrentPosition(
-                    function (pos) {
-                        if (pos.coords.accuracy > PRECISION_MINIMA) {
-                            if(isTransmitting) { indicadorGPS.innerText = '🟠 GPS Señal Débil'; indicadorGPS.className = 'gps-status offline'; }
-                            return; 
-                        }
-
-                        if(isTransmitting) { indicadorGPS.innerText = '🟢 Rastreo Activo'; indicadorGPS.className = 'gps-status active'; }
-
-                        let lat = pos.coords.latitude;
-                        let lng = pos.coords.longitude;
-                        let momento = obtenerFechaHoraActual();
-
-                        syncQueue.ubicaciones.push({ lat: lat, lng: lng, fecha_hora: momento.full });
-
-                        if (ultimaUbicacion) {
-                            let distancia = calcularDistancia(ultimaUbicacion.lat, ultimaUbicacion.lng, lat, lng);
-                            if (distancia <= TOLERANCIA_METROS) {
-                                if (!paradaActiva) {
-                                    minutosInmovil++;
-                                    if (minutosInmovil >= TIEMPO_PARA_PARADA && !modalAbierto) {
-                                        activarAlertaParada(lat, lng);
-                                    }
-                                }
-                            } else {
-                                minutosInmovil = 0;
-                                ultimaUbicacion = { lat: lat, lng: lng };
-                                window.ultimaUbicacion = ultimaUbicacion;
-                                if (paradaActiva) {
-                                    paradaActiva.hora_fin = momento.hora;
-                                    paradaActiva = null; 
-                                }
-                            }
-                        } else {
-                            ultimaUbicacion = { lat: lat, lng: lng };
-                            window.ultimaUbicacion = ultimaUbicacion;
-                        }
-                        
-                        guardarCola();
-                        sincronizarDatosOffline();
-                    },
-                    function (err) {
-                        if(isTransmitting) { indicadorGPS.innerText = '🔴 GPS Apagado'; indicadorGPS.className = 'gps-status offline'; }
-                    },
-                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-                );
-            }
-
-            function activarAlertaParada(lat, lng) {
-                modalAbierto = true;
-                tiempoRestante = TIMEOUT_ALERTA;
-                document.getElementById('modalParada').style.display = 'flex';
-                document.getElementById('countdown_parada').innerText = tiempoRestante;
-                
-                if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
-
-                timerModal = setInterval(() => {
-                    tiempoRestante--;
-                    document.getElementById('countdown_parada').innerText = tiempoRestante;
-                    if (tiempoRestante <= 0) {
-                        clearInterval(timerModal);
-                        ejecutarRegistroParada("No registrado (Automático)", "Punto no clasificado", "Automático", lat, lng);
-                    }
-                }, 1000);
-            }
-
-            window.registrarParadaManual = function() {
-                clearInterval(timerModal);
-                let tipo = document.getElementById('tipo_parada').value;
-                let nombre = document.getElementById('nombre_punto_parada').value.trim() || 'Punto Desconocido';
-                ejecutarRegistroParada(tipo, nombre, 'Manual', ultimaUbicacion.lat, ultimaUbicacion.lng);
-            };
-
-            window.triggerParadaManual = function(e) {
-                if (e) e.preventDefault();
-                if (!ultimaUbicacion) {
-                    alert("Aún no tenemos señal de GPS. Por favor espere unos segundos o verifique su conexión.");
-                    return;
-                }
-                if (paradaActiva) {
-                    let momento = obtenerFechaHoraActual();
-                    paradaActiva.hora_fin = momento.hora;
-                    paradaActiva = null;
-                    sincronizarDatosOffline();
-                }
-                activarAlertaParada(ultimaUbicacion.lat, ultimaUbicacion.lng);
-            };
-
-            function ejecutarRegistroParada(tipo, nombre, origen, lat, lng) {
-                document.getElementById('modalParada').style.display = 'none';
-                document.getElementById('nombre_punto_parada').value = ''; 
-                modalAbierto = false;
-                let momento = obtenerFechaHoraActual();
-                
-                paradaActiva = {
-                    temp_id: Date.now().toString(),
-                    fecha: momento.fecha,
-                    hora_inicio: momento.hora,
-                    hora_fin: null,
-                    lat: lat,
-                    lng: lng,
-                    tipo_actividad: tipo,
-                    nombre_punto: nombre,
-                    origen_registro: origen
-                };
-                
-                syncQueue.paradas.push(paradaActiva);
-                guardarCola();
-                sincronizarDatosOffline();
-            }
-
-            function sincronizarDatosOffline() {
-                if (!navigator.onLine || !isTransmitting) {
-                    if (indicadorGPS && isTransmitting) indicadorGPS.innerText = '🟠 Guardando Offline';
-                    return; 
-                }
-
-                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-                const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
-
-                if (syncQueue.ubicaciones.length > 0) {
-                    let payloadUbi = [...syncQueue.ubicaciones];
-                    let bodyStr = JSON.stringify({ ubicaciones: payloadUbi });
-                    let estimatedBytes = new Blob([bodyStr]).size + 500; 
-                    
-                    fetch('/api/flotaespecial/actualizar_ubicacion', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                        body: bodyStr
-                    }).then(res => {
-                        if (res.ok) {
-                            addDataUsage(estimatedBytes);
-                            syncQueue.ubicaciones = syncQueue.ubicaciones.filter(u => !payloadUbi.includes(u));
-                            guardarCola();
-                        }
-                    }).catch(e => {});
-                }
-
-                let paradasNuevas = syncQueue.paradas.filter(p => !p.db_id);
-                if (paradasNuevas.length > 0) {
-                    let bodyStr = JSON.stringify({ paradas: paradasNuevas });
-                    let estimatedBytes = new Blob([bodyStr]).size + 500;
-                    
-                    fetch('/api/flotaespecial/registrar_parada', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                        body: bodyStr
-                    }).then(res => res.json()).then(data => {
-                        if (data.status === 'success') {
-                            addDataUsage(estimatedBytes);
-                            data.ids_mapeados.forEach(mapping => {
-                                let p = syncQueue.paradas.find(x => x.temp_id === mapping.temp_id);
-                                if (p) p.db_id = mapping.db_id;
-                            });
-                            guardarCola();
-                        }
-                    }).catch(e => {});
-                }
-
-                let paradasCerradas = syncQueue.paradas.filter(p => p.db_id && p.hora_fin && !p.sincronizada);
-                if (paradasCerradas.length > 0) {
-                    let payloadFin = paradasCerradas.map(p => ({ id: p.db_id, hora_fin: p.hora_fin }));
-                    let bodyStr = JSON.stringify({ paradas: payloadFin });
-                    let estimatedBytes = new Blob([bodyStr]).size + 500;
-                    
-                    fetch('/api/flotaespecial/actualizar_fin_parada', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                        body: bodyStr
-                    }).then(res => {
-                        if (res.ok) {
-                            addDataUsage(estimatedBytes);
-                            paradasCerradas.forEach(p => p.sincronizada = true);
-                            syncQueue.paradas = syncQueue.paradas.filter(p => !p.sincronizada);
-                            guardarCola();
-                        }
-                    }).catch(e => {});
-                }
-            }
-
-            procesarLecturaGPS();
-            setInterval(procesarLecturaGPS, FRECUENCIA_SONDEO);
-        });
-    </script>
-    {% endif %}
 </body>
 </html>

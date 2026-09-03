@@ -1,0 +1,528 @@
+<!-- app/templates/B_modulo_flotaespecial_conductores.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gestión de Conductores | Transporte Especial | {{ empresa }}</title>
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    <meta name="theme-color" content="#015249">
+
+    <style>
+        /* PALETA CORPORATIVA BQA-ONE (Heredada) */
+        :root {
+            --verde: #015249;        
+            --verde-osc: #003b35;    
+            --bg-grad-start: #d7f2ec; 
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --radius: 10px;
+            --sidebar-width: 260px;
+            --topbar-height: 70px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Verdana, Geneva, Tahoma, sans-serif; background-color: #f3f4f6; color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+        a { text-decoration: none; color: inherit; }
+
+        /* SIDEBAR Y MENÚ */
+        .sidebar { width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: transform 0.3s ease; z-index: 1000; }
+        .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
+        .logo-app { max-height: 35px; width: auto; }
+        .nav-menu { flex-grow: 1; padding: 20px 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        
+        .nav-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; border-radius: var(--radius); color: var(--text-muted); font-size: 14px; font-weight: 600; transition: all 0.2s; cursor: pointer; }
+        .nav-item-content { display: flex; align-items: center; gap: 12px; }
+        .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
+        .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
+        .nav-item.back-btn { color: #f59e0b; border-bottom: 1px solid var(--border); border-radius: 0; margin-bottom: 10px; padding-bottom: 15px;}
+        .nav-icon { font-size: 18px; }
+        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
+        .logout-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444; font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2; }
+
+        /* MAIN CONTENT */
+        .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; flex-shrink: 0; }
+        .topbar-left { display: flex; align-items: center; gap: 15px; }
+        .menu-toggle { display: none; background: none; border: none; font-size: 24px; color: var(--verde); cursor: pointer; }
+        .logo-cliente { max-height: 40px; width: auto; object-fit: contain; }
+        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
+        .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
+
+        .content-area { flex-grow: 1; padding: 25px; overflow-y: auto; background: radial-gradient(circle at top left, var(--bg-grad-start) 0, #f3f4f6 60%, #f3f4f6 100%); }
+
+        /* Alertas y Botones */
+        .flash-messages { width: 100%; max-width: 1200px; margin-bottom: 20px; }
+        .flash-alert { padding: 12px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; border: 1px solid currentColor; margin-bottom: 10px; }
+        .flash-success { background-color: #d1fae5; color: #065f46; }
+        .flash-danger { background-color: #fee2e2; color: #991b1b; }
+        .flash-warning { background-color: #fef3c7; color: #92400e; }
+
+        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;}
+        .action-title-group { display: flex; align-items: center; gap: 15px; }
+        .action-header h2 { color: var(--verde); font-size: 20px; margin: 0;}
+        .btn-close-view { background: #e5e7eb; color: #4b5563; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; font-weight: bold;}
+        
+        .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 6px;}
+        .btn-primary:hover { background: var(--verde-osc); }
+        .btn-info { background: #0ea5e9; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; transition: 0.2s;}
+        .btn-info:hover { background: #0284c7; }
+
+        /* Tablas */
+        .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-width: 1200px; overflow-x: auto; margin-bottom: 25px; border: 1px solid var(--border);}
+        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;}
+        .data-table th { background: #f9fafb; padding: 15px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+        .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); }
+        .data-table tr:hover { background-color: #fdfdfd; }
+        
+        .btn-icon { background: none; border: none; cursor: pointer; font-size: 16px; margin-left: 10px; transition: 0.2s; }
+        .btn-icon.edit:hover { color: #f59e0b; transform: scale(1.1); }
+        .btn-icon.delete:hover { color: #ef4444; transform: scale(1.1); }
+        .btn-pdf-mini { background: #eefcf9; color: var(--verde); border: 1px solid #ccfbf1; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; margin-bottom: 3px;}
+        .btn-pdf-mini:hover { background: #ccfbf1; }
+
+        /* Formularios y Modales */
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
+        .grid-form.full { grid-template-columns: 1fr; }
+        .readonly-box { background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px; color: var(--text); min-height: 34px; display: flex; align-items: center; }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
+        .modal-box { background: var(--surface); width: 95%; max-width: 900px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;}
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; position: sticky; top: 0; background: var(--surface); z-index: 10;}
+        .modal-header h3 { color: var(--verde); font-size: 18px; }
+        .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;}
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; font-family: inherit;}
+        
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--surface); z-index: 10;}
+        .btn-cancel { padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); background: #f9fafb; cursor: pointer; font-weight: bold; color: var(--text);}
+        .section-divider { grid-column: 1 / -1; margin-top: 15px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px; }
+        .section-divider h4 { color: var(--verde-osc); font-size: 14px; margin: 0; display: flex; align-items: center; gap: 8px;}
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; height: 100vh; left: 0; top: 0; transform: translateX(-100%); box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+            .sidebar.open { transform: translateX(0); }
+            .menu-toggle { display: block; }
+            .grid-form { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+        </div>
+        <nav class="nav-menu">
+            <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="nav-item back-btn">
+                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Volver al Panel Central</div>
+            </a>
+            <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='vehiculos') }}" class="nav-item">
+                <div class="nav-item-content"><span class="nav-icon">🚐</span> Vehículos</div>
+            </a>
+            <a href="{{ url_for('flotaespecial_conductores.gestion_conductores') }}" class="nav-item active">
+                <div class="nav-item-content"><span class="nav-icon">👨‍✈️</span> Conductores</div>
+            </a>
+            <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='preoperacionales') }}" class="nav-item">
+                <div class="nav-item-content"><span class="nav-icon">📋</span> Preoperacionales</div>
+            </a>
+            <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='terceros') }}" class="nav-item">
+                <div class="nav-item-content"><span class="nav-icon">🏢</span> Empresas Terceras</div>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="logout-btn"><span>🚪</span> Cerrar Sesión</a>
+        </div>
+    </aside>
+
+    <main class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="menu-toggle" id="menuToggle">☰</button>
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ nombre }}</span>
+                <span class="user-role">Controlador Transporte Especial</span>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div class="flash-messages">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash-alert {% if category == 'success' %}flash-success{% elif category == 'warning' %}flash-warning{% else %}flash-danger{% endif %}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <div class="action-header" style="margin-bottom: 10px;">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Volver al Panel Central">&times;</a>
+                    <h2>Gestión de Conductores (Operadores de Flota)</h2>
+                </div>
+                <button class="btn-primary" onclick="abrirCrearConductor()"><span>➕</span> Ingresar Conductor</button>
+            </div>
+
+            <!-- BUSCADOR VISOR -->
+            <div class="table-card" style="padding: 15px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="form-group" style="margin-bottom: 0; flex: 1; max-width: 400px;">
+                    <label style="color: var(--verde);">🔎 Auditar Conductor (Visor por Cédula)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="input_consulta_cedula" placeholder="Ingrese número de cédula...">
+                        <button class="btn-primary" onclick="buscarYMostrarVisor()" style="height: 38px;">Auditar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nombre / Cédula</th>
+                            <th>Ubicación Base</th>
+                            <th>Licencia (Vence)</th>
+                            <th>Seg. Social (Pagado/Vence)</th>
+                            <th>Documentos (PDF)</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in conductores %}
+                        <tr>
+                            <td><b style="color: var(--verde);">{{ c.nombre }}</b><br><small>{{ c.cedula }}</small></td>
+                            <td>{{ c.municipio_base or 'N/D' }}<br><small>{{ c.departamento_base or '' }}</small></td>
+                            <td>{{ c.numero_licencia_conduccion or 'N/D' }}<br><small>{{ c.vencimiento_licencia_conduccion or 'N/D' }}</small></td>
+                            <td>
+                                P: {{ c.ultimo_pago_seguridad_social or 'N/D' }}<br>
+                                <b>V: {{ c.vencimiento_seguridad_social or 'N/D' }}</b>
+                            </td>
+                            <td>
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    {% if c.ruta_pdf_cedula %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_cedula }}')" class="btn-pdf-mini">📄 Cédula</a> {% endif %}
+                                    {% if c.ruta_pdf_licencia %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_licencia }}')" class="btn-pdf-mini">📄 Licencia</a> {% endif %}
+                                    {% if c.ruta_pdf_seguridad_social %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_seguridad_social }}')" class="btn-pdf-mini">📄 Seg. Social</a> {% endif %}
+                                    {% if not c.ruta_pdf_cedula and not c.ruta_pdf_licencia and not c.ruta_pdf_seguridad_social %}
+                                        <span style="font-size: 11px; color: #9ca3af;">Sin documentos</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td style="white-space: nowrap;">
+                                <button class="btn-icon edit" title="Editar" 
+                                        data-id="{{ c.id }}"
+                                        data-nombre="{{ c.nombre }}"
+                                        data-cedula="{{ c.cedula }}"
+                                        data-dep="{{ c.departamento_base }}"
+                                        data-mun="{{ c.municipio_base }}"
+                                        data-lic="{{ c.numero_licencia_conduccion }}"
+                                        data-vlic="{{ c.vencimiento_licencia_conduccion }}"
+                                        data-eps="{{ c.eps }}"
+                                        data-afp="{{ c.fondo_pensiones }}"
+                                        data-arl="{{ c.arl }}"
+                                        data-pago="{{ c.ultimo_pago_seguridad_social }}"
+                                        data-tg="{{ c.telegram_id }}"
+                                        onclick="abrirEditarConductor(this)">✏️</button>
+                                <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarConductor('{{ c.id }}', '{{ c.cedula }}', '{{ c.nombre }}')">🗑️</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay conductores registrados en la base de datos.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 30px; font-size: 11px; color: #9ca3af; border-top: 1px solid var(--border); padding-top: 15px; max-width: 1200px;">
+                <p>&copy; 2026 BQA ONE Technology. Sistema Multiusuario Seguro.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL CRUD CONDUCTOR (CREAR/EDITAR) -->
+    <div id="modalConductor" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="tituloModalConductor">Registrar Nuevo Conductor</h3>
+                <button class="close-btn" onclick="closeModal('modalConductor')">&times;</button>
+            </div>
+
+            <form action="{{ url_for('flotaespecial_conductores.gestion_conductores') }}" method="POST" class="grid-form" enctype="multipart/form-data" id="formConductor">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" id="accionConductor" value="crear">
+                <input type="hidden" name="conductor_id" id="conductor_id">
+
+                <div class="section-divider"><h4>👤 Identificación y Contacto</h4></div>
+                <div class="form-group"><label>Nombre Completo *</label><input type="text" name="nombre" id="c_nombre" required></div>
+                <div class="form-group">
+                    <label>Número de Cédula *</label>
+                    <input type="text" name="cedula" id="c_cedula" required style="font-weight: bold;">
+                    <small style="color: #6b7280; font-size: 10px;">(Se usará como contraseña de acceso al sistema)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Departamento Base</label>
+                    <select name="departamento_base" id="c_dep_base" onchange="cargarMunicipios('c_dep_base', 'c_mun_base')"></select>
+                </div>
+                <div class="form-group">
+                    <label>Municipio Base</label>
+                    <select name="municipio_base" id="c_mun_base"></select>
+                </div>
+
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>ID Telegram (Notificaciones Automáticas)</label>
+                    <input type="text" name="telegram_id" id="c_telegram">
+                    <small style="color: #f59e0b; font-size: 10px;">Requerido para alertas de vencimiento y asignación de viajes.</small>
+                </div>
+
+                <div class="section-divider"><h4>🪪 Licencia de Conducción</h4></div>
+                <div class="form-group"><label>Número de Licencia</label><input type="text" name="numero_licencia_conduccion" id="c_licencia"></div>
+                <div class="form-group"><label>Fecha Vencimiento Licencia</label><input type="date" name="vencimiento_licencia_conduccion" id="c_vlicencia"></div>
+
+                <div class="section-divider"><h4>🏥 Seguridad Social Integral</h4></div>
+                <div class="form-group"><label>EPS</label><input type="text" name="eps" id="c_eps"></div>
+                <div class="form-group"><label>Fondo de Pensiones (AFP)</label><input type="text" name="fondo_pensiones" id="c_afp"></div>
+                <div class="form-group"><label>ARL</label><input type="text" name="arl" id="c_arl"></div>
+                <div class="form-group">
+                    <label>Fecha de Último Pago (Seguridad Social)</label>
+                    <input type="date" name="ultimo_pago_seguridad_social" id="c_pago_ss">
+                    <small style="color: #10b981; font-size: 10px;">El sistema calculará automáticamente el vencimiento a 30 días.</small>
+                </div>
+
+                <div class="section-divider"><h4>📂 Digitalización de Documentos (PDF)</h4></div>
+                <p style="grid-column: 1 / -1; font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Solo archivos .pdf. En edición, dejar en blanco para mantener el archivo actual.</p>
+                <div class="form-group"><label>Cédula Ciudadanía</label><input type="file" name="file_pdf_cedula" accept=".pdf"></div>
+                <div class="form-group"><label>Licencia de Conducción</label><input type="file" name="file_pdf_licencia" accept=".pdf"></div>
+                <div class="form-group"><label>Planilla Seguridad Social</label><input type="file" name="file_pdf_seguridad_social" accept=".pdf"></div>
+
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalConductor')">Cancelar</button><button type="submit" class="btn-primary" id="btnGuardarConductor">Guardar Conductor</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL VISOR INDIVIDUAL -->
+    <div id="modalVisorConductor" class="modal-overlay">
+        <div class="modal-box" style="max-width: 900px; width: 95%;">
+            <div class="modal-header">
+                <h3>🔍 Auditoría de Conductor: <span id="vis_nombre_titulo" style="color: var(--verde);"></span></h3>
+                <button class="close-btn" onclick="closeModal('modalVisorConductor')">&times;</button>
+            </div>
+            
+            <div class="grid-form" style="background: #f9fafb; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
+                <div class="form-group"><label>Nombre y Cédula</label><div id="vis_id" class="readonly-box" style="font-weight: bold; color: var(--verde); font-size: 15px;"></div></div>
+                <div class="form-group"><label>Ubicación Base</label><div id="vis_ubicacion" class="readonly-box"></div></div>
+                <div class="form-group"><label>Telegram ID</label><div id="vis_tg" class="readonly-box"></div></div>
+                <div class="form-group"><label>Licencia de Conducción</label><div id="vis_lic" class="readonly-box"></div></div>
+                <div class="form-group"><label>Afiliaciones (EPS / AFP / ARL)</label><div id="vis_afil" class="readonly-box"></div></div>
+                <div class="form-group"><label>Seguridad Social (Pago / Vence)</label><div id="vis_ss" class="readonly-box"></div></div>
+            </div>
+
+            <div class="section-divider"><h4>📄 Documentos Digitalizados</h4></div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                <button id="btnVisCed" class="btn-info">Cédula PDF</button>
+                <button id="btnVisLic" class="btn-info">Licencia PDF</button>
+                <button id="btnVisSS" class="btn-info">Seguridad Social PDF</button>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeModal('modalVisorConductor')">Cerrar Visor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ELIMINAR CONDUCTOR -->
+    <div id="modalEliminarConductor" class="modal-overlay">
+        <div class="modal-box" style="max-width: 400px; width: 90%;">
+            <div class="modal-header">
+                <h3 style="color: #ef4444;">⚠️ Eliminar Conductor</h3>
+                <button class="close-btn" onclick="closeModal('modalEliminarConductor')">&times;</button>
+            </div>
+            <form action="{{ url_for('flotaespecial_conductores.gestion_conductores') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="eliminar">
+                <input type="hidden" name="conductor_id" id="delete_conductor_id">
+                <input type="hidden" name="cedula" id="delete_conductor_cedula">
+                <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro de eliminar el expediente del conductor <b id="delete_conductor_nombre"></b>? Esto también revocará su acceso al sistema.</p>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarConductor')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+        function toggleSidebar() { sidebar.classList.toggle('open'); }
+        if(menuToggle) menuToggle.addEventListener('click', toggleSidebar);
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        function verPDF(rutaRelativa) {
+            if (rutaRelativa && rutaRelativa !== 'None' && rutaRelativa.trim() !== '') {
+                let finalRoute = rutaRelativa.startsWith('static/') ? '/' + rutaRelativa : '/static/' + rutaRelativa;
+                window.open(finalRoute, '_blank');
+            } else {
+                alert('Documento PDF no disponible.');
+            }
+        }
+
+        const divipolaColombia = {
+            "AMAZONAS": ["LETICIA", "PUERTO NARIÑO", "EL ENCANTO", "LA CHORRERA", "LA PEDRERA", "MIRITI - PARANA", "PUERTO ALEGRIA", "PUERTO ARICA", "PUERTO SANTANDER", "TARAPACA"],
+            "ANTIOQUIA": ["MEDELLIN", "ABEJORRAL", "ABRIAQUI", "ALEJANDRIA", "AMAGA", "AMALFI", "ANDES", "ANGELOPOLIS", "ANGOSTURA", "ANORI", "SANTAFE DE ANTIOQUIA", "ANZA", "APARTADO", "ARBOLETES", "ARGELIA", "ARMENIA", "BARBOSA", "BELMIRA", "BELLO", "BETANIA", "BETULIA", "CIUDAD BOLIVAR", "BRICEÑO", "BURITICA", "CACERES", "CAICEDO", "CALDAS", "CAMPAMENTO", "CAÑASGORDAS", "CARACOLI", "CARAMANTA", "CAREPA", "EL CARMEN DE VIBORAL", "CAROLINA", "CAUCASIA", "CHIGORODO", "CISNEROS", "COCORNA", "CONCEPCION", "CONCORDIA", "COPACABANA", "DABEIBA", "DONMATIAS", "EBEJICO", "EL BAGRE", "ENTRERRIOS", "ENVIGADO", "FREDONIA", "FRONTINO", "GIRALDO", "GIRARDOTA", "GOMEZ PLATA", "GRANADA", "GUADALUPE", "GUARNE", "GUATAPE", "HELICONIA", "HISPANIA", "ITAGUI", "ITUANGO", "JARDIN", "JERICO", "LA CEJA", "LA ESTRELLA", "LA PINTADA", "LA UNION", "LIBORINA", "MACEO", "MARINILLA", "MONTEBELLO", "MURINDO", "MUTATA", "NARIÑO", "NECOCLI", "NECHI", "OLAYA", "PEÑOL", "PEQUE", "PUEBLORRICO", "PUERTO BERRIO", "PUERTO NARE", "PUERTO TRIUNFO", "REMEDIOS", "RETIRO", "RIONEGRO", "SABANALARGA", "SABANETA", "SALGAR", "SAN ANDRES DE CUERQUIA", "SAN CARLOS", "SAN FRANCISCO", "SAN JERONIMO", "SAN JOSE DE LA MONTAÑA", "SAN JUAN DE URABA", "SAN LUIS", "SAN PEDRO DE LOS MILAGROS", "SAN PEDRO DE URABA", "SAN RAFAEL", "SAN ROQUE", "SAN VICENTE FERRER", "SANTA BARBARA", "SANTA ROSA DE OSOS", "SANTO DOMINGO", "EL SANTUARIO", "SEGOVIA", "SONSON", "SOPETRAN", "TAMESIS", "TARAZA", "TARSO", "TITIRIBI", "TOLEDO", "TURBO", "URAMITA", "URRAO", "VALDIVIA", "VALPARAISO", "VEGACHI", "VENECIA", "VIGIA DEL FUERTE", "YALI", "YARUMAL", "YOLOMBO", "YONDO", "ZARAGOZA"],
+            "ARAUCA": ["ARAUCA", "ARAUQUITA", "CRAVO NORTE", "FORTUL", "PUERTO RONDON", "SARAVENA", "TAME"],
+            "ATLANTICO": ["BARRANQUILLA", "BARANOA", "CAMPO DE LA CRUZ", "CANDELARIA", "GALAPA", "JUAN DE ACOSTA", "LURUACO", "MALAMBO", "MANATI", "PALMAR DE VARELA", "PIOJO", "POLONUEVO", "PONEDERA", "PUERTO COLOMBIA", "REPELON", "SABANAGRANDE", "SABANALARGA", "SANTA LUCIA", "SANTO TOMAS", "SOLEDAD", "SUAN", "TUBARA", "USIACURI"],
+            "BOGOTA D.C.": ["BOGOTA, D.C."],
+            "BOLIVAR": ["CARTAGENA DE INDIAS", "ACHI", "ALTOS DEL ROSARIO", "ARENAL", "ARJONA", "ARROYOHONDO", "BARRANCO DE LOBA", "CALAMAR", "CANTAGALLO", "CICUCO", "CORDOBA", "CLEMENCIA", "EL CARMEN DE BOLIVAR", "EL GUAMO", "EL PEÑON", "HATILLO DE LOBA", "MAGANGUE", "MAHATES", "MARGARITA", "MARIA LA BAJA", "MONTECRISTO", "MOMPOS", "MORALES", "NOROSI", "PINILLOS", "REGIDOR", "RIO VIEJO", "SAN CRISTOBAL", "SAN ESTANISLAO", "SAN FERNANDO", "SAN JACINTO", "SAN JACINTO DEL CAUCA", "SAN JUAN NEPOMUCENO", "SAN MARTIN DE LOBA", "SAN PABLO", "SANTA CATALINA", "SANTA ROSA", "SANTA ROSA DEL SUR", "SIMITI", "SOPLAVIENTO", "TALAIGUA NUEVO", "TIQUISIO", "TURBACO", "TURBANA", "VILLANUEVA", "ZAMBRANO"],
+            "BOYACA": ["TUNJA", "AQUITANIA", "CHIQUINQUIRA", "DUITAMA", "PAIPA", "SOGAMOSO", "VILLA DE LEYVA"],
+            "CALDAS": ["MANIZALES", "CHINCHINA", "LA DORADA", "VILLAMARIA"],
+            "CAQUETA": ["FLORENCIA", "SAN VICENTE DEL CAGUAN"],
+            "CASANARE": ["YOPAL", "AGUAZUL", "VILLANUEVA"],
+            "CAUCA": ["POPAYAN", "SANTANDER DE QUILICHAO", "PUERTO TEJADA"],
+            "CESAR": ["VALLEDUPAR", "AGUACHICA", "BOSCONIA", "AGUSTIN CODAZZI"],
+            "CHOCO": ["QUIBDO", "ISTMINA"],
+            "CORDOBA": ["MONTERIA", "CERETE", "LORICA", "MONTELIBANO", "SAHAGUN"],
+            "CUNDINAMARCA": ["BOGOTA", "CAJICA", "CHIA", "FACATATIVA", "FUNZA", "FUSAGASUGA", "GIRARDOT", "MADRID", "MOSQUERA", "SOACHA", "TOCANCIPA", "ZIPAQUIRA"],
+            "GUAVIARE": ["SAN JOSE DEL GUAVIARE"],
+            "HUILA": ["NEIVA", "GARZON", "PITALITO", "LA PLATA"],
+            "LA GUAJIRA": ["RIOHACHA", "MAICAO", "URIBIA", "SAN JUAN DEL CESAR"],
+            "MAGDALENA": ["SANTA MARTA", "CIENAGA", "FUNDACION", "EL BANCO"],
+            "META": ["VILLAVICENCIO", "ACACIAS", "GRANADA", "PUERTO LOPEZ"],
+            "NARIÑO": ["PASTO", "IPIALES", "TUMACO"],
+            "NORTE DE SANTANDER": ["CUCUTA", "OCAÑA", "PAMPLONA", "VILLA DEL ROSARIO", "LOS PATIOS"],
+            "PUTUMAYO": ["MOCOA", "PUERTO ASIS"],
+            "QUINDIO": ["ARMENIA", "CALARCA", "MONTENEGRO", "QUIMBAYA", "LA TEBAIDA"],
+            "RISARALDA": ["PEREIRA", "DOSQUEBRADAS", "SANTA ROSA DE CABAL", "LA VIRGINIA"],
+            "SAN ANDRES": ["SAN ANDRES", "PROVIDENCIA"],
+            "SANTANDER": ["BUCARAMANGA", "FLORIDABLANCA", "GIRON", "PIEDECUESTA", "BARRANCABERMEJA", "SAN GIL", "SOCORRO"],
+            "SUCRE": ["SINCELEJO", "COROZAL", "SAN MARCOS", "TOLU"],
+            "TOLIMA": ["IBAGUE", "ESPINAL", "MELGAR", "HONDA", "MARIQUITA", "CHAPARRAL", "LÍBANO"],
+            "VALLE DEL CAUCA": ["CALI", "BUENAVENTURA", "PALMIRA", "TULUA", "YUMBO", "CARTAGO", "JAMUNDI", "BUGA", "CANDELARIA"],
+            "VAUPES": ["MITU"],
+            "VICHADA": ["PUERTO CARREÑO"]
+        };
+
+        function cargarMunicipios(depSelectId, munSelectId) {
+            const depSelect = document.getElementById(depSelectId);
+            const munSelect = document.getElementById(munSelectId);
+            if (!depSelect || !munSelect) return;
+            const dep = depSelect.value;
+            munSelect.innerHTML = '<option value="">Seleccione Municipio...</option>';
+            if (dep && divipolaColombia[dep]) {
+                divipolaColombia[dep].sort().forEach(mun => {
+                    let option = document.createElement('option');
+                    option.value = mun; option.text = mun; munSelect.appendChild(option);
+                });
+            }
+        }
+
+        function initSelectoresDivipola() {
+            const depSelect = document.getElementById('c_dep_base');
+            let optionsHTML = '<option value="">Seleccione Departamento...</option>';
+            Object.keys(divipolaColombia).sort().forEach(dep => { optionsHTML += `<option value="${dep}">${dep}</option>`; });
+            if (depSelect) depSelect.innerHTML = optionsHTML;
+        }
+
+        document.addEventListener("DOMContentLoaded", initSelectoresDivipola);
+
+        function abrirCrearConductor() {
+            document.getElementById('formConductor').reset();
+            document.getElementById('tituloModalConductor').innerText = 'Registrar Nuevo Conductor';
+            document.getElementById('accionConductor').value = 'crear';
+            document.getElementById('c_cedula').readOnly = false;
+            document.getElementById('btnGuardarConductor').innerText = 'Guardar Conductor';
+            openModal('modalConductor');
+        }
+
+        function abrirEditarConductor(btn) {
+            const d = btn.dataset;
+            document.getElementById('formConductor').reset();
+            document.getElementById('tituloModalConductor').innerText = 'Editar Expediente Conductor';
+            document.getElementById('accionConductor').value = 'editar';
+            document.getElementById('btnGuardarConductor').innerText = 'Guardar Cambios';
+            
+            document.getElementById('conductor_id').value = d.id;
+            document.getElementById('c_nombre').value = d.nombre;
+            document.getElementById('c_cedula').value = d.cedula;
+            document.getElementById('c_cedula').readOnly = true; 
+
+            let depSelect = document.getElementById('c_dep_base');
+            if (d.dep && d.dep !== 'None') {
+                depSelect.value = d.dep;
+                cargarMunicipios('c_dep_base', 'c_mun_base');
+                let munSelect = document.getElementById('c_mun_base');
+                if (d.mun && d.mun !== 'None') munSelect.value = d.mun;
+            }
+
+            document.getElementById('c_licencia').value = (d.lic !== 'None') ? d.lic : '';
+            document.getElementById('c_vlicencia').value = (d.vlic !== 'None') ? d.vlic : '';
+            document.getElementById('c_eps').value = (d.eps !== 'None') ? d.eps : '';
+            document.getElementById('c_afp').value = (d.afp !== 'None') ? d.afp : '';
+            document.getElementById('c_arl').value = (d.arl !== 'None') ? d.arl : '';
+            document.getElementById('c_pago_ss').value = (d.pago !== 'None') ? d.pago : '';
+            document.getElementById('c_telegram').value = (d.tg !== 'None') ? d.tg : '';
+
+            openModal('modalConductor');
+        }
+
+        function confirmarEliminarConductor(id, cedula, nombre) {
+            document.getElementById('delete_conductor_id').value = id;
+            document.getElementById('delete_conductor_cedula').value = cedula;
+            document.getElementById('delete_conductor_nombre').innerText = nombre;
+            openModal('modalEliminarConductor');
+        }
+
+        // ================= VISOR INDIVIDUAL (AJAX) =================
+        async function buscarYMostrarVisor() {
+            let cedula = document.getElementById('input_consulta_cedula').value.trim();
+            if (!cedula) { alert("Ingrese un número de cédula válido."); return; }
+
+            try {
+                let res = await fetch(`{{ url_for('flotaespecial_conductores.visor_conductor_individual') }}?cedula=${cedula}`);
+                let data = await res.json();
+                
+                if (data.success && data.conductor) {
+                    const c = data.conductor;
+                    document.getElementById('vis_nombre_titulo').innerText = c.nombre;
+                    document.getElementById('vis_id').innerText = `${c.nombre} (CC: ${c.cedula})`;
+                    document.getElementById('vis_ubicacion').innerText = `${c.municipio_base || 'N/D'} - ${c.departamento_base || 'N/D'}`;
+                    document.getElementById('vis_tg').innerText = c.telegram_id || 'No registrado';
+                    document.getElementById('vis_lic').innerText = `N° ${c.numero_licencia_conduccion || 'N/D'} | Vence: ${c.vencimiento_licencia_conduccion || 'N/D'}`;
+                    document.getElementById('vis_afil').innerText = `EPS: ${c.eps || 'N/D'} | AFP: ${c.fondo_pensiones || 'N/D'} | ARL: ${c.arl || 'N/D'}`;
+                    document.getElementById('vis_ss').innerText = `Pago: ${c.ultimo_pago_seguridad_social || 'N/D'} | Vence: ${c.vencimiento_seguridad_social || 'N/D'}`;
+
+                    configurarBotonVisor('btnVisCed', c.ruta_pdf_cedula);
+                    configurarBotonVisor('btnVisLic', c.ruta_pdf_licencia);
+                    configurarBotonVisor('btnVisSS', c.ruta_pdf_seguridad_social);
+
+                    openModal('modalVisorConductor');
+                } else {
+                    alert(data.message || "Conductor no encontrado en la flota de esta empresa.");
+                }
+            } catch (error) {
+                alert("Error de red al consultar el expediente.");
+            }
+        }
+
+        function configurarBotonVisor(idBtn, ruta) {
+            const btn = document.getElementById(idBtn);
+            if (ruta && ruta !== 'None' && ruta.trim() !== '') {
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                btn.onclick = function() { verPDF(ruta); };
+            } else {
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+                btn.onclick = function() { alert("Documento no disponible en el expediente."); };
+            }
+        }
+    </script>
+</body>
+</html>
