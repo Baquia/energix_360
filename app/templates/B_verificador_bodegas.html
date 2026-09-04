@@ -423,13 +423,15 @@
 
             <!-- Zona del Pulgar (Thumb Zone - Acciones) -->
             <div class="picking-bottom-actions">
+                <button id="btn-masivo" class="hidden" onclick="confirmarMasivo()" style="width: 100%; background: var(--primary); color: white; padding: 15px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(67, 56, 202, 0.3);">⚡ VERIFICACIÓN MASIVA</button>
                 <button class="btn-finish" onclick="intentarVerificarItem()">CONFIRMAR AUDITORÍA</button>
                 <button class="btn-reset" onclick="resetearConteo()">🔄 Reiniciar Lectura</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-verify" class="modal-wrap">
+    <!-- Modal Verificación Final -->
+    <div id="modal-verify" class="modal-wrap" style="z-index: 105;">
         <div class="verify-sheet">
             <div style="font-size: 3.5rem; margin-bottom: 10px;">✅</div>
             <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">¿Sellar Verificación?</h3>
@@ -439,6 +441,21 @@
             <div class="verify-btns">
                 <button class="btn-v-cancel" onclick="cancelarConfirmacion()">Volver</button>
                 <button class="btn-v-confirm" onclick="ejecutarVerificacionFinal()">SELLAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmación Verificación Masiva -->
+    <div id="modal-confirm-masivo" class="modal-wrap" style="z-index: 115;">
+        <div class="verify-sheet">
+            <div style="font-size: 3.5rem; margin-bottom: 10px;">⚡</div>
+            <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">Verificación Masiva</h3>
+            <p id="txt-confirm-masivo" style="color:#475569; line-height:1.5; font-size:1.05rem;">
+                ¿Seguro verificaste X unidades del producto Y?
+            </p>
+            <div class="verify-btns">
+                <button class="btn-v-cancel" onclick="cerrarMasivo()">No, Volver</button>
+                <button class="btn-v-confirm" style="background: var(--primary);" onclick="ejecutarMasivo()">Sí, Confirmo</button>
             </div>
         </div>
     </div>
@@ -770,6 +787,12 @@
             if (itemActivo.req_unidades > 0) document.getElementById('area-teclado-fracciones').classList.remove('hidden');
             else document.getElementById('area-teclado-fracciones').classList.add('hidden');
 
+            if (itemActivo.req_cajas > 10 || itemActivo.req_unidades > 10) {
+                document.getElementById('btn-masivo').classList.remove('hidden');
+            } else {
+                document.getElementById('btn-masivo').classList.add('hidden');
+            }
+
             evaluarBotonTerminar();
             document.getElementById('modal-picking').style.display = 'flex';
         }
@@ -960,6 +983,46 @@
 
         function cancelarConfirmacion() {
             document.getElementById('modal-verify').style.display = 'none';
+        }
+
+        // =====================================
+        // DISPARADOR MASIVO
+        // =====================================
+        function confirmarMasivo() {
+            if (!itemActivo) return;
+            const nombre = (itemActivo.descripcion_producto || 'Producto').replace(/\.{2,}/g, '').trim();
+            let texto = '¿Seguro verificaste ';
+            if (itemActivo.req_cajas > 0) texto += `<b>${itemActivo.req_cajas} cajas</b> `;
+            if (itemActivo.req_cajas > 0 && itemActivo.req_unidades > 0) texto += 'y ';
+            if (itemActivo.req_unidades > 0) texto += `<b>${itemActivo.req_unidades} unidades</b> `;
+            texto += `del producto <b>${nombre}</b>?`;
+            
+            document.getElementById('txt-confirm-masivo').innerHTML = texto;
+            document.getElementById('modal-confirm-masivo').style.display = 'flex';
+        }
+        
+        function cerrarMasivo() {
+            document.getElementById('modal-confirm-masivo').style.display = 'none';
+        }
+        
+        function ejecutarMasivo() {
+            if (!itemActivo) return;
+            itemActivo.act_cajas = itemActivo.req_cajas;
+            itemActivo.act_unidades = itemActivo.req_unidades;
+            
+            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+            
+            cerrarMasivo();
+            playBeep();
+            evaluarBotonTerminar();
+            
+            if (scanner) {
+                try {
+                    document.getElementById('embedded-reader').style.opacity = '0.5';
+                    detenerCamara();
+                } catch(e) {}
+            }
         }
 
         function ejecutarVerificacionFinal() {
