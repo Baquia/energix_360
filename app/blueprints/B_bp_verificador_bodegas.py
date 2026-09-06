@@ -94,9 +94,13 @@ def verificador_items_orden(orden):
             LEFT JOIN productos prod 
                 ON (p.codigo_producto = prod.ean OR p.codigo_producto = prod.sku) 
                 AND p.id_empresa = prod.id_empresa
+            LEFT JOIN configuracion_rutas_picking crp 
+                ON p.marca = crp.marca AND p.id_empresa = crp.id_empresa
             WHERE p.id_empresa=%s AND p.numero_orden_origen=%s AND p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO')
             ORDER BY 
+                IFNULL(crp.secuencia_picking, 9999) ASC,
                 CASE 
+                    WHEN p.marca = 'NO EN BASE DE DATOS' THEN 99
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 1
                     WHEN p.codigo_producto = 'SIN_CODIGO' AND p.marca != 'NO EN BASE DE DATOS' THEN 2
                     WHEN p.codigo_producto != 'SIN_CODIGO' AND p.marca = 'NO EN BASE DE DATOS' THEN 3

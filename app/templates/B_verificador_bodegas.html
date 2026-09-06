@@ -681,7 +681,15 @@
                 return;
             }
 
+            let marcaActual = null;
+
             visibles.forEach(i => {
+                let marcaItem = i.marca || 'GENÉRICO';
+                if (marcaItem !== marcaActual) {
+                    htmlInner += `<div style="grid-column: 1/-1; margin-top: 15px; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 2px solid var(--border); color: var(--primary-dark); font-weight: 900; font-size: 1.1rem; text-transform: uppercase;">🏷️ ${marcaItem}</div>`;
+                    marcaActual = marcaItem;
+                }
+
                 let nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
                 let badgeHtml = '';
 
