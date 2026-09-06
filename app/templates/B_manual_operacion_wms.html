@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Operación WMS v1.0 - BAQ-ONE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-green: #60ba00;
+            --brand-dark-green: #015249;
+            --brand-accent: #ff6b00;
+            --bg-light: #f8fafc;
+            --card-bg: #ffffff;
+            --text-dark: #1f2937;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e2e8f0;
+            margin: 0;
+            padding: 0;
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        /* --- BOTÓN FLOTANTE IMPRESIÓN / PDF --- */
+        .no-print-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #0f172a;
+            color: white;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 9999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .btn-pdf {
+            background: var(--brand-green);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.2s;
+        }
+
+        .btn-pdf:hover {
+            background: #4e9200;
+            transform: translateY(-1px);
+        }
+
+        /* --- CONTENEDOR PRINCIPAL TIPO HOJA --- */
+        .document-container {
+            max-width: 900px;
+            margin: 60px auto 40px auto;
+            background: var(--card-bg);
+            padding: 60px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            border-radius: 4px;
+        }
+
+        /* --- PORTADA --- */
+        .cover-page {
+            text-align: center;
+            padding: 40px 0 60px 0;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 50px;
+        }
+
+        .logo-svg {
+            width: 180px;
+            height: auto;
+            margin-bottom: 20px;
+        }
+
+        .cover-title {
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: var(--brand-dark-green);
+            margin: 10px 0;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+        }
+
+        .cover-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-bottom: 30px;
+        }
+
+        .cover-badge {
+            display: inline-block;
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        /* --- TABLA DE CONTENIDO (ÍNDICE) --- */
+        .toc-box {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 50px;
+        }
+
+        .toc-title {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--brand-dark-green);
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            border-bottom: 2px solid var(--brand-green);
+            padding-bottom: 8px;
+            display: inline-block;
+        }
+
+        .toc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .toc-list li {
+            margin-bottom: 10px;
+        }
+
+        .toc-list a {
+            color: #0369a1;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            transition: color 0.2s;
+        }
+
+        .toc-list a:hover {
+            color: var(--brand-dark-green);
+            text-decoration: underline;
+        }
+
+        .toc-sublist {
+            list-style: none;
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+
+        .toc-sublist li {
+            margin-bottom: 6px;
+        }
+
+        .toc-sublist a {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.88rem;
+        }
+
+        /* --- SECCIONES Y CONTENIDO --- */
+        .section-header {
+            border-left: 6px solid var(--brand-green);
+            padding-left: 15px;
+            margin-top: 50px;
+            margin-bottom: 25px;
+        }
+
+        .section-header h2 {
+            font-size: 1.6rem;
+            font-weight: 900;
+            color: var(--brand-dark-green);
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .section-header p {
+            margin: 4px 0 0 0;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        h3 {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin-top: 30px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        p, li {
+            font-size: 0.95rem;
+            color: #334155;
+            line-height: 1.7;
+        }
+
+        ul, ol {
+            padding-left: 20px;
+        }
+
+        /* --- CAJAS DESTACADAS Y TIPs --- */
+        .callout {
+            background: #f0fdfa;
+            border-left: 4px solid var(--brand-green);
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 20px 0;
+        }
+
+        .callout-title {
+            font-weight: 800;
+            color: var(--brand-dark-green);
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .callout-warning {
+            background: #fff1f2;
+            border-left-color: #e11d48;
+        }
+
+        .callout-warning .callout-title {
+            color: #9f1239;
+        }
+
+        /* --- INSIGNIAS Y BOTONES EN TEXTO --- */
+        .ui-badge {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #1e293b;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            font-weight: 700;
+            border: 1px solid #cbd5e1;
+        }
+
+        .ui-btn {
+            display: inline-block;
+            background: var(--brand-dark-green);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        /* --- PIE DE PÁGINA --- */
+        .doc-footer {
+            margin-top: 80px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* --- IMPRESIÓN Y EXPORTACIÓN EN PDF --- */
+        @media print {
+            .no-print-bar {
+                display: none !important;
+            }
+
+            body {
+                background: white;
+            }
+
+            .document-container {
+                max-width: 100%;
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+            }
+
+            .page-break {
+                break-before: page;
+                page-break-before: always;
+            }
+
+            a {
+                text-decoration: none;
+                color: inherit;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA SUPERIOR DE ACCIÓN -->
+    <div class="no-print-bar">
+        <div style="font-weight: 700; font-size: 0.9rem;">📚 Manual de Usuario Sistema WMS BAQ-ONE</div>
+        <button class="btn-pdf" onclick="window.print()">
+            📥 Descargar / Imprimir en PDF
+        </button>
+    </div>
+
+    <!-- DOCUMENTO PRINCIPAL -->
+    <div class="document-container">
+
+        <!-- PORTADA -->
+        <div class="cover-page">
+            <!-- LOGO BQA ONE VECTORIAL -->
+            <svg class="logo-svg" viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 50 90 C 120 10, 220 20, 250 45 C 170 40, 100 80, 50 90 Z" fill="#60ba00"/>
+                <text x="50" y="125" font-family="'Inter', sans-serif" font-weight="900" font-size="38" fill="#60ba00" font-style="italic">BQA</text>
+                <text x="50" y="170" font-family="'Inter', sans-serif" font-weight="900" font-size="52" fill="#60ba00">ONE</text>
+                <text x="50" y="190" font-family="'Inter', sans-serif" font-weight="600" font-size="12" fill="#60ba00" letter-spacing="0.5">Smart Business Operations</text>
+            </svg>
+
+            <div class="cover-title">Manual de Operación WMS</div>
+            <div class="cover-subtitle">Guía Práctica para Módulos de Controlador, Operador y Verificador</div>
+            <div class="cover-badge">VERSIÓN 1.0 — DOCUMENTO OFICIAL</div>
+        </div>
+
+        <!-- TABLA DE CONTENIDO (ÍNDICE CLICABLE) -->
+        <div class="toc-box">
+            <div class="toc-title">Índice del Manual</div>
+            <ul class="toc-list">
+                <li>
+                    <a href="#sec-intro">1. Introducción al Sistema WMS BAQ-ONE <span>Pág. 1</span></a>
+                </li>
+                <li>
+                    <a href="#sec-controlador">2. Módulo Controlador de Logística (Supervisión) <span>Pág. 2</span></a>
+                    <ul class="toc-sublist">
+                        <li><a href="#sub-alistamiento-vivo">• Alistamiento en Vivo y Panel Monitor</a></li>
+                        <li><a href="#sub-andon-vivo">• Consola ANDON: Resolver Novedades Bloqueantes</a></li>
+                        <li><a href="#sub-cargar-excel">• Cargar Picking desde Archivo Excel</a></li>
+                        <li><a href="#sub-rutas-pasillos">• Configuración de Rutas de Bodega (Pasillos)</a></li>
+                        <li><a href="#sub-catalogo-productos">• Gestión de Productos (Creación, Edición y Borrado)</a></li>
+                        <li><a href="#sub-promociones">• Gestión de Promociones y Kits (Combos)</a></li>
+                        <li><a href="#sub-despacho-actas">• Despacho de Vehículos y Firma de Actas</a></li>
+                        <li><a href="#sub-usuarios-wms">• Administración de Usuarios WMS</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#sec-operador">3. Módulo Operador de Bodega (Picking en Piso) <span>Pág. 3</span></a>
+                    <ul class="toc-sublist">
+                        <li><a href="#sub-op-ingreso">• Tablero Personal e Indicadores (KPIs)</a></li>
+                        <li><a href="#sub-op-modos">• Modos de Alistamiento: Lotes vs Órdenes Sueltas</a></li>
+                        <li><a href="#sub-op-escaner">• Pantalla de Trabajo y Escáner de Código de Barras</a></li>
+                        <li><a href="#sub-op-masivo">• Alistamiento Masivo (> 10 Unidades)</a></li>
+                        <li><a href="#sub-op-novedades">• Reporte de Novedades y Pantalla de Congelamiento</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#sec-verificador">4. Módulo Verificador de Bodega (Auditoría) <span>Pág. 4</span></a>
+                    <ul class="toc-sublist">
+                        <li><a href="#sub-ver-lista">• Lista de Pedidos Alistados por Auditar</a></li>
+                        <li><a href="#sub-ver-proceso">• Proceso de Re-Escaneo y Verificación Masiva</a></li>
+                        <li><a href="#sub-ver-sello">• Sello de Auditoría Física y Cierre</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <!-- SECCIÓN 1: INTRODUCCIÓN -->
+        <div id="sec-intro">
+            <div class="section-header">
+                <h2>1. Introducción al Sistema WMS BAQ-ONE</h2>
+                <p>Conceptos generales y filosofía de trabajo en la bodega.</p>
+            </div>
+            <p>El Módulo <b>WMS (Warehouse Management System)</b> del aplicativo <b>BAQ-ONE</b> es una herramienta diseñada para optimizar, controlar y auditar en tiempo real el flujo de mercancías dentro de la bodega. Su principal objetivo es eliminar errores de despacho, garantizar la velocidad de alistamiento y mantener un registro transparente de productividad.</p>
+            
+            <div class="callout">
+                <div class="callout-title">💡 Aislamiento de Seguridad (Multiempresa / SaaS)</div>
+                Toda la información manejada en la plataforma está aislada estrictamente por empresa. Los datos de inventarios, pedidos, usuarios y rutas de una compañía jamás se cruzan con los de otra.
+            </div>
+
+            <p>El flujo operativo se compone de tres roles complementarios:</p>
+            <ol>
+                <li><b>Controlador de Logística:</b> Carga la información, organiza las rutas, asigna muelles y resuelve problemas en tiempo real.</li>
+                <li><b>Operador de Bodega:</b> Recoge físicamente la mercancía escaneando códigos EAN mediante dispositivos móviles.</li>
+                <li><b>Verificador de Bodega:</b> Audita la mercancía alistada para certificar que coincide exacto con lo pedido antes de despachar.</li>
+            </ol>
+        </div>
+
+        <div class="page-break"></div>
+
+        <!-- SECCIÓN 2: CONTROLADOR DE LOGÍSTICA -->
+        <div id="sec-controlador">
+            <div class="section-header">
+                <h2>2. Módulo Controlador de Logística</h2>
+                <p>Centro de mando operativo, configuración de parámetros y gestión de novedades.</p>
+            </div>
+
+            <div id="sub-alistamiento-vivo">
+                <h3>2.1 Alistamiento en Vivo</h3>
+                <p>Es la consola principal de monitoreo. Para ingresar, despliega el menú lateral en <span class="ui-badge">Gestión Logística</span> ➔ <span class="ui-btn">Alistamiento en Vivo</span>.</p>
+                <ul>
+                    <li><b>Barra de KPIs Superiores:</b> Muestra de forma inmediata las órdenes activas, ítems pendientes y finalizados del turno.</li>
+                    <li><b>Asignación de Muelles (Puertas):</b> En la tabla "1. Asignar Muelles", el controlador debe escribir la zona y muelle correspondiente (ejemplo: Muelle 1, Muelle 2) y pulsar <span class="ui-btn">Asignar</span> para liberar el pedido hacia los operarios de piso.</li>
+                    <li><b>Matriz de Operarios en Vivo:</b> Muestra qué auxiliares están conectados (indicador verde 🟢), qué marcas tienen asignadas, su velocidad (ítems por minuto) y porcentaje de avance.</li>
+                </ul>
+            </div>
+
+            <div id="sub-andon-vivo">
+                <h3>2.2 Consola ANDON: Resolver Novedades Bloqueantes</h3>
+                <p>Cuando un operador reporta un problema en piso (ejemplo: producto sin código de barras o no encontrado), su pantalla se congela y aparece una alerta roja en el panel del Controlador llamada <b>"🚨 Novedades Activas (ANDON)"</b>.</p>
+                <p>Al hacer clic en <span class="ui-btn" style="background:#e11d48;">Gestionar Novedad</span>, se despliega un modal con 3 opciones de solución:</p>
+                <ul>
+                    <li><b>Formalizar Producto (Asignar EAN):</b> Permite buscar el producto real en el catálogo maestro e inyectar el código de barras faltante. El operario se desbloquea al instante y puede continuar escaneando.</li>
+                    <li><b>Autorizar a Ciegas:</b> Opción de excepción. Permite que el operario cuente manualmente el producto sin requerir escaneo de cámara.</li>
+                    <li><b>Confirmar Agotado:</b> Si el producto definitivamente no existe en bodega, el controlador confirma la ausencia y el ítem se cierra en cero.</li>
+                </ul>
+            </div>
+
+            <div id="sub-cargar-excel">
+                <h3>2.3 Cargar Picking (Excel)</h3>
+                <p>Ubicado en <span class="ui-badge">Gestión Logística</span> ➔ <span class="ui-btn">Cargar Picking (Excel)</span>. Permite importar las planillas o listados de pedidos en formato <code>.XLSX</code> o <code>.CSV</code>.</p>
+                <ul>
+                    <li>El sistema cuenta con un motor inteligente que detecta automáticamente la columna de descripción, código EAN y cantidades (cajas/unidades).</li>
+                    <li>Si una línea incluye cajas y unidades sueltas simultáneamente, el sistema la bifurca de manera transparente para facilitar la labor del operario.</li>
+                </ul>
+            </div>
+
+            <div id="sub-rutas-pasillos">
+                <h3>2.4 Configuración de Rutas de Bodega (Pasillos)</h3>
+                <p>Accede mediante <span class="ui-badge">Gestión Logística</span> ➔ <span class="ui-btn">Rutas de Bodega (Pasillos)</span>.</p>
+                <p>Permite ordenar lógicamente las marcas según la disposición física de los pasillos. Puedes arrastrar las marcas hacia arriba o abajo (o usar las flechas ⬆️ / ⬇️). El orden establecido aquí es el mismo que seguirá la pantalla del operario para evitar desplazamientos innecesarios en la bodega.</p>
+            </div>
+
+            <div id="sub-catalogo-productos">
+                <h3>2.5 Gestión de Productos (Creación, Edición y Borrado)</h3>
+                <p>Ubicado en el menú <span class="ui-badge">Gestión de Productos</span>:</p>
+                <ul>
+                    <li><b>Agregar Productos:</b> Se pueden registrar ítems manualmente o mediante carga masiva usando la plantilla descargable en Excel.</li>
+                    <li><b>Editar Productos:</b> Permite buscar un producto por marca y modificar su <b>EAN (Código de barras)</b>, <b>Nombre</b>, <b>Marca (Fabricante)</b> y <b>Unidad de Embalaje</b>.
+                        <div class="callout callout-warning">
+                            <div class="callout-title">⚠️ Modal de Seguridad en Edición</div>
+                            Antes de guardar cualquier cambio en un producto, el sistema desplegará un modal interactivo mostrando el resumen del cambio (ejemplo: <code>EAN: 770123 ➔ 770999</code>). El usuario debe presionar "Sí, Confirmar" para aplicar la modificación.
+                        </div>
+                    </li>
+                    <li><b>Eliminar Productos:</b> Permite borrar un producto individual o destruir una marca completa. Para destrucciones masivas, el sistema exige escribir la palabra clave de seguridad <code>ELIMINAR</code> en mayúsculas.</li>
+                </ul>
+            </div>
+
+            <div id="sub-promociones">
+                <h3>2.6 Gestión de Promociones y Kits (Combos)</h3>
+                <p>Ubicado en <span class="ui-badge">Gestión de Productos</span> ➔ <span class="ui-btn">Gestión Promociones</span>. Permite armar combos o kits integrados por múltiples productos hijos.</p>
+                <ul>
+                    <li>Se ingresa el EAN y Nombre del Kit Padre (ejemplo: <i>Combo Cerveza + Vasos</i>).</li>
+                    <li>Se agregan uno a uno los componentes hijos especificando cuántas cajas o unidades aporta cada uno al combo.</li>
+                    <li>Al cargarse un pedido con ese kit, el WMS lo desglosará en la lista del operario automáticamente.</li>
+                </ul>
+            </div>
+
+            <div id="sub-despacho-actas">
+                <h3>2.7 Despacho de Vehículos y Firma de Actas</h3>
+                <p>Cuando un pedido pasa al estado <span class="ui-badge" style="background:#dcfce7; color:#166534;">VERIFICADO</span>, aparece el botón verde <span class="ui-btn" style="background:#10b981;">🚚 Vehículo</span>.</p>
+                <ol>
+                    <li>Selecciona la placa del vehículo transportador.</li>
+                    <li>Activa la cámara para tomar la foto de evidencia de la carga en el camión.</li>
+                    <li>El conductor registra su firma digital directamente sobre la pantalla táctil.</li>
+                    <li>Haz clic en <span class="ui-btn">Confirmar Despacho</span>. El sistema genera de inmediato el <b>Acta / Manifiesto de Carga</b> en PDF listo para imprimir.</li>
+                </ol>
+            </div>
+
+            <div id="sub-usuarios-wms">
+                <h3>2.8 Administración de Usuarios WMS</h3>
+                <p>Ubicado en <span class="ui-badge">Gestión de Usuarios</span> ➔ <span class="ui-btn">Perfiles Operativos</span>. Permite crear y administrar las cuentas de acceso del personal de la bodega (Operadores, Verificadores y Controladores).</p>
+                <p><b>Regla de Licenciamiento:</b> Cada empresa tiene habilitado un cupo máximo de <b>8 usuarios WMS</b> operativos concurrentes.</p>
+            </div>
+        </div>
+
+        <div class="page-break"></div>
+
+        <!-- SECCIÓN 3: OPERADOR DE BODEGA -->
+        <div id="sec-operador">
+            <div class="section-header">
+                <h2>3. Módulo Operador de Bodega (Picking)</h2>
+                <p>Interfaz optimizada para teléfonos móviles y terminales portátiles de lectura.</p>
+            </div>
+
+            <div id="sub-op-ingreso">
+                <h3>3.1 Tablero Personal e Indicadores (KPIs)</h3>
+                <p>Al iniciar sesión en un dispositivo móvil, el operario observa su tarjeta de rendimiento del turno:</p>
+                <ul>
+                    <li><b>Avance:</b> Porcentaje de mercancía recolectada sobre el total asignado.</li>
+                    <li><b>Ítems/Min:</b> Velocidad promedio de lectura.</li>
+                    <li><b>Novedades %:</b> Porcentaje de ítems reportados con fallas o ausencias.</li>
+                </ul>
+            </div>
+
+            <div id="sub-op-modos">
+                <h3>3.2 Modos de Alistamiento</h3>
+                <p>El operario puede alistar bajo dos modalidades según las órdenes del supervisor:</p>
+                <ul>
+                    <li><b>🏷️ Lotes Agrupados:</b> Agrupa los pedidos por marca y los ordena según el recorrido físico de los pasillos configurado por el controlador.</li>
+                    <li><b>📦 Órdenes de Pedido Sueltas:</b> Permite alistar un pedido individual específico.</li>
+                </ul>
+            </div>
+
+            <div id="sub-op-escaner">
+                <h3>3.3 Pantalla de Trabajo y Escáner de Código de Barras</h3>
+                <p>Al seleccionar un producto de la lista, se abre la hoja modal de trabajo:</p>
+                <ol>
+                    <li>Haz clic en <span class="ui-btn">ENCENDER CÁMARA</span>.</li>
+                    <li>Apunta la mira del visor sobre el código de barras EAN del empaque.</li>
+                    <li>Al detectar el código correcto, el sistema emitirá un <b>sonido (beep) fuerte</b>, una vibración táctil y un destello verde en pantalla, incrementando automáticamente el contador de unidades.</li>
+                </ol>
+
+                <div class="callout">
+                    <div class="callout-title">🔋 Modo Ahorro de Batería Inteligente</div>
+                    Si el visor permanece 20 segundos sin detectar lecturas, la cámara se pausará automáticamente para ahorrar batería y no sobrecalentar el teléfono. Basta con pulsar la pantalla para reanudar el escaneo.
+                </div>
+            </div>
+
+            <div id="sub-op-masivo">
+                <h3>3.4 Alistamiento Masivo (> 10 Unidades)</h3>
+                <p>Para acelerar el proceso en productos empacados en cajas o bultos con muchas unidades individuales dentro (ejemplo: bolsas de frituras o galletas), el sistema habilita automáticamente el botón azul <span class="ui-btn" style="background:#004e92;">⚡ ALISTAMIENTO MASIVO</span> **únicamente cuando la cantidad requerida sea mayor a 10 unidades**.</p>
+                <ul>
+                    <li>Al pulsar el botón, se despliega el modal de confirmación: <i>"¿Seguro alistaste [X] unidades del producto [Y]?"</i>.</li>
+                    <li>Al presionar <b>"SÍ, CONFIRMO"</b>, el contador se completa de inmediato sin necesidad de pistolear o escanear una por una las bolsas.</li>
+                </ul>
+            </div>
+
+            <div id="sub-op-novedades">
+                <h3>3.5 Reporte de Novedades y Pantalla de Congelamiento</h3>
+                <p>Si ocurre un problema en el pasillo, el operario debe presionar el botón de novedad correspondiente:</p>
+                <ul>
+                    <li><span class="ui-badge" style="background:#fee2e2; color:#9f1239;">🚫 Sin Stock</span>: Cuando el estante está físicamente vacío.</li>
+                    <li><span class="ui-badge" style="background:#fef3c7; color:#92400e;">⚠️ Sin EAN</span>: Cuando el empaque no tiene etiqueta o está rota.</li>
+                    <li><span class="ui-badge" style="background:#f1f5f9; color:#475569;">⚠️ NO EN BD</span>: Cuando el producto no existe en el catálogo.</li>
+                </ul>
+
+                <div class="callout callout-warning">
+                    <div class="callout-title">🚨 Bloqueo de Pantalla ANDON</div>
+                    Al reportar una novedad, la pantalla del operario se congelará mostrando el aviso <b>"OPERACIÓN DETENIDA"</b>. El operario debe permanecer en el sitio. En segundos, el controlador resolverá la novedad desde su panel central y la pantalla del móvil se desbloqueará automáticamente para continuar la ruta.
+                </div>
+            </div>
+        </div>
+
+        <div class="page-break"></div>
+
+        <!-- SECCIÓN 4: VERIFICADOR DE BODEGA -->
+        <div id="sec-verificador">
+            <div class="section-header">
+                <h2>4. Módulo Verificador de Bodega (Auditoría)</h2>
+                <p>Control de calidad final previo al cargue de vehículos.</p>
+            </div>
+
+            <div id="sub-ver-lista">
+                <h3>4.1 Lista de Pedidos Alistados</h3>
+                <p>El Verificador ingresa desde su interfaz táctil y observa las órdenes marcadas como listas por el equipo de picking.</p>
+                <ul>
+                    <li>Al seleccionar un pedido, se despliega la lista de mercancía física entregada en el muelle.</li>
+                    <li>Si un producto traía una novedad reportada por el alistador, aparecerá resaltado con una insignia de advertencia roja.</li>
+                </ul>
+            </div>
+
+            <div id="sub-ver-proceso">
+                <h3>4.2 Proceso de Re-Escaneo y Verificación Masiva</h3>
+                <ol>
+                    <li>El Verificador toma el producto del pallet o estiba e inicia la lectura presionando <span class="ui-btn" style="background:#4338ca;">ACTIVAR LECTOR</span>.</li>
+                    <li>Cada escaneo correcto valida que la mercancía física entregada por el alistador es exactamente la solicitada.</li>
+                    <li><b>Verificación Masiva:</b> Al igual que en el módulo de operador, si un ítem supera las 10 unidades, el verificador contará con el botón <span class="ui-btn" style="background:#4338ca;">⚡ VERIFICACIÓN MASIVA</span> para auditar por empaque completo tras responder el modal de confirmación.</li>
+                </ol>
+            </div>
+
+            <div id="sub-ver-sello">
+                <h3>4.3 Sello de Auditoría Física y Cierre</h3>
+                <p>Una vez completadas las cantidades auditadas, el botón inferior cambiará a verde con la leyenda <span class="ui-btn" style="background:#10b981;">CONFIRMAR AUDITORÍA ✓</span>.</p>
+                <p>Al pulsar sobre él y confirmar en el modal de cierre, la orden queda oficialmente certificada en estado <span class="ui-badge" style="background:#dcfce7; color:#166534;">VERIFICADO</span> y lista para ser asignada a un vehículo de despacho.</p>
+            </div>
+        </div>
+
+        <!-- PIE DE PÁGINA DOCUMENTAL -->
+        <div class="doc-footer">
+            <div>BAQUIA-EMS S.A.S. — Todos los derechos reservados © 2026</div>
+            <div>Sistema BAQ-ONE WMS | Versión 1.0</div>
+        </div>
+
+    </div>
+
+</body>
+</html>

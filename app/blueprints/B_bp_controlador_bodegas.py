@@ -11,6 +11,14 @@ import math
 bp_bodegas = Blueprint('bodegas', __name__)
 
 # ==============================================================================
+# MANUAL DE OPERACIÓN WMS
+# ==============================================================================
+@bp_bodegas.route('/bodegas/manual_operacion')
+def manual_operacion():
+    if 'usuario_id' not in session: return redirect('/')
+    return render_template('B_manual_operacion_wms.html')
+
+# ==============================================================================
 # 1. VISTA PRINCIPAL (DASHBOARD CONTROLADOR/JEFE)
 # ==============================================================================
 
@@ -1348,14 +1356,21 @@ def editar_producto():
     try:
         empresa_id = session.get('empresa_id')
         data = request.get_json()
-        ean = data.get('ean')
+        ean_original = data.get('ean_original')
+        nuevo_ean = data.get('nuevo_ean')
         nuevo_nombre = data.get('producto')
+        nueva_marca = data.get('marca')
         nuevo_embalaje = data.get('unidad_embalaje')
         
-        if not ean or not nuevo_nombre: return jsonify({'status': 'error', 'message': 'Faltan datos'})
+        if not ean_original or not nuevo_ean or not nuevo_nombre: 
+            return jsonify({'status': 'error', 'message': 'Faltan datos'})
 
         cur = mysql.connection.cursor()
-        cur.execute("UPDATE productos SET producto = %s, unidad_embalaje = %s WHERE ean = %s AND id_empresa = %s", (nuevo_nombre, nuevo_embalaje, ean, empresa_id))
+        cur.execute("""
+            UPDATE productos 
+            SET ean = %s, sku = %s, producto = %s, fabricante = %s, unidad_embalaje = %s 
+            WHERE ean = %s AND id_empresa = %s
+        """, (nuevo_ean, nuevo_ean, nuevo_nombre, nueva_marca, nuevo_embalaje, ean_original, empresa_id))
         mysql.connection.commit()
         cur.close()
         

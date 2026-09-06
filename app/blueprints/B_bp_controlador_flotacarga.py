@@ -34,7 +34,7 @@ def gestor_flota_required(f):
         perfil = str(session.get('perfil', '')).strip().lower()
         tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
         
-        if perfil not in ['gestor_flotacarga', 'controlador_transportecarga', 'webmaster'] and 'webmaster' not in tipo_empresa:
+        if perfil not in ['gestor_flotacarga', 'controlador_transportecarga', 'webmaster',] and 'webmaster' not in tipo_empresa:
             flash('Acceso denegado: Se requiere perfil de Gestor/Controlador de Flota para ingresar a este módulo.', 'danger')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
