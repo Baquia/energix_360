@@ -29,6 +29,23 @@ def preoperacional_tc():
         empresa_id = session.get("empresa_id")
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
+        # REGLA: Candado para evitar doble inspección en un mismo día
+        cur.execute("""
+            SELECT id FROM inspeccion_preoperacional 
+            WHERE id_empresa = %s AND placa_vehiculo = %s 
+            AND fecha_inspeccion = CURDATE() AND vehiculo_aprobado = 1
+            LIMIT 1
+        """, (empresa_id, placa))
+        
+        if cur.fetchone():
+            cur.close()
+            flash("El vehículo ya cuenta con una inspección aprobada el día de hoy.", "info")
+            if placa_carga:
+                try: return redirect(url_for('router_universal', modulo='flota'))
+                except: return redirect(url_for('flotacarga.dashboard_operador'))
+            else:
+                return redirect(url_for('operador_flotaespecial.dashboard_operador_especial'))
+
         if placa_carga:
             cur.execute("SELECT * FROM vehiculos WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
             vehiculo = cur.fetchone()
@@ -97,11 +114,28 @@ def validar_qr():
         cur.close()
         return jsonify(success=False, message="Consistencia rota: El vehículo no es suyo."), 403
 
+    # REGLA: Bypass si ya existe inspección aprobada hoy
+    cur.execute("""
+        SELECT id FROM inspeccion_preoperacional 
+        WHERE id_empresa = %s AND placa_vehiculo = %s 
+        AND fecha_inspeccion = CURDATE() AND vehiculo_aprobado = 1
+        LIMIT 1
+    """, (session_nit, placa))
+    inspeccion_hoy = cur.fetchone()
+
+    nuevo_estatus = 'Logueado' if inspeccion_hoy else 'Prelogueado'
+
     if v["flota_tipo"] == 'carga':
-        cur.execute("UPDATE vehiculos SET estatus='Prelogueado' WHERE id=%s", (v["id"],))
+        cur.execute("UPDATE vehiculos SET estatus=%s WHERE id=%s", (nuevo_estatus, v["id"]))
         session["placa_prelogueada"] = placa
+        
+        if inspeccion_hoy:
+            cur.execute("""
+                INSERT INTO historial_sesiones_flota (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion)
+                VALUES (%s, %s, %s, NOW(), 'ACTIVA')
+            """, (session_nit, session.get("usuario_id"), placa))
     else:
-        cur.execute("UPDATE vehiculos_especial SET estatus='Prelogueado' WHERE id=%s", (v["id"],))
+        cur.execute("UPDATE vehiculos_especial SET estatus=%s WHERE id=%s", (nuevo_estatus, v["id"]))
         session["placa_prelogueada_especial"] = placa
         
         try:
@@ -111,8 +145,8 @@ def validar_qr():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """)
             cur.execute("""
-                INSERT INTO historial_sesiones_flotaespecial (id_empresa, id_usuario, placa_vehiculo, fecha_login)
-                VALUES (%s, %s, %s, NOW())
+                INSERT INTO historial_sesiones_flotaespecial (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion)
+                VALUES (%s, %s, %s, NOW(), 'ACTIVA')
             """, (session_nit, session.get("usuario_id"), placa))
         except: pass
         
@@ -185,49 +219,15 @@ def guardar_inspeccion():
         novedades_rojas = []
         novedades_amarillas = []
 
-        docs_config = {
-            'doc_licencia_conduccion': ('Licencia Conducción', 'fecha_vence_licencia'), 
-            'doc_soat_vigente': ('SOAT', 'fecha_vence_soat'),
-            'doc_tecnomecanica_vigente': ('Tecnomecánica', 'fecha_vence_tecnomecanica'), 
-            'doc_tarjeta_operacion': ('Tarjeta Operación', 'fecha_vence_tarjeta_operacion')
-        }
-
+        # Valores neutros para la sección documental (Eliminada del frontend)
         doc_values = {
-            'doc_licencia_conduccion': 0,
-            'doc_soat_vigente': 0,
-            'doc_tecnomecanica_vigente': 0,
-            'doc_tarjeta_operacion': 0
+            'doc_licencia_conduccion': 1,
+            'doc_soat_vigente': 1,
+            'doc_tecnomecanica_vigente': 1,
+            'doc_tarjeta_operacion': 1
         }
-
-        # Validación de Documentos con Fecha (Asignación Explícita 1/0 a BD)
-        for doc_key, (doc_name, date_field) in docs_config.items():
-            fecha_str = get_date(date_field)
-            if fecha_str:
-                try:
-                    vence = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-                    dias_restantes = (vence - fecha_inspeccion).days
-                    if dias_restantes < 0: 
-                        novedades_rojas.append(f"VENCIDO: {doc_name}")
-                        doc_values[doc_key] = 0
-                    elif dias_restantes <= 30: 
-                        novedades_amarillas.append(f"POR VENCER: {doc_name}")
-                        doc_values[doc_key] = 1
-                    else:
-                        doc_values[doc_key] = 1
-                except: 
-                    doc_values[doc_key] = 0
-            else: 
-                novedades_rojas.append(f"FALTANTE: {doc_name}")
-                doc_values[doc_key] = 0
-
-        # Validación Binaria Exigida PESV Paso 16
-        val_cedula = get_int('doc_cedula', 0)
-        if val_cedula == 0:
-            novedades_rojas.append("FALTANTE: Cédula de Ciudadanía")
-            
-        val_licencia_transito = get_int('doc_licencia_transito', 0)
-        if val_licencia_transito == 0:
-            novedades_rojas.append("FALTANTE: Licencia de Tránsito (Propiedad)")
+        val_cedula = 1
+        val_licencia_transito = 1
 
         fields_3_state = [
             'mec_nivel_aceite_motor', 'mec_liquido_frenos', 'mec_liquido_embrague', 'mec_nivel_refrigerante', 'mec_estado_correas', 'mec_ausencia_fugas', 'luc_altas_bajas', 'luc_frenos_stop', 'luc_direccionales', 'luc_parqueo_estacionarias', 'luc_reversa_alarma', 'luc_delimitadoras_cocuyos', 'lla_tuercas_pernos', 'lla_repuesto_operativa', 'lla_suspension_muelles', 'fre_pedal_firme', 'fre_parqueo_mano', 'fre_presion_aire_manometro', 'fre_juego_direccion', 'fre_pito_corneta', 'fre_limpiaparabrisas_plumillas', 'car_estado_estructura', 'car_compuertas_carpas_amarres', 'car_cinturones_seguridad', 'car_espejos_retrovisores', 'car_vidrio_parabrisas', 'equ_extintor_10lbs', 'equ_tacos_bloqueo', 'equ_senales_reflectivas', 'equ_gato_hidraulico', 'equ_cruceta_herramientas', 'equ_botiquin_completo'
@@ -312,7 +312,7 @@ def guardar_inspeccion():
         params = (
             usuario_id, empresa_id, consecutivo, fecha_inspeccion, hora_inspeccion,
             session.get('nombre'), placa, request.form.get('tipo_vehiculo', 'NPR / Turbo'), kilometraje, ruta,
-            doc_values['doc_licencia_conduccion'], get_date('fecha_vence_licencia'), doc_values['doc_soat_vigente'], get_date('fecha_vence_soat'), doc_values['doc_tecnomecanica_vigente'], get_date('fecha_vence_tecnomecanica'), doc_values['doc_tarjeta_operacion'], get_date('fecha_vence_tarjeta_operacion'), val_cedula, val_licencia_transito,
+            doc_values['doc_licencia_conduccion'], None, doc_values['doc_soat_vigente'], None, doc_values['doc_tecnomecanica_vigente'], None, doc_values['doc_tarjeta_operacion'], None, val_cedula, val_licencia_transito,
             get_int('mec_aceite_motor'), get_int('mec_liquido_frenos'), get_int('mec_liquido_embrague'), get_int('mec_refrigerante'), get_int('mec_correas'), get_int('mec_fugas'), get_int('luc_altas'), get_int('luc_frenos'), get_int('luc_direccionales'), get_int('luc_parqueo_estacionarias'), get_int('luc_reversa'), get_int('luc_cocuyos'),
             get_int('llan_tuercas'), get_int('llan_repuesto'), get_int('llan_muelles'), get_int('fren_pedal'), get_int('fren_mano'), get_int('fren_manometro'), get_int('fren_juego_direccion'), get_int('fre_pito_corneta'), get_int('fren_plumillas'),
             get_int('est_compuertas'), get_int('est_carpas'), get_int('est_cinturones'), get_int('est_espejos'), get_int('est_parabrisas'),

@@ -1325,7 +1325,7 @@
                     </table>
                 </div>
                 <!-- Armador -->
-                <div style="flex:1;">
+                <div style="flex:1; overflow-y: auto; height: 100%; padding-right: 10px; display: block; padding-bottom: 40px;">
                     <h4 id="titulo-armador" style="margin-top: 0; color: #db2777;">✨ Armar Nueva Promoción</h4>
                     
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">EAN del Combo/Promo (Padre)</label>
@@ -1353,12 +1353,28 @@
                     </div>
 
                     <h5 style="margin-bottom: 10px; color:var(--color-text);">Contenido del Kit:</h5>
-                    <div id="caja-kit" style="min-height:120px; border:2px dashed #cbd5e1; border-radius:12px; padding:15px; margin-bottom:20px; background: #f8fafc;">
-                        <div style="text-align:center; color:#9ca3af; padding-top:30px; font-weight:500;">Tu kit está vacío</div>
+                    <div style="border: 1px solid #cbd5e1; border-radius: 12px; overflow-x: auto; margin-bottom: 20px;">
+                        <table class="data-table" style="margin: 0; font-size: 0.85rem; min-width: 600px;">
+                            <thead style="background: #f8fafc;">
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>EAN</th>
+                                    <th>Fabricante</th>
+                                    <th style="text-align:center;">Cajas</th>
+                                    <th style="text-align:center;">Unidades</th>
+                                    <th style="text-align:center;">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="caja-kit-body">
+                                <tr><td colspan="6" style="text-align:center; color:#9ca3af; padding:30px; font-weight:500;">Tu kit está vacío</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                     
-                    <button class="btn-confirm" onclick="guardarPromocionFinal()" style="width:100%; background: #db2777; font-size:1.05rem;">💾 Guardar Promoción Completa</button>
-                    <button class="btn-cancel" onclick="limpiarArmador()" style="width:100%; margin-top:10px; font-size:1.05rem;">Limpiar / Nueva</button>
+                    <div style="margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+                        <button class="btn-confirm" onclick="guardarPromocionFinal()" style="width:100%; background: #db2777; font-size:1.05rem;">💾 Guardar Promoción Completa</button>
+                        <button class="btn-cancel" onclick="limpiarArmador()" style="width:100%; margin-top:10px; font-size:1.05rem;">Limpiar / Nueva</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1522,7 +1538,7 @@
                                                     {% if v.en_linea == 1 %}<span style="font-size: 10px;" title="En línea">🟢</span>{% else %}<span style="font-size: 10px;" title="Fuera de línea">⚪</span>{% endif %}
                                                     <strong>{{ v.nombre_verificador }}</strong>
                                                 </td>
-                                                <td data-label="Auditados"><span class="badge badge-purple">{{ v.items_verificados }}</span></td>
+                                                <td data-label="Auditados"><span class="badge badge-purple">${v.items_verificados}</span></td>
                                                 <td data-label="Discrepancias">
                                                     <span style="font-weight:700; color:{% if v.indice_discrepancia > 0 %}#e11d48{% else %}#10b981{% endif %};">{{ v.indice_discrepancia }}%</span>
                                                 </td>
@@ -1544,7 +1560,7 @@
                                             {% for m in marcas_huerfanas %}
                                             <tr>
                                                 <td data-label="Marca"><strong style="color: #e11d48;">{{ m.marca }}</strong></td>
-                                                <td data-label="Líneas Pendientes"><span class="badge badge-yellow">{{ m.total_items }}</span></td>
+                                                <td data-label="Líneas Pendientes"><span class="badge badge-yellow">${m.total_items}</span></td>
                                             </tr>
                                             {% endfor %}
                                         {% else %}
@@ -1594,24 +1610,23 @@
                                 <td data-label="Orden" style="font-weight:700; font-size:1.1rem;">{{ op.orden }}</td>
 
                                 <td data-label="Progreso">
-                                    <button onclick="verDetalleOrden('{{ op.orden }}')" class="btn-assign" style="width:100%; justify-content:space-between; background:#f0f9ff; border-color:#bae6fd; color:#0369a1;">
-                                        <span>${{ op.items_listos }} / {{ op.total_items }}</span>
-                                        <span>🔍</span>
+                                    <button onclick="verDetalleOrden('${op.orden}')" class="btn-assign" style="width:100%; justify-content:space-between; background:#f0f9ff; border-color:#bae6fd; color:#0369a1;">
+                                        <span>${op.items_listos} / ${op.total_items}</span><span>🔍</span>
                                     </button>
                                 </td>
 
                                 <td data-label="Tiempo Total">
                                     {% if op.estado_visual in ['VERIFICADO', 'DESPACHADO', 'TERMINADO', 'ALISTADO'] %}
-                                    <span style="color:#059669; font-weight:800; font-family:monospace; font-size:1.1rem;">🏁 {{ op.duracion_str }}</span>
+                                    <span style="color:#059669; font-weight:800; font-family:monospace; font-size:1.1rem;">🏁 ${op.duracion_str}</span>
                                     {% elif op.segundos_transcurridos is not none %}
-                                    <span class="cronometro" data-segundos="{{ op.segundos_transcurridos }}" style="font-family:monospace; font-size:1.1rem; font-weight:800; color:#ea580c; background:#fff7ed; padding:4px 8px; border-radius:6px; border:1px solid #ffedd5;">00:00:00</span>
+                                    <span class="cronometro" data-segundos="${op.segundos_transcurridos}" style="font-family:monospace; font-size:1.1rem; font-weight:800; color:#ea580c; background:#fff7ed; padding:4px 8px; border-radius:6px; border:1px solid #ffedd5;">00:00:00</span>
                                     {% else %}
                                     <span style="color:#9ca3af; font-size:1.1rem; font-weight:800;">--:--</span>
                                     {% endif %}
                                 </td>
                                 <td data-label="Acción">
                                     {% if op.estado_visual == 'VERIFICADO' %}
-                                    <button onclick="abrirModalDespacho('{{ op.orden }}')" class="btn-assign" style="background:#10b981; color:white; border:none; width: 100%; padding:12px;">🚚 Vehículo</button>
+                                    <button onclick="abrirModalDespacho('${op.orden}')" class="btn-assign" style="background:#10b981; color:white; border:none; width: 100%; padding:12px;">🚚 Vehículo</button>
                                     {% elif op.estado_visual == 'DESPACHADO' or op.estado_visual == 'TERMINADO' %}
                                     <button onclick="window.open('/bodegas/imprimir_acta/${op.orden}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>
                                     {% elif op.estado_visual == 'ALISTADO' %}
@@ -2835,6 +2850,39 @@
             document.getElementById('modalDetalleOrden').style.display = 'none';
         }
 
+        function resolverPromoHuerfana(idRow, ean, nombre) {
+            fetch('/api/bodegas/resolver_promo_huerfana', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_row: idRow })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.status === 'success') {
+                    alert("✅ " + res.message);
+                } else {
+                    alert("⚠️ " + res.message);
+                    cerrarModalDetalle();
+                    abrirModalPromociones();
+                    setTimeout(() => {
+                        let inputEan = document.getElementById('promo-codigo');
+                        let inputNombre = document.getElementById('promo-nombre');
+                        if(inputEan) {
+                            inputEan.value = ean !== 'SIN_CODIGO' ? ean : '';
+                            inputEan.readOnly = false;
+                        }
+                        if(inputNombre) {
+                            inputNombre.value = nombre;
+                        }
+                    }, 300);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("❌ Error de conexión al resolver promoción.");
+            });
+        }
+
         function cargarDatosDetalle(orden) {
             const tbPend = document.getElementById('tblPendientesBody');
             const tbList = document.getElementById('tblListosBody');
@@ -2928,6 +2976,7 @@
                     let htmlHuerfanas = '';
                     huerfanas.forEach((h, x) => {
                         let esPar = x % 2 === 0;
+                        let descClean = h.descripcion_producto.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                         htmlHuerfanas += `
                         <tr style="background-color: ${esPar ? '#f9fafb' : '#ffffff'}; border-bottom: 1px solid #f3f4f6;">
                             <td style="padding: 15px 12px; color: #374151;">
@@ -2935,7 +2984,7 @@
                                 <div style="font-size:0.75rem; color:#6b7280; margin-top:4px;">EAN: ${h.codigo_producto}</div>
                             </td>
                             <td style="padding: 15px 10px; text-align: center; vertical-align: middle;">
-                                <button onclick="abrirModalPromociones(); cerrarModalDetalle();" style="background:#e11d48; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:bold; width:100%;">⚙️ Configurar</button>
+                                <button onclick="resolverPromoHuerfana(${h.id}, '${h.codigo_producto}', '${descClean}')" style="background:#e11d48; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:bold; width:100%;">⚙️ Configurar</button>
                             </td>
                         </tr>`;
                     });
@@ -3615,7 +3664,11 @@
                 .then(r => r.json())
                 .then(data => {
                     selectProd.innerHTML = '<option value="">2. Selecciona Producto...</option>';
-                    data.forEach(p => { selectProd.innerHTML += `<option value="${p.ean}">${p.producto} (${p.unidad_embalaje})</option>`; });
+                    data.forEach(p => { 
+                        let descClean = p.producto.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                        let marcaClean = (p.fabricante || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                        selectProd.innerHTML += `<option value="${p.ean}" data-nombre="${descClean}" data-marca="${marcaClean}">${p.producto} (${p.unidad_embalaje})</option>`; 
+                    });
                 });
         }
 
@@ -3623,15 +3676,23 @@
             const selectProd = document.getElementById('promo-select-prod');
             const ean = selectProd.value;
             if (!ean) return alert("⚠️ Selecciona un producto hijo primero.");
-            const nombre = selectProd.options[selectProd.selectedIndex].text;
+            
+            const selectedOption = selectProd.options[selectProd.selectedIndex];
+            const nombre = selectedOption.getAttribute('data-nombre') || selectedOption.text;
+            const marca = selectedOption.getAttribute('data-marca') || 'N/A';
+            
             const cajas = parseInt(document.getElementById('promo-cajas').value) || 0;
             const unidades = parseInt(document.getElementById('promo-unidades').value) || 0;
 
             if (cajas === 0 && unidades === 0) return alert("⚠️ Debes indicar la cantidad de cajas o unidades.");
 
             const existente = kitActual.find(k => k.ean === ean);
-            if (existente) { existente.cajas += cajas; existente.unidades += unidades; } 
-            else kitActual.push({ ean, nombre, cajas, unidades });
+            if (existente) { 
+                existente.cajas += cajas; 
+                existente.unidades += unidades; 
+            } else {
+                kitActual.push({ ean, nombre, marca, cajas, unidades });
+            }
 
             document.getElementById('promo-cajas').value = '0';
             document.getElementById('promo-unidades').value = '0';
@@ -3640,27 +3701,29 @@
         }
 
         function renderizarCajaKit() {
-            const caja = document.getElementById('caja-kit');
-            caja.innerHTML = '';
+            const tbody = document.getElementById('caja-kit-body');
+            tbody.innerHTML = '';
             if (kitActual.length === 0) {
-                caja.innerHTML = '<div style="text-align:center; color:#9ca3af; padding-top:30px; font-weight:500;">Tu kit está vacío</div>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#9ca3af; padding:30px; font-weight:500;">Tu kit está vacío</td></tr>';
                 return;
             }
 
             kitActual.forEach((item, index) => {
-                caja.innerHTML += `
-                    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                        <div>
-                            <div style="font-weight: 700; font-size: 0.95rem; color: #374151;">${item.nombre}</div>
-                            <div style="font-size: 0.85rem; color: #db2777; font-weight: 700;">
-                                ${item.cajas > 0 ? item.cajas + ' CJ ' : ''} ${item.unidades > 0 ? item.unidades + ' UN' : ''}
-                            </div>
-                        </div>
-                        <button onclick="quitarDeKit(${index})" style="background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-weight: 800; font-size:1.1rem;">X</button>
-                    </div>
+                tbody.innerHTML += `
+                    <tr style="background: white; border-bottom: 1px solid #f1f5f9;">
+                        <td data-label="Producto" style="font-weight: 700; color: #1f2937; font-size: 0.9rem;">${item.nombre}</td>
+                        <td data-label="EAN" style="font-family: monospace; font-size: 0.85rem; color: #64748b;">${item.ean}</td>
+                        <td data-label="Fabricante" style="font-size: 0.85rem; color: #64748b;">${item.marca || 'N/A'}</td>
+                        <td data-label="Cajas" style="font-weight: 700; color: #db2777; text-align: center;">${item.cajas}</td>
+                        <td data-label="Unidades" style="font-weight: 700; color: #db2777; text-align: center;">${item.unidades}</td>
+                        <td data-label="Acción" style="text-align: center;">
+                            <button onclick="quitarDeKit(${index})" style="background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-weight: 800; font-size:1.1rem;" title="Eliminar Componente">X</button>
+                        </td>
+                    </tr>
                 `;
             });
         }
+        
         function quitarDeKit(index) { kitActual.splice(index, 1); renderizarCajaKit(); }
 
         // MÓDULO DE PROMOCIONES - FUNCIONES ACTUALIZADAS
@@ -3751,7 +3814,8 @@
                 .then(data => {
                     kitActual = data.map(d => ({
                         ean: d.ean_componente,
-                        nombre: d.descripcion_componente,
+                        nombre: d.nombre_componente || d.descripcion_componente,
+                        marca: d.marca_componente || 'N/A',
                         cajas: d.cajas_componente,
                         unidades: d.fracciones_componente
                     }));

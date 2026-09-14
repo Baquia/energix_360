@@ -42,6 +42,9 @@
         .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
         .user-role { font-size: 10px; color: var(--text-muted); background: rgba(255, 255, 255, 0.6); padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
 
+        .network-status { font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 12px; background: #10b981; color: white; margin-top: 5px; text-align: center; }
+        .network-status.offline { background: #ef4444; }
+
         .wrap { width: 100%; max-width: 900px; margin: 20px auto 40px; padding: 0 20px; }
         .welcome-title { color: var(--verde); font-size: 22px; font-weight: 700; margin-bottom: 25px; text-align: left; border-bottom: 2px solid rgba(1, 82, 73, 0.1); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
 
@@ -63,14 +66,11 @@
 
         /* MODALES */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.85); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
-        .modal-box { background: var(--surface); width: 90%; max-width: 400px; border-radius: var(--radius); padding: 30px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
-        .modal-title { color: var(--verde); margin-bottom: 10px; font-size: 20px; display: flex; justify-content: space-between; align-items: center;}
+        .modal-box { background: var(--surface); width: 90%; max-width: 400px; border-radius: var(--radius); padding: 30px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-height: 90vh; overflow-y: auto;}
+        .modal-title { color: var(--verde); margin-bottom: 10px; font-size: 20px; display: flex; justify-content: space-between; align-items: center; font-weight: bold;}
         .modal-text { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
-        .form-group { text-align: left; margin-bottom: 15px; }
-        .form-group label { font-size: 13px; font-weight: bold; color: var(--text); }
-        .form-group select, .form-group input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); margin-top: 5px; font-size: 14px; outline: none;}
-        .form-group select:focus, .form-group input:focus { border-color: var(--verde); }
         .btn-submit { background: var(--verde); color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
+        .btn-success { background: #10b981; color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
         .btn-cancel { background: #f3f4f6; color: #4b5563; border: 1px solid var(--border); padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
 
         /* HITOS Y FIRMA */
@@ -108,14 +108,13 @@
             <span class="user-role">Operador Especial</span>
             {% if session.get('placa_prelogueada_especial') %}
                 <span class="user-role" style="background-color: var(--verde); color: white; margin-top: 5px; font-size: 11px;">Vehículo: {{ session.get('placa_prelogueada_especial') }}</span>
+                <div id="netStatus" class="network-status">Online</div>
             {% endif %}
         </div>
     </header>
 
     <main class="wrap">
-        <h2 class="welcome-title">
-            Consola Operativa
-        </h2>
+        <h2 class="welcome-title">Consola Operativa</h2>
         
         <div class="modules-grid">
             {% if session.get('placa_prelogueada_especial') %}
@@ -131,13 +130,12 @@
                         <!-- PANEL DE HITOS OBLIGATORIOS -->
                         <div style="background: var(--surface); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow);">
                             <h3 style="font-size: 16px; color: var(--verde); margin-bottom: 5px;">Evidencias de Recorrido</h3>
-                            <p style="font-size: 12px; color: var(--text-muted);">Adjunte las evidencias fotográficas en cada punto para poder finalizar el viaje y generar el reporte seguro.</p>
+                            <p style="font-size: 12px; color: var(--text-muted);">Adjunte las evidencias fotográficas obligatorias (Cámara en vivo) para poder finalizar el viaje.</p>
                             
                             <div class="hitos-container">
-                                <!-- Inputs Ocultos de Cámara -->
-                                <input type="file" id="camOrigen" capture="environment" accept="image/*" style="display:none;" onchange="procesarFoto(event, 'origen')">
-                                <input type="file" id="camDestino" capture="environment" accept="image/*" style="display:none;" onchange="procesarFoto(event, 'destino')">
-                                <input type="file" id="camRetorno" capture="environment" accept="image/*" style="display:none;" onchange="procesarFoto(event, 'retorno')">
+                                <!-- Inputs Ocultos de Cámara - RESTRINGIDOS -->
+                                <input type="file" id="camOrigen" accept="image/jpeg, image/png" capture="environment" style="display:none;" onchange="procesarFoto(event, 'origen')">
+                                <input type="file" id="camDestino" accept="image/jpeg, image/png" capture="environment" style="display:none;" onchange="procesarFoto(event, 'destino')">
 
                                 <button id="btnHito1" class="btn-hito active" onclick="document.getElementById('camOrigen').click()">
                                     <span>📸 1. Recogida (Origen)</span> <span class="hito-icon" id="iconHito1">⏳</span>
@@ -146,25 +144,16 @@
                                 <button id="btnHito2" class="btn-hito" disabled onclick="document.getElementById('camDestino').click()">
                                     <span>📸 2. Llegada (Destino)</span> <span class="hito-icon" id="iconHito2">🔒</span>
                                 </button>
-                                
-                                <!-- BOTÓN INTERMEDIO DE REANUDACIÓN DE VIAJE (PAUSAS EPS) -->
-                                <button id="btnReanudar" class="btn-submit" onclick="procesarReinicio()" style="display:none; background: #0ea5e9; font-size: 14px; margin-top: 10px; margin-bottom: 10px;">
-                                    ▶️ Reanudar Viaje (Paciente a Bordo)
-                                </button>
-
-                                <button id="btnHito3" class="btn-hito" disabled onclick="document.getElementById('camRetorno').click()">
-                                    <span>📸 3. Retorno (Origen)</span> <span class="hito-icon" id="iconHito3">🔒</span>
-                                </button>
                             </div>
                             
                             <button id="btnFirmarCerrar" onclick="abrirModalFirma()" class="btn-submit" style="background: #ef4444; margin-top: 20px; display: none;">
-                                ✍️ Firmar y Finalizar Viaje
+                                📝 Completar Declaración y Cerrar Viaje
                             </button>
                         </div>
                     </div>
 
                 {% else %}
-                    <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE -->
+                    <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE MANUALMENTE -->
                     <div style="width: 100%; text-align: center; grid-column: 1 / -1; padding: 30px 10px;">
                         <h3 style="color: var(--verde); margin-bottom: 15px;">Vehículo enlazado: {{ session.get('placa_prelogueada_especial') }}</h3>
                         
@@ -174,10 +163,19 @@
                                 <span style="font-size: 24px;">📋</span> Diligenciar Preoperacional
                             </a>
                         {% elif estatus_vehiculo == 'Logueado' %}
-                            <p style="color: var(--text-muted); margin-bottom: 25px;">El vehículo está listo. Inicie el servicio asociando el Token de 6 caracteres asignado por el controlador.</p>
-                            <button onclick="document.getElementById('modalIniciarViaje').style.display='flex'" class="btn-card" style="background: var(--verde); color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(1, 82, 73, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto;">
-                                <span style="font-size: 24px;">▶</span> VINCULAR Y EMPEZAR
-                            </button>
+                            <p style="color: var(--text-muted); margin-bottom: 25px;">El vehículo está listo. Ingrese el código del viaje para iniciar la operación.</p>
+                            
+                            <!-- Ingreso Manual de ID Único -->
+                            <div style="background: var(--surface); padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid var(--border); max-width: 450px; margin: 0 auto; text-align: left;">
+                                <p style="font-size: 14px; color: var(--verde-osc); margin-bottom: 15px; font-weight: bold;">Código enviado por Telegram:</p>
+                                <div style="display: flex; gap: 10px; flex-direction: column;">
+                                    <input type="text" id="manual_id_viaje" placeholder="Ej: 3UIE5R_IDA" style="width: 100%; padding: 16px; border-radius: 10px; border: 2px solid var(--border); font-family: monospace; text-transform: uppercase; font-size: 16px; outline: none; text-align: center; letter-spacing: 2px;">
+                                    <button onclick="iniciarViajeManual()" class="btn-card" style="background: var(--verde); padding: 16px 20px; border-radius: 10px; border: none; color: white; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px;">
+                                        <span>▶</span> Iniciar Recorrido
+                                    </button>
+                                </div>
+                            </div>
+
                         {% else %}
                             <p style="color: var(--text-muted); margin-bottom: 25px;">El estado del vehículo no permite iniciar viaje en este momento.</p>
                         {% endif %}
@@ -218,41 +216,121 @@
         </div>
     </div>
 
-    <!-- MODAL DE INICIO DE VIAJE (VINCULACIÓN TOKEN) -->
-    <div id="modalIniciarViaje" class="modal-overlay">
-        <div class="modal-box">
-            <h3 class="modal-title">Iniciar Servicio</h3>
-            <p class="modal-text">Ingrese el Token (ID Viaje) alfanumérico de 6 caracteres recibido en Telegram para validar la asignación y empezar.</p>
-            <div class="form-group">
-                <label>Token del Viaje Asignado:</label>
-                <input type="text" id="id_traslado_eps_input" placeholder="Ej. 62D9GI" maxlength="6" required style="text-transform: uppercase; font-family: monospace; font-size: 18px; text-align: center; letter-spacing: 2px;">
-            </div>
-            <button onclick="iniciarViaje()" class="btn-submit" id="btnProcesarInicio">Validar y Empezar</button>
-            <button onclick="document.getElementById('modalIniciarViaje').style.display='none'" class="btn-cancel">Cancelar</button>
-        </div>
-    </div>
-
     <!-- MODAL DE FIRMA Y FINALIZACIÓN -->
     <div id="modalFirma" class="modal-overlay">
         <div class="modal-box" style="max-width: 500px;">
-            <h3 class="modal-title">Firma de Conformidad</h3>
-            <p class="modal-text" style="font-size: 12px;">El paciente o su acudiente debe firmar en pantalla para validar la finalización del recorrido seguro.</p>
+            <h3 class="modal-title">Finalización y Declaración</h3>
             
+            <p style="font-size: 11px; text-align: justify; color: #4b5563; background: #f3f4f6; padding: 10px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid var(--verde);">
+                <b>Declaración Juramentada:</b> Declaro que los datos aquí registrados corresponden a la realidad y que este tramo del viaje ha sido ejecutado de manera real según la orden de servicio establecida, cumpliendo con los protocolos normativos vigentes.
+            </p>
+
+            <input type="file" id="camPaciente" accept="image/jpeg, image/png" capture="environment" style="display:none;" onchange="procesarFotoPaciente(event)">
+            <button type="button" id="btnFotoPaciente" onclick="document.getElementById('camPaciente').click()" class="btn-cancel" style="margin-top: 0; margin-bottom: 10px; background: #e0f2fe; color: #0284c7; border-color: #bae6fd;">
+                📸 Tomar Foto del Paciente (Obligatorio)
+            </button>
+            <p id="lblFotoPaciente" style="font-size: 12px; color: #10b981; display: none; font-weight: bold; margin-bottom: 10px;">✔️ Foto del paciente adjuntada correctamente</p>
+
+            <p class="modal-text" style="font-size: 12px; margin-bottom: 5px;">Firma de conformidad (Paciente o Acudiente):</p>
             <canvas id="signaturePad" width="300" height="150"></canvas>
             
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button onclick="limpiarFirma()" class="btn-cancel" style="margin-top: 0;">🧹 Limpiar</button>
-                <button onclick="enviarEvidenciasYFinalizar()" class="btn-submit" id="btnProcesarFin" style="margin-top: 0;">Generar Sello y Cerrar</button>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button onclick="limpiarFirma()" class="btn-cancel" style="margin-top: 0;">🧹 Limpiar Firma</button>
+                <button onclick="confirmarAccion('¿Está seguro que desea FINALIZAR el viaje y enviar las evidencias?', enviarEvidenciasYFinalizar)" class="btn-submit" id="btnProcesarFin" style="margin-top: 0;">Generar Sello y Cerrar</button>
             </div>
-            <button onclick="document.getElementById('modalFirma').style.display='none'" class="btn-cancel" style="background: transparent; border: none; margin-top: 5px;">Volver</button>
+            <button onclick="document.getElementById('modalFirma').style.display='none'" class="btn-cancel" style="background: transparent; border: none; margin-top: 5px;">Volver a Hitos</button>
         </div>
     </div>
 
-    <!-- SCRIPT GLOBAL, VIAJES, HITOS Y QR SCANNER -->
+    <!-- MODAL UNIVERSAL DE CONFIRMACIÓN -->
+    <div id="modalConfirmacionUniversal" class="modal-overlay" style="z-index: 9999;">
+        <div class="modal-box" style="max-width: 350px;">
+            <h3 class="modal-title" style="color: var(--verde);">Confirmar Acción</h3>
+            <p class="modal-text" id="textoConfirmacionUniversal"></p>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn-cancel" onclick="cerrarModalUniversal()">No, Cancelar</button>
+                <button type="button" class="btn-submit" onclick="ejecutarAccionUniversal()" style="background: var(--verde);">Sí, Proceder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT GLOBAL, VIAJES, HITOS, OFFLINE Y QR SCANNER -->
     <script>
         let isNavigatingLegally = false;
+        let accionPendienteUniversal = null;
+        let idViajeSeleccionadoTemp = null;
+        let trayectoSeleccionadoTemp = null;
 
+        // ============================================
+        // CONTROL OFFLINE Y SINCRONIZACIÓN (INDEXEDDB)
+        // ============================================
+        const dbName = "BQATransporteDB";
+        let db;
+        const reqDB = indexedDB.open(dbName, 1);
+        reqDB.onupgradeneeded = (e) => {
+            db = e.target.result;
+            if(!db.objectStoreNames.contains('viajes_offline')) {
+                db.createObjectStore('viajes_offline', { keyPath: 'id_local', autoIncrement: true });
+            }
+        };
+        reqDB.onsuccess = (e) => { db = e.target.result; sincronizarOffline(); };
+
+        function updateNetworkStatus() {
+            const el = document.getElementById('netStatus');
+            if(!el) return;
+            if (navigator.onLine) {
+                el.textContent = 'Online';
+                el.className = 'network-status';
+                sincronizarOffline();
+            } else {
+                el.textContent = 'Offline (Guardando local)';
+                el.className = 'network-status offline';
+            }
+        }
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+
+        function guardarViajeOffline(payload) {
+            const tx = db.transaction('viajes_offline', 'readwrite');
+            tx.objectStore('viajes_offline').add(payload);
+            alert("📍 Sin conexión de red detectada. El viaje se guardó exitosamente en el dispositivo y se enviará automáticamente cuando recupere la señal.");
+            finalizarFlujoUI();
+        }
+
+        function sincronizarOffline() {
+            if(!db || !navigator.onLine) return;
+            const tx = db.transaction('viajes_offline', 'readonly');
+            const store = tx.objectStore('viajes_offline');
+            const req = store.getAll();
+            req.onsuccess = async () => {
+                const viajes = req.result;
+                if(viajes.length > 0) {
+                    const el = document.getElementById('netStatus');
+                    if(el) el.textContent = 'Sincronizando...';
+                }
+                for(let v of viajes) {
+                    try {
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                        const res = await fetch("{{ url_for('operador_flotaespecial.finalizar_viaje_especial') }}", {
+                            method: "POST", headers: { "Content-Type": "application/json", 'X-CSRFToken': csrfToken },
+                            body: JSON.stringify(v)
+                        });
+                        if(res.ok) {
+                            const txDel = db.transaction('viajes_offline', 'readwrite');
+                            txDel.objectStore('viajes_offline').delete(v.id_local);
+                        }
+                    } catch(e) { console.error("Fallo sync", e); }
+                }
+                updateNetworkStatus();
+            };
+        }
+
+        // ============================================
+        // INICIO, EVENTOS NATIVOS Y RECUPERACIÓN
+        // ============================================
         document.addEventListener("DOMContentLoaded", function () {
+            updateNetworkStatus();
+            
             if ({% if session.get('viaje_activo_especial') %}true{% else %}false{% endif %}) {
                 verificarHitosUI();
                 initFirmaCanvas();
@@ -271,9 +349,7 @@
                 const viajeActivoServer = {% if session.get('viaje_activo_especial') %}true{% else %}false{% endif %};
 
                 if (viajeGuardado === 'true' && placaGuardada && !viajeActivoServer && navigator.onLine) {
-                    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-                    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
-
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
                     fetch("{{ url_for('operador_flotaespecial.recuperar_viaje_especial') }}", {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
@@ -281,11 +357,8 @@
                     })
                     .then(res => res.json())
                     .then(data => {
-                        if(data.status === 'success') {
-                            window.location.reload();
-                        } else {
-                            limpiarViajeLocal();
-                        }
+                        if(data.status === 'success') { window.location.reload(); } 
+                        else { limpiarViajeLocal(); }
                     }).catch(e => console.error("Error en reconexión silenciosa:", e));
                 }
             }
@@ -298,15 +371,10 @@
                     e.preventDefault();
                     isNavigatingLegally = true; 
                     const logoutUrl = this.href;
-                    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-                    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
-                    
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
                     fetch("{{ url_for('operador_flotaespecial.logout_manual_flotaespecial') }}", {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
-                    }).finally(() => {
-                        window.location.href = logoutUrl;
-                    });
+                        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
+                    }).finally(() => { window.location.href = logoutUrl; });
                 });
             }
 
@@ -331,6 +399,70 @@
                 }
             });
         });
+
+        // ============================================
+        // MODAL UNIVERSAL
+        // ============================================
+        function confirmarAccion(mensaje, callback) {
+            document.getElementById('textoConfirmacionUniversal').innerText = mensaje;
+            accionPendienteUniversal = callback;
+            document.getElementById('modalConfirmacionUniversal').style.display = 'flex';
+        }
+        function cerrarModalUniversal() {
+            document.getElementById('modalConfirmacionUniversal').style.display = 'none';
+            accionPendienteUniversal = null;
+        }
+        function ejecutarAccionUniversal() {
+            if(accionPendienteUniversal) accionPendienteUniversal();
+            cerrarModalUniversal();
+        }
+
+        // ============================================
+        // INICIO MANUAL DE VIAJES (TOKEN)
+        // ============================================
+        function iniciarViajeManual() {
+            const manualId = document.getElementById('manual_id_viaje').value.trim().toUpperCase();
+            if (!manualId) {
+                alert("Por favor ingrese el código del viaje enviado por Telegram.");
+                return;
+            }
+            const trayecto = manualId.includes('_VUELTA') ? 'VUELTA' : 'IDA';
+            prepararInicioViaje(manualId, trayecto);
+        }
+
+        function prepararInicioViaje(idViaje, trayecto) {
+            idViajeSeleccionadoTemp = idViaje;
+            trayectoSeleccionadoTemp = trayecto;
+            confirmarAccion(`¿Está seguro que desea INICIAR el viaje ${idViaje} ahora?`, iniciarViaje);
+        }
+
+        function iniciarViaje() {
+            if (!idViajeSeleccionadoTemp) return;
+            
+            if(!navigator.onLine) {
+                alert("Debes tener conexión a Internet para INICIAR un viaje.");
+                return;
+            }
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            fetch("{{ url_for('operador_flotaespecial.iniciar_viaje_especial') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ id_traslado_eps: idViajeSeleccionadoTemp })
+            }).then(res => res.json())
+              .then(data => {
+                  if(data.status === 'success') {
+                      localStorage.setItem('bqa_viaje_activo_especial', 'true');
+                      localStorage.setItem('bqa_placa_activa_especial', '{{ session.get("placa_prelogueada_especial") }}');
+                      localStorage.setItem('bqa_trayecto_activo', trayectoSeleccionadoTemp);
+                      localStorage.setItem('bqa_ultimo_id_viaje', idViajeSeleccionadoTemp);
+                      
+                      window.location.reload();
+                  } else {
+                      alert("Error al iniciar: " + data.message);
+                  }
+              }).catch(e => alert("Error de conexión. Intente nuevamente."));
+        }
 
         // ============================================
         // LÓGICA DE ESCANEO DE QR (PRE-LOGUEO)
@@ -384,35 +516,41 @@
         }
 
         function ejecutarPreLogin(placa) {
-            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
-            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             fetch("{{ url_for('operador_flotaespecial.prelogin_flotaespecial') }}", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                 body: JSON.stringify({ placa: placa })
             })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) {
+            .then(async res => {
+                const isJson = res.headers.get('content-type')?.includes('application/json');
+                const data = isJson ? await res.json() : null;
+
+                if (!res.ok) {
+                    const errorMsg = (data && data.message) || `Error del servidor HTTP ${res.status}`;
+                    throw new Error(errorMsg);
+                }
+                
+                if (data && data.success) {
                     window.location.reload();
                 } else {
-                    alert("Error en validación: " + data.message);
+                    throw new Error((data && data.message) || "Error desconocido en validación.");
                 }
             })
             .catch(e => {
-                alert("Error de conexión al servidor. Verifique su señal de internet.");
+                // Muestra el error real (sea de servidor, validación de placa o red)
+                alert("Falla en la operación: " + e.message);
             });
         }
 
         // ============================================
-        // CAPTURA DE GPS Y FOTO POR EVENTO (SINTONIZADO)
+        // CAPTURA DE GPS Y FOTO CON COMPRESIÓN CANVAS 
         // ============================================
         function procesarFoto(event, hito) {
             const file = event.target.files[0];
             if (!file) return;
 
-            const iconId = 'iconHito' + (hito === 'origen' ? '1' : (hito === 'destino' ? '2' : '3'));
+            const iconId = 'iconHito' + (hito === 'origen' ? '1' : '2');
             const iconEl = document.getElementById(iconId);
             const originalIcon = iconEl.innerText;
             iconEl.innerText = '⏳';
@@ -430,10 +568,10 @@
                     _dibujarYGuardar(file, hito, lat, lng, iconEl, originalIcon);
                 },
                 function(err) {
-                    alert("No se pudo obtener la ubicación GPS. Verifique que el GPS de su celular esté encendido y otorgue permisos.");
+                    alert("No se pudo obtener la ubicación GPS rápidamente. Verifique que el GPS esté encendido.");
                     iconEl.innerText = originalIcon;
                 },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
             );
         }
 
@@ -443,7 +581,7 @@
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800;
+                    const MAX_WIDTH = 800; 
                     const MAX_HEIGHT = 800;
                     let width = img.width;
                     let height = img.height;
@@ -473,7 +611,7 @@
                     ctx.fillText(`Fecha/Hora: ${dateStr}`, 10, height - 20);
                     ctx.fillText(`Coordenadas: ${latStr}, ${lngStr}`, 10, height - 5);
 
-                    const base64Str = canvas.toDataURL('image/jpeg', 0.8);
+                    const base64Str = canvas.toDataURL('image/jpeg', 0.6);
                     localStorage.setItem(`bqa_foto_${hito}`, base64Str);
                     
                     const telemetria = {
@@ -485,6 +623,10 @@
 
                     iconEl.innerText = originalIcon;
                     verificarHitosUI();
+
+                    if (hito === 'destino') {
+                        setTimeout(abrirModalFirma, 500);
+                    }
                 };
                 img.src = e.target.result;
             };
@@ -492,57 +634,52 @@
         }
 
         // ============================================
-        // EVENTO: REANUDACIÓN DE VIAJE (PAUSA PACIENTE)
+        // CAPTURA FOTO DEL PACIENTE (SIN TELEMETRÍA)
         // ============================================
-        window.procesarReinicio = function() {
-            const btn = document.getElementById('btnReanudar');
-            btn.disabled = true;
-            btn.innerText = "⏳ Capturando GPS de Reanudación...";
+        function procesarFotoPaciente(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800; const MAX_HEIGHT = 800;
+                    let width = img.width; let height = img.height;
+                    
+                    if (width > height) { 
+                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } 
+                    } else { 
+                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } 
+                    }
+                    
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
 
-            if (!navigator.geolocation) {
-                alert("Su navegador no soporta geolocalización.");
-                btn.disabled = false;
-                btn.innerText = "▶️ Reanudar Viaje (Paciente a Bordo)";
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(
-                function(pos) {
-                    const telemetria = {
-                        lat: pos.coords.latitude,
-                        lng: pos.coords.longitude,
-                        hora: new Date().toISOString().slice(0, 19).replace('T', ' ')
-                    };
-                    localStorage.setItem('bqa_telemetria_reinicio', JSON.stringify(telemetria));
-                    verificarHitosUI();
-                },
-                function(err) {
-                    alert("Error al obtener GPS para reanudar el viaje. Asegúrese de tener el GPS activo.");
-                    btn.disabled = false;
-                    btn.innerText = "▶️ Reanudar Viaje (Paciente a Bordo)";
-                },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-            );
-        };
+                    const base64Str = canvas.toDataURL('image/jpeg', 0.6);
+                    localStorage.setItem('bqa_foto_paciente', base64Str);
+                    
+                    document.getElementById('lblFotoPaciente').style.display = 'block';
+                    document.getElementById('btnFotoPaciente').style.display = 'none';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
 
         function verificarHitosUI() {
             const fOrigen = localStorage.getItem('bqa_foto_origen');
             const fDestino = localStorage.getItem('bqa_foto_destino');
-            const fRetorno = localStorage.getItem('bqa_foto_retorno');
-            const tReinicio = localStorage.getItem('bqa_telemetria_reinicio');
 
             const btn1 = document.getElementById('btnHito1');
             const btn2 = document.getElementById('btnHito2');
-            const btn3 = document.getElementById('btnHito3');
-            const btnReanudar = document.getElementById('btnReanudar');
             const icon1 = document.getElementById('iconHito1');
             const icon2 = document.getElementById('iconHito2');
-            const icon3 = document.getElementById('iconHito3');
             const btnCerrar = document.getElementById('btnFirmarCerrar');
 
             if (!btn1) return;
 
-            // Hito 1: Recogida
             if (fOrigen) {
                 btn1.classList.remove('active'); btn1.classList.add('done');
                 icon1.innerText = '✔️';
@@ -552,38 +689,15 @@
                 }
             }
             
-            // Hito 2: Llegada a Destino y Pausa EPS
             if (fDestino) {
                 btn2.classList.remove('active'); btn2.classList.add('done');
                 icon2.innerText = '✔️';
-                
-                if (!tReinicio) {
-                    if(btnReanudar) {
-                        btnReanudar.style.display = 'block';
-                        btnReanudar.disabled = false;
-                        btnReanudar.innerText = "▶️ Reanudar Viaje (Paciente a Bordo)";
-                    }
-                    btn3.disabled = true; btn3.classList.remove('active');
-                    icon3.innerText = '🔒';
-                } else {
-                    if(btnReanudar) btnReanudar.style.display = 'none';
-                    if (!fRetorno) {
-                        btn3.disabled = false; btn3.classList.add('active');
-                        icon3.innerText = '⏳';
-                    }
-                }
-            }
-
-            // Hito 3: Retorno
-            if (fRetorno) {
-                btn3.classList.remove('active'); btn3.classList.add('done');
-                icon3.innerText = '✔️';
                 btnCerrar.style.display = 'block';
             }
         }
 
         // ============================================
-        // LÓGICA DE FIRMA CANVAS
+        // LÓGICA DE FIRMA CANVAS Y MODAL (CORREGIDO)
         // ============================================
         let ctxFirma = null;
         let isDrawing = false;
@@ -598,10 +712,22 @@
 
             function getCoordinates(event) {
                 const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+
+                let clientX, clientY;
                 if (event.touches && event.touches.length > 0) {
-                    return { x: event.touches[0].clientX - rect.left, y: event.touches[0].clientY - rect.top };
+                    clientX = event.touches[0].clientX;
+                    clientY = event.touches[0].clientY;
+                } else {
+                    clientX = event.clientX;
+                    clientY = event.clientY;
                 }
-                return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+                
+                return { 
+                    x: (clientX - rect.left) * scaleX, 
+                    y: (clientY - rect.top) * scaleY 
+                };
             }
 
             canvas.addEventListener('mousedown', (e) => { isDrawing = true; const coords = getCoordinates(e); ctxFirma.beginPath(); ctxFirma.moveTo(coords.x, coords.y); });
@@ -620,88 +746,92 @@
         }
 
         function abrirModalFirma() {
-            document.getElementById('modalFirma').style.display = 'flex';
+            if(localStorage.getItem('bqa_foto_paciente')) {
+                document.getElementById('lblFotoPaciente').style.display = 'block';
+                document.getElementById('btnFotoPaciente').style.display = 'none';
+            } else {
+                document.getElementById('lblFotoPaciente').style.display = 'none';
+                document.getElementById('btnFotoPaciente').style.display = 'block';
+            }
+            
+            const modal = document.getElementById('modalFirma');
+            modal.style.display = 'flex';
+            
+            // Recalcular y fijar el canvas de firma en base a su visualización real en pantalla
+            setTimeout(() => {
+                const canvas = document.getElementById('signaturePad');
+                if(canvas) {
+                    const rect = canvas.parentElement.getBoundingClientRect();
+                    canvas.width = rect.width - 60; // Descontar padding del modal box
+                    canvas.height = 150;
+                    initFirmaCanvas(); // Reinicializar contexto tras cambio de tamaño
+                }
+            }, 50);
         }
 
         // ============================================
-        // API CALLS: INICIAR / FINALIZAR VIAJE
+        // FINALIZAR VIAJE (ONLINE Y OFFLINE)
         // ============================================
         function limpiarViajeLocal() {
             localStorage.removeItem('bqa_viaje_activo_especial');
-            localStorage.removeItem('bqa_placa_activa_especial');
             localStorage.removeItem('bqa_foto_origen');
             localStorage.removeItem('bqa_foto_destino');
-            localStorage.removeItem('bqa_foto_retorno');
+            localStorage.removeItem('bqa_foto_paciente');
             localStorage.removeItem('bqa_telemetria_origen');
             localStorage.removeItem('bqa_telemetria_destino');
-            localStorage.removeItem('bqa_telemetria_retorno');
-            localStorage.removeItem('bqa_telemetria_reinicio');
         }
 
-        function iniciarViaje() {
-            const idTraslado = document.getElementById('id_traslado_eps_input').value.trim().toUpperCase();
-            if (!idTraslado || idTraslado.length !== 6) {
-                alert("Por favor ingrese un Token de viaje válido (6 caracteres).");
-                return;
-            }
-
-            const btn = document.getElementById('btnProcesarInicio');
-            btn.disabled = true;
-            btn.innerHTML = '⏱ Validando y Enlazando...';
-
-            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
-            
-            fetch("{{ url_for('operador_flotaespecial.iniciar_viaje_especial') }}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ id_traslado_eps: idTraslado })
-            }).then(res => res.json())
-              .then(data => {
-                  if(data.status === 'success') {
-                      localStorage.setItem('bqa_viaje_activo_especial', 'true');
-                      localStorage.setItem('bqa_placa_activa_especial', '{{ session.get("placa_prelogueada_especial") }}');
-                      window.location.reload();
-                  } else {
-                      alert("Error al validar el Token: " + data.message);
-                      btn.disabled = false;
-                      btn.innerHTML = 'Validar y Empezar';
-                  }
-              }).catch(e => {
-                  alert("Error de conexión. Intente nuevamente.");
-                  btn.disabled = false;
-                  btn.innerHTML = 'Validar y Empezar';
-              });
+        function finalizarFlujoUI() {
+            limpiarViajeLocal();
+            // Nueva instrucción: Limpieza total y reinicio a la pantalla principal
+            alert("✅ Recorrido finalizado exitosamente. Ya puede recibir o iniciar una nueva asignación.");
+            window.location.reload();
         }
 
         function enviarEvidenciasYFinalizar() {
             const canvas = document.getElementById('signaturePad');
+            const fotoPaciente = localStorage.getItem('bqa_foto_paciente');
+            
+            if(!fotoPaciente) {
+                alert("Es obligatorio adjuntar la foto del paciente para validar el recorrido.");
+                return;
+            }
+
+            const blank = document.createElement('canvas');
+            blank.width = canvas.width; blank.height = canvas.height;
+            if(canvas.toDataURL() === blank.toDataURL()) {
+                alert("Falta la firma de conformidad.");
+                return;
+            }
+
             const firmaB64 = canvas.toDataURL("image/png");
             
             let telOrigen = JSON.parse(localStorage.getItem('bqa_telemetria_origen') || '{}');
             let telDestino = JSON.parse(localStorage.getItem('bqa_telemetria_destino') || '{}');
-            let telReinicio = JSON.parse(localStorage.getItem('bqa_telemetria_reinicio') || '{}');
-            let telRetorno = JSON.parse(localStorage.getItem('bqa_telemetria_retorno') || '{}');
 
             const payload = {
                 foto_origen: localStorage.getItem('bqa_foto_origen'),
                 foto_destino: localStorage.getItem('bqa_foto_destino'),
-                foto_retorno: localStorage.getItem('bqa_foto_retorno'),
+                foto_paciente: fotoPaciente, 
                 firma: firmaB64,
                 telemetria: {
                     lat_origen: telOrigen.lat, lng_origen: telOrigen.lng, hora_origen: telOrigen.hora,
-                    lat_destino: telDestino.lat, lng_destino: telDestino.lng, hora_destino: telDestino.hora,
-                    hora_reinicio: telReinicio.hora,
-                    lat_retorno: telRetorno.lat, lng_retorno: telRetorno.lng, hora_retorno: telRetorno.hora
-                }
+                    lat_destino: telDestino.lat, lng_destino: telDestino.lng, hora_destino: telDestino.hora
+                },
+                id_viaje_fisico: '{{ session.get("id_viaje_especial") }}',
+                id_viaje_alfanumerico: '{{ session.get("codigo_viaje_alfanumerico") }}'
             };
 
             const btn = document.getElementById('btnProcesarFin');
             btn.disabled = true;
             btn.innerHTML = '⏱ Procesando Cierre...';
 
-            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-            const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            if(!navigator.onLine) {
+                guardarViajeOffline(payload);
+                return;
+            }
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             
             fetch("{{ url_for('operador_flotaespecial.finalizar_viaje_especial') }}", {
                 method: 'POST',
@@ -710,18 +840,14 @@
             }).then(res => res.json())
               .then(data => {
                   if(data.status === 'success') {
-                      limpiarViajeLocal();
-                      alert("Servicio finalizado exitosamente. Las evidencias se han enviado a la central y el sello criptográfico ha sido generado.");
-                      window.location.reload();
+                      finalizarFlujoUI();
                   } else {
                       alert("Error al finalizar viaje: " + data.message);
                       btn.disabled = false;
                       btn.innerHTML = 'Generar Sello y Cerrar';
                   }
               }).catch(e => {
-                  alert("Error de conexión al enviar evidencias. Intente de nuevo.");
-                  btn.disabled = false;
-                  btn.innerHTML = 'Generar Sello y Cerrar';
+                  guardarViajeOffline(payload);
               });
         }
     </script>

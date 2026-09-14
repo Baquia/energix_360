@@ -18,6 +18,8 @@ from app import mysql
 from app.utils import login_required_custom
 from functools import wraps
 import MySQLdb.cursors
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.barcode import qr
 
 bp_flotaespecial_eps = Blueprint('flotaespecial_eps', __name__, url_prefix='/gestor_flotaespecial/eps_bp')
 
@@ -50,15 +52,28 @@ def _obtener_codigo_dane(departamento, municipio):
     return dane_map.get(dep, {}).get(mun, "")
 
 # =========================================================
-# HELPER: CÁLCULO DE TURNOS (DIÁLISIS)
+# HELPER: CÁLCULO DE TURNOS Y FRECUENCIAS
 # =========================================================
-def _get_next_date(current_date, turno):
+def _get_next_date_turno(current_date, turno):
     """Calcula la siguiente fecha válida según el turno de diálisis"""
     next_d = current_date + timedelta(days=1)
     valid_days = [0, 2, 4] if turno == '1' else [1, 3, 5]
     while next_d.weekday() not in valid_days:
         next_d += timedelta(days=1)
     return next_d
+
+def _get_next_date_frecuencia(current_date, frecuencia):
+    """Calcula la siguiente fecha válida según la frecuencia seleccionada"""
+    if frecuencia == 'diaria': return current_date + timedelta(days=1)
+    elif frecuencia == 'cada_2_dias': return current_date + timedelta(days=2)
+    elif frecuencia == 'cada_3_dias': return current_date + timedelta(days=3)
+    elif frecuencia == 'cada_4_dias': return current_date + timedelta(days=4)
+    elif frecuencia == 'semanal': return current_date + timedelta(weeks=1)
+    elif frecuencia == 'quincenal': return current_date + timedelta(days=15)
+    elif frecuencia == 'mensual': return current_date + timedelta(days=30)
+    elif frecuencia == 'bimensual': return current_date + timedelta(days=60)
+    elif frecuencia == 'trimestral': return current_date + timedelta(days=90)
+    return current_date
 
 # =========================================================
 # HELPER: TELEGRAM Y EMAIL (Motor Dinámico)
@@ -80,6 +95,32 @@ def _enviar_mensajes_telegram_hilo(chat_ids, mensaje):
                         break
                 except Exception as e:
                     pass
+    hilo = threading.Thread(target=tarea_envio)
+    hilo.daemon = True
+    hilo.start()
+
+def _enviar_documento_telegram_hilo(chat_ids, mensaje, filepath):
+    TOKEN = "8841682239:AAFOj8TpeOW4ulhIkNoIyGaTZ2MLlI9ydVo"
+    def tarea_envio():
+        url = f"https://api.telegram.org/bot{TOKEN}/sendDocument"
+        for chat_id in chat_ids:
+            try:
+                with open(filepath, 'rb') as f:
+                    data = {
+                        "chat_id": chat_id,
+                        "caption": mensaje,
+                        "parse_mode": "Markdown"
+                    }
+                    files = {"document": f}
+                    for intento in range(3):
+                        try:
+                            resp = requests.post(url, data=data, files=files, timeout=15)
+                            if resp.status_code == 200:
+                                break
+                        except Exception:
+                            pass
+            except Exception:
+                pass
     hilo = threading.Thread(target=tarea_envio)
     hilo.daemon = True
     hilo.start()
@@ -226,7 +267,6 @@ def asegurar_tablas_transporte_especial(cur):
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """)
 
-    # Migración de columnas dinámicas
     try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN tipo_documento VARCHAR(20) AFTER nombre_usuario")
     except: pass
     try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN departamento_destino VARCHAR(100) AFTER direccion_origen")
@@ -261,7 +301,7 @@ def gestion_eps():
     return redirect(url_for('flotaespecial_eps.gestion_traslados_captura'))
 
 # =========================================================
-# ETAPA 1: CAPTURA (MAESTRA)
+# ETAPA 1: CAPTURA (MAESTRA) 
 # =========================================================
 @bp_flotaespecial_eps.route('/captura', methods=['GET', 'POST'])
 @login_required_custom
@@ -348,7 +388,7 @@ def gestion_traslados_captura():
                                 datos_extraidos["numero_autorizacion"] = num
                                 break
 
-                    stop_pattern = r'(?=\s{2,}|\||\n|TIPO|EDAD|SEXO|NUMERO|No CARN|NIVEL|DIRECCION|DEPARTAMENTO|CORREO|TELEFONO|MUNICIPIO|FECHA|PRIMER|SEGUNDO|$)'
+                    stop_pattern = r'(?=\s{2,}|\||\n|TIPO|EDAD|SEXO|NUMERO|No CARN|NIVEL|DEPARTAMENTO|CORREO|TELEFONO|MUNICIPIO|FECHA|PRIMER|SEGUNDO|$)'
 
                     regex_tipo = r'\b(CC|C[ée]dula(?: de ciudadan[íi]a)?|TI|Tarjeta(?: de identidad)?|RC|Registro civil|N[°º]\s*registro civil|RG|N[°º]\s*RG|CE|C\s*ext|Pasaporte|PA|PAS|Permiso de Protecci[óo]n Temporal|PPT)\b'
                     m_tdoc = re.search(r'(?:TIPO\s+DOC|TIPO\s+IDENTIFICACI[OÓ]N|IDENTIFICACI[OÓ]N)[\s\:\.\n\|]*' + regex_tipo, texto_paciente, flags=re.IGNORECASE)
@@ -414,17 +454,11 @@ def gestion_traslados_captura():
 
                     datos_extraidos["cod_mun_ent"] = _obtener_codigo_dane(datos_extraidos.get("departamento"), datos_extraidos.get("municipio"))
 
-                    m_dir = re.search(r'DIRECCI[OÓ]N[\s\:\.\n\|]+([A-Za-z0-9\#\-\s\.\/]+?)' + stop_pattern, texto_paciente, flags=re.IGNORECASE)
+                    m_dir = re.search(r'DIRECCI[OÓ]N[\s\:\.\n\|]*([^\n\|]+)', texto_paciente, flags=re.IGNORECASE)
                     if m_dir:
                          cand_dir = m_dir.group(1).strip().upper()
-                         valid_kws = ["CALLE", "CLL", "CARRERA", "CRA", "N°", "NÚMERO", "NUMERO", "AVENIDA", "AV", "AVDA", "SUR", "NORTE", "ESTE", "OESTE", "KILOMETRO", "KM", "VIA"]
-                         if any(kw in cand_dir for kw in valid_kws):
-                              if datos_extraidos.get("municipio") and datos_extraidos["municipio"] in cand_dir:
-                                  cand_dir = cand_dir.replace(datos_extraidos["municipio"], "").strip()
-                              if datos_extraidos.get("departamento") and datos_extraidos["departamento"] in cand_dir:
-                                  cand_dir = cand_dir.replace(datos_extraidos["departamento"], "").strip()
-                              cand_dir = re.sub(r'(CORREO|TELEFONO|DEPARTAMENTO|MUNICIPIO).*', '', cand_dir).strip()
-                              datos_extraidos["direccion_origen"] = re.sub(r'[\s\,]+$', '', cand_dir).strip()[:100] 
+                         cand_dir = re.sub(r'(CORREO|TELEFONO|DEPARTAMENTO|MUNICIPIO).*', '', cand_dir).strip()
+                         datos_extraidos["direccion_origen"] = re.sub(r'[\s\,]+$', '', cand_dir).strip()[:100] 
 
                     m_nombres = re.search(r'PRIMER APELLIDO(?:.*?)SEGUNDO NOMBRE[\s\n\|]+([A-Za-zñÑáéíóúÁÉÍÓÚ\s]+?)(?=\n|TIPO|EDAD|SEXO|NUMERO)', texto_paciente, flags=re.IGNORECASE)
                     if m_nombres:
@@ -468,7 +502,7 @@ def gestion_traslados_captura():
             numero_prescripcion = request.form.get('NoPrescripcion', '').strip()
             fecha_entrega_servicio = request.form.get('fecha_entrega_servicio') or None
             numero_autorizacion = request.form.get('numero_autorizacion', '').strip()
-            tipo_servicio = request.form.get('tipo_servicio', 'AMBULATORIA')
+            tipo_servicio = 'POR DEFINIR'
             codigo_servicio = request.form.get('CodSerTecAEntregar')
             
             nombre_usuario = request.form.get('nombre_usuario', '').strip()
@@ -495,23 +529,6 @@ def gestion_traslados_captura():
             observaciones = request.form.get('observaciones')
             ruta_documento = request.form.get('ruta_documento')
             
-            errores_validacion = []
-            if not eps_cliente.upper().endswith("EPS") and not eps_cliente.upper().endswith("S.A.S"):
-                errores_validacion.append("Asegúrese de que el nombre de la EPS sea válido (Regla 1).")
-            if numero_autorizacion == id_eps_cliente or numero_autorizacion == id_usuario:
-                errores_validacion.append("El Número de Orden/Autorización no puede ser igual al NIT ni al documento del paciente (Reglas 2, 3 y 6).")
-            if not nombre_usuario:
-                errores_validacion.append("No se pudo construir o extraer el nombre del paciente a partir de la sección de Datos (Reglas 4 y 5).")
-            if not id_usuario:
-                errores_validacion.append("Falta el documento de identidad del paciente (Regla 6).")
-            if not direccion_origen:
-                errores_validacion.append("Faltan los datos de Origen del viaje (Regla 7).")
-
-            if errores_validacion:
-                for err in errores_validacion:
-                    flash(err, 'danger')
-                return redirect(url_for('flotaespecial_eps.gestion_traslados_captura'))
-            
             try:
                 cur.execute("""
                     INSERT INTO maestra_traslados_eps_tespecial 
@@ -530,7 +547,7 @@ def gestion_traslados_captura():
                       departamento_destino, municipio_destino, direccion_destino, 
                       cantidad, cantidad, observaciones, ruta_documento))
                 mysql.connection.commit()
-                flash('Orden Maestra guardada exitosamente cumpliendo todas las reglas de negocio.', 'success')
+                flash('Orden Maestra guardada exitosamente.', 'success')
                 return redirect(url_for('flotaespecial_eps.gestion_traslados_captura'))
             except Exception as e:
                 flash(f'Error al guardar captura: {str(e)}', 'danger')
@@ -545,7 +562,7 @@ def gestion_traslados_captura():
     )
 
 # =========================================================
-# ETAPA 2: ASIGNACIÓN Y DESGLOSE (AUTOMÁTICO)
+# ETAPA 2: DESGLOSE STRICTO (_IDA / _VUELTA)
 # =========================================================
 @bp_flotaespecial_eps.route('/asignacion', methods=['GET', 'POST'])
 @login_required_custom
@@ -566,34 +583,50 @@ def gestion_traslados_asignacion():
                 viajes_generados = 0
                 
                 for _ in range(diferencia):
-                    id_viaje_nuevo = generar_id_viaje_unico(cur)
+                    id_viaje_padre = generar_id_viaje_unico(cur) 
+                    base_viaje = generar_id_viaje_unico(cur) 
                     
+                    id_ida = f"{base_viaje}_IDA"
+                    id_vuelta = f"{base_viaje}_VUELTA"
+
                     cur.execute("""
                         INSERT INTO control_viajes_flota_especial 
-                        (id_empresa, id_eps_cliente, numero_autorizacion, numero_prescripcion, tipo_servicio, 
+                        (id_empresa, id_eps_cliente, numero_autorizacion, numero_prescripcion, tipo_servicio, trayecto,
                         nombre_usuario, tipo_documento, id_usuario, telefono_usuario, 
                         departamento, municipio, direccion_origen, 
                         departamento_destino, municipio_destino, direccion_destino, 
-                        vehiculo_asignado, conductor_asignado, 
-                        fecha_servicio, hora_inicio, hora_fin, id_viaje, estatus_servicio, ruta_documento)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, NULL, 
-                        NULL, '07:00:00', NULL, %s, 'CAPTURADO', %s)
+                        id_viaje, id_viaje_padre, estatus_servicio, ruta_documento)
+                        VALUES (%s, %s, %s, %s, %s, 'IDA', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'CAPTURADO', %s)
                     """, (empresa_id, maestra['id_eps_cliente'], maestra['numero_autorizacion'], maestra['numero_prescripcion'], 
                           maestra['tipo_servicio'], maestra['nombre_usuario'], maestra.get('tipo_documento'), maestra['id_usuario'], maestra['telefono_usuario'], 
                           maestra['departamento'], maestra['municipio'], maestra['direccion_origen'], 
                           maestra.get('departamento_destino'), maestra.get('municipio_destino'), maestra['direccion_destino'], 
-                          id_viaje_nuevo, maestra.get('ruta_documento')))
-                    viajes_generados += 1
+                          id_ida, id_viaje_padre, maestra.get('ruta_documento')))
+                    
+                    cur.execute("""
+                        INSERT INTO control_viajes_flota_especial 
+                        (id_empresa, id_eps_cliente, numero_autorizacion, numero_prescripcion, tipo_servicio, trayecto,
+                        nombre_usuario, tipo_documento, id_usuario, telefono_usuario, 
+                        departamento, municipio, direccion_origen, 
+                        departamento_destino, municipio_destino, direccion_destino, 
+                        id_viaje, id_viaje_padre, estatus_servicio, ruta_documento)
+                        VALUES (%s, %s, %s, %s, %s, 'VUELTA', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'CAPTURADO', %s)
+                    """, (empresa_id, maestra['id_eps_cliente'], maestra['numero_autorizacion'], maestra['numero_prescripcion'], 
+                          maestra['tipo_servicio'], maestra['nombre_usuario'], maestra.get('tipo_documento'), maestra['id_usuario'], maestra['telefono_usuario'], 
+                          maestra.get('departamento_destino'), maestra.get('municipio_destino'), maestra['direccion_destino'], 
+                          maestra['departamento'], maestra['municipio'], maestra['direccion_origen'], 
+                          id_vuelta, id_viaje_padre, maestra.get('ruta_documento')))
+                    
+                    viajes_generados += 2
                 
-                # Descontar el saldo al desglosar
                 cur.execute("UPDATE maestra_traslados_eps_tespecial SET diferencia = 0 WHERE id = %s", (maestra_id,))
                 mysql.connection.commit()
-                flash(f'Éxito: Se han desglosado {viajes_generados} viajes individuales listos para verificación y programación.', 'success')
+                flash(f'Éxito: Se han desglosado {viajes_generados} viajes individuales (IDA/VUELTA) estrictamente divididos.', 'success')
             else:
                 flash('La orden maestra ya no tiene traslados disponibles.', 'warning')
         except Exception as e:
             mysql.connection.rollback()
-            flash(f'Error en asignación: {str(e)}', 'danger')
+            flash(f'Error en desglose: {str(e)}', 'danger')
         finally:
             cur.close()
         return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion'))
@@ -603,13 +636,118 @@ def gestion_traslados_asignacion():
     ordenes_maestras = cur.fetchall()
     cur.close()
     
-    return render_template(
-        'B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
-        active_module='traslados_asignacion', ordenes_maestras=ordenes_maestras
-    )
+    return render_template('B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_asignacion', ordenes_maestras=ordenes_maestras)
 
 # =========================================================
-# ETAPA 3: PROGRAMACIÓN DE FECHAS Y TURNOS
+# ETAPA 3: VERIFICACIÓN CON ACOMPAÑANTE (TELEFÓNICA)
+# =========================================================
+@bp_flotaespecial_eps.route('/verificacion', methods=['GET', 'POST'])
+@login_required_custom
+@controlador_flotaespecial_required
+def gestion_traslados_verificacion():
+    empresa_id = session.get('empresa_id')
+    
+    if request.method == 'POST':
+        accion = request.form.get('accion')
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        try:
+            if accion == 'editar_y_verificar':
+                viaje_id = request.form.get('viaje_id')
+                nombre_usuario = request.form.get('nombre_usuario', '').strip()
+                id_usuario = request.form.get('id_usuario', '').strip()
+                telefono_usuario = request.form.get('telefono_usuario')
+                
+                # Nuevos campos de origen y destino capturados
+                departamento_origen = request.form.get('departamento_origen')
+                municipio_origen = request.form.get('municipio_origen')
+                direccion_origen = request.form.get('direccion_origen')
+                departamento_destino = request.form.get('departamento_destino')
+                municipio_destino = request.form.get('municipio_destino')
+                direccion_destino = request.form.get('direccion_destino')
+                
+                lleva_acompanante = 1 if request.form.get('lleva_acompanante') else 0
+                nombre_acompanante = request.form.get('nombre_acompanante', '').strip()
+                cedula_acompanante = request.form.get('cedula_acompanante', '').strip()
+                
+                if lleva_acompanante and (not nombre_acompanante or not cedula_acompanante):
+                    flash('Al indicar acompañante debe ingresar nombre y cédula.', 'danger')
+                    return redirect(url_for('flotaespecial_eps.gestion_traslados_verificacion'))
+                
+                # Actualización en el viaje específico (IDA)
+                cur.execute("""
+                    UPDATE control_viajes_flota_especial 
+                    SET nombre_usuario=%s, id_usuario=%s, telefono_usuario=%s, 
+                        departamento=%s, municipio=%s, direccion_origen=%s,
+                        departamento_destino=%s, municipio_destino=%s, direccion_destino=%s,
+                        lleva_acompanante=%s, nombre_acompanante=%s, cedula_acompanante=%s,
+                        estatus_servicio = 'VERIFICADO'
+                    WHERE id=%s AND id_empresa=%s
+                """, (nombre_usuario, id_usuario, telefono_usuario, 
+                      departamento_origen, municipio_origen, direccion_origen,
+                      departamento_destino, municipio_destino, direccion_destino,
+                      lleva_acompanante, nombre_acompanante, cedula_acompanante, 
+                      viaje_id, empresa_id))
+                
+                # Actualización en cascada (para todos los demás viajes con el mismo id_viaje_padre)
+                # OJO: Para el viaje de VUELTA, el origen y destino van invertidos. El backend respeta esta inversión guardando 
+                # en cascada los datos base del paciente, y actualizando la VUELTA con las direcciones cruzadas.
+                cur.execute("SELECT id, trayecto FROM control_viajes_flota_especial WHERE id_viaje_padre = (SELECT id_viaje_padre FROM control_viajes_flota_especial WHERE id=%s) AND id_empresa=%s AND id != %s", (viaje_id, empresa_id, viaje_id))
+                viajes_asociados = cur.fetchall()
+                
+                for v_asoc in viajes_asociados:
+                    if v_asoc['trayecto'] == 'VUELTA':
+                        cur.execute("""
+                            UPDATE control_viajes_flota_especial 
+                            SET nombre_usuario=%s, id_usuario=%s, telefono_usuario=%s, 
+                                departamento=%s, municipio=%s, direccion_origen=%s,
+                                departamento_destino=%s, municipio_destino=%s, direccion_destino=%s,
+                                lleva_acompanante=%s, nombre_acompanante=%s, cedula_acompanante=%s,
+                                estatus_servicio = 'VERIFICADO'
+                            WHERE id=%s
+                        """, (nombre_usuario, id_usuario, telefono_usuario, 
+                              departamento_destino, municipio_destino, direccion_destino, # VUELTA = Origen es el Destino de IDA
+                              departamento_origen, municipio_origen, direccion_origen,    # VUELTA = Destino es el Origen de IDA
+                              lleva_acompanante, nombre_acompanante, cedula_acompanante, v_asoc['id']))
+                    else:
+                        cur.execute("""
+                            UPDATE control_viajes_flota_especial 
+                            SET nombre_usuario=%s, id_usuario=%s, telefono_usuario=%s, 
+                                departamento=%s, municipio=%s, direccion_origen=%s,
+                                departamento_destino=%s, municipio_destino=%s, direccion_destino=%s,
+                                lleva_acompanante=%s, nombre_acompanante=%s, cedula_acompanante=%s,
+                                estatus_servicio = 'VERIFICADO'
+                            WHERE id=%s
+                        """, (nombre_usuario, id_usuario, telefono_usuario, 
+                              departamento_origen, municipio_origen, direccion_origen,
+                              departamento_destino, municipio_destino, direccion_destino,
+                              lleva_acompanante, nombre_acompanante, cedula_acompanante, v_asoc['id']))
+                
+                mysql.connection.commit()
+                flash('Datos auditados telefónicamente y viajes verificados (incluye Acompañante, Origen y Destino).', 'success')
+                
+        except Exception as e:
+            mysql.connection.rollback()
+            flash(f'Error en verificación: {str(e)}', 'danger')
+        finally:
+            cur.close()
+        return redirect(url_for('flotaespecial_eps.gestion_traslados_verificacion'))
+        
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("""
+        SELECT c.*, m.ruta_documento AS ruta_documento
+        FROM control_viajes_flota_especial c
+        LEFT JOIN maestra_traslados_eps_tespecial m ON c.numero_prescripcion = m.numero_prescripcion AND c.id_empresa = m.id_empresa
+        WHERE c.id_empresa = %s AND c.estatus_servicio = 'CAPTURADO' AND c.trayecto = 'IDA'
+        ORDER BY c.id ASC
+    """, (empresa_id,))
+    viajes_capturados = cur.fetchall()
+    cur.close()
+    
+    return render_template('B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_verificacion', viajes=viajes_capturados)
+
+# =========================================================
+# ETAPA 4: PROGRAMACIÓN (TURNOS Y CASCADAS)
 # =========================================================
 @bp_flotaespecial_eps.route('/programacion', methods=['GET', 'POST'])
 @login_required_custom
@@ -626,151 +764,81 @@ def gestion_traslados_programacion():
                 viaje_id = request.form.get('viaje_id')
                 fecha_servicio = request.form.get('fecha_servicio')
                 hora_inicio = request.form.get('hora_inicio')
-                turno = request.form.get('turno') # '1' (L-M-V), '2' (M-J-S) o 'manual'
                 
-                # Actualiza el viaje actual
+                tipo_servicio = request.form.get('tipo_servicio')
+                turno = request.form.get('turno') 
+                frecuencia = request.form.get('frecuencia')
+                
+                if tipo_servicio:
+                    cur.execute("""
+                        UPDATE control_viajes_flota_especial 
+                        SET tipo_servicio = %s 
+                        WHERE numero_prescripcion = (SELECT numero_prescripcion FROM (SELECT numero_prescripcion FROM control_viajes_flota_especial WHERE id=%s) AS tmp) 
+                        AND id_empresa = %s
+                    """, (tipo_servicio, viaje_id, empresa_id))
+                    
+                    cur.execute("""
+                        UPDATE maestra_traslados_eps_tespecial 
+                        SET tipo_servicio = %s 
+                        WHERE numero_prescripcion = (SELECT numero_prescripcion FROM (SELECT numero_prescripcion FROM control_viajes_flota_especial WHERE id=%s) AS tmp2) 
+                        AND id_empresa = %s
+                    """, (tipo_servicio, viaje_id, empresa_id))
+
                 cur.execute("""
                     UPDATE control_viajes_flota_especial 
                     SET fecha_servicio = %s, hora_inicio = %s, estatus_servicio = 'PROGRAMADO'
-                    WHERE id = %s AND id_empresa = %s
+                    WHERE id = %s AND id_empresa = %s AND trayecto = 'IDA'
                 """, (fecha_servicio, hora_inicio, viaje_id, empresa_id))
                 
-                # Auto-programación para turnos de Diálisis
-                if turno in ['1', '2'] and fecha_servicio:
-                    cur.execute("SELECT numero_autorizacion FROM control_viajes_flota_especial WHERE id=%s", (viaje_id,))
-                    auth = cur.fetchone()
-                    if auth:
+                if (turno in ['1', '2'] or frecuencia) and fecha_servicio:
+                    cur.execute("SELECT numero_prescripcion, tipo_servicio FROM control_viajes_flota_especial WHERE id=%s", (viaje_id,))
+                    viaje_ref = cur.fetchone()
+                    if viaje_ref:
                         cur.execute("""
-                            SELECT id FROM control_viajes_flota_especial 
-                            WHERE numero_autorizacion=%s AND id_empresa=%s 
-                            AND estatus_servicio = 'CAPTURADO' AND id != %s 
+                            SELECT id, id_viaje_padre FROM control_viajes_flota_especial 
+                            WHERE numero_prescripcion=%s AND id_empresa=%s 
+                            AND estatus_servicio = 'VERIFICADO' AND trayecto = 'IDA'
+                            AND id != %s
                             ORDER BY id ASC
-                        """, (auth['numero_autorizacion'], empresa_id, viaje_id))
+                        """, (viaje_ref['numero_prescripcion'], empresa_id, viaje_id))
                         pendientes = cur.fetchall()
                         
                         curr_date = datetime.strptime(fecha_servicio, '%Y-%m-%d').date()
                         for p in pendientes:
-                            curr_date = _get_next_date(curr_date, turno)
-                            cur.execute("""
-                                UPDATE control_viajes_flota_especial 
-                                SET fecha_servicio=%s, hora_inicio=%s, estatus_servicio='PROGRAMADO' 
-                                WHERE id=%s
-                            """, (curr_date.strftime('%Y-%m-%d'), hora_inicio, p['id']))
+                            if viaje_ref['tipo_servicio'].upper() == 'DIALISIS' and turno in ['1', '2']:
+                                curr_date = _get_next_date_turno(curr_date, turno)
+                            elif frecuencia and frecuencia != 'unico':
+                                curr_date = _get_next_date_frecuencia(curr_date, frecuencia)
+                            
+                            cur.execute("UPDATE control_viajes_flota_especial SET fecha_servicio=%s, hora_inicio=%s, estatus_servicio='PROGRAMADO' WHERE id=%s", (curr_date.strftime('%Y-%m-%d'), hora_inicio, p['id']))
                 
                 mysql.connection.commit()
-                flash('Servicio(s) programado(s) exitosamente.', 'success')
+                flash('Viaje(s) programado(s) correctamente.', 'success')
 
         except Exception as e:
             mysql.connection.rollback()
-            flash(f'Error en el proceso de programación: {str(e)}', 'danger')
+            flash(f'Error en programación: {str(e)}', 'danger')
         finally:
             cur.close()
         return redirect(url_for('flotaespecial_eps.gestion_traslados_programacion'))
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cur.execute("""
-        SELECT c.*, COALESCE(c.ruta_documento, m.ruta_documento) AS ruta_documento
+        SELECT c.*, 
+               (SELECT COUNT(*) FROM control_viajes_flota_especial 
+                WHERE numero_prescripcion = c.numero_prescripcion 
+                AND trayecto = 'IDA' AND id_empresa = %s) as total_idas
         FROM control_viajes_flota_especial c
-        LEFT JOIN (
-            SELECT numero_autorizacion, numero_prescripcion, id_empresa, MAX(ruta_documento) as ruta_documento 
-            FROM maestra_traslados_eps_tespecial 
-            GROUP BY numero_autorizacion, numero_prescripcion, id_empresa
-        ) m 
-          ON c.numero_autorizacion = m.numero_autorizacion 
-          AND (c.numero_prescripcion = m.numero_prescripcion OR c.numero_prescripcion IS NULL OR m.numero_prescripcion IS NULL) 
-          AND c.id_empresa = m.id_empresa
-        WHERE c.id_empresa = %s AND c.estatus_servicio = 'CAPTURADO'
+        WHERE c.id_empresa = %s AND c.estatus_servicio = 'VERIFICADO' AND c.trayecto = 'IDA' 
         ORDER BY c.id ASC
-    """, (empresa_id,))
-    viajes_capturados = cur.fetchall()
+    """, (empresa_id, empresa_id))
+    viajes_verificados = cur.fetchall()
     cur.close()
     
-    return render_template(
-        'B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
-        active_module='traslados_programacion', viajes=viajes_capturados
-    )
+    return render_template('B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_programacion', viajes=viajes_verificados)
 
 # =========================================================
-# ETAPA 4: VERIFICACIÓN Y AUDITORÍA DE DATOS
-# =========================================================
-@bp_flotaespecial_eps.route('/verificacion', methods=['GET', 'POST'])
-@login_required_custom
-@controlador_flotaespecial_required
-def gestion_traslados_verificacion():
-    empresa_id = session.get('empresa_id')
-    
-    if request.method == 'POST':
-        accion = request.form.get('accion')
-        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
-        try:
-            if accion == 'verificar':
-                viaje_id = request.form.get('viaje_id')
-                cur.execute("UPDATE control_viajes_flota_especial SET estatus_servicio = 'VERIFICADO', fecha_notificacion_info = NOW() WHERE id = %s AND id_empresa = %s", (viaje_id, empresa_id))
-                mysql.connection.commit()
-                flash('Viaje verificado. Listo para asignar flota.', 'success')
-
-            elif accion == 'editar_y_verificar':
-                viaje_id = request.form.get('viaje_id')
-                nombre_usuario = request.form.get('nombre_usuario', '').strip()
-                tipo_documento = request.form.get('tipo_documento')
-                id_usuario = request.form.get('id_usuario', '').strip()
-                telefono_usuario = request.form.get('telefono_usuario')
-                
-                departamento = request.form.get('departamento')
-                municipio = request.form.get('municipio')
-                direccion_origen = request.form.get('direccion_origen')
-                
-                departamento_destino = request.form.get('departamento_destino')
-                municipio_destino = request.form.get('municipio_destino')
-                direccion_destino = request.form.get('direccion_destino')
-                
-                cur.execute("""
-                    UPDATE control_viajes_flota_especial 
-                    SET nombre_usuario=%s, tipo_documento=%s, id_usuario=%s, telefono_usuario=%s, 
-                        departamento=%s, municipio=%s, direccion_origen=%s, 
-                        departamento_destino=%s, municipio_destino=%s, direccion_destino=%s,
-                        estatus_servicio = 'VERIFICADO', fecha_notificacion_info = NOW()
-                    WHERE id=%s AND id_empresa=%s
-                """, (nombre_usuario, tipo_documento, id_usuario, telefono_usuario, 
-                      departamento, municipio, direccion_origen, 
-                      departamento_destino, municipio_destino, direccion_destino, 
-                      viaje_id, empresa_id))
-                mysql.connection.commit()
-                flash('Datos auditados, corregidos y viaje verificado exitosamente.', 'success')
-                
-        except Exception as e:
-            mysql.connection.rollback()
-            flash(f'Error en el proceso de verificación: {str(e)}', 'danger')
-        finally:
-            cur.close()
-        return redirect(url_for('flotaespecial_eps.gestion_traslados_verificacion'))
-        
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("""
-        SELECT c.*, COALESCE(c.ruta_documento, m.ruta_documento) AS ruta_documento
-        FROM control_viajes_flota_especial c
-        LEFT JOIN (
-            SELECT numero_autorizacion, numero_prescripcion, id_empresa, MAX(ruta_documento) as ruta_documento 
-            FROM maestra_traslados_eps_tespecial 
-            GROUP BY numero_autorizacion, numero_prescripcion, id_empresa
-        ) m 
-          ON c.numero_autorizacion = m.numero_autorizacion 
-          AND (c.numero_prescripcion = m.numero_prescripcion OR c.numero_prescripcion IS NULL OR m.numero_prescripcion IS NULL) 
-          AND c.id_empresa = m.id_empresa
-        WHERE c.id_empresa = %s AND c.estatus_servicio = 'PROGRAMADO'
-        ORDER BY c.fecha_servicio ASC, c.hora_inicio ASC
-    """, (empresa_id,))
-    viajes_programados = cur.fetchall()
-    cur.close()
-    
-    return render_template(
-        'B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
-        active_module='traslados_verificacion', viajes=viajes_programados
-    )
-
-# =========================================================
-# ETAPA 5: ASIGNACIÓN DE FLOTA Y NOTIFICACIÓN (TELEGRAM)
+# ETAPA 5: GENERACIÓN DE FUEC Y ASIGNACIÓN (TELEGRAM)
 # =========================================================
 @bp_flotaespecial_eps.route('/asignacion_flota', methods=['GET', 'POST'])
 @login_required_custom
@@ -786,55 +854,113 @@ def gestion_traslados_asignacion_flota():
         try:
             if accion == 'asignar_flota':
                 viaje_id = request.form.get('viaje_id')
-                vehiculo = request.form.get('vehiculo')
+                vehiculo_placa = request.form.get('vehiculo')
                 conductor = request.form.get('conductor')
                 
                 cur.execute("""
-                    UPDATE control_viajes_flota_especial 
-                    SET vehiculo_asignado = %s, conductor_asignado = %s, estatus_servicio = 'ASIGNADO' 
-                    WHERE id = %s AND id_empresa = %s
-                """, (vehiculo, conductor, viaje_id, empresa_id))
+                    SELECT v.*, e.nombre_comercial, e.nit 
+                    FROM vehiculos_especial v 
+                    LEFT JOIN empresas e ON v.id_empresa = e.id 
+                    WHERE v.placa = %s AND v.id_empresa = %s
+                """, (vehiculo_placa, empresa_id))
+                veh_docs = cur.fetchone()
+
+                cur.execute("SELECT * FROM usuarios WHERE nombre = %s AND empresa_id = %s", (conductor, empresa_id))
+                cond_docs = cur.fetchone()
+
+                hoy_date = datetime.now().date()
+                errores_docs = []
+
+                if veh_docs:
+                    if veh_docs.get('vencimiento_soat') and veh_docs['vencimiento_soat'] < hoy_date: 
+                        errores_docs.append("SOAT Vencido")
+                    
+                    exige_rtm = True
+                    if veh_docs.get('fecha_matricula'):
+                        edad_dias = (hoy_date - veh_docs['fecha_matricula']).days
+                        if edad_dias < (5 * 365.25):
+                            exige_rtm = False
+                            
+                    if exige_rtm:
+                        if not veh_docs.get('vencimiento_rtm'):
+                            errores_docs.append("RTM No Registrada (Vehículo con 5 años o más)")
+                        elif veh_docs['vencimiento_rtm'] < hoy_date:
+                            errores_docs.append("RTM Vencida")
+
+                    if veh_docs.get('vencimiento_tarjeta_operacion') and veh_docs['vencimiento_tarjeta_operacion'] < hoy_date: 
+                        errores_docs.append("Tarjeta Op. Vencida")
+                else: 
+                    errores_docs.append("Datos Vehículo No Encontrados")
+
+                if cond_docs:
+                    if cond_docs.get('vencimiento_licencia_conduccion') and cond_docs['vencimiento_licencia_conduccion'] < hoy_date: 
+                        errores_docs.append("Licencia Vencida")
+                
+                if errores_docs:
+                    flash(f"⛔ Prevención Activa (Decreto 1079): Bloqueo por {', '.join(errores_docs)}.", "danger")
+                    return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
                 
                 cur.execute("SELECT * FROM control_viajes_flota_especial WHERE id = %s", (viaje_id,))
                 viaje_data = cur.fetchone()
+
+                id_fuec_unico = f"FUEC-{empresa_id}-{vehiculo_placa}-{viaje_data['id_viaje']}"
+                consecutivo = f"{veh_docs.get('nit','00')}-{datetime.now().year}-1-{random.randint(100,999)}"
+                
+                pdf_filename = f"{id_fuec_unico}.pdf"
+                ruta_relativa = f"uploads/flotaespecial/fuec/{pdf_filename}"
+                ruta_pdf_abs = os.path.join(current_app.static_folder, ruta_relativa)
+                os.makedirs(os.path.dirname(ruta_pdf_abs), exist_ok=True)
+                
+                doc = SimpleDocTemplate(ruta_pdf_abs, pagesize=letter)
+                story = []
+                styles = getSampleStyleSheet()
+                story.append(Paragraph("FORMATO ÚNICO DE EXTRACTO DEL CONTRATO (FUEC)", styles['Heading1']))
+                story.append(Paragraph(f"Empresa: {veh_docs.get('nombre_comercial') or veh_docs.get('empresa_transporte', 'N/D')}", styles['Normal']))
+                story.append(Paragraph(f"Vehículo: {vehiculo_placa} - Conductor: {conductor}", styles['Normal']))
+                story.append(Paragraph(f"ID FUEC: {id_fuec_unico} | Consecutivo: {consecutivo}", styles['Normal']))
+                
+                qr_code = qr.QrCodeWidget(id_fuec_unico)
+                d = Drawing(150, 150)
+                d.add(qr_code)
+                story.append(d)
+                doc.build(story)
+                
+                cur.execute("""
+                    INSERT INTO fuec (id_empresa, id_fuec_unico, consecutivo_extracto, placa, cedula_conductor, id_traslado_eps, numero_contrato, contratante_nombre, contratante_nit_cedula, origen, destino, fecha_inicio_vigencia, fecha_fin_vigencia, ruta_pdf_fuec, codigo_qr_url)
+                    VALUES (%s, %s, %s, %s, %s, %s, 'N/A', 'EPS', 'EPS-NIT', %s, %s, NOW(), DATE_ADD(NOW(), INTERVAL 1 DAY), %s, %s)
+                """, (empresa_id, id_fuec_unico, consecutivo, vehiculo_placa, cond_docs['cedula'], viaje_data['id_viaje'], viaje_data['municipio'], viaje_data['municipio_destino'], ruta_relativa, id_fuec_unico))
+
+                cur.execute("UPDATE control_viajes_flota_especial SET vehiculo_asignado = %s, conductor_asignado = %s, estatus_servicio = 'ASIGNADO' WHERE id = %s", (vehiculo_placa, conductor, viaje_id))
+                
+                if cond_docs.get('telegram_id'):
+                    mensaje_tg = (
+                        f"🟢 *NUEVA ASIGNACIÓN DE VIAJE (FUEC)*\n\n"
+                        f"🏢 *Empresa:* {empresa_nombre}\n"
+                        f"🆔 *Prescripción:* {viaje_data.get('numero_prescripcion')}\n"
+                        f"🚙 *Vehículo:* {vehiculo_placa}\n\n"
+                        f"📋 *PROGRAMACIÓN:*\n"
+                        f"ID Viaje: `{viaje_data['id_viaje']}`\n"
+                        f"Trayecto: {viaje_data.get('trayecto', 'IDA')}\n"
+                        f"Paciente: {viaje_data['nombre_usuario']}\n"
+                        f"Fecha: {viaje_data.get('fecha_servicio', 'N/D')} | Hora: {viaje_data.get('hora_inicio', 'N/D')}\n"
+                        f"Origen: {viaje_data['direccion_origen']}\n"
+                        f"Destino: {viaje_data['direccion_destino']}"
+                    )
+                    _enviar_documento_telegram_hilo([cond_docs['telegram_id']], mensaje_tg, ruta_pdf_abs)
+                
                 mysql.connection.commit()
-                
-                if viaje_data:
-                    # Invocar notificación oficial a Telegram
-                    notificar_programacion_viaje(empresa_id, empresa_nombre, viaje_data, 'ASIGNACION')
-                
-                flash('Flota asignada y notificación enviada al Telegram del conductor.', 'success')
-                
-            elif accion == 'novedad':
-                viaje_id = request.form.get('viaje_id')
-                observacion = request.form.get('observacion')
-                cur.execute("UPDATE control_viajes_flota_especial SET fecha_notificacion_info=NOW() WHERE id=%s AND id_empresa=%s", (viaje_id, empresa_id))
-                mysql.connection.commit()
-                flash('Novedad reportada sobre el viaje.', 'success')
+                flash('Flota asignada y FUEC enviado exitosamente al Telegram del conductor.', 'success')
 
         except Exception as e:
             mysql.connection.rollback()
-            flash(f'Error en asignación de flota: {str(e)}', 'danger')
+            flash(f'Error en asignación/FUEC: {str(e)}', 'danger')
         finally:
             cur.close()
         return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
         
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("""
-        SELECT c.*, COALESCE(c.ruta_documento, m.ruta_documento) AS ruta_documento
-        FROM control_viajes_flota_especial c
-        LEFT JOIN (
-            SELECT numero_autorizacion, numero_prescripcion, id_empresa, MAX(ruta_documento) as ruta_documento 
-            FROM maestra_traslados_eps_tespecial 
-            GROUP BY numero_autorizacion, numero_prescripcion, id_empresa
-        ) m 
-          ON c.numero_autorizacion = m.numero_autorizacion 
-          AND (c.numero_prescripcion = m.numero_prescripcion OR c.numero_prescripcion IS NULL OR m.numero_prescripcion IS NULL) 
-          AND c.id_empresa = m.id_empresa
-        WHERE c.id_empresa = %s AND c.estatus_servicio = 'VERIFICADO'
-        ORDER BY c.fecha_servicio ASC, c.hora_inicio ASC
-    """, (empresa_id,))
-    viajes_verificados = cur.fetchall()
+    cur.execute("SELECT * FROM control_viajes_flota_especial WHERE id_empresa = %s AND estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA') ORDER BY fecha_servicio ASC", (empresa_id,))
+    viajes_programados = cur.fetchall()
     
     cur.execute("SELECT placa, clase AS tipo FROM vehiculos_especial WHERE id_empresa = %s", (empresa_id,))
     vehiculos = cur.fetchall()
@@ -843,13 +969,10 @@ def gestion_traslados_asignacion_flota():
     conductores = cur.fetchall()
     cur.close()
     
-    return render_template(
-        'B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
-        active_module='traslados_asignacion_flota', viajes=viajes_verificados, vehiculos=vehiculos, conductores=conductores
-    )
+    return render_template('B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_asignacion_flota', viajes=viajes_programados, vehiculos=vehiculos, conductores=conductores)
 
 # =========================================================
-# AUDITORÍA DE VIAJES INDIVIDUALES (AUTOMÁTICO Y SEGURO)
+# ETAPAS 6 Y 7: AUDITORÍA Y RESULTADOS
 # =========================================================
 @bp_flotaespecial_eps.route('/auditoria', methods=['GET', 'POST'])
 @login_required_custom
@@ -924,9 +1047,6 @@ def gestion_traslados_auditoria():
     
     return render_template('B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_auditoria', viajes=viajes)
 
-# =========================================================
-# HISTORIAL AUDITADOS
-# =========================================================
 @bp_flotaespecial_eps.route('/auditados', methods=['GET'])
 @login_required_custom
 @controlador_flotaespecial_required
@@ -934,7 +1054,7 @@ def gestion_traslados_auditados():
     empresa_id = session.get('empresa_id')
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cur.execute("""
-        SELECT id_viaje, numero_autorizacion, nombre_usuario, eps_cliente, operador_ejecucion, 
+        SELECT id_viaje, numero_autorizacion, nombre_usuario, id_eps_cliente AS eps_cliente, operador_ejecucion, 
                vehiculo_asignado, fecha_fin_real, auditor_nombre, fecha_auditoria, hash_auditoria,
                COALESCE(ruta_pdf_unificado, ruta_documento) as ruta_documento
         FROM control_viajes_flota_especial 

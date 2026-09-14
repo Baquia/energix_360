@@ -67,6 +67,89 @@ def dashboard_operador_especial():
                            estatus_vehiculo=estatus_vehiculo)
 
 # ==============================================================================
+# 1.1 MOTOR DE DATOS DINÁMICOS PARA LA LISTA DE VIAJES ASIGNADOS
+# ==============================================================================
+@bp_operador_flotaespecial.route('/api/viaje_especial/dashboard_data', methods=['GET'])
+@login_required_custom
+def dashboard_data_especial():
+    empresa_id = session.get('empresa_id')
+    usuario_nombre = session.get('nombre')
+    placa = session.get('placa_prelogueada_especial')
+    
+    if not placa:
+        return jsonify({"status": "error", "message": "No hay vehículo prelogueado"}), 400
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("""
+            SELECT id_viaje, id_viaje_padre, numero_autorizacion, numero_prescripcion, nombre_usuario, direccion_origen, direccion_destino, 
+                   hora_inicio, trayecto, estatus_servicio
+            FROM control_viajes_flota_especial 
+            WHERE id_empresa = %s 
+              AND (vehiculo_asignado = %s OR conductor_asignado = %s)
+              AND estatus_servicio = 'ASIGNADO'
+            ORDER BY fecha_servicio ASC, hora_inicio ASC
+        """, (empresa_id, placa, usuario_nombre))
+        viajes_asignados = cur.fetchall()
+
+        for v in viajes_asignados:
+            v['hora_inicio'] = str(v['hora_inicio']) if v.get('hora_inicio') else "Pendiente"
+            v['trayecto'] = (v.get('trayecto') or 'IDA').upper()
+
+        return jsonify({"status": "success", "viajes_asignados": viajes_asignados}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+# ==============================================================================
+# 1.2 SOLICITAR ASIGNACIÓN AUTOMÁTICA DEL VIAJE DE VUELTA
+# ==============================================================================
+@bp_operador_flotaespecial.route('/api/viaje_especial/autoasignar_vuelta', methods=['POST'])
+@login_required_custom
+def autoasignar_vuelta_especial():
+    empresa_id = session.get('empresa_id')
+    usuario_nombre = session.get('nombre')
+    placa = session.get('placa_prelogueada_especial')
+    
+    if not placa:
+        return jsonify({"status": "error", "message": "Vehículo no prelogueado."}), 400
+        
+    datos = request.get_json(silent=True) or {}
+    id_viaje_ida = str(datos.get('id_viaje', '')).strip().upper() 
+    
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("SELECT id_viaje_padre FROM control_viajes_flota_especial WHERE id_viaje = %s AND id_empresa = %s", (id_viaje_ida, empresa_id))
+        ida = cur.fetchone()
+        if not ida or not ida.get('id_viaje_padre'):
+            return jsonify({"status": "error", "message": "Referencia de viaje padre no encontrada."}), 404
+            
+        cur.execute("""
+            SELECT id, id_viaje FROM control_viajes_flota_especial 
+            WHERE id_empresa = %s AND id_viaje_padre = %s AND trayecto = 'VUELTA' AND estatus_servicio = 'PDTE. ASIGNAR VUELTA'
+            LIMIT 1
+        """, (empresa_id, ida['id_viaje_padre']))
+        vuelta = cur.fetchone()
+        
+        if not vuelta:
+             return jsonify({"status": "error", "message": "No se encontró un viaje de VUELTA pendiente. El controlador debe aprobarlo en cabina."}), 404
+             
+        cur.execute("""
+            UPDATE control_viajes_flota_especial 
+            SET vehiculo_asignado = %s, conductor_asignado = %s, estatus_servicio = 'ASIGNADO'
+            WHERE id = %s AND id_empresa = %s
+        """, (placa, usuario_nombre, vuelta['id'], empresa_id))
+        mysql.connection.commit()
+        
+        return jsonify({"status": "success", "id_viaje_vuelta": vuelta['id_viaje']}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+# ==============================================================================
 # 2. LÓGICA DE PRELOGIN Y VIAJES (Enlace con el Vehículo Especial)
 # ==============================================================================
 @bp_operador_flotaespecial.route('/dashboard/flotaespecial/prelogin', methods=['POST'])
@@ -91,23 +174,34 @@ def prelogin_flotaespecial():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
     try:
-        cur.execute("ALTER TABLE vehiculos_especial ADD COLUMN estatus VARCHAR(50) DEFAULT 'No logueado', ADD COLUMN ultima_latitud DECIMAL(10, 8) NULL, ADD COLUMN ultima_longitud DECIMAL(11, 8) NULL;")
-    except:
-        pass
+        try:
+            cur.execute("ALTER TABLE vehiculos_especial ADD COLUMN estatus VARCHAR(50) DEFAULT 'No logueado', ADD COLUMN ultima_latitud DECIMAL(10, 8) NULL, ADD COLUMN ultima_longitud DECIMAL(11, 8) NULL;")
+        except:
+            pass
 
-    cur.execute("SELECT id, id_empresa FROM vehiculos_especial WHERE placa = %s LIMIT 1", (placa,))
-    v = cur.fetchone()
+        # Ajuste Anti-Error 1054: Se retira 'id' de la consulta
+        cur.execute("SELECT id_empresa FROM vehiculos_especial WHERE placa = %s LIMIT 1", (placa,))
+        v = cur.fetchone()
 
-    if not v:
-        cur.close()
-        return jsonify(success=False, message="Vehículo no encontrado en el sistema."), 404
-    
-    if str(v["id_empresa"]) != str(empresa_id):
-        cur.close()
-        return jsonify(success=False, message="Este vehículo no pertenece a su empresa."), 403
+        if not v:
+            return jsonify(success=False, message="Vehículo no encontrado en el sistema."), 404
+        
+        if str(v["id_empresa"]) != str(empresa_id):
+            return jsonify(success=False, message="Este vehículo no pertenece a su empresa."), 403
 
-    try:
-        cur.execute("UPDATE vehiculos_especial SET estatus='Prelogueado' WHERE id=%s", (v["id"],))
+        # REGLA: Bypass si ya existe inspección aprobada hoy (Ajuste Anti-Error 1054: SELECT 1)
+        cur.execute("""
+            SELECT 1 FROM inspeccion_preoperacional 
+            WHERE id_empresa = %s AND placa_vehiculo = %s 
+            AND fecha_inspeccion = CURDATE() AND vehiculo_aprobado = 1
+            LIMIT 1
+        """, (empresa_id, placa))
+        inspeccion_hoy = cur.fetchone()
+
+        nuevo_estatus = 'Logueado' if inspeccion_hoy else 'Prelogueado'
+
+        # Ajuste Anti-Error 1054: Actualización por placa en lugar de id
+        cur.execute("UPDATE vehiculos_especial SET estatus=%s WHERE placa=%s AND id_empresa=%s", (nuevo_estatus, placa, empresa_id))
         
         cur.execute("""
             CREATE TABLE IF NOT EXISTS historial_sesiones_flotaespecial (
@@ -130,20 +224,19 @@ def prelogin_flotaespecial():
         """, (empresa_id, usuario_id, placa))
         
         mysql.connection.commit()
+        
+        session["placa_prelogueada_especial"] = placa
+        
+        return jsonify(
+            success=True, 
+            message="Vehículo prelogueado correctamente.", 
+            redirect_url="/preoperacional"
+        )
     except Exception as e:
         mysql.connection.rollback()
-        cur.close()
-        return jsonify(success=False, message=f"Error al registrar sesión: {str(e)}"), 500
+        return jsonify(success=False, message=f"Error interno del servidor: {str(e)}"), 500
     finally:
         cur.close()
-
-    session["placa_prelogueada_especial"] = placa
-    
-    return jsonify(
-        success=True, 
-        message="Vehículo prelogueado correctamente.", 
-        redirect_url="/preoperacional"
-    )
 
 @bp_operador_flotaespecial.route('/api/viaje_especial/iniciar', methods=['POST'])
 @login_required_custom
@@ -184,11 +277,8 @@ def iniciar_viaje_especial():
         except: pass
         try: cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN lat_origen DECIMAL(10,8) NULL, ADD COLUMN lng_origen DECIMAL(11,8) NULL, ADD COLUMN hora_origen DATETIME NULL, ADD COLUMN lat_destino DECIMAL(10,8) NULL, ADD COLUMN lng_destino DECIMAL(11,8) NULL, ADD COLUMN hora_destino DATETIME NULL, ADD COLUMN lat_retorno DECIMAL(10,8) NULL, ADD COLUMN lng_retorno DECIMAL(11,8) NULL, ADD COLUMN hora_retorno DATETIME NULL;")
         except: pass
-        
-        # MIGRACIÓN: Control de tiempos de pausa y conducción efectiva
         try: cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN hora_reinicio DATETIME NULL, ADD COLUMN tiempo_efectivo_minutos INT DEFAULT 0;")
         except: pass
-
         try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN operador_ejecucion VARCHAR(100) NULL, ADD COLUMN fecha_ejecucion_real DATETIME NULL, ADD COLUMN fecha_fin_real DATETIME NULL;")
         except: pass
 
@@ -233,7 +323,7 @@ def iniciar_viaje_especial():
         session['id_viaje_especial'] = id_viaje_fisico
         session['codigo_viaje_alfanumerico'] = id_viaje_alfanumerico
 
-        return jsonify({"status": "success", "consecutivo": consecutivo}), 200
+        return jsonify({"status": "success", "consecutivo": consecutivo, "id_viaje_fisico": id_viaje_fisico}), 200
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -243,34 +333,31 @@ def iniciar_viaje_especial():
 @bp_operador_flotaespecial.route('/api/viaje_especial/finalizar', methods=['POST'])
 @login_required_custom
 def finalizar_viaje_especial():
-    id_viaje_fisico = session.get('id_viaje_especial')
-    id_viaje_alfanumerico = session.get('codigo_viaje_alfanumerico')
+    datos = request.get_json(silent=True) or {}
+    
+    id_viaje_fisico = datos.get('id_viaje_fisico') or session.get('id_viaje_especial')
+    id_viaje_alfanumerico = datos.get('id_viaje_alfanumerico') or session.get('codigo_viaje_alfanumerico')
     empresa_id = session.get('empresa_id')
 
     if not id_viaje_fisico or not id_viaje_alfanumerico:
         return jsonify({"status": "error", "message": "No hay un viaje activo para finalizar."}), 400
 
-    datos = request.get_json(silent=True) or {}
     foto_origen = datos.get('foto_origen')
     foto_destino = datos.get('foto_destino')
-    foto_retorno = datos.get('foto_retorno')
+    foto_paciente = datos.get('foto_paciente')
     firma = datos.get('firma')
     telemetria = datos.get('telemetria', {})
 
-    # CALCULAR TIEMPO EFECTIVO DE CONDUCCIÓN (Descontando la pausa)
+    # CALCULAR TIEMPO EFECTIVO DE CONDUCCIÓN SIMPLIFICADO
     tiempo_efectivo_minutos = 0
     try:
         fmt = '%Y-%m-%d %H:%M:%S'
         h_ori = datetime.strptime(telemetria.get('hora_origen'), fmt) if telemetria.get('hora_origen') else None
         h_des = datetime.strptime(telemetria.get('hora_destino'), fmt) if telemetria.get('hora_destino') else None
-        h_rei = datetime.strptime(telemetria.get('hora_reinicio'), fmt) if telemetria.get('hora_reinicio') else None
-        h_ret = datetime.strptime(telemetria.get('hora_retorno'), fmt) if telemetria.get('hora_retorno') else None
         
         t_total = 0
         if h_ori and h_des: 
             t_total += max(0, (h_des - h_ori).total_seconds())
-        if h_rei and h_ret: 
-            t_total += max(0, (h_ret - h_rei).total_seconds())
             
         tiempo_efectivo_minutos = int(t_total / 60)
     except Exception as calc_err:
@@ -278,35 +365,37 @@ def finalizar_viaje_especial():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
+        try: 
+            cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN foto_paciente VARCHAR(255) NULL;")
+        except: 
+            pass
+
         ruta_origen = _guardar_testigo_base64(foto_origen, 'viajes', f"origen_{id_viaje_fisico}")
         ruta_destino = _guardar_testigo_base64(foto_destino, 'viajes', f"destino_{id_viaje_fisico}")
-        ruta_retorno = _guardar_testigo_base64(foto_retorno, 'viajes', f"retorno_{id_viaje_fisico}")
+        ruta_paciente = _guardar_testigo_base64(foto_paciente, 'viajes', f"paciente_{id_viaje_fisico}")
         ruta_firma = _guardar_testigo_base64(firma, 'viajes', f"firma_{id_viaje_fisico}")
 
+        # Se guarda utilizando foto_paciente en lugar del antiguo testigo de retorno
         cur.execute("""
             UPDATE viajes_flotaespecial 
             SET fecha_hora_fin = NOW(), estado = 'Finalizado',
-                foto_origen = %s, foto_destino = %s, foto_retorno = %s, firma = %s,
+                foto_origen = %s, foto_destino = %s, foto_paciente = %s, firma = %s,
                 lat_origen = %s, lng_origen = %s, hora_origen = %s,
                 lat_destino = %s, lng_destino = %s, hora_destino = %s,
-                hora_reinicio = %s,
-                lat_retorno = %s, lng_retorno = %s, hora_retorno = %s,
                 tiempo_efectivo_minutos = %s
             WHERE id = %s AND id_empresa = %s
-        """, (ruta_origen, ruta_destino, ruta_retorno, ruta_firma, 
+        """, (ruta_origen, ruta_destino, ruta_paciente, ruta_firma, 
               telemetria.get('lat_origen'), telemetria.get('lng_origen'), telemetria.get('hora_origen'),
               telemetria.get('lat_destino'), telemetria.get('lng_destino'), telemetria.get('hora_destino'),
-              telemetria.get('hora_reinicio'),
-              telemetria.get('lat_retorno'), telemetria.get('lng_retorno'), telemetria.get('hora_retorno'),
               tiempo_efectivo_minutos,
               id_viaje_fisico, empresa_id))
         
         cur.execute("""
             SELECT v.id, v.consecutivo_viaje, v.fecha_hora_inicio, v.fecha_hora_fin, v.placa_vehiculo, 
-                   v.foto_origen, v.foto_destino, v.foto_retorno, v.firma, v.id_traslado_eps,
+                   v.foto_origen, v.foto_destino, v.foto_paciente, v.firma, v.id_traslado_eps,
                    c.id_eps_cliente AS eps_cliente, c.numero_autorizacion, c.numero_prescripcion, 
                    c.tipo_servicio AS codigo_servicio, c.nombre_usuario, c.id_usuario, 
-                   c.direccion_origen, c.direccion_destino, c.id_viaje,
+                   c.direccion_origen, c.direccion_destino, c.id_viaje, c.trayecto, c.id_viaje_padre,
                    u.nombre AS conductor_nombre, u.cedula AS conductor_cedula,
                    e.nombre_comercial AS empresa_transporte
             FROM viajes_flotaespecial v
@@ -390,19 +479,22 @@ def finalizar_viaje_especial():
 
                 img_ori = _get_image(safe_str(viaje_data.get('foto_origen')))
                 img_des = _get_image(safe_str(viaje_data.get('foto_destino')))
-                img_ret = _get_image(safe_str(viaje_data.get('foto_retorno')))
+                img_pac = _get_image(safe_str(viaje_data.get('foto_paciente'))) 
 
                 data_sec3 = [
-                    [img_ori, img_des, img_ret],
+                    [img_ori, img_des, img_pac],
                     [Paragraph("<b>PUNTO 1: RECOGIDA</b>", ParagraphStyle('C', parent=styles['Normal'], alignment=1, fontSize=8)), 
                      Paragraph("<b>PUNTO 2: LLEGADA</b>", ParagraphStyle('C', parent=styles['Normal'], alignment=1, fontSize=8)), 
-                     Paragraph("<b>PUNTO 3: DEVOLUCIÓN</b>", ParagraphStyle('C', parent=styles['Normal'], alignment=1, fontSize=8))]
+                     Paragraph("<b>FOTO PACIENTE / ACUDIENTE</b>", ParagraphStyle('C', parent=styles['Normal'], alignment=1, fontSize=8))]
                 ]
                 t3 = Table(data_sec3, colWidths=[175, 175, 175])
                 t3.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#e5e7eb')), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e5e7eb'))]))
                 story.append(t3)
 
-                story.append(Spacer(1, 30))
+                story.append(Spacer(1, 15))
+                decl_style = ParagraphStyle('Decl', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#4b5563'), alignment=4, spaceAfter=15)
+                story.append(Paragraph("<b>Declaración Juramentada:</b> Declaro que los datos aquí registrados corresponden a la realidad y que este tramo del viaje ha sido ejecutado de manera real según la orden de servicio establecida, cumpliendo con los protocolos normativos vigentes.", decl_style))
+
                 img_firma = _get_image(safe_str(viaje_data.get('firma')))
                 data_firma = [
                     [img_firma],
@@ -433,13 +525,22 @@ def finalizar_viaje_especial():
                     fecha_fin_real = NOW() 
                 WHERE id_viaje = %s AND id_empresa = %s
             """, (ruta_pdf_final, id_viaje_alfanumerico, empresa_id))
+            
+            if viaje_data.get('trayecto') == 'IDA' and viaje_data.get('id_viaje_padre'):
+                cur.execute("""
+                    UPDATE control_viajes_flota_especial 
+                    SET estatus_servicio = 'PDTE. ASIGNAR VUELTA' 
+                    WHERE id_viaje_padre = %s AND trayecto = 'VUELTA' AND id_empresa = %s 
+                    AND estatus_servicio IN ('CAPTURADO', 'VERIFICADO', 'PROGRAMADO')
+                """, (viaje_data.get('id_viaje_padre'), empresa_id))
 
         mysql.connection.commit()
 
-        session.pop('viaje_activo_especial', None)
-        session.pop('consecutivo_viaje_especial', None)
-        session.pop('id_viaje_especial', None)
-        session.pop('codigo_viaje_alfanumerico', None)
+        if str(id_viaje_fisico) == str(session.get('id_viaje_especial')):
+            session.pop('viaje_activo_especial', None)
+            session.pop('consecutivo_viaje_especial', None)
+            session.pop('id_viaje_especial', None)
+            session.pop('codigo_viaje_alfanumerico', None)
 
         return jsonify({"status": "success"}), 200
     except Exception as e:

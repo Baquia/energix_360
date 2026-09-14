@@ -122,6 +122,9 @@
         .badge-danger { background: #fee2e2; color: #991b1b; }
         .badge-info { background: #e0f2fe; color: #075985; }
         .badge-purple { background: #f3e8ff; color: #6b21a8; }
+
+        .btn-pdf { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.2s;}
+        .btn-pdf:hover { background: #bae6fd; }
         
         /* Formularios Integrados */
         .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
@@ -166,17 +169,14 @@
         </div>
         
         <nav class="nav-menu">
-            <!-- Botón de retroceso al sub-menú intermedio -->
             <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="nav-item back-btn">
                 <div class="nav-item-content"><span class="nav-icon">⬅️</span> Menú Transporte Especial</div>
             </a>
 
-            <!-- Tablero Operativo de KPIs -->
             <a href="{{ url_for('controlador_flotaespecial.dashboard_operativo') }}" class="nav-item">
-                <div class="nav-item-content"><span class="nav-icon">📊</span> Tablero Operativo</div>
+                <div class="nav-item-content"><span class="nav-icon">📊</span> Panel Operativo en Vivo</div>
             </a>
 
-            <!-- Submenú Operativo Desplegable -->
             <div class="nav-item open" onclick="toggleDropdown('epsMenu', this)">
                 <div class="nav-item-content"><span class="nav-icon">🏥</span> Gestión Operativa EPS</div>
                 <span class="dropdown-arrow">▼</span>
@@ -184,19 +184,13 @@
             <div class="dropdown-container open" id="epsMenu">
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" class="dropdown-item {% if active_module == 'traslados_captura' %}active{% endif %}">1. Captura de Autorización</a>
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}" class="dropdown-item {% if active_module == 'traslados_asignacion' %}active{% endif %}">2. Desglose de Viajes</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_programacion') }}" class="dropdown-item {% if active_module == 'traslados_programacion' %}active{% endif %}">3. Programar Viajes</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" class="dropdown-item {% if active_module == 'traslados_verificacion' %}active{% endif %}">4. Verificación de Datos</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" class="dropdown-item {% if active_module == 'traslados_verificacion' %}active{% endif %}">3. Verificación de Datos</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_programacion') }}" class="dropdown-item {% if active_module == 'traslados_programacion' %}active{% endif %}">4. Programar Viajes</a>
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" class="dropdown-item {% if active_module == 'traslados_asignacion_flota' %}active{% endif %}">5. Asignación de Flota</a>
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" class="dropdown-item {% if active_module == 'traslados_auditoria' %}active{% endif %}">6. Auditoría de Viajes</a>
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditados') }}" class="dropdown-item {% if active_module == 'traslados_auditados' %}active{% endif %}">7. Historial Auditados</a>
             </div>
-            
-            <!-- Gestión de Flota -->
-            <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" class="nav-item">
-                <div class="nav-item-content"><span class="nav-icon">🚐</span> Gestión de Flota</div>
-            </a>
 
-            <!-- Enlace fijo a Panel Principal BQA -->
             <a href="{{ url_for('panel_principal') }}" class="nav-item" style="margin-top: 15px; border-top: 1px solid var(--border); border-radius: 0; padding-top: 15px;">
                 <div class="nav-item-content"><span class="nav-icon">🏠</span> Menú Principal BQA</div>
             </a>
@@ -213,6 +207,8 @@
         <header class="topbar">
             <div class="topbar-left">
                 <button class="menu-toggle" id="menuToggle">☰</button>
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo-app" alt="BQA-ONE" style="max-height: 35px; width: auto; margin-right: 5px;">
+                <span style="border-left: 1px solid var(--border); height: 30px; margin: 0 10px;"></span>
                 <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
             </div>
             
@@ -240,7 +236,7 @@
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 1: Captura de Orden Maestra</h2>
+                        <h2>Etapa 1: Captura de Autorización</h2>
                     </div>
                 </div>
 
@@ -255,7 +251,7 @@
                 </div>
 
                 <div class="table-card" style="padding: 0;">
-                    <h3 style="padding: 20px 20px 0 20px; font-size: 16px; color: var(--verde);">Paso 2: Validar y Guardar (Generar Maestra)</h3>
+                    <h3 style="padding: 20px 20px 0 20px; font-size: 16px; color: var(--verde);">Paso 2: Validar y Guardar</h3>
                     <form action="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" method="POST" class="grid-form">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="accion" value="guardar_captura">
@@ -276,9 +272,8 @@
                         </div>
                         <div class="form-group"><label>EPS Cliente</label><input type="text" name="eps_cliente" value="{{ datos_extraidos.eps_nombre if datos_extraidos else '' }}" required></div>
                         <div class="form-group"><label>ID EPS Cliente (NIT)</label><input type="text" name="IDProv" value="{{ datos_extraidos.eps_nit if datos_extraidos else '' }}" required></div>
-                        <div class="form-group"><label>Número de Prescripción</label><input type="text" name="NoPrescripcion" value="{{ datos_extraidos.numero_prescripcion if datos_extraidos else '' }}"></div>
+                        <div class="form-group"><label>Número de Prescripción (ID PRINCIPAL)</label><input type="text" name="NoPrescripcion" value="{{ datos_extraidos.numero_prescripcion if datos_extraidos else '' }}"></div>
                         <div class="form-group"><label>Número de Autorización</label><input type="text" name="numero_autorizacion" value="{{ datos_extraidos.numero_autorizacion if datos_extraidos else '' }}" required></div>
-                        
                         <div class="form-group"><label>Fecha de Entrega</label><input type="date" name="fecha_entrega_servicio" value="{{ datos_extraidos.fecha_entrega_servicio if datos_extraidos else '' }}" required></div>
 
                         <div style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
@@ -335,48 +330,38 @@
                         
                         <div class="form-group"><label>Código Servicio</label><input type="text" name="CodSerTecAEntregar" value="{{ datos_extraidos.codigo_servicio if datos_extraidos else '' }}" required></div>
                         <div class="form-group"><label>Total Traslados Aprobados</label><input type="number" name="CantTotAEntregar" value="{{ datos_extraidos.cantidad if datos_extraidos else '1' }}" required></div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label>Tipo de Servicio (Requiere Turnos especiales si es Diálisis)</label>
-                            <select name="tipo_servicio">
-                                <option value="AMBULATORIA">Ambulatoria (Citas Médicas)</option>
-                                <option value="TERAPIAS">Terapias</option>
-                                <option value="DIALISIS">Diálisis</option>
-                                <option value="URGENCIAS">Urgencias</option>
-                            </select>
-                        </div>
+                        
                         <div class="form-group" style="grid-column: 1 / -1;"><label>Observaciones</label><textarea name="observaciones" rows="2"></textarea></div>
                         
                         <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--border);">
-                            <button type="submit" class="btn-primary">Guardar Orden Maestra</button>
+                            <button type="submit" class="btn-primary">Guardar Orden</button>
                         </div>
                     </form>
                 </div>
                 
-                <h3 style="margin-bottom: 10px; font-size: 16px; color: var(--text);">Órdenes Maestras con Traslados Disponibles</h3>
+                <h3 style="margin-bottom: 10px; font-size: 16px; color: var(--text);">Órdenes con Traslados Disponibles</h3>
                 <div class="table-card">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Auth #</th>
+                                <th>Prescripción (ID)</th>
                                 <th>Paciente</th>
                                 <th>Origen</th>
-                                <th>Servicio</th>
-                                <th>Aprobados</th>
+                                <th>Procedimiento</th>
                                 <th>Disponibles</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for t in traslados_capturados %}
                             <tr>
-                                <td><b>{{ t.numero_autorizacion }}</b></td>
+                                <td><b>{{ t.numero_prescripcion }}</b></td>
                                 <td>{{ t.nombre_usuario }}</td>
                                 <td>{{ t.direccion_origen }}</td>
                                 <td><span class="badge badge-gray">{{ t.tipo_servicio }}</span></td>
-                                <td style="text-align: center;">{{ t.numero_traslados_aporbados }}</td>
                                 <td style="text-align: center;"><span class="badge badge-success" style="font-size: 12px;">+{{ t.diferencia }}</span></td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="6" style="text-align: center; padding: 20px;">No hay órdenes maestras con traslados pendientes.</td></tr>
+                            <tr><td colspan="5" style="text-align: center; padding: 20px;">No hay órdenes con traslados pendientes.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -387,20 +372,19 @@
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 2: Desglose Automático de Viajes</h2>
+                        <h2>Etapa 2: Desglose de Viajes (Ida y Vuelta)</h2>
                     </div>
                 </div>
                 
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Seleccione una orden maestra para desglosar el saldo en viajes individuales.</p>
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Seleccione una orden maestra para desglosar el saldo en viajes individuales estrictamente divididos en IDA y VUELTA.</p>
 
                 <div class="table-card">
                     <table class="data-table">
                         <thead>
                             <tr>
+                                <th>Prescripción (ID)</th>
                                 <th>Paciente / Contacto</th>
-                                <th>Auth #</th>
-                                <th>Tipo Servicio</th>
-                                <th>Ruta (Origen - Destino)</th>
+                                <th>Origen (Dep - Mun)</th>
                                 <th>Disponibles</th>
                                 <th>Acción</th>
                             </tr>
@@ -408,165 +392,167 @@
                         <tbody>
                             {% for t in ordenes_maestras %}
                             <tr>
-                                <td><b>{{ t.nombre_usuario }}</b><br><small>{{ t.telefono_usuario }}</small></td>
-                                <td>{{ t.numero_autorizacion }}</td>
-                                <td><span class="badge badge-purple">{{ t.tipo_servicio }}</span></td>
-                                <td>O: {{ t.direccion_origen }}<br>D: {{ t.direccion_destino }}</td>
+                                <td><b>{{ t.numero_prescripcion }}</b></td>
+                                <td>{{ t.nombre_usuario }}<br><small>{{ t.telefono_usuario }}</small></td>
+                                <td>{{ t.departamento }}<br><small>{{ t.municipio }}</small></td>
                                 <td style="text-align: center;"><span class="badge badge-success" style="font-size: 12px;">{{ t.diferencia }}</span></td>
                                 <td>
-                                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}" method="POST" style="display:inline;" onsubmit="return confirm('¿Confirma que desea desglosar automáticamente los {{ t.diferencia }} viajes pendientes para esta orden?');">
+                                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}" method="POST" style="display:inline;">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <input type="hidden" name="accion" value="Desglosar Viajes"/>
                                         <input type="hidden" name="maestra_id" value="{{ t.id }}">
                                         <button type="submit" class="btn-primary" style="padding: 6px 12px; font-size: 12px; background: #0ea5e9;">⚡ Desglosar Viajes</button>
                                     </form>
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay órdenes maestras con traslados disponibles para desglosar.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-            {% elif active_module == 'traslados_programacion' %}
-                <!-- ================= ETAPA 3: PROGRAMACIÓN DE VIAJES ================= -->
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 3: Programación de Fechas y Turnos</h2>
-                    </div>
-                </div>
-                
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Seleccione la fecha y turno para programar el o los viajes. Si es Diálisis, el sistema auto-programará los consecutivos.</p>
-
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Paciente / Teléfono</th>
-                                <th>Auth #</th>
-                                <th>Servicio</th>
-                                <th>Estado</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for v in viajes %}
-                            <tr>
-                                <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.telefono_usuario }}</small></td>
-                                <td>{{ v.numero_autorizacion }}</td>
-                                <td><span class="badge badge-gray">{{ v.tipo_servicio }}</span></td>
-                                <td><span class="badge badge-gray">Capturado</span></td>
-                                <td>
-                                    <button type="button" class="btn-info" style="padding: 6px 10px; font-size: 11px;"
-                                        onclick="abrirProgramacion('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}', '{{ v.fecha_servicio or '' }}', '{{ v.hora_inicio or '' }}')">
-                                        📅 Programar
-                                    </button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes en estado capturado para programar.</td></tr>
+                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay órdenes maestras con traslados disponibles para desglosar.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
 
             {% elif active_module == 'traslados_verificacion' %}
-                <!-- ================= ETAPA 4: VERIFICACIÓN DE DATOS ================= -->
+                <!-- ================= ETAPA 3: VERIFICACIÓN DE DATOS Y ACOMPAÑANTE ================= -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 4: Verificación de Datos de Viajes Programados</h2>
+                        <h2>Etapa 3: Verificación Telefónica de Datos</h2>
                     </div>
                 </div>
                 
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Audite la información del paciente contra el PDF original. Al guardar, el viaje quedará validado para asignación.</p>
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Audite la información del paciente telefónicamente. En este paso **debe confirmar si viaja con acompañante**.</p>
 
                 <div class="table-card">
                     <table class="data-table">
                         <thead>
                             <tr>
+                                <th>Prescripción</th>
                                 <th>Paciente / Teléfono</th>
-                                <th>Auth #</th>
                                 <th>Servicio</th>
-                                <th>Fecha Programada</th>
+                                <th>ID Viaje</th>
                                 <th>Acción</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for v in viajes %}
                             <tr>
-                                <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.telefono_usuario }}</small></td>
-                                <td>{{ v.numero_autorizacion }}</td>
+                                <td><b>{{ v.numero_prescripcion }}</b></td>
+                                <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
                                 <td><span class="badge badge-gray">{{ v.tipo_servicio }}</span></td>
-                                <td>{{ v.fecha_servicio or 'N/D' }}<br><small>{{ v.hora_inicio or '' }}</small></td>
+                                <td><span style="font-family: monospace; font-size: 14px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span></td>
                                 <td>
-                                    <!-- Supresión del botón 'Verificar Directo' -->
                                     <button type="button" class="btn-primary" style="padding: 6px 10px; font-size: 11px;"
                                         onclick="abrirRevision(this)"
                                         data-id="{{ v.id }}"
-                                        data-ruta="{{ v.ruta_documento }}"
-                                        data-nombre="{{ v.nombre_usuario }}"
-                                        data-tipodoc="{{ v.tipo_documento }}"
-                                        data-idusr="{{ v.id_usuario }}"
-                                        data-tel="{{ v.telefono_usuario }}"
-                                        data-dep="{{ v.departamento }}"
-                                        data-mun="{{ v.municipio }}"
-                                        data-ori="{{ v.direccion_origen }}"
-                                        data-dep-des="{{ v.departamento_destino }}"
-                                        data-mun-des="{{ v.municipio_destino }}"
-                                        data-des="{{ v.direccion_destino }}">
-                                        👁️ Revisar PDF
+                                        data-ruta="{{ v.ruta_documento or '' }}"
+                                        data-nombre="{{ v.nombre_usuario or '' }}"
+                                        data-tipodoc="{{ v.tipo_documento or '' }}"
+                                        data-idusr="{{ v.id_usuario or '' }}"
+                                        data-tel="{{ v.telefono_usuario or '' }}"
+                                        data-dep="{{ v.departamento or '' }}"
+                                        data-mun="{{ v.municipio or '' }}"
+                                        data-ori="{{ v.direccion_origen or '' }}"
+                                        data-dep-des="{{ v.departamento_destino or '' }}"
+                                        data-mun-des="{{ v.municipio_destino or '' }}"
+                                        data-des="{{ v.direccion_destino or '' }}">
+                                        📞 Auditar Datos
                                     </button>
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes programados pendientes de verificación.</td></tr>
+                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes pendientes de verificación.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'traslados_programacion' %}
+                <!-- ================= ETAPA 4: PROGRAMACIÓN DE VIAJES ================= -->
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Etapa 4: Programar Viajes</h2>
+                    </div>
+                </div>
+                
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">El modal solicitará definir el Tipo de Servicio y se ajustará automáticamente dependiendo de si es Diálisis u Otros Procedimientos y la cantidad de viajes de la orden.</p>
+
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Prescripción (ID)</th>
+                                <th>Paciente / Teléfono</th>
+                                <th>Procedimiento</th>
+                                <th>ID Viaje</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for v in viajes %}
+                            <tr>
+                                <td><b>{{ v.numero_prescripcion }}</b></td>
+                                <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
+                                <td><span class="badge badge-purple" id="tipo_srv_{{ v.id }}">{{ v.tipo_servicio }}</span></td>
+                                <td><span style="font-family: monospace; font-size: 14px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span></td>
+                                <td>
+                                    <button type="button" class="btn-info" style="padding: 6px 10px; font-size: 11px;"
+                                        onclick="abrirProgramacion('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}', {{ v.total_idas|default(1) }})">
+                                        📅 Programar Viajes
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes verificados pendientes de programar.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
 
             {% elif active_module == 'traslados_asignacion_flota' %}
-                <!-- ================= ETAPA 5: ASIGNACIÓN DE FLOTA (TELEGRAM) ================= -->
+                <!-- ================= ETAPA 5: ASIGNACIÓN DE FLOTA Y FUEC ================= -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 5: Asignación de Flota</h2>
+                        <h2>Etapa 5: Asignación de Flota (Generación FUEC)</h2>
                     </div>
                 </div>
                 
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Asigne vehículo y conductor a los viajes verificados. Esto notificará inmediatamente al operador vía Telegram.</p>
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Asigne vehículo y conductor. El sistema validará normativas (Decreto 1079), generará el FUEC en PDF y lo enviará al Telegram del conductor.</p>
 
                 <div class="table-card">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>ID Viaje (Código)</th>
+                                <th>Prescripción</th>
+                                <th>ID Viaje / Trayecto</th>
                                 <th>Paciente / Teléfono</th>
                                 <th>Fechas Prog.</th>
-                                <th>Estado</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for v in viajes %}
                             <tr>
-                                <td><span style="font-family: monospace; font-size: 15px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span><br><small>Auth: {{ v.numero_autorizacion }}</small></td>
-                                <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.telefono_usuario }}</small></td>
+                                <td><b>{{ v.numero_prescripcion }}</b></td>
+                                <td>
+                                    <span style="font-family: monospace; font-size: 15px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span><br>
+                                    <span class="badge {% if v.trayecto == 'IDA' %}badge-info{% else %}badge-purple{% endif %}">[ {{ v.trayecto }} ]</span>
+                                </td>
+                                <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
                                 <td>{{ v.fecha_servicio or 'N/D' }}<br><small>{{ v.hora_inicio or '' }}</small></td>
-                                <td><span class="badge badge-purple">Verificado (Pdte. Flota)</span></td>
                                 <td>
                                     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
                                         <button type="button" class="btn-success" style="padding: 6px 10px; font-size: 11px;"
-                                            onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}', '{{ v.numero_autorizacion }}')">
-                                            🚐 Asignar Flota (TG)
+                                            onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}')">
+                                            🚐 Generar FUEC y Asignar
                                         </button>
                                     </div>
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes en cola de asignación de flota.</td></tr>
+                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes programados en cola de asignación.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -577,38 +563,46 @@
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Auditoría de Viajes Ejecutados</h2>
+                        <h2>Etapa 6: Auditoría de Viajes Individuales</h2>
                     </div>
                 </div>
                 
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Revise las evidencias enviadas por los operadores en ruta. Apruebe para generar el Sello criptográfico SHA-256 o rechace para devolver el servicio a estado Asignado.</p>
+
                 <div class="table-card">
                     <table class="data-table">
                         <thead>
                             <tr>
                                 <th>ID Viaje</th>
-                                <th>Paciente / EPS</th>
-                                <th>Operador Real</th>
-                                <th>Fin Real</th>
-                                <th>Evidencias y Reporte</th>
-                                <th>Acciones</th>
+                                <th>Paciente / Trayecto</th>
+                                <th>Operador / Vehículo</th>
+                                <th>Fecha Fin Real</th>
+                                <th>Evidencias (Reporte)</th>
+                                <th>Acción</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for t in viajes %}
+                            {% for v in viajes %}
                             <tr>
-                                <td><span style="font-family: monospace; font-weight: bold; color: var(--verde);">{{ t.id_viaje }}</span></td>
-                                <td>{{ t.nombre_usuario }}<br><small>{{ t.id_eps_cliente }}</small></td>
-                                <td>{{ t.operador_ejecucion }}<br><small>{{ t.vehiculo_asignado }}</small></td>
-                                <td>{{ t.fecha_fin_real }}</td>
-                                <td>
-                                    <div style="display: flex; gap: 5px; flex-direction: column;">
-                                        <button class="btn-primary" style="background: #8b5cf6;" onclick="abrirAuditoriaPDF('{{ t.ruta_documento }}')">📄 Ver Reporte</button>
-                                    </div>
-                                </td>
+                                <td><span style="font-family: monospace; font-size: 15px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span></td>
+                                <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.trayecto|default('IDA') }}</small></td>
+                                <td>{{ v.conductor_asignado }}<br><small>{{ v.vehiculo_asignado }}</small></td>
+                                <td>{{ v.fecha_fin_real or 'N/D' }}</td>
+                                <td><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 Ver Reporte Cierre</button></td>
                                 <td>
                                     <div style="display: flex; gap: 5px;">
-                                        <button class="btn-success" onclick="abrirModalAprobarAuditoria('{{ t.id }}', '{{ t.id_viaje }}')" title="Validar y Aprobar">✔️ Aprobar</button>
-                                        <button class="btn-danger" onclick="abrirRechazoAuditoria('{{ t.id }}', '{{ t.id_viaje }}')">❌ Rechazar</button>
+                                        <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST" style="display:inline;">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <input type="hidden" name="viaje_id" value="{{ v.id }}">
+                                            <input type="hidden" name="accion" value="aprobar_auditoria">
+                                            <button type="submit" class="btn-success" style="padding: 6px 10px; font-size: 11px;">✔️ Aprobar</button>
+                                        </form>
+                                        <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST" style="display:inline;">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <input type="hidden" name="viaje_id" value="{{ v.id }}">
+                                            <input type="hidden" name="accion" value="rechazar_auditoria">
+                                            <button type="button" class="btn-danger" style="padding: 6px 10px; font-size: 11px;" onclick="if(confirm('¿Seguro que desea rechazar las evidencias y devolver el viaje a estado ASIGNADO para corrección del conductor?')) this.form.submit();">✖️ Rechazar</button>
+                                        </form>
                                     </div>
                                 </td>
                             </tr>
@@ -624,166 +618,212 @@
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Historial de Viajes Auditados (Listos para Facturación)</h2>
+                        <h2>Etapa 7: Historial de Viajes Auditados</h2>
                     </div>
                 </div>
                 
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Listado de viajes finalizados y certificados con Sello de Integridad SHA-256 (Últimos 100 registros).</p>
+
                 <div class="table-card">
                     <table class="data-table">
                         <thead>
                             <tr>
                                 <th>ID Viaje</th>
-                                <th>Auth #</th>
-                                <th>Paciente</th>
-                                <th>EPS</th>
+                                <th>Paciente / EPS</th>
                                 <th>Operador / Vehículo</th>
-                                <th>Ejecución Real</th>
-                                <th>Auditor / Fecha</th>
-                                <th>Reporte PDF</th>
-                                <th>Estado</th>
+                                <th>Auditor / Fecha Cert.</th>
+                                <th>Sello SHA-256</th>
+                                <th>Documento Oficial</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for t in viajes %}
+                            {% for v in viajes %}
                             <tr>
-                                <td><span style="font-family: monospace; font-weight: bold;">{{ t.id_viaje }}</span></td>
-                                <td><b>{{ t.numero_autorizacion }}</b></td>
-                                <td>{{ t.nombre_usuario }}</td>
-                                <td>{{ t.eps_cliente }}</td>
-                                <td>{{ t.operador_ejecucion }} ({{ t.vehiculo_asignado }})</td>
-                                <td>{{ t.fecha_fin_real }}</td>
-                                <td><small><b>{{ t.auditor_nombre or 'N/A' }}</b><br>{{ t.fecha_auditoria or '' }}</small></td>
-                                <td><button onclick="abrirPDF('{{ t.ruta_documento }}')" class="btn-pdf">📄 Ver PDF</button></td>
-                                <td><span class="badge badge-success">Auditado</span></td>
+                                <td><span style="font-family: monospace; font-size: 14px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span></td>
+                                <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.eps_cliente }}</small></td>
+                                <td>{{ v.operador_ejecucion }}<br><small>{{ v.vehiculo_asignado }}</small></td>
+                                <td>{{ v.auditor_nombre }}<br><small>{{ v.fecha_auditoria }}</small></td>
+                                <td><span title="{{ v.hash_auditoria }}" style="font-family: monospace; font-size: 10px; color: #475569; background: #f1f5f9; padding: 4px 6px; border-radius: 4px; display: inline-block;">{{ (v.hash_auditoria|string)[:12] }}...</span></td>
+                                <td><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 Ver Reporte Sellado</button></td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes auditados en el historial reciente.</td></tr>
+                            <tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de viajes auditados recientemente.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+
             {% endif %}
             
-            <div style="margin-top: 30px; font-size: 11px; color: #9ca3af; border-top: 1px solid var(--border); padding-top: 15px; max-width: 1000px;">
-                <p>&copy; 2026 BQA ONE Technology. Sistema Multiusuario Seguro.</p>
-            </div>
         </div>
     </main>
 
-    <!-- ================= MODALES TRASLADOS Y OPERATIVOS ================= -->
-    <div id="modalRevisionVerificacion" class="modal-overlay">
-        <div class="modal-box" style="max-width: 1000px; width: 95%;">
-            <div class="modal-header">
-                <h3>Revisión y Ajuste de Datos 📞</h3>
-                <button class="close-btn" onclick="closeModal('modalRevisionVerificacion')">&times;</button>
-            </div>
-            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 300px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; height: 60vh; position: relative;">
-                    <button type="button" onclick="ampliarPDF()" style="position: absolute; top: 10px; right: 15px; background: var(--verde); color: white; border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; font-weight: bold; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 6px; transition: 0.2s;" title="Abrir en pantalla completa">
-                        🔍 Ampliar
-                    </button>
-                    <iframe id="visor_pdf" src="" style="width: 100%; height: 100%; border: none;"></iframe>
-                </div>
-                
-                <div style="flex: 1; min-width: 300px; overflow-y: auto; height: 60vh; padding-right: 10px;">
-                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="accion" value="editar_y_verificar">
-                        <input type="hidden" name="viaje_id" id="rev_traslado_id">
-
-                        <h4 style="color: var(--verde-osc); margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">Datos Editables del Paciente</h4>
-                        <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre_usuario" id="rev_nombre" required></div>
-                        <div style="display: flex; gap: 10px;">
-                            <div class="form-group" style="flex: 1;">
-                                <label>Tipo Doc.</label>
-                                <select name="tipo_documento" id="rev_tipodoc" required>
-                                    <option value="">Seleccione...</option>
-                                    <option value="CC">CC - Cédula de Ciudadanía</option>
-                                    <option value="TI">TI - Tarjeta de Identidad</option>
-                                    <option value="CE">CE - Cédula de Extranjería</option>
-                                    <option value="RC">RC - Registro Civil</option>
-                                    <option value="PA">PA - Pasaporte</option>
-                                    <option value="PPT">PPT - Permiso Prot. Temporal</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="flex: 1;"><label>Número Doc.</label><input type="text" name="id_usuario" id="rev_idusr" required></div>
-                        </div>
-                        <div class="form-group"><label>Teléfono Contacto</label><input type="text" name="telefono_usuario" id="rev_tel"></div>
-
-                        <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">📍 Origen del Viaje</h4>
-                        <div style="display: flex; gap: 10px;">
-                            <div class="form-group" style="flex: 1;">
-                                <label>Departamento Origen</label>
-                                <select name="departamento" id="rev_dep_ori" onchange="cargarMunicipios('rev_dep_ori', 'rev_mun_ori')"></select>
-                            </div>
-                            <div class="form-group" style="flex: 1;">
-                                <label>Municipio Origen</label>
-                                <select name="municipio" id="rev_mun_ori"></select>
-                            </div>
-                        </div>
-                        <div class="form-group"><label>Dirección Origen Exacta</label><input type="text" name="direccion_origen" id="rev_ori" required></div>
-                        
-                        <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">🏁 Destino del Viaje</h4>
-                        <div style="display: flex; gap: 10px;">
-                            <div class="form-group" style="flex: 1;">
-                                <label>Departamento Destino</label>
-                                <select name="departamento_destino" id="rev_dep_des" onchange="cargarMunicipios('rev_dep_des', 'rev_mun_des')"></select>
-                            </div>
-                            <div class="form-group" style="flex: 1;">
-                                <label>Municipio Destino</label>
-                                <select name="municipio_destino" id="rev_mun_des"></select>
-                            </div>
-                        </div>
-                        <div class="form-group"><label>Dirección Destino Exacta</label><input type="text" name="direccion_destino" id="rev_des"></div>
-
-                        <div class="modal-footer" style="position: sticky; bottom: 0; background: var(--surface); padding-top: 10px; border-top: 1px solid var(--border); z-index: 10;">
-                            <button type="button" class="btn-cancel" onclick="closeModal('modalRevisionVerificacion')">Cancelar</button>
-                            <button type="submit" class="btn-primary" style="background: #10b981;">Guardar y Verificar</button>
-                        </div>
-                    </form>
-                </div>
+    <!-- ================= MODAL UNIVERSAL DE CONFIRMACIÓN (REGLA 1.2) ================= -->
+    <div id="modalConfirmacionUniversal" class="modal-overlay" style="z-index: 9999;">
+        <div class="modal-box" style="max-width: 400px; text-align: center;">
+            <h3 class="modal-title" style="justify-content: center; color: var(--verde);">Confirmar Operación</h3>
+            <p id="textoConfirmacionUniversal" style="font-size: 14px; color: var(--text); margin-bottom: 20px;"></p>
+            <div style="display: flex; justify-content: center; gap: 10px;">
+                <button type="button" class="btn-cancel" onclick="cancelarEnvioUniversal()">No</button>
+                <button type="button" class="btn-primary" onclick="procesarEnvioUniversal()" style="background: var(--verde);">Sí</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL DE PROGRAMACIÓN Y TURNOS -->
+    <!-- ================= MODAL DE VERIFICACIÓN (INCLUYE ACOMPAÑANTE, ORIGEN Y DESTINO) ================= -->
+    <div id="modalRevisionVerificacion" class="modal-overlay">
+        <div class="modal-box" style="max-width: 600px; width: 95%;">
+            <div class="modal-header">
+                <h3>Verificación Telefónica de Datos 📞</h3>
+                <button class="close-btn" onclick="closeModal('modalRevisionVerificacion')">&times;</button>
+            </div>
+            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="editar_y_verificar">
+                <input type="hidden" name="viaje_id" id="rev_traslado_id">
+
+                <h4 style="color: var(--verde-osc); margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">Datos del Paciente</h4>
+                <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre_usuario" id="rev_nombre" required></div>
+                <div class="form-group"><label>Número Doc. (ID)</label><input type="text" name="id_usuario" id="rev_idusr" required></div>
+                <div class="form-group"><label>Teléfono Contacto</label><input type="text" name="telefono_usuario" id="rev_tel"></div>
+
+                <!-- SECCIÓN INYECTADA: DATOS DE ORIGEN -->
+                <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">📍 Datos de Origen</h4>
+                <div class="form-group">
+                    <label>Departamento Origen</label>
+                    <select name="departamento_origen" id="rev_dep_ori" onchange="cargarMunicipios('rev_dep_ori', 'rev_mun_ori')" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Municipio Origen</label>
+                    <select name="municipio_origen" id="rev_mun_ori" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Dirección Origen Exacta</label>
+                    <input type="text" name="direccion_origen" id="rev_ori" required>
+                </div>
+
+                <!-- SECCIÓN INYECTADA: DATOS DE DESTINO -->
+                <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">🏁 Datos de Destino</h4>
+                <div class="form-group">
+                    <label>Departamento Destino</label>
+                    <select name="departamento_destino" id="rev_dep_des" onchange="cargarMunicipios('rev_dep_des', 'rev_mun_des')" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Municipio Destino</label>
+                    <select name="municipio_destino" id="rev_mun_des" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Dirección Destino Exacta</label>
+                    <input type="text" name="direccion_destino" id="rev_des" required>
+                </div>
+
+                <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">👥 Confirmación de Acompañante (Obligatorio preguntar)</h4>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #111827;">
+                        <input type="checkbox" name="lleva_acompanante" id="rev_chk_acompanante" onchange="toggleRevAcompanante()" style="width: auto;"> 
+                        Sí, el paciente viajará con acompañante
+                    </label>
+                </div>
+                <div class="form-group div-rev-acompanante" style="display: none;">
+                    <label>Nombre Completo del Acompañante</label>
+                    <input type="text" name="nombre_acompanante" id="rev_nombre_acompanante">
+                </div>
+                <div class="form-group div-rev-acompanante" style="display: none;">
+                    <label>Cédula del Acompañante</label>
+                    <input type="text" name="cedula_acompanante" id="rev_cedula_acompanante">
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" onclick="closeModal('modalRevisionVerificacion')">Cancelar</button>
+                    <button type="submit" class="btn-primary" style="background: #10b981;">Guardar y Verificar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL PROGRAMACIÓN DINÁMICA (REGLAS DIÁLISIS / CASCADA) ================= -->
     <div id="modalProgramacion" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>Programar Fechas y Turnos 📅</h3>
+                <h3 id="titulo_programacion">Programar Fechas y Turnos 📅</h3>
                 <button class="close-btn" onclick="closeModal('modalProgramacion')">&times;</button>
             </div>
             <form action="{{ url_for('flotaespecial_eps.gestion_traslados_programacion') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="programar">
                 <input type="hidden" name="viaje_id" id="prog_viaje_id">
+                <input type="hidden" id="prog_total_idas" value="0">
                 
                 <p style="font-size: 13px; margin-bottom: 15px;">Viaje ID: <b id="prog_alfa" style="font-family: monospace; color: var(--verde);"></b><br>Paciente: <span id="prog_paciente"></span></p>
                 
-                <div class="form-group">
-                    <label>Tipo de Programación (Turno)</label>
-                    <select name="turno" required>
-                        <option value="manual">Citas / Terapias (Manual por cada viaje)</option>
-                        <option value="1">Diálisis - Turno 1 (Lunes, Miércoles, Viernes)</option>
-                        <option value="2">Diálisis - Turno 2 (Martes, Jueves, Sábado)</option>
+                <!-- DEFINICIÓN INICIAL DEL TIPO DE PROCEDIMIENTO -->
+                <div class="form-group" style="border-bottom: 1px solid var(--border); padding-bottom: 15px;">
+                    <label style="color: #ef4444;">1. Seleccione el Tipo de Servicio (Obligatorio)</label>
+                    <select name="tipo_servicio" id="select_tipo_servicio" onchange="adaptarModalProgramacion()" required>
+                        <option value="">Seleccione...</option>
+                        <option value="DIALISIS">Diálisis</option>
+                        <option value="CITAS-TERAPIAS-OTROS">Citas / Terapias / Otros Procedimientos</option>
                     </select>
                 </div>
 
-                <div class="form-group"><label>Fecha Exacta del Primer Viaje</label><input type="date" name="fecha_servicio" id="prog_fecha" required></div>
-                <div class="form-group"><label>Hora de Recogida</label><input type="time" name="hora_inicio" id="prog_hini" required></div>
+                <!-- SECCIÓN DINÁMICA: DIÁLISIS -->
+                <div id="seccion_dialisis" style="display: none;">
+                    <div class="form-group">
+                        <label>2. Seleccione el Turno de Diálisis (Autoprogramación)</label>
+                        <select name="turno" id="select_turno" onchange="configurarCalendarioDialisis()">
+                            <option value="">Seleccione Turno...</option>
+                            <option value="1">Turno 1 → LUNES - MIÉRCOLES - VIERNES</option>
+                            <option value="2">Turno 2 → MARTES - JUEVES - SÁBADO</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN DINÁMICA: CITAS Y FRECUENCIAS (SOLO SI HAY > 1 VIAJE) -->
+                <div id="seccion_frecuencias" style="display: none;">
+                    <div class="form-group">
+                        <label>2. Frecuencia de Repetición (Cascada Automática)</label>
+                        <select name="frecuencia" id="select_frecuencia" onchange="liberarCalendario()">
+                            <option value="">Seleccione Frecuencia...</option>
+                            <option value="diaria">Diaria</option>
+                            <option value="cada_2_dias">Cada 2 días</option>
+                            <option value="cada_3_dias">Cada 3 días</option>
+                            <option value="cada_4_dias">Cada 4 días</option>
+                            <option value="semanal">Semanal</option>
+                            <option value="quincenal">Quincenal</option>
+                            <option value="mensual">Mensual</option>
+                            <option value="bimensual">Bimensual</option>
+                            <option value="trimestral">Trimestral</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN COMÚN DE FECHA Y HORA -->
+                <div id="seccion_fecha_hora" style="display: none;">
+                    <div class="form-group">
+                        <label>3. Fecha de Inicio del (Primer) Viaje</label>
+                        <input type="date" name="fecha_servicio" id="prog_fecha" required onchange="validarFechaSeleccionada()">
+                        <small id="error_fecha" style="color: #ef4444; display: none; font-weight: bold; margin-top: 5px;">Día inválido para el turno seleccionado.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Hora de Recogida</label>
+                        <input type="time" name="hora_inicio" id="prog_hini" required>
+                    </div>
+                    <p style="font-size: 11px; color: #f59e0b; margin-top: 10px;">🔔 El sistema programará automáticamente los viajes IDA posteriores basándose en la configuración elegida.</p>
+                </div>
                 
-                <p style="font-size: 11px; color: #6b7280; margin-top: 10px;">ℹ️ Si elige Turno 1 o 2, los viajes sucesivos de esta orden maestra se auto-programarán en los días correspondientes a la misma hora.</p>
-                
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalProgramacion')">Cancelar</button><button type="submit" class="btn-primary" style="background: #0ea5e9;">Programar</button></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" onclick="closeModal('modalProgramacion')">Cancelar</button>
+                    <button type="submit" class="btn-primary" id="btn_submit_prog" style="background: #0ea5e9; display: none;">Guardar y Programar</button>
+                </div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL DE ASIGNACIÓN DE FLOTA (TELEGRAM) -->
+    <!-- ================= MODAL ASIGNACIÓN Y FUEC ================= -->
     <div id="modalAsignacionFlota" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>Asignar Flota Definitiva 🚐</h3>
+                <h3>Generar FUEC y Asignar 🚐</h3>
                 <button class="close-btn" onclick="closeModal('modalAsignacionFlota')">&times;</button>
             </div>
             <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" method="POST">
@@ -791,10 +831,10 @@
                 <input type="hidden" name="accion" value="asignar_flota">
                 <input type="hidden" name="viaje_id" id="asig_flota_viaje_id">
                 
-                <p style="font-size: 13px; margin-bottom: 15px;">Viaje ID: <b id="asig_flota_alfa" style="font-family: monospace; color: var(--verde);"></b><br>Auth: <span id="asig_flota_auth"></span><br>Paciente: <span id="asig_flota_paciente"></span></p>
+                <p style="font-size: 13px; margin-bottom: 15px;">Viaje ID: <b id="asig_flota_alfa" style="font-family: monospace; color: var(--verde);"></b><br>Paciente: <span id="asig_flota_paciente"></span></p>
                 
                 <div class="form-group">
-                    <label>Vehículo (Placa)</label>
+                    <label>Seleccionar Vehículo (Placa)</label>
                     <select name="vehiculo" required>
                         <option value="">Seleccione vehículo...</option>
                         {% if vehiculos is defined %}
@@ -805,7 +845,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Conductor (Operador)</label>
+                    <label>Seleccionar Conductor (App Móvil)</label>
                     <select name="conductor" required>
                         <option value="">Seleccione conductor...</option>
                         {% if conductores is defined %}
@@ -816,150 +856,15 @@
                     </select>
                 </div>
                 
-                <p style="font-size: 11px; color: #f59e0b; margin-top: 10px;">🔔 Al confirmar, el viaje quedará ASIGNADO y se enviará la notificación automática vía Telegram al dispositivo del conductor.</p>
+                <p style="font-size: 11px; color: #ef4444; font-weight: bold; margin-top: 10px;">⚠️ SISTEMA DE PREVENCIÓN ACTIVO: Se verificará que SOAT, RTM y Licencias estén vigentes. Si hay vencimientos, se abortará el proceso.</p>
+                <p style="font-size: 11px; color: #10b981; font-weight: bold; margin-top: 5px;">✔️ NOTIFICACIÓN TELEGRAM: Se enviará el PDF oficial del FUEC al Telegram del conductor al finalizar.</p>
                 
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalAsignacionFlota')">Cancelar</button><button type="submit" class="btn-primary" style="background: #10b981;">Asignar y Notificar</button></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL REPORTE DE NOVEDAD -->
-    <div id="modalNovedadVerificacion" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Reportar Novedad</h3>
-                <button class="close-btn" onclick="closeModal('modalNovedadVerificacion')">&times;</button>
-            </div>
-            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="novedad">
-                <input type="hidden" name="viaje_id" id="novedad_traslado_id">
-                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">Auth: <b id="novedad_auth"></b></p>
-                <div class="form-group">
-                    <label>Observación / Motivo de la Novedad</label>
-                    <textarea name="observacion" rows="4" required placeholder="Ej. Datos inconsistentes, paciente no contesta..."></textarea>
-                </div>
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalNovedadVerificacion')">Cancelar</button><button type="submit" class="btn-warning">Guardar Novedad</button></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL VISOR DE AUDITORÍA PDF -->
-    <div id="modalAuditoriaPDF" class="modal-overlay">
-        <div class="modal-box" style="max-width: 800px; width: 95%; height: 80vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3>Reporte de Recorrido Seguro</h3>
-                <button class="close-btn" onclick="closeModal('modalAuditoriaPDF')">&times;</button>
-            </div>
-            <div id="contenedor_pdf_auditoria" style="flex: 1; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
-                <iframe id="iframe_auditoria_pdf" src="" style="width: 100%; height: 100%; border: none;"></iframe>
-            </div>
-            <div class="modal-footer" style="margin-top: 0;">
-                <button type="button" class="btn-cancel" onclick="closeModal('modalAuditoriaPDF')">Cerrar Visor</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- MODAL DE CERTIFICACIÓN Y VALIDACIÓN (AUTOMATIZADO) -->
-    <div id="modalAprobarAuditoria" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3 style="color: var(--verde);">Certificación de Auditoría</h3>
-                <button class="close-btn" onclick="closeModal('modalAprobarAuditoria')">&times;</button>
-            </div>
-            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="aprobar_auditoria">
-                <input type="hidden" name="viaje_id" id="aprobar_viaje_id">
-                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">ID Viaje: <b id="aprobar_alfa" style="font-family: monospace;"></b></p>
-                <p style="font-size: 13px; color: var(--text); margin-bottom: 15px;">¿Desea confirmar la validación automática del Sello SHA-256 y certificar este viaje finalizado?</p>
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalAprobarAuditoria')">Cancelar</button>
-                    <button type="submit" class="btn-success" style="padding: 10px 15px;">Confirmar y Aprobar Auditoría</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL RECHAZO DE AUDITORÍA -->
-    <div id="modalRechazoAuditoria" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3 style="color: #ef4444;">Rechazar Auditoría</h3>
-                <button class="close-btn" onclick="closeModal('modalRechazoAuditoria')">&times;</button>
-            </div>
-            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="rechazar_auditoria">
-                <input type="hidden" name="viaje_id" id="rechazo_viaje_id">
-                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">ID Viaje: <b id="rechazo_alfa" style="font-family: monospace;"></b></p>
-                <div class="form-group">
-                    <label>Motivo del Rechazo (Devolución a estado ASIGNADO)</label>
-                    <textarea name="observacion" rows="4" required placeholder="Ej. La foto del destino no es clara, falta la firma del paciente..."></textarea>
-                </div>
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalRechazoAuditoria')">Cancelar</button><button type="submit" class="btn-danger">Confirmar Rechazo</button></div>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalAsignacionFlota')">Cancelar</button><button type="submit" class="btn-primary" style="background: #10b981;">Validar y Generar FUEC</button></div>
             </form>
         </div>
     </div>
 
     <script>
-        // ================= SEGURIDAD Y NAVEGACIÓN =================
-        let isNavigatingLegally = false;
-
-        document.querySelectorAll('a, button').forEach(el => {
-            el.addEventListener('click', () => {
-                isNavigatingLegally = true;
-                setTimeout(() => { isNavigatingLegally = false; }, 1000);
-            });
-        });
-
-        history.pushState(null, null, location.href);
-        window.addEventListener('popstate', function(event) {
-            history.pushState(null, null, location.href);
-            alert("⚠️ Acción denegada: Utilice el botón 'Volver al Panel Central' del menú para salir de esta vista de forma segura.");
-        });
-
-        // ================= LÓGICA DE INTERFAZ =================
-        function ampliarPDF() {
-            const iframe = document.getElementById('visor_pdf');
-            let src = iframe.getAttribute('src');
-            if (src && src.trim() !== '') {
-                window.open(src, '_blank');
-            } else {
-                alert('No hay un documento disponible para ampliar.');
-            }
-        }
-
-        // Corrección del Error 404 para archivos PDF
-        function abrirPDF(rutaRelativa) {
-            if (rutaRelativa && rutaRelativa !== 'None' && rutaRelativa.trim() !== '') {
-                let finalRoute = rutaRelativa.startsWith('static/') ? '/' + rutaRelativa : '/static/' + rutaRelativa;
-                window.open(finalRoute, '_blank');
-            } else {
-                alert('No se adjuntó un documento PDF para esta orden.');
-            }
-        }
-
-        const menuToggle = document.getElementById('menuToggle');
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebarOverlay');
-
-        function toggleSidebar() {
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('active');
-        }
-        menuToggle.addEventListener('click', toggleSidebar);
-        overlay.addEventListener('click', toggleSidebar);
-
-        function openModal(id) { document.getElementById(id).classList.add('active'); }
-        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-        
-        function toggleDropdown(menuId, el) {
-            const dropdown = document.getElementById(menuId);
-            dropdown.classList.toggle('open');
-            el.classList.toggle('open');
-        }
-
         // ================= DICCIONARIO DIVIPOLA: DEPARTAMENTOS Y MUNICIPIOS =================
         const divipolaColombia = {
             "AMAZONAS": ["LETICIA", "PUERTO NARIÑO", "EL ENCANTO", "LA CHORRERA", "LA PEDRERA", "MIRITI - PARANA", "PUERTO ALEGRIA", "PUERTO ARICA", "PUERTO SANTANDER", "TARAPACA"],
@@ -1030,23 +935,195 @@
 
         document.addEventListener("DOMContentLoaded", function() {
             initSelectoresDivipola();
+            
+            // Si hay datos ocultos de captura, autoseleccionar
+            const hiddenDep = document.getElementById('hidden_dep_captura');
+            const hiddenMun = document.getElementById('hidden_mun_captura');
+            if(hiddenDep && hiddenDep.value && document.getElementById('cap_dep_ori')) {
+                document.getElementById('cap_dep_ori').value = hiddenDep.value.toUpperCase();
+                cargarMunicipios('cap_dep_ori', 'cap_mun_ori');
+                if(hiddenMun && hiddenMun.value) {
+                    setTimeout(() => { document.getElementById('cap_mun_ori').value = hiddenMun.value.toUpperCase(); }, 100);
+                }
+            }
         });
 
-        // Funciones Traslados y Operativos Corregidas (Mantenimiento de IDs exactos)
+        // ================= INTERCEPTOR UNIVERSAL =================
+        let formPendienteUniversal = null;
+        
+        document.addEventListener('submit', function(e) {
+            if (!e.target.hasAttribute('data-confirmed')) {
+                e.preventDefault();
+                formPendienteUniversal = e.target;
+                
+                let actionText = "¿Está seguro que desea ejecutar esta operación de modificación o inserción de datos?";
+                document.getElementById('textoConfirmacionUniversal').innerText = actionText;
+                document.getElementById('modalConfirmacionUniversal').classList.add('active');
+            }
+        });
+
+        function cancelarEnvioUniversal() {
+            formPendienteUniversal = null;
+            document.getElementById('modalConfirmacionUniversal').classList.remove('active');
+        }
+
+        function procesarEnvioUniversal() {
+            if (formPendienteUniversal) {
+                formPendienteUniversal.setAttribute('data-confirmed', 'true');
+                document.getElementById('modalConfirmacionUniversal').classList.remove('active');
+                formPendienteUniversal.submit();
+            }
+        }
+
+        // ================= LÓGICA DE ACOMPAÑANTES =================
+        function toggleRevAcompanante() {
+            const isChecked = document.getElementById('rev_chk_acompanante').checked;
+            const divs = document.querySelectorAll('.div-rev-acompanante');
+            divs.forEach(div => {
+                div.style.display = isChecked ? 'block' : 'none';
+                const input = div.querySelector('input');
+                if(input) input.required = isChecked;
+            });
+        }
+
+        // ================= LÓGICA DE PROGRAMACIÓN DINÁMICA =================
+        function abrirProgramacion(id, alfa, paciente, total_idas) {
+            document.getElementById('prog_viaje_id').value = id;
+            document.getElementById('prog_alfa').innerText = alfa;
+            document.getElementById('prog_paciente').innerText = paciente;
+            document.getElementById('prog_total_idas').value = total_idas || 1;
+            
+            // Reiniciar y Ocultar todo
+            document.getElementById('select_tipo_servicio').value = '';
+            document.getElementById('seccion_dialisis').style.display = 'none';
+            document.getElementById('seccion_frecuencias').style.display = 'none';
+            document.getElementById('seccion_fecha_hora').style.display = 'none';
+            document.getElementById('btn_submit_prog').style.display = 'none';
+            
+            document.getElementById('select_turno').required = false;
+            document.getElementById('select_frecuencia').required = false;
+            
+            document.getElementById('prog_fecha').value = '';
+            document.getElementById('prog_hini').value = '';
+            document.getElementById('error_fecha').style.display = 'none';
+
+            openModal('modalProgramacion');
+        }
+
+        function adaptarModalProgramacion() {
+            const tipo = document.getElementById('select_tipo_servicio').value;
+            const totalIdas = parseInt(document.getElementById('prog_total_idas').value) || 1;
+            
+            const secDialisis = document.getElementById('seccion_dialisis');
+            const secFrecuencias = document.getElementById('seccion_frecuencias');
+            const secFechaHora = document.getElementById('seccion_fecha_hora');
+            const btnSubmit = document.getElementById('btn_submit_prog');
+            
+            const selTurno = document.getElementById('select_turno');
+            const selFrecuencia = document.getElementById('select_frecuencia');
+            
+            // Reiniciar valores y validez
+            selTurno.value = ''; selTurno.required = false;
+            selFrecuencia.value = ''; selFrecuencia.required = false;
+            document.getElementById('prog_fecha').value = '';
+            document.getElementById('error_fecha').style.display = 'none';
+
+            if (!tipo) {
+                secDialisis.style.display = 'none';
+                secFrecuencias.style.display = 'none';
+                secFechaHora.style.display = 'none';
+                btnSubmit.style.display = 'none';
+                return;
+            }
+
+            if (tipo === 'DIALISIS') {
+                secDialisis.style.display = 'block';
+                secFrecuencias.style.display = 'none';
+                secFechaHora.style.display = 'block';
+                btnSubmit.style.display = 'block';
+                
+                selTurno.required = true;
+                configurarCalendarioDialisis();
+                
+            } else if (tipo === 'CITAS-TERAPIAS-OTROS') {
+                secDialisis.style.display = 'none';
+                secFechaHora.style.display = 'block';
+                btnSubmit.style.display = 'block';
+                
+                if (totalIdas > 1) {
+                    secFrecuencias.style.display = 'block';
+                    selFrecuencia.required = true;
+                } else {
+                    secFrecuencias.style.display = 'none';
+                    selFrecuencia.required = false;
+                }
+                liberarCalendario();
+            }
+        }
+
+        function configurarCalendarioDialisis() {
+            const turno = document.getElementById('select_turno').value;
+            const inputFecha = document.getElementById('prog_fecha');
+            
+            let hoy = new Date();
+            hoy.setDate(hoy.getDate() + 1); 
+            inputFecha.min = hoy.toISOString().split('T')[0];
+            inputFecha.value = ''; 
+            document.getElementById('error_fecha').style.display = 'none';
+            document.getElementById('btn_submit_prog').disabled = false;
+        }
+
+        function liberarCalendario() {
+            const inputFecha = document.getElementById('prog_fecha');
+            let hoy = new Date();
+            hoy.setDate(hoy.getDate() + 1);
+            inputFecha.min = hoy.toISOString().split('T')[0];
+            document.getElementById('error_fecha').style.display = 'none';
+            document.getElementById('btn_submit_prog').disabled = false;
+        }
+
+        function validarFechaSeleccionada() {
+            const tipo = document.getElementById('select_tipo_servicio').value;
+            if (tipo !== 'DIALISIS') return; 
+
+            const turno = document.getElementById('select_turno').value;
+            const inputFecha = document.getElementById('prog_fecha');
+            const errorMsg = document.getElementById('error_fecha');
+            const btnSubmit = document.getElementById('btn_submit_prog');
+            
+            if (!turno || !inputFecha.value) return;
+
+            const dateObj = new Date(inputFecha.value.replace(/-/g, '\/'));
+            const day = dateObj.getDay(); 
+
+            let valido = false;
+            if (turno === '1' && [1, 3, 5].includes(day)) valido = true; 
+            if (turno === '2' && [2, 4, 6].includes(day)) valido = true; 
+
+            if (!valido) {
+                errorMsg.style.display = 'block';
+                inputFecha.value = ''; 
+                btnSubmit.disabled = true;
+            } else {
+                errorMsg.style.display = 'none';
+                btnSubmit.disabled = false;
+            }
+        }
+
+        // ================= FUNCIONES DE APERTURA MODALES RESTANTES =================
         function abrirRevision(btn) {
-            document.getElementById('rev_traslado_id').value = btn.getAttribute('data-id');
-            document.getElementById('rev_nombre').value = btn.getAttribute('data-nombre');
+            document.getElementById('rev_traslado_id').value = btn.getAttribute('data-id') || "";
+            document.getElementById('rev_nombre').value = btn.getAttribute('data-nombre') || "";
             
             let tipoDocValue = (btn.getAttribute('data-tipodoc') || "").trim();
             let tipoDocSelect = document.getElementById('rev_tipodoc');
-            if (tipoDocValue && Array.from(tipoDocSelect.options).some(opt => opt.value === tipoDocValue)) {
+            if (tipoDocSelect && tipoDocValue && Array.from(tipoDocSelect.options).some(opt => opt.value === tipoDocValue)) {
                 tipoDocSelect.value = tipoDocValue;
             }
 
-            document.getElementById('rev_idusr').value = btn.getAttribute('data-idusr');
-            document.getElementById('rev_tel').value = btn.getAttribute('data-tel');
+            document.getElementById('rev_idusr').value = btn.getAttribute('data-idusr') || "";
+            document.getElementById('rev_tel').value = btn.getAttribute('data-tel') || "";
             
-            // Cargar Origen
             let depOriValue = (btn.getAttribute('data-dep') || "").toUpperCase().trim();
             let munOriValue = (btn.getAttribute('data-mun') || "").toUpperCase().trim();
             let depOriSelect = document.getElementById('rev_dep_ori');
@@ -1060,9 +1137,9 @@
                 }
             }
 
-            document.getElementById('rev_ori').value = btn.getAttribute('data-ori');
+            let elOri = document.getElementById('rev_ori');
+            if (elOri) elOri.value = btn.getAttribute('data-ori') || "";
 
-            // Cargar Destino
             let depDesValue = (btn.getAttribute('data-dep-des') || "").toUpperCase().trim();
             let munDesValue = (btn.getAttribute('data-mun-des') || "").toUpperCase().trim();
             let depDesSelect = document.getElementById('rev_dep_des');
@@ -1076,69 +1153,41 @@
                 }
             }
 
-            document.getElementById('rev_des').value = btn.getAttribute('data-des');
-
-            let ruta = btn.getAttribute('data-ruta');
-            let iframe = document.getElementById('visor_pdf');
-            if (ruta && ruta !== 'None' && ruta !== '') {
-                iframe.src = ruta.startsWith('static/') ? '/' + ruta : '/static/' + ruta;
-            } else {
-                iframe.src = "";
-            }
+            let elDes = document.getElementById('rev_des');
+            if (elDes) elDes.value = btn.getAttribute('data-des') || "";
 
             openModal('modalRevisionVerificacion');
         }
 
-        function abrirNovedadVerificacion(id, auth) {
-            document.getElementById('novedad_traslado_id').value = id;
-            document.getElementById('novedad_auth').innerText = auth;
-            openModal('modalNovedadVerificacion');
-        }
-
-        function abrirProgramacion(id, alfa, paciente, fecha, hini) {
-            document.getElementById('prog_viaje_id').value = id;
-            document.getElementById('prog_alfa').innerText = alfa;
-            document.getElementById('prog_paciente').innerText = paciente;
-            
-            if(fecha && fecha !== 'None') document.getElementById('prog_fecha').value = fecha;
-            if(hini && hini !== 'None') document.getElementById('prog_hini').value = hini;
-
-            openModal('modalProgramacion');
-        }
-
-        function abrirAsignacionFlota(id, alfa, paciente, auth) {
+        function abrirAsignacionFlota(id, alfa, paciente) {
             document.getElementById('asig_flota_viaje_id').value = id;
             document.getElementById('asig_flota_alfa').innerText = alfa;
             document.getElementById('asig_flota_paciente').innerText = paciente;
-            document.getElementById('asig_flota_auth').innerText = auth;
             openModal('modalAsignacionFlota');
         }
-        
-        function abrirAuditoriaPDF(ruta) {
-            let iframe = document.getElementById('iframe_auditoria_pdf');
-            let contenedorPdf = document.getElementById('contenedor_pdf_auditoria');
-            
-            if (ruta && ruta !== 'None' && ruta !== '') {
-                contenedorPdf.style.display = 'block';
-                iframe.src = ruta.startsWith('static/') ? '/' + ruta : '/static/' + ruta;
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function toggleDropdown(menuId, el) {
+            const dropdown = document.getElementById(menuId);
+            dropdown.classList.toggle('open');
+            el.classList.toggle('open');
+        }
+
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        function toggleSidebar() { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); }
+        menuToggle.addEventListener('click', toggleSidebar);
+        overlay.addEventListener('click', toggleSidebar);
+
+        function abrirPDF(rutaRelativa) {
+            if (rutaRelativa && rutaRelativa !== 'None' && rutaRelativa.trim() !== '') {
+                let finalRoute = rutaRelativa.startsWith('static/') ? '/' + rutaRelativa : '/static/' + rutaRelativa;
+                window.open(finalRoute, '_blank');
             } else {
-                contenedorPdf.style.display = 'none';
-                iframe.src = "";
-                alert("El reporte PDF no pudo ser generado o no está disponible en el servidor.");
+                alert('No se adjuntó un documento PDF para esta orden.');
             }
-            openModal('modalAuditoriaPDF');
-        }
-
-        function abrirRechazoAuditoria(id, alfa) {
-            document.getElementById('rechazo_viaje_id').value = id;
-            document.getElementById('rechazo_alfa').innerText = alfa;
-            openModal('modalRechazoAuditoria');
-        }
-
-        function abrirModalAprobarAuditoria(id, alfa) {
-            document.getElementById('aprobar_viaje_id').value = id;
-            document.getElementById('aprobar_alfa').innerText = alfa;
-            openModal('modalAprobarAuditoria');
         }
     </script>
 </body>

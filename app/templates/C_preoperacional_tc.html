@@ -194,28 +194,13 @@
 
         <div class="step-section" id="step-2">
             <div class="card">
-                <div class="card-header">Capítulo 2: Control Documental</div>
+                <div class="card-header">Capítulo 2: Estado Mecánico</div>
                 <div class="card-body">
-                    <div class="form-group"><label>Venc. Licencia Conducción <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_licencia" class="form-control" required></div>
-                    <div class="form-group"><label>Venc. SOAT <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_soat" class="form-control" required></div>
-                    <div class="form-group"><label>Venc. Tecnomecánica <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_tecnomecanica" class="form-control" required></div>
-                    <div class="form-group"><label>Venc. Tarjeta Operación <span style="color:#ef4444;">*</span></label><input type="date" name="fecha_vence_tarjeta_operacion" class="form-control" required></div>
-                    
-                    <div class="form-group">
-                        <label>¿Porta Cédula de Ciudadanía? <span style="color:#ef4444;">*</span></label>
-                        <div class="radio-group">
-                            <label class="radio-option" style="width: 50%;"><input type="radio" name="doc_cedula" value="1" required><span class="text-op">Sí Porta</span></label>
-                            <label class="radio-option" style="width: 50%;"><input type="radio" name="doc_cedula" value="0" required><span class="text-ro">No Porta</span></label>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>¿Porta Licencia de Tránsito (Propiedad)? <span style="color:#ef4444;">*</span></label>
-                        <div class="radio-group">
-                            <label class="radio-option" style="width: 50%;"><input type="radio" name="doc_licencia_transito" value="1" required><span class="text-op">Sí Porta</span></label>
-                            <label class="radio-option" style="width: 50%;"><input type="radio" name="doc_licencia_transito" value="0" required><span class="text-ro">No Porta</span></label>
-                        </div>
-                    </div>
+                    {{ render_3_state('mec_aceite_motor', 'Nivel Aceite de Motor') }}
+                    {{ render_3_state('mec_liquido_frenos', 'Líquido de Frenos / Embrague') }}
+                    {{ render_3_state('mec_refrigerante', 'Nivel de Refrigerante') }}
+                    {{ render_3_state('mec_correas', 'Estado de Correas') }}
+                    {{ render_3_state('mec_fugas', 'Fugas Visibles (Aceite/Agua/Aire)') }}
                 </div>
             </div>
             <div class="row">
@@ -226,24 +211,7 @@
 
         <div class="step-section" id="step-3">
             <div class="card">
-                <div class="card-header">Capítulo 3: Estado Mecánico</div>
-                <div class="card-body">
-                    {{ render_3_state('mec_aceite_motor', 'Nivel Aceite de Motor') }}
-                    {{ render_3_state('mec_liquido_frenos', 'Líquido de Frenos / Embrague') }}
-                    {{ render_3_state('mec_refrigerante', 'Nivel de Refrigerante') }}
-                    {{ render_3_state('mec_correas', 'Estado de Correas') }}
-                    {{ render_3_state('mec_fugas', 'Fugas Visibles (Aceite/Agua/Aire)') }}
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(3)">⬅</button></div>
-                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(3)">Siguiente ➔</button></div>
-            </div>
-        </div>
-
-        <div class="step-section" id="step-4">
-            <div class="card">
-                <div class="card-header">Capítulo 4: Luces</div>
+                <div class="card-header">Capítulo 3: Luces</div>
                 <div class="card-body">
                     {{ render_3_state('luc_altas', 'Luces Altas') }}
                     {{ render_3_state('luc_bajas', 'Luces Bajas') }}
@@ -254,14 +222,14 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(4)">⬅</button></div>
-                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(4)">Siguiente ➔</button></div>
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(3)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(3)">Siguiente ➔</button></div>
             </div>
         </div>
 
-        <div class="step-section" id="step-5">
+        <div class="step-section" id="step-4">
             <div class="card">
-                <div class="card-header">Capítulo 5: Llantas (Esquema Posicional)</div>
+                <div class="card-header">Capítulo 4: Llantas (Esquema Posicional)</div>
                 <div class="card-body">
                     <p style="font-size: 13px; color: var(--text-muted); text-align: center; margin-bottom: 15px;">Toque cada llanta del esquema para calificar. <strong style="color:var(--verde);">Obligatorio.</strong></p>
                     <div class="chasis-wrapper"><div class="chasis-container" id="chasis_render"></div></div>
@@ -271,14 +239,14 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(5)">⬅</button></div>
-                <div class="col-8"><button type="button" class="btn-next" onclick="validarLlantasYContinuar(5)">Siguiente ➔</button></div>
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(4)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="validarLlantasYContinuar(4)">Siguiente ➔</button></div>
             </div>
         </div>
 
-        <div class="step-section" id="step-6">
+        <div class="step-section" id="step-5">
             <div class="card">
-                <div class="card-header">Capítulo 6: Frenos y Cabina</div>
+                <div class="card-header">Capítulo 5: Frenos y Cabina</div>
                 <div class="card-body">
                     {{ render_3_state('fre_pedal_firme', 'Firmeza Pedal de Freno') }}
                     {{ render_3_state('fre_parqueo_mano', 'Freno de Mano') }}
@@ -288,14 +256,14 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(6)">⬅</button></div>
-                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(6)">Siguiente ➔</button></div>
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(5)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(5)">Siguiente ➔</button></div>
             </div>
         </div>
 
-        <div class="step-section" id="step-7">
+        <div class="step-section" id="step-6">
             <div class="card">
-                <div class="card-header">Capítulo 7: Carrocería</div>
+                <div class="card-header">Capítulo 6: Carrocería</div>
                 <div class="card-body">
                     {{ render_3_state('car_estado_estructura', 'Compuertas y Seguros') }}
                     {{ render_3_state('car_compuertas_carpas_amarres', 'Carpas y Amarres') }}
@@ -305,14 +273,14 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(7)">⬅</button></div>
-                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(7)">Siguiente ➔</button></div>
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(6)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(6)">Siguiente ➔</button></div>
             </div>
         </div>
 
-        <div class="step-section" id="step-8">
+        <div class="step-section" id="step-7">
             <div class="card mb-3">
-                <div class="card-header">Capítulo 8: Prevención</div>
+                <div class="card-header">Capítulo 7: Prevención</div>
                 <div class="card-body">
                     {{ render_3_state('equ_extintor_10lbs', 'Extintor Vigente') }}
                     {{ render_3_state('equ_tacos_bloqueo', 'Tacos / Cuñas') }}
@@ -328,14 +296,14 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(8)">⬅</button></div>
-                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(8)">Firmar Inspección ➔</button></div>
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(7)">⬅</button></div>
+                <div class="col-8"><button type="button" class="btn-next" onclick="nextStep(7)">Firmar Inspección ➔</button></div>
             </div>
         </div>
 
-        <div class="step-section" id="step-9">
+        <div class="step-section" id="step-8">
             <div class="card mb-3">
-                <div class="card-header" style="background: #0f172a;">Capítulo 9: Autenticación HSEQ</div>
+                <div class="card-header" style="background: #0f172a;">Capítulo 8: Autenticación HSEQ</div>
                 <div class="card-body">
                     
                     <div class="auth-container">
@@ -372,7 +340,7 @@
             </div>
             
             <div class="row mb-4">
-                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(9)">⬅ Atrás</button></div>
+                <div class="col-4"><button type="button" class="btn-prev" onclick="prevStep(8)">⬅ Atrás</button></div>
                 <div class="col-8">
                     <button type="submit" class="btn btn-success btn-lg btn-block" style="font-weight:bold; height: 100%;">
                         FINALIZAR Y ENVIAR ✅
@@ -427,7 +395,7 @@
 </div>
 
 <script>
-    const totalSteps = 9; 
+    const totalSteps = 8; 
     let isSubmitting = false;
     let streamMedia = null;
 
@@ -455,7 +423,7 @@
         }
 
         if (isValid) {
-            if(currentStep === 8) {
+            if(currentStep === 7) {
                 setTimeout(redimensionarCanvasFirma, 300);
             }
             showToast();
@@ -586,7 +554,7 @@
         
         document.getElementById('firma_grafica_base64').value = canvasFirma.toDataURL('image/png');
         
-        const btn = document.querySelector('#step-9 button[type="submit"]');
+        const btn = document.querySelector('#step-8 button[type="submit"]');
         const statusText = document.getElementById('gps-status');
         
         btn.disabled = true;

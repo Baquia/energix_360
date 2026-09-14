@@ -1,7 +1,8 @@
 # app/blueprints/B_bp_controlador_flotaespecial.py
 import os
-from datetime import datetime
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash
+import hashlib
+from datetime import datetime, timedelta
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash, jsonify
 from app import mysql, bcrypt
 from app.utils import login_required_custom
 from functools import wraps
@@ -28,7 +29,6 @@ def controlador_flotaespecial_required(f):
 @login_required_custom
 @controlador_flotaespecial_required
 def dashboard_controlador():
-    # Renderiza exclusivamente el menú de tarjetas intermedio
     return render_template(
         'B_modulo_controlador_flotaespecial.html',
         nit=session.get('nit'),
@@ -39,7 +39,7 @@ def dashboard_controlador():
     )
 
 # =========================================================
-# 2. DASHBOARD DE KPIS OPERATIVOS (NUEVO ARCHIVO)
+# 2. DASHBOARD DE KPIS OPERATIVOS (ESTÁTICO/HISTÓRICO)
 # =========================================================
 @bp_controlador_flotaespecial.route('/operativa')
 @login_required_custom
@@ -56,7 +56,6 @@ def dashboard_operativo():
     
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
-    # KPIs del rango de fechas
     cur.execute("""
         SELECT 
             COUNT(*) as total,
@@ -74,11 +73,10 @@ def dashboard_operativo():
     if not kpis or kpis['total'] is None:
         kpis = {'total': 0, 'capturados': 0, 'programados': 0, 'verificados': 0, 'asignados': 0, 'ejecucion': 0, 'ejecutados': 0}
 
-    # Consultar todos los viajes del rango para distribuirlos a la vista
     cur.execute("""
         SELECT c.id_viaje, c.fecha_servicio, c.hora_inicio, c.vehiculo_asignado, c.conductor_asignado, 
                c.nombre_usuario, c.telefono_usuario, c.direccion_origen, c.direccion_destino, c.estatus_servicio,
-               c.numero_prescripcion, c.id_eps_cliente AS ips,
+               c.numero_prescripcion, c.id_eps_cliente AS ips, c.trayecto,
                COALESCE(c.ruta_documento, m.ruta_documento) as ruta_documento
         FROM control_viajes_flota_especial c
         LEFT JOIN (
@@ -95,7 +93,6 @@ def dashboard_operativo():
     viajes = cur.fetchall()
     cur.close()
 
-    # Partición en las 6 categorías requeridas
     viajes_capturados = [v for v in viajes if v['estatus_servicio'] == 'CAPTURADO']
     viajes_programados = [v for v in viajes if v['estatus_servicio'] == 'PROGRAMADO']
     viajes_verificados = [v for v in viajes if v['estatus_servicio'] == 'VERIFICADO']
@@ -118,6 +115,116 @@ def dashboard_operativo():
         viajes_ejecucion=viajes_ejecucion,
         viajes_ejecutados=viajes_ejecutados
     )
+
+# =========================================================
+# 2.1 MOTOR DE DATOS EN VIVO (SHORT-POLLING KANBAN + LISTA)
+# =========================================================
+@bp_controlador_flotaespecial.route('/api/operativa/vivo', methods=['GET'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_operativa_vivo():
+    empresa_id = session.get('empresa_id')
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        # Asegurar existencia de la columna de ocultamiento visual
+        try:
+            cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN oculto_kanban BOOLEAN DEFAULT FALSE")
+        except:
+            pass
+
+        # REGLA ACTUALIZADA: Se excluyen los viajes que el controlador ha marcado como ocultos (oculto_kanban = TRUE)
+        cur.execute("""
+            SELECT id, id_viaje, numero_autorizacion, numero_prescripcion, nombre_usuario, id_usuario, 
+                   direccion_origen, direccion_destino, telefono_usuario,
+                   hora_inicio, fecha_servicio, trayecto, estatus_servicio, vehiculo_asignado, conductor_asignado, id_viaje_padre
+            FROM control_viajes_flota_especial 
+            WHERE id_empresa = %s 
+              AND estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA', 'ASIGNADO', 'EN EJECUCION', 'TERMINADO-PDTE AUDITAR')
+              AND (oculto_kanban = FALSE OR oculto_kanban IS NULL)
+            ORDER BY fecha_servicio ASC, hora_inicio ASC
+        """, (empresa_id,))
+        viajes = cur.fetchall()
+
+        datos = {
+            "verificacion_previaje": [], # 0. Lista Superior Requerida
+            "ida_en_progreso": [],       # 1. Columna Kanban
+            "ida_terminadas": [],        # 2. Columna Kanban
+            "vuelta_pendientes": [],     # 3. Columna Kanban
+            "vuelta_en_progreso": [],    # 4. Columna Kanban
+            "vuelta_terminadas": []      # 5. Columna Kanban
+        }
+
+        for v in viajes:
+            h_init = v.get('hora_inicio')
+            f_serv = v.get('fecha_servicio')
+            if h_init is not None and f_serv is not None:
+                v['hora_inicio'] = f"{f_serv} | {h_init}"
+            else:
+                v['hora_inicio'] = f"{f_serv} | Pendiente" if f_serv else "Pendiente"
+                
+            trayecto = (v.get('trayecto') or 'IDA').upper()
+            estatus = (v.get('estatus_servicio') or '').upper()
+            
+            v['trayecto'] = trayecto
+            v['estatus_servicio'] = estatus
+
+            if trayecto == 'IDA':
+                if estatus == 'PROGRAMADO':
+                    datos["verificacion_previaje"].append(v)
+                elif estatus in ['ASIGNADO', 'EN EJECUCION']:
+                    datos["ida_en_progreso"].append(v)
+                elif estatus == 'TERMINADO-PDTE AUDITAR':
+                    datos["ida_terminadas"].append(v)
+                    
+            elif trayecto == 'VUELTA':
+                if estatus == 'PDTE. ASIGNAR VUELTA':
+                    datos["vuelta_pendientes"].append(v)
+                elif estatus in ['ASIGNADO', 'EN EJECUCION']:
+                    datos["vuelta_en_progreso"].append(v)
+                elif estatus == 'TERMINADO-PDTE AUDITAR':
+                    datos["vuelta_terminadas"].append(v)
+
+        return jsonify({"status": "success", "data": datos}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+# =========================================================
+# 2.2 MOTOR PARA OCULTAR TARJETAS TERMINADAS DEL KANBAN
+# =========================================================
+@bp_controlador_flotaespecial.route('/api/operativa/ocultar_kanban', methods=['POST'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_ocultar_kanban():
+    empresa_id = session.get('empresa_id')
+    datos = request.get_json(silent=True) or {}
+    viaje_id = datos.get('viaje_id')
+
+    if not viaje_id:
+        return jsonify({"status": "error", "message": "ID de viaje no proporcionado"}), 400
+
+    cur = mysql.connection.cursor()
+    try:
+        try:
+            cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN oculto_kanban BOOLEAN DEFAULT FALSE")
+        except:
+            pass
+
+        cur.execute("""
+            UPDATE control_viajes_flota_especial 
+            SET oculto_kanban = TRUE
+            WHERE id = %s AND id_empresa = %s
+        """, (viaje_id, empresa_id))
+        
+        mysql.connection.commit()
+        return jsonify({"status": "success", "message": "Viaje retirado del tablero operativo."}), 200
+
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
 
 # =========================================================
 # 3. GESTIÓN DE OPERADORES

@@ -48,10 +48,20 @@ def control_logistica():
                 UNIQUE KEY unique_ruta_marca (id_empresa, marca)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
+        
+        # AGREGAR COLUMNA nombre_componente A promociones_clientes SI NO EXISTE
+        try:
+            cur.execute("""
+                ALTER TABLE promociones_clientes 
+                ADD COLUMN nombre_componente VARCHAR(255) NULL AFTER ean_componente;
+            """)
+        except Exception:
+            pass # La columna ya existe
+            
         mysql.connection.commit()
         cur.close()
     except Exception as e:
-        print(f"Aviso tabla fabricantes_proveedores / configuracion_rutas_picking: {e}")
+        print(f"Aviso tablas: {e}")
     
     kpis = {
         'pedidos_totales': 0, 
@@ -1456,7 +1466,7 @@ def detalle_promocion(ean_promo):
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT p.ean_componente, p.cajas_componente, p.fracciones_componente,
+            SELECT p.ean_componente, p.nombre_componente, p.cajas_componente, p.fracciones_componente,
                    IFNULL(m.producto, 'Producto Desconocido') as descripcion_componente,
                    IFNULL(m.fabricante, 'N/A') as marca_componente
             FROM promociones_clientes p
@@ -1491,14 +1501,14 @@ def guardar_promocion():
         for comp in componentes:
             data_to_insert.append((
                 nombre_empresa, empresa_id, ean_promo, nombre_promo,
-                comp['ean'], comp['cajas'], comp['unidades'], 'ACTIVO'
+                comp['ean'], comp.get('nombre', ''), comp['cajas'], comp['unidades'], 'ACTIVO'
             ))
         
         if data_to_insert:
             cur.executemany("""
                 INSERT INTO promociones_clientes 
-                (empresa, id_empresa, ean_promo, nombre_promo, ean_componente, cajas_componente, fracciones_componente, estado)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (empresa, id_empresa, ean_promo, nombre_promo, ean_componente, nombre_componente, cajas_componente, fracciones_componente, estado)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, data_to_insert)
         
         mysql.connection.commit()
