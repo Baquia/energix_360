@@ -161,7 +161,7 @@
         .item-row.done { display: none !important; }
 
         .qty-indicator {
-            min-width: 55px; height: 55px; background: var(--bg-light); color: var(--primary-dark);
+            min-width: 65px; height: 60px; background: var(--bg-light); color: var(--primary-dark);
             border-radius: 10px; display: flex; align-items: center; justify-content: center;
             font-size: 1.1rem; font-weight: 900; border: 1px solid var(--border); flex-shrink: 0;
         }
@@ -179,9 +179,9 @@
         }
 
         .picking-sheet {
-            width: 100%; max-width: 600px; height: 100vh; background: white;
-            display: flex; flex-direction: column; position: relative;
-            animation: slideUp 0.3s ease-out;
+            width: 100%; max-width: 600px; height: auto; max-height: 90vh; background: white;
+            display: flex; flex-direction: column; position: relative; border-radius: 20px 20px 0 0;
+            animation: slideUp 0.3s ease-out; overflow: hidden;
         }
 
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -210,13 +210,13 @@
         .stat-lbl { font-size: 0.7rem; color: var(--secondary); font-weight: 800; text-transform: uppercase; }
         .stat-val { font-size: 1.2rem; font-weight: 900; color: #1e293b; }
 
+        /* --- ESTILOS DE LA CÁMARA (AHORA EN LISTA PRINCIPAL) --- */
         .camera-container {
-            flex: 1; background: #000; border-radius: 12px; overflow: hidden; position: relative;
-            display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
-            min-height: 250px;
+            width: 100%; background: #000; border-radius: 12px; overflow: hidden; position: relative;
+            display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px;
+            min-height: 220px; max-height: 350px;
         }
 
-        /* --- RESTAURACIÓN DE LA MIRA Y DESTELLO --- */
         .scanner-mira {
             position: absolute;
             top: 50%;
@@ -236,7 +236,7 @@
             box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
         }
 
-        #embedded-reader { width: 100%; height: 100%; transition: opacity 0.3s ease; }
+        #main-embedded-reader { width: 100%; height: 100%; transition: opacity 0.3s ease; }
 
         .btn-start-cam {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -246,7 +246,6 @@
         }
         .btn-start-cam:active { background: rgba(255, 255, 255, 0.4); }
 
-        /* Botón de reanudar inteligente (Ahorro de batería) */
         .btn-resume-cam {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.6); color: white; display: none;
@@ -257,6 +256,7 @@
         .btn-resume-cam span.text { font-size: 1.2rem; font-weight: 800; }
         .btn-resume-cam span.sub { font-size: 0.85rem; color: #cbd5e1; margin-top: 5px; }
 
+        /* Controles Manuales */
         .action-area { background: #eef2ff; border-radius: 16px; padding: 15px; border: 1px solid #e0e7ff; text-align: center; margin-bottom: 15px; flex-shrink: 0; }
         .counter-big { font-size: 3.5rem; font-weight: 900; color: var(--primary); line-height: 1; display: block; margin-bottom: 5px; }
         .counter-lbl { font-size: 0.85rem; color: var(--primary-dark); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
@@ -268,11 +268,6 @@
         }
         .btn-finish:active { transform: scale(0.98); }
 
-        .btn-reset {
-            margin-top: 10px; background: #f1f5f9; border: 1px solid #cbd5e1; padding: 12px; border-radius: 10px;
-            color: #475569; font-size: 0.95rem; font-weight: 700; cursor: pointer; width: 100%;
-        }
-
         /* Modal Verificación Final */
         .verify-sheet { background: white; width: 90%; max-width: 350px; border-radius: 20px; padding: 30px 20px; text-align: center; margin: auto; }
         .verify-btns { display: flex; gap: 10px; margin-top: 25px; }
@@ -280,28 +275,6 @@
         .btn-v-confirm { flex: 1; padding: 15px; border: none; background: var(--success); border-radius: 12px; font-weight: 800; color: white; font-size:1rem;}
 
         .hidden { display: none !important; }
-
-        /* =======================================================
-           LANDSCAPE OPTIMIZATION FOR BARCODE SCANNING
-           ======================================================= */
-        @media (orientation: landscape) and (max-height: 600px) {
-            .picking-sheet {
-                flex-direction: row; flex-wrap: wrap; height: 100vh; overflow: hidden; padding: 0;
-            }
-            .picking-scroll-area {
-                flex: 1; height: 100vh; padding: 15px;
-            }
-            .camera-container {
-                position: absolute; top: 0; left: 0; width: 50%; height: 100vh; margin: 0; border-radius: 0; z-index: 1;
-            }
-            .picking-scroll-area {
-                margin-left: 50%; width: 50%; padding-bottom: 90px;
-            }
-            .picking-bottom-actions {
-                position: absolute; bottom: 0; right: 0; width: 50%; z-index: 2; padding: 10px 15px;
-            }
-            .btn-close-modal { top: 10px; right: 10px; }
-        }
     </style>
 </head>
 
@@ -361,10 +334,28 @@
                     <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">ORDEN A VERIFICAR</div>
                     <div style="font-size: 2.2rem; font-weight: 900; margin-bottom: 5px;" id="lblOrdenTitle">#0000</div>
                     <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 700; font-size:1.1rem;">
-                        <span>Por auditar</span><span id="lblProgress">0/0</span>
+                        <span>Por auditar</span><span id="lblProgress">0</span>
                     </div>
                     <div class="p-bar" style="height: 10px; background: rgba(255,255,255,0.2);">
                         <div id="header-progress-bar" class="p-fill" style="width: 0%; background: #2ecc71;"></div>
+                    </div>
+                </div>
+
+                <!-- CÁMARA INCORPORADA EN LA VISTA PRINCIPAL -->
+                <div class="camera-container" id="main-camera-section" style="display: none;">
+                    <div id="main-embedded-reader"></div>
+                    <div id="main-scanner-mira" class="scanner-mira"></div> 
+                    <div id="main-cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraPrincipal()">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        ACTIVAR LECTOR
+                    </div>
+                    <div id="main-cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamaraPrincipal()">
+                        <span class="icon">▶️</span>
+                        <span class="text">Tocar para reanudar</span>
+                        <span class="sub">Pausado para ahorrar batería</span>
                     </div>
                 </div>
 
@@ -377,30 +368,10 @@
         </div>
     </div>
 
-    <!-- MODAL PRINCIPAL DE TRABAJO (DIVIDIDO EN SCROLL Y THUMB ZONE) -->
+    <!-- MODAL SECUNDARIO (SOLO AJUSTE MANUAL O MASIVO, SIN CÁMARA) -->
     <div id="modal-picking" class="modal-wrap">
         <div class="picking-sheet">
             <button class="btn-close-modal" onclick="cerrarModalVerificacion()">✕</button>
-
-            <!-- Zona Escáner y Datos (Scrollable en Portrait, Mitad Izq/Der en Landscape) -->
-            <div class="camera-container" id="camera-section">
-                <div id="embedded-reader"></div>
-                <div id="scanner-mira" class="scanner-mira"></div> <!-- LA MIRA VISUAL -->
-                <div id="cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraIncrustada()">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                    </svg>
-                    ACTIVAR LECTOR
-                </div>
-                
-                <!-- Botón de reanudar cuando la cámara está en modo suspensión -->
-                <div id="cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamara()">
-                    <span class="icon">▶️</span>
-                    <span class="text">Tocar para reanudar</span>
-                    <span class="sub">Pausado para ahorrar batería</span>
-                </div>
-            </div>
 
             <div class="picking-scroll-area">
                 <div class="pick-header">
@@ -422,7 +393,11 @@
 
                 <div class="action-area" id="area-conteo-cajas">
                     <span class="counter-lbl" style="color:var(--primary-dark);">📦 CAJAS VERIFICADAS</span>
-                    <span id="pk-count-cajas" class="counter-big" style="color:var(--primary);">0</span>
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 15px;">
+                        <button onclick="cambiarCajas(-1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #e0e7ff; color: var(--primary-dark); font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
+                        <span id="pk-count-cajas" class="counter-big" style="color:var(--primary); margin: 0; min-width: 70px;">0</span>
+                        <button onclick="cambiarCajas(1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: var(--primary); color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
+                    </div>
                 </div>
 
                 <div class="action-area hidden" id="area-teclado-fracciones" style="background: #f3e8ff; border-color: #e9d5ff;">
@@ -435,26 +410,9 @@
                 </div>
             </div>
 
-            <!-- Zona del Pulgar (Thumb Zone - Acciones) -->
             <div class="picking-bottom-actions">
                 <button id="btn-masivo" class="hidden" onclick="confirmarMasivo()" style="width: 100%; background: var(--primary); color: white; padding: 15px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(67, 56, 202, 0.3);">⚡ VERIFICACIÓN MASIVA</button>
-                <button class="btn-finish" onclick="intentarVerificarItem()">CONFIRMAR AUDITORÍA</button>
-                <button class="btn-reset" onclick="resetearConteo()">🔄 Reiniciar Lectura</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Verificación Final -->
-    <div id="modal-verify" class="modal-wrap" style="z-index: 105;">
-        <div class="verify-sheet">
-            <div style="font-size: 3.5rem; margin-bottom: 10px;">✅</div>
-            <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">¿Sellar Verificación?</h3>
-            <p style="color:#475569; line-height:1.5; font-size:1.05rem;">
-                Auditoría Física: <b id="vf-count" style="color:var(--secondary); font-size:1.3rem;">0</b>
-            </p>
-            <div class="verify-btns">
-                <button class="btn-v-cancel" onclick="cancelarConfirmacion()">Volver</button>
-                <button class="btn-v-confirm" onclick="ejecutarVerificacionFinal()">SELLAR</button>
+                <button class="btn-finish" onclick="ejecutarVerificacionFinal()">SELLO MANUAL ✓</button>
             </div>
         </div>
     </div>
@@ -546,38 +504,42 @@
             } catch (e) { console.log("Audio play error", e); }
         }
 
-        // FUNCIONES DE AHORRO DE BATERÍA (SLEEP MODE)
+        // FUNCIONES DE AHORRO DE BATERÍA (CÁMARA PRINCIPAL)
         function iniciarTemporizadorInactividad() {
             clearTimeout(sleepTimer);
-            // Si pasan 20 segundos sin leer código, pausamos la cámara
             sleepTimer = setTimeout(pausarCamaraPorInactividad, 20000);
         }
 
         function pausarCamaraPorInactividad() {
-            if (scanner) {
+            if (scanner && scanner.getState() === 2) { 
                 try {
-                    scanner.pause(true); // Pausa el consumo de CPU/Video
-                    document.getElementById('embedded-reader').style.opacity = '0.3';
-                    document.getElementById('scanner-mira').style.display = 'none';
-                    document.getElementById('cam-resume-btn').style.display = 'flex';
+                    scanner.pause(true); 
+                    document.getElementById('main-embedded-reader').style.opacity = '0.3';
+                    document.getElementById('main-scanner-mira').style.display = 'none';
+                    document.getElementById('main-cam-resume-btn').style.display = 'flex';
                 } catch(e) {}
             }
         }
 
-        function reanudarCamara() {
+        function reanudarCamaraPrincipal() {
             if (scanner) {
                 try {
                     scanner.resume();
-                    document.getElementById('embedded-reader').style.opacity = '1';
-                    document.getElementById('cam-resume-btn').style.display = 'none';
-                    document.getElementById('scanner-mira').style.display = 'block';
+                    document.getElementById('main-embedded-reader').style.opacity = '1';
+                    document.getElementById('main-cam-resume-btn').style.display = 'none';
+                    document.getElementById('main-scanner-mira').style.display = 'block';
                     iniciarTemporizadorInactividad();
                 } catch(e) {}
             }
         }
 
         function mostrarMenu() { toggleView('view-menu'); }
-        function volverAlMenu() { mostrarMenu(); }
+        
+        function volverAlMenu() { 
+            if(scanner) detenerCamaraPrincipal();
+            mostrarMenu(); 
+        }
+
         function toggleView(id) {
             ['view-menu', 'view-orders', 'view-items'].forEach(v => document.getElementById(v).classList.add('hidden'));
             document.getElementById(id).classList.remove('hidden');
@@ -613,8 +575,19 @@
             fetch(`/api/verificador/items_orden/${ordenActual}?v=` + new Date().getTime())
                 .then(r => r.json())
                 .then(d => {
+                    // Evitar sobreescribir el progreso si el usuario está escaneando
                     if (itemActivo === null) {
-                        listaItems = d.filter(i => i.estado_actividad === 'ALISTADO');
+                        let oldItems = [...listaItems];
+                        listaItems = d.filter(i => i.estado_actividad === 'ALISTADO').map(i => {
+                            let old = oldItems.find(o => o.id === i.id);
+                            return {
+                                ...i,
+                                req_cajas: parseInt(i.req_cajas) || 0,
+                                req_unidades: parseInt(i.req_unidades) || 0,
+                                act_cajas: old ? old.act_cajas : 0,
+                                act_unidades: old ? old.act_unidades : 0
+                            };
+                        });
                         renderizarItems();
                     }
                 }).catch(e => console.log(e));
@@ -637,6 +610,7 @@
 
 
         function cargarOrdenes() {
+            if(scanner) detenerCamaraPrincipal();
             toggleView('view-orders');
             const cOrd = document.getElementById('orders-container');
             cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>';
@@ -647,9 +621,148 @@
             ordenActual = ord;
             document.getElementById('lblOrdenTitle').textContent = '#' + ord;
             document.getElementById('searchBox').value = '';
+            
+            // Preparar cámara principal
+            document.getElementById('main-camera-section').style.display = 'flex';
+            document.getElementById('main-cam-overlay-btn').style.display = 'flex';
+            document.getElementById('main-scanner-mira').style.display = 'none';
+            if(scanner) detenerCamaraPrincipal();
+
             toggleView('view-items');
             document.getElementById('items-container').innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando inventario alistado...</div>';
-            cargarItemsSilencioso();
+            
+            fetch(`/api/verificador/items_orden/${ordenActual}?v=` + new Date().getTime())
+                .then(r => r.json())
+                .then(d => {
+                    listaItems = d.filter(i => i.estado_actividad === 'ALISTADO').map(i => ({
+                        ...i,
+                        req_cajas: parseInt(i.req_cajas) || 0,
+                        req_unidades: parseInt(i.req_unidades) || 0,
+                        act_cajas: 0,
+                        act_unidades: 0
+                    }));
+                    renderizarItems();
+                }).catch(e => console.log(e));
+        }
+
+        // =====================================
+        // MOTOR DE ESCÁNER PRINCIPAL (NUEVO)
+        // =====================================
+        function iniciarCamaraPrincipal() {
+            document.getElementById('main-cam-overlay-btn').style.display = 'none';
+            document.getElementById('main-cam-resume-btn').style.display = 'none';
+
+            initAudio();
+            requestWakeLock();
+
+            const isPortrait = window.innerHeight > window.innerWidth;
+            const screenWidth = window.innerWidth;
+            const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.4);
+            const targetHeight = Math.floor(targetWidth * 0.45);
+
+            const mira = document.getElementById('main-scanner-mira');
+            mira.style.width = targetWidth + 'px';
+            mira.style.height = targetHeight + 'px';
+            mira.style.display = 'block';
+
+            const configScanner = {
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.ITF
+                ]
+            };
+
+            scanner = new Html5Qrcode("main-embedded-reader", configScanner);
+            scanner.start(
+                { facingMode: "environment" },
+                { fps: 4, qrbox: { width: targetWidth, height: targetHeight } },
+                (decodedText) => {
+                    iniciarTemporizadorInactividad();
+                    const now = Date.now();
+                    if (now - lastScanTime < 1000) return; 
+
+                    const scanned = decodedText.trim().toUpperCase();
+                    
+                    // Buscar el primer ítem que coincida con el EAN y le falten unidades
+                    let targetItem = listaItems.find(i => 
+                        (i.codigo_producto || '').trim().toUpperCase() === scanned && 
+                        (i.act_cajas < i.req_cajas || i.act_unidades < i.req_unidades)
+                    );
+
+                    if (targetItem) {
+                        lastScanTime = now;
+                        playBeep();
+
+                        // Animación Destello Verde
+                        if (mira) {
+                            mira.classList.add('success');
+                            setTimeout(() => mira.classList.remove('success'), 300);
+                        }
+
+                        // Incrementar contadores
+                        if (targetItem.req_cajas > 0 && targetItem.act_cajas < targetItem.req_cajas) {
+                            targetItem.act_cajas++;
+                        } else if (targetItem.req_unidades > 0 && targetItem.act_unidades < targetItem.req_unidades) {
+                            targetItem.act_unidades++;
+                        }
+
+                        renderizarItems();
+
+                        // Auto Sellar si completó
+                        if (targetItem.act_cajas === targetItem.req_cajas && targetItem.act_unidades === targetItem.req_unidades) {
+                            ejecutarVerificacionAutomatica(targetItem);
+                        }
+
+                    } else {
+                        lastScanTime = now;
+                        alert(`❌ Código incorrecto o el producto ya fue verificado totalmente.`);
+                    }
+                },
+                (err) => {}
+            ).then(() => {
+                iniciarTemporizadorInactividad();
+            }).catch(err => {
+                console.error(err);
+                alert("Error cámara: " + (err.message || err));
+                document.getElementById('main-cam-overlay-btn').style.display = 'flex';
+                document.getElementById('main-scanner-mira').style.display = 'none';
+            });
+        }
+
+        function detenerCamaraPrincipal() {
+            clearTimeout(sleepTimer);
+            if (scanner) {
+                scanner.stop().then(() => { scanner.clear(); }).catch(e => console.log(e));
+                scanner = null;
+            }
+            const mira = document.getElementById('main-scanner-mira');
+            if(mira) mira.style.display = 'none';
+            document.getElementById('main-cam-resume-btn').style.display = 'none';
+        }
+
+        function ejecutarVerificacionAutomatica(item) {
+            fetch('/api/verificador/confirmar_item', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id_row: item.id,
+                    cajas_verificadas: item.act_cajas,
+                    unidades_verificadas: item.act_unidades
+                })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'ok') {
+                    // Desaparece de la lista
+                    listaItems = listaItems.filter(i => i.id !== item.id);
+                    renderizarItems();
+                } else {
+                    alert("⚠️ Error del servidor al guardar verificación.");
+                }
+            })
+            .catch(e => console.error("Error automático", e));
         }
 
         function renderizarItems() {
@@ -657,7 +770,7 @@
             let htmlInner = '';
 
             const txt = document.getElementById('searchBox').value.toLowerCase();
-            document.getElementById('lblProgress').textContent = `Por auditar: ${listaItems.length}`;
+            document.getElementById('lblProgress').textContent = `${listaItems.length}`;
 
             if (listaItems.length === 0) {
                 c.innerHTML = `
@@ -668,6 +781,7 @@
                 <button onclick="cargarOrdenes()" style="padding:18px 30px; background:var(--primary); color:white; border:none; border-radius:12px; margin-top:20px; font-weight:900; font-size:1.1rem; width:100%; box-shadow: 0 4px 10px rgba(67, 56, 202, 0.3);">Volver a Mis Órdenes</button>
             </div>`;
                 document.getElementById('header-progress-bar').style.width = '100%';
+                if(scanner) detenerCamaraPrincipal();
                 return;
             }
 
@@ -708,14 +822,15 @@
                                  </div><br>`;
                 }
 
+                // Cantidades con Progreso Visible Nativo
                 let htmlCantidades = '';
-                if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.95rem;">📦 ${i.req_cajas}</div>`;
-                if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.95rem; color: var(--secondary);">🍬 ${i.req_unidades}</div>`;
+                if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.85rem; font-weight:900;">📦 ${i.act_cajas || 0}/${i.req_cajas}</div>`;
+                if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.85rem; color: var(--secondary); font-weight:900;">🍬 ${i.act_unidades || 0}/${i.req_unidades}</div>`;
                 if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.95rem;">0</div>`;
 
                 htmlInner += `
             <div id="card_${i.id}" class="item-row active" onclick="abrirModalVerificarId(${i.id})">
-                <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 10px; width: auto; font-size: 0.95rem;">
+                <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 5px; width: auto;">
                     ${htmlCantidades}
                 </div>
                 <div class="item-details" style="overflow: hidden;">
@@ -729,14 +844,20 @@
 
         function filtrarLista() { renderizarItems(); }
 
+
+        // =====================================
+        // MODAL MANUAL / MASIVO
+        // =====================================
         function abrirModalVerificarId(id) {
             const item = listaItems.find(i => i.id === id);
             if (!item) return;
 
             itemActivo = item;
-            lastScanTime = 0;
             
-            requestWakeLock();
+            // Pausar cámara principal para ahorrar recursos
+            if (scanner && scanner.getState() === 2) { 
+                scanner.pause(true);
+            }
 
             const pickHeader = document.querySelector('.pick-header');
             const oldAlert = document.getElementById('kit-alert-msg');
@@ -758,21 +879,13 @@
             document.getElementById('pk-name').textContent = nombreDisplay;
             document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
 
-            // Para el verificador, lo "solicitado" es lo que el operador "entregó" en sistema
-            itemActivo.req_cajas = parseInt(item.req_cajas) || 0;
-            itemActivo.req_unidades = parseInt(item.req_unidades) || 0;
-
-            // Cantidades verificadas
-            itemActivo.act_cajas = 0;
-            itemActivo.act_unidades = 0;
-
             let htmlReqModal = '';
             if (itemActivo.req_cajas > 0) htmlReqModal += `<span style="display:inline-block; margin-right:15px;">📦 ${itemActivo.req_cajas} CAJAS</span>`;
             if (itemActivo.req_unidades > 0) htmlReqModal += `<span style="display:inline-block;">🍬 ${itemActivo.req_unidades} UNIDADES</span>`;
             document.getElementById('pk-req').innerHTML = htmlReqModal || '0';
 
-            document.getElementById('pk-count-cajas').textContent = "0";
-            document.getElementById('pk-count-unidades').textContent = "0";
+            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
 
             // Mostrar Novedad si existe
             const novAlert = document.getElementById('novedad-alert');
@@ -781,10 +894,6 @@
                 novAlert.classList.remove('hidden');
 
                 if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS' || item.novedad_alistamiento === 'SIN_EAN') {
-                    document.getElementById('embedded-reader').style.opacity = '0.3';
-                    document.getElementById('cam-overlay-btn').style.display = 'none';
-                    document.getElementById('cam-resume-btn').style.display = 'none';
-
                     if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS') {
                         itemActivo.act_cajas = 0;
                         itemActivo.act_unidades = 0;
@@ -798,9 +907,6 @@
                 }
             } else {
                 novAlert.classList.add('hidden');
-                document.getElementById('cam-overlay-btn').style.display = 'flex';
-                document.getElementById('embedded-reader').style.opacity = '1';
-                document.getElementById('cam-resume-btn').style.display = 'none';
             }
 
             if (itemActivo.req_cajas > 0) document.getElementById('area-conteo-cajas').classList.remove('hidden');
@@ -820,27 +926,29 @@
         }
 
         function cerrarModalVerificacion() {
-            releaseWakeLock();
-            detenerCamara();
             document.getElementById('modal-picking').style.display = 'none';
             itemActivo = null;
+            
+            // Reanudar cámara principal
+            if (scanner) {
+                try {
+                    scanner.resume();
+                    iniciarTemporizadorInactividad();
+                } catch(e) {}
+            }
+            renderizarItems();
         }
 
-        function resetearConteo() {
-            if (itemActivo) {
-                itemActivo.act_cajas = 0;
-                itemActivo.act_unidades = 0;
-                document.getElementById('pk-count-cajas').textContent = "0";
-                document.getElementById('pk-count-unidades').textContent = "0";
+        function cambiarCajas(valor) {
+            if (!itemActivo) return;
+            let actual = itemActivo.act_cajas;
+            let nuevo = actual + valor;
+
+            if (nuevo >= 0 && nuevo <= itemActivo.req_cajas) {
+                itemActivo.act_cajas = nuevo;
+                document.getElementById('pk-count-cajas').textContent = nuevo;
+                playBeep();
                 evaluarBotonTerminar();
-                if (scanner) {
-                    try {
-                        scanner.resume(); 
-                        document.getElementById('embedded-reader').style.opacity = '1';
-                        document.getElementById('cam-resume-btn').style.display = 'none';
-                        iniciarTemporizadorInactividad();
-                    } catch(e) {}
-                }
             }
         }
 
@@ -854,20 +962,6 @@
                 document.getElementById('pk-count-unidades').textContent = nuevo;
                 playBeep();
                 evaluarBotonTerminar();
-
-                if (scanner) {
-                    try {
-                        if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
-                            scanner.pause(true);
-                            document.getElementById('embedded-reader').style.opacity = '0.5';
-                            detenerCamara();
-                        } else {
-                            document.getElementById('embedded-reader').style.opacity = '1';
-                            document.getElementById('cam-resume-btn').style.display = 'none';
-                            iniciarTemporizadorInactividad();
-                        }
-                    } catch(e) {}
-                }
             }
         }
 
@@ -879,136 +973,13 @@
                 btn.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.3)';
             } else {
                 btn.style.background = '#374151';
-                btn.textContent = 'HAY DISCREPANCIA (GUARDAR ASÍ)';
+                btn.textContent = 'SELLO MANUAL ✓';
                 btn.style.boxShadow = 'none';
             }
         }
 
-        function iniciarCamaraIncrustada() {
-            if (!itemActivo) return;
-            document.getElementById('cam-overlay-btn').style.display = 'none';
-            document.getElementById('cam-resume-btn').style.display = 'none';
-
-            initAudio();
-
-            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
-                alert("⚠️ Este ítem ya está completo. Presiona 'Confirmar Auditoría'.");
-                return;
-            }
-
-            const isPortrait = window.innerHeight > window.innerWidth;
-            const screenWidth = window.innerWidth;
-            const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
-            const targetHeight = Math.floor(targetWidth * 0.45);
-
-            // Ajustamos la MIRA visual exactamente a esa área
-            const mira = document.getElementById('scanner-mira');
-            mira.style.width = targetWidth + 'px';
-            mira.style.height = targetHeight + 'px';
-            mira.style.display = 'block';
-
-            const configScanner = {
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.ITF
-                ]
-            };
-
-            scanner = new Html5Qrcode("embedded-reader", configScanner);
-            scanner.start(
-                { facingMode: "environment" }, // Límite de resolución REMOVIDO para evitar error en Android
-                { 
-                    fps: 4, 
-                    qrbox: { width: targetWidth, height: targetHeight }
-                },
-                (decodedText) => {
-                    iniciarTemporizadorInactividad();
-                    const now = Date.now();
-                    if (now - lastScanTime < 1500) return; 
-
-                    const scanned = decodedText.trim().toUpperCase();
-                    const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
-
-                    if (target && scanned === target) {
-                        lastScanTime = now;
-                        playBeep();
-
-                        // Animación de Destello Verde en la Mira
-                        const miraVisual = document.getElementById('scanner-mira');
-                        if (miraVisual) {
-                            miraVisual.classList.add('success');
-                            setTimeout(() => miraVisual.classList.remove('success'), 300);
-                        }
-
-                        if (itemActivo.req_cajas > 0 && itemActivo.act_cajas < itemActivo.req_cajas) {
-                            itemActivo.act_cajas++;
-                            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
-                            
-                            document.getElementById('pk-count-cajas').style.color = '#10b981';
-                            setTimeout(() => document.getElementById('pk-count-cajas').style.color = 'var(--primary)', 300);
-
-                            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
-                                document.getElementById('embedded-reader').style.opacity = '0.5';
-                                detenerCamara();
-                            }
-                        } else if (itemActivo.req_unidades > 0 && itemActivo.act_unidades < itemActivo.req_unidades) {
-                            itemActivo.act_unidades++;
-                            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
-
-                            document.getElementById('pk-count-unidades').style.color = '#10b981';
-                            setTimeout(() => document.getElementById('pk-count-unidades').style.color = '#7e22ce', 300);
-
-                            if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
-                                document.getElementById('embedded-reader').style.opacity = '0.5';
-                                detenerCamara();
-                            }
-                        }
-
-                        evaluarBotonTerminar();
-                    } else {
-                        lastScanTime = now;
-                        alert(`❌ Código incorrecto. Esperado: ${itemActivo.codigo_producto}`);
-                    }
-                },
-                (err) => { }
-            ).then(() => {
-                iniciarTemporizadorInactividad();
-            }).catch(err => {
-                console.error(err);
-                alert("Error cámara: " + (err.message || err));
-                document.getElementById('cam-overlay-btn').style.display = 'flex';
-                document.getElementById('scanner-mira').style.display = 'none';
-            });
-        }
-
-        function detenerCamara() {
-            clearTimeout(sleepTimer);
-            if (scanner) {
-                scanner.stop().then(() => { scanner.clear(); }).catch(e => console.log(e));
-                scanner = null;
-            }
-            const mira = document.getElementById('scanner-mira');
-            if(mira) mira.style.display = 'none';
-            document.getElementById('cam-resume-btn').style.display = 'none';
-        }
-
-        function intentarVerificarItem() {
-            if (!itemActivo) return;
-            document.getElementById('vf-count').innerHTML = `📦 ${itemActivo.act_cajas} | 🍬 ${itemActivo.act_unidades}`;
-            document.getElementById('modal-verify').style.display = 'flex';
-        }
-
-        function cancelarConfirmacion() {
-            document.getElementById('modal-verify').style.display = 'none';
-        }
-
         // =====================================
-        // DISPARADOR MASIVO
+        // DISPARADOR MASIVO (DESDE MODAL)
         // =====================================
         function confirmarMasivo() {
             if (!itemActivo) return;
@@ -1038,17 +1009,10 @@
             cerrarMasivo();
             playBeep();
             evaluarBotonTerminar();
-            
-            if (scanner) {
-                try {
-                    document.getElementById('embedded-reader').style.opacity = '0.5';
-                    detenerCamara();
-                } catch(e) {}
-            }
         }
 
         function ejecutarVerificacionFinal() {
-            const btn = document.querySelector('.btn-v-confirm');
+            const btn = document.querySelector('.btn-finish');
             btn.textContent = 'Sellando...';
             btn.disabled = true;
 
@@ -1066,7 +1030,6 @@
                 .then(r => r.json())
                 .then(d => {
                     if (d.status === 'ok') {
-                        cancelarConfirmacion();
                         cerrarModalVerificacion();
                         listaItems = listaItems.filter(i => i.id !== idParaBorrar);
                         itemActivo = null;
@@ -1078,7 +1041,7 @@
                 })
                 .catch(e => alert("❌ Error de Conexión."))
                 .finally(() => {
-                    btn.textContent = 'SELLAR';
+                    btn.textContent = 'SELLO MANUAL ✓';
                     btn.disabled = false;
                 });
         }
