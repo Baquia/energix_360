@@ -977,6 +977,14 @@
                 if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.95rem; color: var(--secondary);">🍬 ${i.req_unidades}</div>`;
                 if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.95rem;">0</div>`;
 
+                let botonCiegas = '';
+                let esCiegasSinCodigo = (i.novedad_alistamiento === 'AUTORIZADO_CIEGAS' && i.codigo_producto === 'SIN_CODIGO');
+                if (esCiegasSinCodigo) {
+                    botonCiegas = `<div style="margin-top: 10px;">
+                        <button onclick="event.stopPropagation(); detenerCamaraPrincipal(() => abrirModalVerificarId(${i.id}))" style="background:#d97706; color:white; border:none; width:100%; padding:10px; border-radius:8px; font-weight:800; font-size:0.95rem; box-shadow: 0 2px 4px rgba(217, 119, 6, 0.3); cursor:pointer;">👀 VERIFICAR A CIEGAS</button>
+                    </div>`;
+                }
+
                 htmlInner += `
             <div id="card_${i.id}" class="item-row active" onclick="detenerCamaraPrincipal(() => abrirModalVerificarId(${i.id}))">
                 <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 10px; width: auto; font-size: 0.95rem;">
@@ -985,6 +993,7 @@
                 <div class="item-details" style="overflow: hidden;">
                     <div class="id-code">${i.codigo_producto || 'S/C'}</div>
                     <div class="id-name" style="word-break: break-word; line-height: 1.2;">${badgeHtml}${nombre}</div>
+                    ${botonCiegas}
                 </div>
             </div>`;
             });
@@ -1066,6 +1075,18 @@
                 document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
                 document.getElementById('modal-cam-resume-btn').style.display = 'none';
             }
+
+            // --- NUEVA LÓGICA VERIFICAR A CIEGAS ---
+            const esCiegasSinCodigo = (item.novedad_alistamiento === 'AUTORIZADO_CIEGAS' && item.codigo_producto === 'SIN_CODIGO');
+            if (esCiegasSinCodigo) {
+                document.getElementById('modal-camera-section').style.display = 'none';
+            } else {
+                document.getElementById('modal-camera-section').style.display = 'flex';
+                document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
+                document.getElementById('modal-cam-resume-btn').style.display = 'none';
+                document.getElementById('modal-embedded-reader').style.opacity = '1';
+            }
+            // ---------------------------------------
 
             if (itemActivo.req_cajas > 0) document.getElementById('area-conteo-cajas').classList.remove('hidden');
             else document.getElementById('area-conteo-cajas').classList.add('hidden');
