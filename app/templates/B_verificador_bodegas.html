@@ -129,7 +129,7 @@
             font-weight: 700; color: var(--text-gray); background: none; border: none; font-size: 1rem; padding: 10px 0;
         }
 
-        /* Responsive Grid para listas */
+        /* Responsive Grid para listas (Landscape Mobile) */
         .responsive-grid {
             display: grid; grid-template-columns: 1fr; gap: 15px;
         }
@@ -170,11 +170,11 @@
         .id-name { font-size: 0.95rem; font-weight: 700; color: #334155; word-break: break-word; line-height: 1.2; }
         .id-code { font-size: 0.75rem; color: var(--text-gray); font-weight: 600; margin-bottom: 4px; }
 
-        /* --- ESTILOS DE LA CÁMARA (AHORA EN LISTA PRINCIPAL) --- */
+        /* --- ESTILOS COMPARTIDOS DE CÁMARA (BUSCADOR Y MODAL) --- */
         .camera-container {
-            width: 100%; background: #000; border-radius: 12px; overflow: hidden; position: relative;
+            flex: 1; background: #000; border-radius: 12px; overflow: hidden; position: relative;
             display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
-            min-height: 250px; max-height: 350px;
+            min-height: 250px;
         }
 
         .scanner-mira {
@@ -196,7 +196,7 @@
             box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
         }
 
-        #embedded-reader { width: 100%; height: 100%; transition: opacity 0.3s ease; }
+        .embedded-reader-class { width: 100%; height: 100%; transition: opacity 0.3s ease; }
 
         .btn-start-cam {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -216,7 +216,8 @@
         .btn-resume-cam span.text { font-size: 1.2rem; font-weight: 800; }
         .btn-resume-cam span.sub { font-size: 0.85rem; color: #cbd5e1; margin-top: 5px; }
 
-        /* --- MODAL TRABAJO (VERIFICACIÓN) THUMB-ZONE OPTIMIZED --- */
+
+        /* --- MODAL TRABAJO (VERIFICACIÓN) --- */
         .modal-wrap {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.98); z-index: 100; display: none;
@@ -225,9 +226,9 @@
         }
 
         .picking-sheet {
-            width: 100%; max-width: 600px; height: auto; max-height: 90vh; background: white;
-            display: flex; flex-direction: column; position: relative; border-radius: 20px 20px 0 0;
-            animation: slideUp 0.3s ease-out; overflow: hidden;
+            width: 100%; max-width: 600px; height: 100vh; background: white;
+            display: flex; flex-direction: column; position: relative;
+            animation: slideUp 0.3s ease-out;
         }
 
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -274,6 +275,28 @@
         .btn-v-confirm { flex: 1; padding: 15px; border: none; background: var(--success); border-radius: 12px; font-weight: 800; color: white; font-size:1rem;}
 
         .hidden { display: none !important; }
+
+        /* =======================================================
+           LANDSCAPE OPTIMIZATION FOR BARCODE SCANNING
+           ======================================================= */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .picking-sheet {
+                flex-direction: row; flex-wrap: wrap; height: 100vh; overflow: hidden; padding: 0;
+            }
+            .picking-scroll-area {
+                flex: 1; height: 100vh; padding: 15px;
+            }
+            #modal-camera-section {
+                position: absolute; top: 0; left: 0; width: 50%; height: 100vh; margin: 0; border-radius: 0; z-index: 1;
+            }
+            .picking-scroll-area {
+                margin-left: 50%; width: 50%; padding-bottom: 90px;
+            }
+            .picking-bottom-actions {
+                position: absolute; bottom: 0; right: 0; width: 50%; z-index: 2; padding: 10px 15px;
+            }
+            .btn-close-modal { top: 10px; right: 10px; }
+        }
     </style>
 </head>
 
@@ -340,19 +363,19 @@
                     </div>
                 </div>
 
-                <!-- CÁMARA INCORPORADA EN LA VISTA PRINCIPAL DE LA LISTA -->
-                <div class="camera-container" id="camera-section" style="display: none;">
-                    <div id="embedded-reader"></div>
-                    <div id="scanner-mira" class="scanner-mira"></div> 
-                    <div id="cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraIncrustada()">
+                <!-- CÁMARA BUSCADOR EN LA VISTA PRINCIPAL -->
+                <div class="camera-container" id="main-camera-section" style="display: none; min-height: 200px;">
+                    <div id="main-embedded-reader" class="embedded-reader-class"></div>
+                    <div id="main-scanner-mira" class="scanner-mira"></div> 
+                    <div id="main-cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraPrincipal()">
                         <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                             <circle cx="12" cy="13" r="4" />
                         </svg>
-                        ACTIVAR LECTOR
+                        ACTIVAR BUSCADOR
                     </div>
                     
-                    <div id="cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamara()">
+                    <div id="main-cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamaraPrincipal()">
                         <span class="icon">▶️</span>
                         <span class="text">Tocar para reanudar</span>
                         <span class="sub">Pausado para ahorrar batería</span>
@@ -360,7 +383,7 @@
                 </div>
 
                 <div style="position: sticky; top: 70px; z-index: 40; background: #f8fafc; padding-bottom: 10px;">
-                    <input type="text" id="searchBox" placeholder="🔍 Buscar producto a auditar..." onkeyup="filtrarLista()"
+                    <input type="text" id="searchBox" placeholder="🔍 Búsqueda manual por nombre..." onkeyup="filtrarLista()"
                         style="width: 100%; padding: 16px; border-radius: 12px; border: 2px solid var(--border); font-size: 1.05rem; font-weight:500; outline:none; transition: 0.2s;">
                 </div>
                 <div id="items-container" class="responsive-grid"></div>
@@ -368,10 +391,29 @@
         </div>
     </div>
 
-    <!-- MODAL SECUNDARIO DE TRABAJO (SIN CÁMARA, SOLO BOTONES DE AJUSTE) -->
+    <!-- MODAL TRABAJO (VERIFICACIÓN) -->
     <div id="modal-picking" class="modal-wrap">
         <div class="picking-sheet">
             <button class="btn-close-modal" onclick="cerrarModalVerificacion()">✕</button>
+
+            <!-- Cámara Modal (Verificación 1 a 1) -->
+            <div class="camera-container" id="modal-camera-section">
+                <div id="modal-embedded-reader" class="embedded-reader-class"></div>
+                <div id="modal-scanner-mira" class="scanner-mira"></div> 
+                <div id="modal-cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraModal()">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                    </svg>
+                    ACTIVAR LECTOR
+                </div>
+                
+                <div id="modal-cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamaraModal()">
+                    <span class="icon">▶️</span>
+                    <span class="text">Tocar para reanudar</span>
+                    <span class="sub">Pausado para ahorrar batería</span>
+                </div>
+            </div>
 
             <div class="picking-scroll-area">
                 <div class="pick-header">
@@ -410,7 +452,7 @@
                 </div>
             </div>
 
-            <!-- Zona del Pulgar (Thumb Zone - Acciones) -->
+            <!-- Zona del Pulgar (Acciones) -->
             <div class="picking-bottom-actions">
                 <button id="btn-masivo" class="hidden" onclick="confirmarMasivo()" style="width: 100%; background: var(--primary); color: white; padding: 15px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(67, 56, 202, 0.3);">⚡ VERIFICACIÓN MASIVA</button>
                 <button class="btn-finish" onclick="intentarVerificarItem()">CONFIRMAR AUDITORÍA</button>
@@ -418,7 +460,7 @@
         </div>
     </div>
 
-    <!-- Modal Verificación Final (Sellado) -->
+    <!-- Modal Confirmación Verificación Final (Sellar) -->
     <div id="modal-verify" class="modal-wrap" style="z-index: 105;">
         <div class="verify-sheet">
             <div style="font-size: 3.5rem; margin-bottom: 10px;">✅</div>
@@ -449,11 +491,16 @@
     </div>
 
     <script>
-        let ordenActual = null, listaItems = [], itemActivo = null, scanner = null;
+        let ordenActual = null, listaItems = [], itemActivo = null;
         let lastScanTime = 0;
         let audioCtx = null;
         let wakeLock = null;
-        let sleepTimer = null;
+        
+        let scannerMain = null;
+        let sleepTimerMain = null;
+        
+        let scannerModal = null;
+        let sleepTimerModal = null;
 
         function cerrarSesionInstantanea(e) {
             if (e) e.preventDefault();
@@ -520,39 +567,271 @@
             } catch (e) { console.log("Audio play error", e); }
         }
 
-        // FUNCIONES DE AHORRO DE BATERÍA (CÁMARA EN VISTA PRINCIPAL)
-        function iniciarTemporizadorInactividad() {
-            clearTimeout(sleepTimer);
-            sleepTimer = setTimeout(pausarCamaraPorInactividad, 20000);
+        // =====================================
+        // CONTROL CAMARA PRINCIPAL (BUSCADOR EN LISTA)
+        // =====================================
+        function iniciarTemporizadorMain() {
+            clearTimeout(sleepTimerMain);
+            sleepTimerMain = setTimeout(pausarCamaraMain, 20000);
         }
 
-        function pausarCamaraPorInactividad() {
-            if (scanner && scanner.getState() === 2) { // Si está escaneando
+        function pausarCamaraMain() {
+            if (scannerMain && scannerMain.getState() === 2) { 
                 try {
-                    scanner.pause(true); 
-                    document.getElementById('embedded-reader').style.opacity = '0.3';
-                    document.getElementById('scanner-mira').style.display = 'none';
-                    document.getElementById('cam-resume-btn').style.display = 'flex';
+                    scannerMain.pause(true); 
+                    document.getElementById('main-embedded-reader').style.opacity = '0.3';
+                    document.getElementById('main-scanner-mira').style.display = 'none';
+                    document.getElementById('main-cam-resume-btn').style.display = 'flex';
                 } catch(e) {}
             }
         }
 
-        function reanudarCamara() {
-            if (scanner) {
+        function reanudarCamaraPrincipal() {
+            if (scannerMain) {
                 try {
-                    scanner.resume();
-                    document.getElementById('embedded-reader').style.opacity = '1';
-                    document.getElementById('cam-resume-btn').style.display = 'none';
-                    document.getElementById('scanner-mira').style.display = 'block';
-                    iniciarTemporizadorInactividad();
+                    scannerMain.resume();
+                    document.getElementById('main-embedded-reader').style.opacity = '1';
+                    document.getElementById('main-cam-resume-btn').style.display = 'none';
+                    document.getElementById('main-scanner-mira').style.display = 'block';
+                    iniciarTemporizadorMain();
                 } catch(e) {}
             }
         }
 
+        function iniciarCamaraPrincipal() {
+            document.getElementById('main-cam-overlay-btn').style.display = 'none';
+            document.getElementById('main-cam-resume-btn').style.display = 'none';
+
+            initAudio();
+            requestWakeLock();
+
+            const isPortrait = window.innerHeight > window.innerWidth;
+            const screenWidth = window.innerWidth;
+            const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
+            const targetHeight = Math.floor(targetWidth * 0.45);
+
+            const mira = document.getElementById('main-scanner-mira');
+            mira.style.width = targetWidth + 'px';
+            mira.style.height = targetHeight + 'px';
+            mira.style.display = 'block';
+
+            const configScanner = {
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.ITF
+                ]
+            };
+
+            scannerMain = new Html5Qrcode("main-embedded-reader", configScanner);
+            scannerMain.start(
+                { facingMode: "environment" },
+                { fps: 4, qrbox: { width: targetWidth, height: targetHeight } },
+                (decodedText) => {
+                    iniciarTemporizadorMain();
+                    const now = Date.now();
+                    if (now - lastScanTime < 1500) return; 
+
+                    const scanned = decodedText.trim().toUpperCase();
+                    
+                    let targetItem = listaItems.find(i => 
+                        (i.codigo_producto || '').trim().toUpperCase() === scanned && 
+                        i.estado_actividad === 'ALISTADO'
+                    );
+
+                    if (targetItem) {
+                        lastScanTime = now;
+                        playBeep();
+
+                        if (mira) {
+                            mira.classList.add('success');
+                            setTimeout(() => mira.classList.remove('success'), 300);
+                        }
+
+                        // Detenemos la cámara principal antes de abrir el modal para evitar colisiones
+                        detenerCamaraPrincipal(() => {
+                            abrirModalVerificarId(targetItem.id);
+                        });
+
+                    } else {
+                        lastScanTime = now;
+                        alert(`❌ Código incorrecto o el producto ya fue verificado.`);
+                    }
+                },
+                (err) => {}
+            ).then(() => {
+                iniciarTemporizadorMain();
+            }).catch(err => {
+                console.error(err);
+                alert("Error cámara buscador: " + (err.message || err));
+                document.getElementById('main-cam-overlay-btn').style.display = 'flex';
+                document.getElementById('main-scanner-mira').style.display = 'none';
+            });
+        }
+
+        function detenerCamaraPrincipal(callback) {
+            clearTimeout(sleepTimerMain);
+            if (scannerMain) {
+                scannerMain.stop().then(() => { 
+                    scannerMain.clear(); 
+                    scannerMain = null; 
+                    if(callback) callback();
+                }).catch(e => { 
+                    console.log(e); 
+                    scannerMain = null;
+                    if(callback) callback();
+                });
+            } else {
+                if(callback) callback();
+            }
+            const mira = document.getElementById('main-scanner-mira');
+            if(mira) mira.style.display = 'none';
+            document.getElementById('main-cam-resume-btn').style.display = 'none';
+            document.getElementById('main-cam-overlay-btn').style.display = 'flex';
+            document.getElementById('main-embedded-reader').style.opacity = '1';
+        }
+
+        // =====================================
+        // CONTROL CAMARA MODAL (AUDITORÍA 1 a 1)
+        // =====================================
+        function iniciarTemporizadorModal() {
+            clearTimeout(sleepTimerModal);
+            sleepTimerModal = setTimeout(pausarCamaraModal, 20000);
+        }
+
+        function pausarCamaraModal() {
+            if (scannerModal && scannerModal.getState() === 2) { 
+                try {
+                    scannerModal.pause(true); 
+                    document.getElementById('modal-embedded-reader').style.opacity = '0.3';
+                    document.getElementById('modal-scanner-mira').style.display = 'none';
+                    document.getElementById('modal-cam-resume-btn').style.display = 'flex';
+                } catch(e) {}
+            }
+        }
+
+        function reanudarCamaraModal() {
+            if (scannerModal) {
+                try {
+                    scannerModal.resume();
+                    document.getElementById('modal-embedded-reader').style.opacity = '1';
+                    document.getElementById('modal-cam-resume-btn').style.display = 'none';
+                    document.getElementById('modal-scanner-mira').style.display = 'block';
+                    iniciarTemporizadorModal();
+                } catch(e) {}
+            }
+        }
+
+        function iniciarCamaraModal() {
+            if (!itemActivo) return;
+            document.getElementById('modal-cam-overlay-btn').style.display = 'none';
+            document.getElementById('modal-cam-resume-btn').style.display = 'none';
+
+            initAudio();
+
+            const isPortrait = window.innerHeight > window.innerWidth;
+            const screenWidth = window.innerWidth;
+            const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
+            const targetHeight = Math.floor(targetWidth * 0.45);
+
+            const mira = document.getElementById('modal-scanner-mira');
+            mira.style.width = targetWidth + 'px';
+            mira.style.height = targetHeight + 'px';
+            mira.style.display = 'block';
+
+            const configScanner = {
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.ITF
+                ]
+            };
+
+            scannerModal = new Html5Qrcode("modal-embedded-reader", configScanner);
+            scannerModal.start(
+                { facingMode: "environment" }, 
+                { fps: 4, qrbox: { width: targetWidth, height: targetHeight } }, 
+                (decodedText) => {
+                    iniciarTemporizadorModal();
+                    const now = Date.now();
+                    if (now - lastScanTime < 1500) return; 
+
+                    const scanned = decodedText.trim().toUpperCase();
+                    const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
+
+                    if (target && scanned === target) {
+                        lastScanTime = now;
+                        playBeep();
+
+                        if (mira) {
+                            mira.classList.add('success');
+                            setTimeout(() => mira.classList.remove('success'), 300);
+                        }
+
+                        if (itemActivo.req_cajas > 0 && itemActivo.act_cajas < itemActivo.req_cajas) {
+                            itemActivo.act_cajas++;
+                            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+                            
+                            document.getElementById('pk-count-cajas').style.color = '#10b981';
+                            setTimeout(() => document.getElementById('pk-count-cajas').style.color = 'var(--primary)', 300);
+
+                        } else if (itemActivo.req_unidades > 0 && itemActivo.act_unidades < itemActivo.req_unidades) {
+                            itemActivo.act_unidades++;
+                            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+
+                            document.getElementById('pk-count-unidades').style.color = '#10b981';
+                            setTimeout(() => document.getElementById('pk-count-unidades').style.color = '#7e22ce', 300);
+                        }
+
+                        evaluarBotonTerminar();
+                    } else {
+                        lastScanTime = now;
+                        alert(`❌ Código incorrecto. Esperado: ${itemActivo.codigo_producto}`);
+                    }
+                },
+                (err) => { }
+            ).then(() => {
+                iniciarTemporizadorModal();
+            }).catch(err => {
+                console.error(err);
+                alert("Error cámara verificación: " + (err.message || err));
+                document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
+                document.getElementById('modal-scanner-mira').style.display = 'none';
+            });
+        }
+
+        function detenerCamaraModal(callback) {
+            clearTimeout(sleepTimerModal);
+            if (scannerModal) {
+                scannerModal.stop().then(() => { 
+                    scannerModal.clear(); 
+                    scannerModal = null; 
+                    if(callback) callback();
+                }).catch(e => { 
+                    console.log(e); 
+                    scannerModal = null;
+                    if(callback) callback();
+                });
+            } else {
+                if(callback) callback();
+            }
+            const mira = document.getElementById('modal-scanner-mira');
+            if(mira) mira.style.display = 'none';
+            document.getElementById('modal-cam-resume-btn').style.display = 'none';
+            document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
+            document.getElementById('modal-embedded-reader').style.opacity = '1';
+        }
+
+        // =====================================
+        // NAVEGACIÓN Y VISTAS
+        // =====================================
         function mostrarMenu() { toggleView('view-menu'); }
         
         function volverAlMenu() { 
-            if(scanner) detenerCamara();
+            detenerCamaraPrincipal();
+            detenerCamaraModal();
             mostrarMenu(); 
         }
 
@@ -561,9 +840,6 @@
             document.getElementById(id).classList.remove('hidden');
         }
 
-        // =====================================
-        // POLLING EN TIEMPO REAL
-        // =====================================
         function cargarOrdenesSilencioso() {
             fetch('/api/verificador/ordenes?v=' + new Date().getTime())
                 .then(r => r.json())
@@ -614,7 +890,8 @@
         }, 3000);
 
         function cargarOrdenes() {
-            if(scanner) detenerCamara();
+            detenerCamaraPrincipal();
+            detenerCamaraModal();
             toggleView('view-orders');
             const cOrd = document.getElementById('orders-container');
             cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>';
@@ -627,11 +904,12 @@
             document.getElementById('searchBox').value = '';
             toggleView('view-items');
             
-            // Mostrar la cámara pero esperar a que el usuario active
-            document.getElementById('camera-section').style.display = 'flex';
-            document.getElementById('cam-overlay-btn').style.display = 'flex';
-            document.getElementById('scanner-mira').style.display = 'none';
-            if(scanner) detenerCamara();
+            // Mostrar y preparar la cámara principal del buscador
+            document.getElementById('main-camera-section').style.display = 'flex';
+            document.getElementById('main-cam-overlay-btn').style.display = 'flex';
+            document.getElementById('main-scanner-mira').style.display = 'none';
+            detenerCamaraPrincipal();
+            detenerCamaraModal();
 
             document.getElementById('items-container').innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando inventario alistado...</div>';
             cargarItemsSilencioso();
@@ -642,7 +920,7 @@
             let htmlInner = '';
 
             const txt = document.getElementById('searchBox').value.toLowerCase();
-            document.getElementById('lblProgress').textContent = `${listaItems.length}`;
+            document.getElementById('lblProgress').textContent = `Por auditar: ${listaItems.length}`;
 
             if (listaItems.length === 0) {
                 c.innerHTML = `
@@ -653,7 +931,7 @@
                 <button onclick="cargarOrdenes()" style="padding:18px 30px; background:var(--primary); color:white; border:none; border-radius:12px; margin-top:20px; font-weight:900; font-size:1.1rem; width:100%; box-shadow: 0 4px 10px rgba(67, 56, 202, 0.3);">Volver a Mis Órdenes</button>
             </div>`;
                 document.getElementById('header-progress-bar').style.width = '100%';
-                if(scanner) detenerCamara();
+                detenerCamaraPrincipal();
                 return;
             }
 
@@ -700,7 +978,7 @@
                 if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.95rem;">0</div>`;
 
                 htmlInner += `
-            <div id="card_${i.id}" class="item-row active" onclick="abrirModalVerificarId(${i.id}, false)">
+            <div id="card_${i.id}" class="item-row active" onclick="detenerCamaraPrincipal(() => abrirModalVerificarId(${i.id}))">
                 <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 10px; width: auto; font-size: 0.95rem;">
                     ${htmlCantidades}
                 </div>
@@ -716,109 +994,15 @@
         function filtrarLista() { renderizarItems(); }
 
         // =====================================
-        // MOTOR DE ESCÁNER PRINCIPAL (EN LISTA)
+        // LÓGICA DEL MODAL DE VERIFICACIÓN
         // =====================================
-        function iniciarCamaraIncrustada() {
-            document.getElementById('cam-overlay-btn').style.display = 'none';
-            document.getElementById('cam-resume-btn').style.display = 'none';
-
-            initAudio();
-            requestWakeLock();
-
-            const isPortrait = window.innerHeight > window.innerWidth;
-            const screenWidth = window.innerWidth;
-            const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
-            const targetHeight = Math.floor(targetWidth * 0.45);
-
-            const mira = document.getElementById('scanner-mira');
-            mira.style.width = targetWidth + 'px';
-            mira.style.height = targetHeight + 'px';
-            mira.style.display = 'block';
-
-            const configScanner = {
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.ITF
-                ]
-            };
-
-            scanner = new Html5Qrcode("embedded-reader", configScanner);
-            scanner.start(
-                { facingMode: "environment" }, 
-                { fps: 4, qrbox: { width: targetWidth, height: targetHeight } }, 
-                (decodedText) => {
-                    iniciarTemporizadorInactividad();
-                    const now = Date.now();
-                    if (now - lastScanTime < 1500) return; 
-
-                    const scanned = decodedText.trim().toUpperCase();
-                    
-                    // Buscar si existe un producto pendiente con ese EAN
-                    let targetItem = listaItems.find(i => 
-                        (i.codigo_producto || '').trim().toUpperCase() === scanned && 
-                        i.estado_actividad === 'ALISTADO'
-                    );
-
-                    if (targetItem) {
-                        lastScanTime = now;
-                        playBeep();
-
-                        // Animación Destello Verde
-                        if (mira) {
-                            mira.classList.add('success');
-                            setTimeout(() => mira.classList.remove('success'), 300);
-                        }
-
-                        // Abrir modal auto-incrementando 1 unidad/caja
-                        setTimeout(() => {
-                            abrirModalVerificarId(targetItem.id, true);
-                        }, 350);
-
-                    } else {
-                        lastScanTime = now;
-                        alert(`❌ Código incorrecto o el producto ya fue verificado totalmente.`);
-                    }
-                },
-                (err) => {}
-            ).then(() => {
-                iniciarTemporizadorInactividad();
-            }).catch(err => {
-                console.error(err);
-                alert("Error cámara: " + (err.message || err));
-                document.getElementById('cam-overlay-btn').style.display = 'flex';
-                document.getElementById('scanner-mira').style.display = 'none';
-            });
-        }
-
-        function detenerCamara() {
-            clearTimeout(sleepTimer);
-            if (scanner) {
-                scanner.stop().then(() => { scanner.clear(); }).catch(e => console.log(e));
-                scanner = null;
-            }
-            const mira = document.getElementById('scanner-mira');
-            if(mira) mira.style.display = 'none';
-            document.getElementById('cam-resume-btn').style.display = 'none';
-        }
-
-        // =====================================
-        // APERTURA DE MODAL
-        // =====================================
-        function abrirModalVerificarId(id, autoIncrement = false) {
+        function abrirModalVerificarId(id) {
             const item = listaItems.find(i => i.id === id);
             if (!item) return;
 
             itemActivo = item;
             lastScanTime = 0;
             requestWakeLock();
-
-            // Pausar la cámara principal mientras el modal está abierto
-            pausarCamaraPorInactividad();
 
             const pickHeader = document.querySelector('.pick-header');
             const oldAlert = document.getElementById('kit-alert-msg');
@@ -840,38 +1024,32 @@
             document.getElementById('pk-name').textContent = nombreDisplay;
             document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
 
+            // Para el verificador, lo "solicitado" es lo que el operador "entregó"
             itemActivo.req_cajas = parseInt(item.req_cajas) || 0;
             itemActivo.req_unidades = parseInt(item.req_unidades) || 0;
 
-            // Auto-incremento si la apertura viene desde el escáner (validó la existencia de 1)
-            if (autoIncrement) {
-                if (itemActivo.req_cajas > 0) {
-                    itemActivo.act_cajas = 1;
-                    itemActivo.act_unidades = 0;
-                } else if (itemActivo.req_unidades > 0) {
-                    itemActivo.act_cajas = 0;
-                    itemActivo.act_unidades = 1;
-                }
-            } else {
-                itemActivo.act_cajas = 0;
-                itemActivo.act_unidades = 0;
-            }
+            // Cantidades verificadas inician en cero
+            itemActivo.act_cajas = 0;
+            itemActivo.act_unidades = 0;
 
             let htmlReqModal = '';
             if (itemActivo.req_cajas > 0) htmlReqModal += `<span style="display:inline-block; margin-right:15px;">📦 ${itemActivo.req_cajas} CAJAS</span>`;
             if (itemActivo.req_unidades > 0) htmlReqModal += `<span style="display:inline-block;">🍬 ${itemActivo.req_unidades} UNIDADES</span>`;
             document.getElementById('pk-req').innerHTML = htmlReqModal || '0';
 
-            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
-            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+            document.getElementById('pk-count-cajas').textContent = "0";
+            document.getElementById('pk-count-unidades').textContent = "0";
 
-            // Mostrar Novedad de Controlador si existe (Falta existencias o ciegas)
+            // Mostrar Novedad si existe
             const novAlert = document.getElementById('novedad-alert');
             if (item.novedad_alistamiento) {
                 novAlert.textContent = `⚠️ NOVEDAD DEL OPERADOR: ${item.novedad_alistamiento.replace('_', ' ')}`;
                 novAlert.classList.remove('hidden');
 
                 if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS' || item.novedad_alistamiento === 'SIN_EAN') {
+                    document.getElementById('modal-cam-overlay-btn').style.display = 'none';
+                    document.getElementById('modal-cam-resume-btn').style.display = 'none';
+
                     if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS') {
                         itemActivo.act_cajas = 0;
                         itemActivo.act_unidades = 0;
@@ -879,11 +1057,14 @@
                         itemActivo.act_cajas = itemActivo.req_cajas;
                         itemActivo.act_unidades = itemActivo.req_unidades;
                     }
+
                     document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
                     document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
                 }
             } else {
                 novAlert.classList.add('hidden');
+                document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
+                document.getElementById('modal-cam-resume-btn').style.display = 'none';
             }
 
             if (itemActivo.req_cajas > 0) document.getElementById('area-conteo-cajas').classList.remove('hidden');
@@ -903,9 +1084,12 @@
         }
 
         function cerrarModalVerificacion() {
-            document.getElementById('modal-picking').style.display = 'none';
-            itemActivo = null;
-            reanudarCamara(); // Reactivar al volver a la lista principal
+            detenerCamaraModal(() => {
+                document.getElementById('modal-picking').style.display = 'none';
+                itemActivo = null;
+                // Al cerrar el modal, restauramos el buscador en la vista principal
+                iniciarCamaraPrincipal();
+            });
         }
 
         function cambiarCajas(valor) {
@@ -959,7 +1143,7 @@
         }
 
         // =====================================
-        // DISPARADOR MASIVO (DESDE MODAL)
+        // DISPARADOR MASIVO
         // =====================================
         function confirmarMasivo() {
             if (!itemActivo) return;
@@ -1007,23 +1191,23 @@
                     unidades_verificadas: itemActivo.act_unidades
                 })
             })
-                .then(r => r.json())
-                .then(d => {
-                    if (d.status === 'ok') {
-                        cancelarConfirmacion(); // Cierra el modal pequeño de validación
-                        cerrarModalVerificacion(); // Cierra el modal principal y Reactiva la cámara de la lista
-                        listaItems = listaItems.filter(i => i.id !== idParaBorrar);
-                        renderizarItems();
-                        playBeep();
-                    } else {
-                        alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
-                    }
-                })
-                .catch(e => alert("❌ Error de Conexión."))
-                .finally(() => {
-                    btn.textContent = 'SELLAR';
-                    btn.disabled = false;
-                });
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'ok') {
+                    cancelarConfirmacion();
+                    cerrarModalVerificacion(); // Esto ya cierra y reabre la cámara principal
+                    listaItems = listaItems.filter(i => i.id !== idParaBorrar);
+                    renderizarItems();
+                    playBeep();
+                } else {
+                    alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
+                }
+            })
+            .catch(e => alert("❌ Error de Conexión."))
+            .finally(() => {
+                btn.textContent = 'SELLAR';
+                btn.disabled = false;
+            });
         }
     </script>
 </body>
