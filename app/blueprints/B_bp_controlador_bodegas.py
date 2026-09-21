@@ -420,7 +420,9 @@ def resolver_novedad_vivo():
             ean = data.get('ean')
             desc = data.get('descripcion')
             marca = data.get('marca', 'GENERICO')
-            embalaje = data.get('unidad_embalaje', 'UND')
+            embalaje = str(data.get('unidad_embalaje', 'UND')).strip().upper()
+            if embalaje not in ['CAJA', 'DISPLAY']:
+                embalaje = 'UND'
             
             cur.execute("""
                 INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
@@ -1184,6 +1186,10 @@ def crear_producto_manual():
     nit_empresa = str(session.get('empresa_id', ''))
     nombre_empresa = str(session.get('nombre_empresa', session.get('empresa', 'Empresa')))
     
+    embalaje = str(data.get('unidad_embalaje', 'UND')).strip().upper()
+    if embalaje not in ['CAJA', 'DISPLAY']:
+        embalaje = 'UND'
+        
     try:
         cur = mysql.connection.cursor()
         cur.execute("SELECT tipo_empresa FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
@@ -1197,7 +1203,7 @@ def crear_producto_manual():
             producto = VALUES(producto), 
             fabricante = VALUES(fabricante), 
             unidad_embalaje = VALUES(unidad_embalaje)
-        """, (nit_empresa, nombre_empresa, tipo_empresa, data.get('ean'), data.get('ean'), data.get('producto'), data.get('fabricante'), data.get('unidad_embalaje', 'UND')))
+        """, (nit_empresa, nombre_empresa, tipo_empresa, data.get('ean'), data.get('ean'), data.get('producto'), data.get('fabricante'), embalaje))
         
         mysql.connection.commit()
         cur.close()
@@ -1285,7 +1291,9 @@ def upload_productos_masivo():
             ean = str(row.get('EAN', '')).strip()
             producto = str(row.get('PRODUCTO', '')).strip()
             fabricante = str(row.get('FABRICANTE', '')).strip()
-            embalaje = str(row.get('UNIDAD_EMBALAJE', 'UND')).strip()
+            embalaje = str(row.get('UNIDAD_EMBALAJE', 'UND')).strip().upper()
+            if embalaje not in ['CAJA', 'DISPLAY']:
+                embalaje = 'UND'
             
             if not ean or not producto or ean.upper() == 'NAN':
                 continue
@@ -1370,7 +1378,9 @@ def editar_producto():
         nuevo_ean = data.get('nuevo_ean')
         nuevo_nombre = data.get('producto')
         nueva_marca = data.get('marca')
-        nuevo_embalaje = data.get('unidad_embalaje')
+        nuevo_embalaje = str(data.get('unidad_embalaje', 'UND')).strip().upper()
+        if nuevo_embalaje not in ['CAJA', 'DISPLAY']:
+            nuevo_embalaje = 'UND'
         
         if not ean_original or not nuevo_ean or not nuevo_nombre: 
             return jsonify({'status': 'error', 'message': 'Faltan datos'})
@@ -1950,7 +1960,7 @@ def upload_excel():
         
         maestra_productos_ean = {}
         maestra_productos_nombre = {}
-        maestra_productos_nombre_lista = {} # <--- NUEVO
+        maestra_productos_nombre_lista = {} 
 
         for row in db_products:
             sku_val = normalizar_codigo(row[0])
@@ -2085,33 +2095,10 @@ def upload_excel():
                     if ('DESCRIPCION' in temp_map) and (('CAJAS' in temp_map or 'UNIDADES' in temp_map) or ('CANTIDAD' in temp_map)):
                         start_row = r + 1; header_map = temp_map; found_table = True; break
 
-                # Fallback por inspección estructural si no se detectó por encabezados directos
+                # Filtro Estricto: Si no se detectaron encabezados, se rechaza la carga.
                 if not found_table:
-                    for j in range(len(df_raw)):
-                        row_fallback = df_raw.iloc[j]
-                        row_str = [str(x) for x in row_fallback.values]
-                        col_code = None; col_desc = None; col_cant1 = None; col_cant2 = None
-                        
-                        for col_idx, val in enumerate(row_str):
-                            val_clean = val.strip()
-                            if val_clean.upper() in ['NAN', '']: continue
-                            
-                            if col_code is None and re.match(r'^\d{3,20}$', val_clean): col_code = col_idx
-                            elif col_desc is None and len(val_clean) > 5 and any(c.isalpha() for c in val_clean): col_desc = col_idx
-                            elif col_cant1 is None and re.match(r'^\d+(\.\d+)?$', val_clean) and float(val_clean) < 10000: col_cant1 = col_idx
-                            elif col_cant2 is None and re.match(r'^\d+(\.\d+)?$', val_clean) and float(val_clean) < 10000: col_cant2 = col_idx
-                        
-                        if col_desc is not None and (col_cant1 is not None or col_cant2 is not None):
-                            header_map = {'CODIGO': col_code, 'DESCRIPCION': col_desc}
-                            if col_cant1 is not None: header_map['CAJAS'] = col_cant1
-                            if col_cant2 is not None: header_map['UNIDADES'] = col_cant2
-                            start_row = j
-                            found_table = True
-                            break
-
-                if not found_table: 
-                    resultados_error.append(f"❌ {filename}: No se detectaron columnas válidas ni patrones de datos.")
-                    continue 
+                    resultados_error.append(f"❌ {filename}: Formato inválido. Por favor utilice la plantilla V2 con las columnas exactas (ej. 'EAN', 'DESCRIPCION', 'CAJAS', 'UNIDADES').")
+                    continue
 
                 # 3. Procesamiento y Comparación Fila por Fila
                 data_to_insert = []

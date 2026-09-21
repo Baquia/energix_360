@@ -41,7 +41,6 @@ def login_required_custom(f):
         ahora_colombia = ahora_utc - timedelta(hours=5)
         corte_hoy = ahora_colombia.replace(hour=4, minute=0, second=0, microsecond=0)
         
-        # Determinar cuál fue el último corte de las 4:00 AM que ya pasó
         if ahora_colombia >= corte_hoy:
             limite_corte_timestamp = corte_hoy.timestamp()
         else:
@@ -49,7 +48,6 @@ def login_required_custom(f):
             
         login_time = session.get('login_time')
         
-        # Si no tiene registro de tiempo o inició sesión antes del último corte de las 4 AM, lo expulsamos
         if not login_time or login_time < limite_corte_timestamp:
             session.clear()
             flash('Tu sesión ha expirado por cambio de turno (4:00 a.m.). Por favor, ingresa nuevamente.', 'warning')
@@ -58,7 +56,6 @@ def login_required_custom(f):
         
         # --- LÓGICA DE CONTROL DE SESIONES ÚNICAS ---
         perfil = str(session.get('perfil', '')).strip().lower()
-        # NUEVA REGLA: Sólo estos perfiles pueden tener múltiples sesiones abiertas a la vez
         perfiles_multi_sesion = ['operador_logistica', 'webmaster_admin', 'supervisor_gas', 'gestor_flotacarga']
         
         if perfil not in perfiles_multi_sesion:
@@ -72,7 +69,6 @@ def login_required_custom(f):
                     row = cur.fetchone()
                     cur.close()
                     
-                    # Si el token en BD es distinto, significa que inició sesión en otro dispositivo
                     if row and row[0] != token_sesion_actual:
                         session.clear()
                         flash('Tu sesión fue cerrada porque ingresaste desde otro dispositivo.', 'danger')
@@ -106,6 +102,7 @@ def index():
     form = LoginForm()
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # Se elimina el filtro estatus = 'ACTIVO' que causaba el error 1054
         cur.execute("SELECT nit, nombre_comercial FROM empresas ORDER BY nombre_comercial ASC")
         empresas_db = cur.fetchall()
         cur.close()
@@ -123,7 +120,7 @@ def index():
 @login_required_custom
 def panel_principal():
     if 'webmaster' in str(session.get('tipo_empresa', '')).lower() or session.get('empresa_id') == '901811727':
-        return redirect(url_for('bp_901811727.panel_webmaster'))
+        return redirect(url_for('bp_901811727_main.panel_webmaster'))
 
     nombre_empresa = session.get('empresa', 'Empresa')
     nombre_usuario = session.get('nombre', 'Usuario')
@@ -159,6 +156,7 @@ def login():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
+    # Se elimina el filtro estatus = 'ACTIVO' que causaba el error 1054
     cur.execute("SELECT nit, tipo_empresa FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
     emp_info = cur.fetchone()
     if not emp_info:
@@ -280,7 +278,6 @@ def router_universal(modulo):
     archivo_destino = str(regla_perfil['archivo_destino']).strip()
     mapa_sistema = ejecutar_escaneo_introspeccion()
 
-    # Redirección inteligente al Blueprint
     if archivo_destino in mapa_sistema:
         return redirect(url_for(mapa_sistema[archivo_destino]))
     elif not archivo_destino.endswith(".html"):
@@ -300,13 +297,11 @@ def logout():
 @login_required_custom
 def api_modulos_sistema_disponibles():
     from flask import current_app
-    excluir = ['static', 'bp_901811727', 'main_router']
+    excluir = ['static', 'bp_901811727_main', 'bp_901811727_admin', 'bp_901811727_energia_glp', 'bp_901811727_audit', 'main_router']
     
-    # 1. Escaneo en bruto de los nombres de los blueprints en memoria
     modulos_raw = list(set([name.replace('bp_', '').replace('B_bp_', '').replace('B_modulo_', '') 
                         for name in current_app.blueprints.keys() if name not in excluir]))
     
-    # 2. Diccionario Traductor para consolidar la V1 en la V2
     mapa_normalizacion = {
         'glp': 'gas', 
         'supervisorgas': 'gas',
@@ -317,12 +312,10 @@ def api_modulos_sistema_disponibles():
         'gestion_carga': 'carga', 
         'gestionavicola_bp': 'carga',
         'gestion_mermas': 'mermas',
-        # --- NUEVO: Transporte Especial ---
         'controlador_flotaespecial': 'flotaespecial',
         'operador_flotaespecial': 'flotaespecial'
     }
     
-    # 3. Homologamos hacia los 4 nombres estándar del Dashboard V2
     modulos_v2 = set()
     for mod in modulos_raw:
         nombre_limpio = mapa_normalizacion.get(mod, mod)

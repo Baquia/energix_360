@@ -4,6 +4,7 @@ import os
 import base64
 import uuid
 import hashlib
+import pytz
 from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash, current_app
 from app import mysql
 from app.utils import login_required_custom
@@ -11,6 +12,9 @@ from datetime import datetime
 import MySQLdb.cursors
 
 bp_operador_flotaespecial = Blueprint('operador_flotaespecial', __name__)
+
+# Zona horaria oficial de Colombia
+BOGOTA_TZ = pytz.timezone('America/Bogota')
 
 # ==============================================================================
 # HELPER: GUARDADO DE EVIDENCIAS EN BASE64 CON DETECCIÓN MIME
@@ -179,8 +183,7 @@ def prelogin_flotaespecial():
         except:
             pass
 
-        # Ajuste Anti-Error 1054: Se retira 'id' de la consulta
-        cur.execute("SELECT id_empresa FROM vehiculos_especial WHERE placa = %s LIMIT 1", (placa,))
+        cur.execute("SELECT id_empresa FROM vehiculos_especial WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, empresa_id))
         v = cur.fetchone()
 
         if not v:
@@ -189,7 +192,6 @@ def prelogin_flotaespecial():
         if str(v["id_empresa"]) != str(empresa_id):
             return jsonify(success=False, message="Este vehículo no pertenece a su empresa."), 403
 
-        # REGLA: Bypass si ya existe inspección aprobada hoy (Ajuste Anti-Error 1054: SELECT 1)
         cur.execute("""
             SELECT 1 FROM inspeccion_preoperacional 
             WHERE id_empresa = %s AND placa_vehiculo = %s 
@@ -200,7 +202,6 @@ def prelogin_flotaespecial():
 
         nuevo_estatus = 'Logueado' if inspeccion_hoy else 'Prelogueado'
 
-        # Ajuste Anti-Error 1054: Actualización por placa en lugar de id
         cur.execute("UPDATE vehiculos_especial SET estatus=%s WHERE placa=%s AND id_empresa=%s", (nuevo_estatus, placa, empresa_id))
         
         cur.execute("""
@@ -220,8 +221,8 @@ def prelogin_flotaespecial():
         
         cur.execute("""
             INSERT INTO historial_sesiones_flotaespecial (id_empresa, id_usuario, placa_vehiculo, fecha_login)
-            VALUES (%s, %s, %s, NOW())
-        """, (empresa_id, usuario_id, placa))
+            VALUES (%s, %s, %s, %s)
+        """, (empresa_id, usuario_id, placa, datetime.now(BOGOTA_TZ)))
         
         mysql.connection.commit()
         
@@ -242,7 +243,6 @@ def prelogin_flotaespecial():
 @login_required_custom
 def iniciar_viaje_especial():
     empresa_id = session.get('empresa_id')
-    usuario_id = session.get('usuario_id')
     usuario_nombre = session.get('nombre')
     placa = session.get('placa_prelogueada_especial')
 
@@ -257,31 +257,6 @@ def iniciar_viaje_especial():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS viajes_flotaespecial (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                id_empresa INT NOT NULL,
-                id_usuario_operador INT NOT NULL,
-                placa_vehiculo VARCHAR(20) NOT NULL,
-                consecutivo_viaje VARCHAR(50) NOT NULL,
-                fecha_hora_inicio DATETIME NOT NULL,
-                fecha_hora_fin DATETIME NULL,
-                estado VARCHAR(20) DEFAULT 'Activo',
-                INDEX(id_empresa, id_usuario_operador)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        """)
-        
-        try: cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN id_traslado_eps VARCHAR(50) NULL")
-        except: pass
-        try: cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN foto_origen VARCHAR(255) NULL, ADD COLUMN foto_destino VARCHAR(255) NULL, ADD COLUMN foto_retorno VARCHAR(255) NULL, ADD COLUMN firma VARCHAR(255) NULL, ADD COLUMN hash_seguridad VARCHAR(255) NULL, ADD COLUMN ruta_pdf VARCHAR(255) NULL")
-        except: pass
-        try: cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN lat_origen DECIMAL(10,8) NULL, ADD COLUMN lng_origen DECIMAL(11,8) NULL, ADD COLUMN hora_origen DATETIME NULL, ADD COLUMN lat_destino DECIMAL(10,8) NULL, ADD COLUMN lng_destino DECIMAL(11,8) NULL, ADD COLUMN hora_destino DATETIME NULL, ADD COLUMN lat_retorno DECIMAL(10,8) NULL, ADD COLUMN lng_retorno DECIMAL(11,8) NULL, ADD COLUMN hora_retorno DATETIME NULL;")
-        except: pass
-        try: cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN hora_reinicio DATETIME NULL, ADD COLUMN tiempo_efectivo_minutos INT DEFAULT 0;")
-        except: pass
-        try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN operador_ejecucion VARCHAR(100) NULL, ADD COLUMN fecha_ejecucion_real DATETIME NULL, ADD COLUMN fecha_fin_real DATETIME NULL;")
-        except: pass
-
         cur.execute("SELECT id, estatus_servicio, id_viaje FROM control_viajes_flota_especial WHERE id_viaje = %s AND id_empresa = %s", (id_viaje_alfanumerico, empresa_id))
         viaje_data = cur.fetchone()
         
@@ -293,28 +268,24 @@ def iniciar_viaje_especial():
 
         cur.execute("""
             SELECT COUNT(*) as total 
-            FROM viajes_flotaespecial 
-            WHERE id_empresa = %s AND placa_vehiculo = %s AND YEAR(fecha_hora_inicio) = YEAR(NOW())
+            FROM control_viajes_flota_especial 
+            WHERE id_empresa = %s AND vehiculo_asignado = %s AND YEAR(fecha_servicio) = YEAR(NOW()) AND consecutivo_viaje IS NOT NULL
         """, (empresa_id, placa))
         resultado = cur.fetchone()
         contador = (resultado['total'] if resultado else 0) + 1
         
         consecutivo = f"VIAJE-ESP-{placa}-{str(contador).zfill(3)}"
-
-        cur.execute("""
-            INSERT INTO viajes_flotaespecial (id_empresa, id_usuario_operador, placa_vehiculo, consecutivo_viaje, fecha_hora_inicio, estado, id_traslado_eps)
-            VALUES (%s, %s, %s, %s, NOW(), 'Activo', %s)
-        """, (empresa_id, usuario_id, placa, consecutivo, id_viaje_alfanumerico))
         
-        id_viaje_fisico = cur.lastrowid
+        id_viaje_fisico = viaje_data['id']
         
         cur.execute("""
             UPDATE control_viajes_flota_especial 
             SET estatus_servicio = 'EN EJECUCION', 
                 operador_ejecucion = %s, 
-                fecha_ejecucion_real = NOW() 
+                fecha_ejecucion_real = %s,
+                consecutivo_viaje = %s 
             WHERE id_viaje = %s AND id_empresa = %s
-        """, (usuario_nombre, id_viaje_alfanumerico, empresa_id))
+        """, (usuario_nombre, datetime.now(BOGOTA_TZ), consecutivo, id_viaje_alfanumerico, empresa_id))
 
         mysql.connection.commit()
 
@@ -330,6 +301,91 @@ def iniciar_viaje_especial():
     finally:
         cur.close()
 
+# ==============================================================================
+# FASE 1: NUEVO ENDPOINT PARA REPORTE DE NOVEDAD DESDE LA APP MÓVIL
+# ==============================================================================
+@bp_operador_flotaespecial.route('/api/viaje_especial/reportar_novedad', methods=['POST'])
+@login_required_custom
+def reportar_novedad_especial():
+    empresa_id = session.get('empresa_id')
+    datos = request.get_json(silent=True) or {}
+    
+    id_viaje_alfanumerico = datos.get('id_traslado_eps') or session.get('codigo_viaje_alfanumerico')
+    tipo_novedad = datos.get('tipo_novedad')
+    descripcion = datos.get('descripcion')
+    
+    if not id_viaje_alfanumerico:
+        return jsonify({"status": "error", "message": "ID de viaje no proporcionado."}), 400
+    if tipo_novedad not in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO']:
+        return jsonify({"status": "error", "message": "Tipo de novedad inválido."}), 400
+    if not descripcion:
+        return jsonify({"status": "error", "message": "Debe incluir una descripción de la novedad."}), 400
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        try:
+            cur.execute("""
+                ALTER TABLE control_viajes_flota_especial 
+                ADD COLUMN estado_novedad VARCHAR(50) NULL, 
+                ADD COLUMN descripcion_novedad TEXT NULL, 
+                ADD COLUMN fecha_novedad DATETIME NULL, 
+                ADD COLUMN monto_liquidacion_manual DECIMAL(10,2) NULL, 
+                ADD COLUMN es_trasbordo BOOLEAN DEFAULT FALSE, 
+                ADD COLUMN fuec_anulado VARCHAR(50) NULL;
+            """)
+        except:
+            pass
+
+        cur.execute("SELECT id, estatus_servicio FROM control_viajes_flota_especial WHERE id_viaje = %s AND id_empresa = %s", (id_viaje_alfanumerico, empresa_id))
+        viaje_info = cur.fetchone()
+        
+        if not viaje_info:
+            return jsonify({"status": "error", "message": "Viaje no encontrado."}), 404
+            
+        if viaje_info['estatus_servicio'] in ['TERMINADO-PDTE AUDITAR', 'AUDITADO']:
+            return jsonify({"status": "error", "message": "No puede reportar contingencias en viajes ya finalizados."}), 400
+
+        lat_falla = datos.get('lat')
+        lng_falla = datos.get('lng')
+        update_coords_str = ""
+        coords_args = []
+        
+        if tipo_novedad == 'NOVEDAD_RECORRIDO' and lat_falla and lng_falla:
+            update_coords_str = ", lat_destino = %s, lng_destino = %s"
+            coords_args = [lat_falla, lng_falla]
+
+        query = f"""
+            UPDATE control_viajes_flota_especial 
+            SET estatus_servicio = %s,
+                estado_novedad = 'ACTIVA',
+                descripcion_novedad = %s,
+                fecha_novedad = %s
+                {update_coords_str}
+            WHERE id_viaje = %s AND id_empresa = %s
+        """
+        
+        args = [tipo_novedad, descripcion, datetime.now(BOGOTA_TZ)] + coords_args + [id_viaje_alfanumerico, empresa_id]
+        
+        cur.execute(query, tuple(args))
+        mysql.connection.commit()
+
+        if str(id_viaje_alfanumerico) == str(session.get('codigo_viaje_alfanumerico')):
+            session.pop('viaje_activo_especial', None)
+            session.pop('consecutivo_viaje_especial', None)
+            session.pop('id_viaje_especial', None)
+            session.pop('codigo_viaje_alfanumerico', None)
+
+        return jsonify({"status": "success", "message": "Novedad reportada. El controlador ha sido alertado."}), 200
+
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+# ==============================================================================
+# 5. FINALIZAR VIAJE NORMAL (ONLINE Y OFFLINE)
+# ==============================================================================
 @bp_operador_flotaespecial.route('/api/viaje_especial/finalizar', methods=['POST'])
 @login_required_custom
 def finalizar_viaje_especial():
@@ -348,7 +404,6 @@ def finalizar_viaje_especial():
     firma = datos.get('firma')
     telemetria = datos.get('telemetria', {})
 
-    # CALCULAR TIEMPO EFECTIVO DE CONDUCCIÓN SIMPLIFICADO
     tiempo_efectivo_minutos = 0
     try:
         fmt = '%Y-%m-%d %H:%M:%S'
@@ -365,21 +420,14 @@ def finalizar_viaje_especial():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        try: 
-            cur.execute("ALTER TABLE viajes_flotaespecial ADD COLUMN foto_paciente VARCHAR(255) NULL;")
-        except: 
-            pass
-
         ruta_origen = _guardar_testigo_base64(foto_origen, 'viajes', f"origen_{id_viaje_fisico}")
         ruta_destino = _guardar_testigo_base64(foto_destino, 'viajes', f"destino_{id_viaje_fisico}")
         ruta_paciente = _guardar_testigo_base64(foto_paciente, 'viajes', f"paciente_{id_viaje_fisico}")
         ruta_firma = _guardar_testigo_base64(firma, 'viajes', f"firma_{id_viaje_fisico}")
 
-        # Se guarda utilizando foto_paciente en lugar del antiguo testigo de retorno
         cur.execute("""
-            UPDATE viajes_flotaespecial 
-            SET fecha_hora_fin = NOW(), estado = 'Finalizado',
-                foto_origen = %s, foto_destino = %s, foto_paciente = %s, firma = %s,
+            UPDATE control_viajes_flota_especial 
+            SET foto_origen = %s, foto_destino = %s, foto_paciente = %s, firma = %s,
                 lat_origen = %s, lng_origen = %s, hora_origen = %s,
                 lat_destino = %s, lng_destino = %s, hora_destino = %s,
                 tiempo_efectivo_minutos = %s
@@ -391,19 +439,18 @@ def finalizar_viaje_especial():
               id_viaje_fisico, empresa_id))
         
         cur.execute("""
-            SELECT v.id, v.consecutivo_viaje, v.fecha_hora_inicio, v.fecha_hora_fin, v.placa_vehiculo, 
-                   v.foto_origen, v.foto_destino, v.foto_paciente, v.firma, v.id_traslado_eps,
+            SELECT c.id, c.consecutivo_viaje, c.fecha_ejecucion_real as fecha_hora_inicio, %s as fecha_hora_fin, c.vehiculo_asignado as placa_vehiculo, 
+                   c.foto_origen, c.foto_destino, c.foto_paciente, c.firma, c.id_viaje as id_traslado_eps,
                    c.id_eps_cliente AS eps_cliente, c.numero_autorizacion, c.numero_prescripcion, 
                    c.tipo_servicio AS codigo_servicio, c.nombre_usuario, c.id_usuario, 
                    c.direccion_origen, c.direccion_destino, c.id_viaje, c.trayecto, c.id_viaje_padre,
                    u.nombre AS conductor_nombre, u.cedula AS conductor_cedula,
                    e.nombre_comercial AS empresa_transporte
-            FROM viajes_flotaespecial v
-            LEFT JOIN control_viajes_flota_especial c ON v.id_traslado_eps COLLATE utf8mb4_unicode_ci = c.id_viaje
-            LEFT JOIN usuarios u ON v.id_usuario_operador = u.id
-            LEFT JOIN empresas e ON v.id_empresa = e.id
-            WHERE v.id = %s
-        """, (id_viaje_fisico,))
+            FROM control_viajes_flota_especial c
+            LEFT JOIN usuarios u ON c.conductor_asignado COLLATE utf8mb4_unicode_ci = u.nombre COLLATE utf8mb4_unicode_ci AND u.empresa_id = c.id_empresa
+            LEFT JOIN empresas e ON c.id_empresa = e.id
+            WHERE c.id = %s AND c.id_empresa = %s
+        """, (datetime.now(BOGOTA_TZ), id_viaje_fisico, empresa_id))
         viaje_data = cur.fetchone()
 
         if viaje_data:
@@ -516,15 +563,14 @@ def finalizar_viaje_especial():
                 print(f"Error generando PDF ReportLab: {str(e)}")
                 ruta_pdf_final = None
 
-            cur.execute("UPDATE viajes_flotaespecial SET hash_seguridad = %s, ruta_pdf = %s WHERE id = %s", (hash_seg, ruta_pdf_final, id_viaje_fisico))
-            
             cur.execute("""
                 UPDATE control_viajes_flota_especial 
                 SET estatus_servicio = 'TERMINADO-PDTE AUDITAR', 
                     ruta_documento = %s, 
-                    fecha_fin_real = NOW() 
+                    hash_seguridad = %s,
+                    fecha_fin_real = %s 
                 WHERE id_viaje = %s AND id_empresa = %s
-            """, (ruta_pdf_final, id_viaje_alfanumerico, empresa_id))
+            """, (ruta_pdf_final, hash_seg, datetime.now(BOGOTA_TZ), id_viaje_alfanumerico, empresa_id))
             
             if viaje_data.get('trayecto') == 'IDA' and viaje_data.get('id_viaje_padre'):
                 cur.execute("""
@@ -549,7 +595,6 @@ def finalizar_viaje_especial():
     finally:
         cur.close()
 
-
 @bp_operador_flotaespecial.route('/api/viaje_especial/recuperar', methods=['POST'])
 @login_required_custom
 def recuperar_viaje_especial():
@@ -564,11 +609,11 @@ def recuperar_viaje_especial():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
         cur.execute("""
-            SELECT id, consecutivo_viaje, id_traslado_eps 
-            FROM viajes_flotaespecial 
-            WHERE placa_vehiculo = %s AND id_empresa = %s AND id_usuario_operador = %s AND estado = 'Activo'
+            SELECT id, consecutivo_viaje, id_viaje as id_traslado_eps 
+            FROM control_viajes_flota_especial 
+            WHERE vehiculo_asignado = %s AND id_empresa = %s AND conductor_asignado = %s AND estatus_servicio = 'EN EJECUCION'
             ORDER BY id DESC LIMIT 1
-        """, (placa, empresa_id, usuario_id))
+        """, (placa, empresa_id, session.get('nombre')))
         viaje = cur.fetchone()
 
         if viaje:
@@ -582,8 +627,8 @@ def recuperar_viaje_especial():
             
             cur.execute("""
                 INSERT INTO historial_sesiones_flotaespecial (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion)
-                VALUES (%s, %s, %s, NOW(), 'ACTIVA')
-            """, (empresa_id, usuario_id, placa))
+                VALUES (%s, %s, %s, %s, 'ACTIVA')
+            """, (empresa_id, usuario_id, placa, datetime.now(BOGOTA_TZ)))
 
             mysql.connection.commit()
             return jsonify({"status": "success", "consecutivo": viaje['consecutivo_viaje']}), 200
@@ -599,6 +644,7 @@ def recuperar_viaje_especial():
 # 3. RUTAS DE SESIÓN EN VIVO (HEARTBEAT Y LOGOUT)
 # ==============================================================================
 @bp_operador_flotaespecial.route('/api/flotaespecial/heartbeat', methods=['POST'])
+@login_required_custom 
 def heartbeat_flotaespecial():
     if 'usuario_id' not in session:
         return jsonify({"status": "error", "message": "No autenticado"}), 401
@@ -607,9 +653,9 @@ def heartbeat_flotaespecial():
         cur = mysql.connection.cursor()
         cur.execute("""
             INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (session.get('usuario_id'),))
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE ultima_actividad = %s
+        """, (session.get('usuario_id'), datetime.now(BOGOTA_TZ), datetime.now(BOGOTA_TZ)))
         mysql.connection.commit()
         cur.close()
         return jsonify({"status": "success"})
@@ -617,6 +663,7 @@ def heartbeat_flotaespecial():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @bp_operador_flotaespecial.route('/api/flotaespecial/logout_manual', methods=['POST'])
+@login_required_custom 
 def logout_manual_flotaespecial():
     if 'usuario_id' not in session: 
         return jsonify({"status": "error"}), 401
@@ -632,10 +679,10 @@ def logout_manual_flotaespecial():
         cur = mysql.connection.cursor()
         cur.execute("""
             UPDATE historial_sesiones_flotaespecial 
-            SET fecha_logout_manual = NOW(), estado_sesion = 'FINALIZADA'
+            SET fecha_logout_manual = %s, estado_sesion = 'FINALIZADA'
             WHERE id_usuario = %s AND id_empresa = %s AND estado_sesion = 'ACTIVA'
             ORDER BY id DESC LIMIT 1
-        """, (usuario_id, empresa_id))
+        """, (datetime.now(BOGOTA_TZ), usuario_id, empresa_id))
         
         if placa:
             cur.execute("UPDATE vehiculos_especial SET estatus='No logueado' WHERE placa=%s AND id_empresa=%s", (placa, empresa_id))
@@ -653,6 +700,7 @@ def logout_manual_flotaespecial():
 # 4. MOTOR DE RASTREO, GEOCERCA Y RUTAS HISTÓRICAS
 # ==============================================================================
 @bp_operador_flotaespecial.route('/api/flotaespecial/actualizar_ubicacion', methods=['POST'])
+@login_required_custom 
 def actualizar_ubicacion_especial():
     if 'usuario_id' not in session or 'placa_prelogueada_especial' not in session:
         return jsonify({"status": "error", "message": "Sesión inválida"}), 401
@@ -666,7 +714,7 @@ def actualizar_ubicacion_especial():
         latitud = datos.get('lat')
         longitud = datos.get('lng')
         if latitud and longitud:
-            ubicaciones = [{'lat': latitud, 'lng': longitud, 'fecha_hora': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]
+            ubicaciones = [{'lat': latitud, 'lng': longitud, 'fecha_hora': datetime.now(BOGOTA_TZ).strftime('%Y-%m-%d %H:%M:%S')}]
 
     if not ubicaciones:
         return jsonify({"status": "error", "message": "Faltan coordenadas"}), 400
@@ -692,7 +740,7 @@ def actualizar_ubicacion_especial():
         cur.execute("UPDATE vehiculos_especial SET ultima_latitud = %s, ultima_longitud = %s WHERE placa = %s AND id_empresa = %s", (ultima_lat, ultima_lng, placa, empresa_id))
         
         for ubi in ubicaciones:
-            fecha_hora = ubi.get('fecha_hora', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            fecha_hora = ubi.get('fecha_hora', datetime.now(BOGOTA_TZ).strftime('%Y-%m-%d %H:%M:%S'))
             cur.execute("""
                 INSERT INTO vehiculos_historial_rutas_especial (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro)
                 VALUES (%s, %s, %s, %s, %s, 'Automático')
@@ -708,6 +756,7 @@ def actualizar_ubicacion_especial():
 
 
 @bp_operador_flotaespecial.route('/api/flotaespecial/registrar_parada', methods=['POST'])
+@login_required_custom 
 def registrar_parada_especial():
     if 'usuario_id' not in session or 'placa_prelogueada_especial' not in session:
         return jsonify({"status": "error", "message": "Sesión inválida"}), 401
@@ -752,8 +801,8 @@ def registrar_parada_especial():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 empresa_id, placa, usuario_id, 
-                p.get('fecha', datetime.now().strftime('%Y-%m-%d')),
-                p.get('hora_inicio', datetime.now().strftime('%H:%M:%S')),
+                p.get('fecha', datetime.now(BOGOTA_TZ).strftime('%Y-%m-%d')),
+                p.get('hora_inicio', datetime.now(BOGOTA_TZ).strftime('%H:%M:%S')),
                 p.get('hora_fin'),
                 p.get('lat'), p.get('lng'),
                 p.get('tipo_actividad', 'Otra'),
@@ -763,7 +812,7 @@ def registrar_parada_especial():
             nuevo_id = cur.lastrowid
             ids_insertados.append({"temp_id": p.get('temp_id'), "db_id": nuevo_id})
             
-            fecha_hora = f"{p.get('fecha', datetime.now().strftime('%Y-%m-%d'))} {p.get('hora_inicio', datetime.now().strftime('%H:%M:%S'))}"
+            fecha_hora = f"{p.get('fecha', datetime.now(BOGOTA_TZ).strftime('%Y-%m-%d'))} {p.get('hora_inicio', datetime.now(BOGOTA_TZ).strftime('%H:%M:%S'))}"
             cur.execute("""
                 INSERT INTO vehiculos_historial_rutas_especial (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro, nombre_punto)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -783,6 +832,7 @@ def registrar_parada_especial():
 
 
 @bp_operador_flotaespecial.route('/api/flotaespecial/actualizar_fin_parada', methods=['POST'])
+@login_required_custom 
 def actualizar_fin_parada_especial():
     if 'usuario_id' not in session: 
         return jsonify({"status": "error"}), 401
@@ -800,7 +850,7 @@ def actualizar_fin_parada_especial():
                     UPDATE historial_paradas_flotaespecial 
                     SET hora_fin = %s 
                     WHERE id = %s AND id_empresa = %s
-                """, (p.get('hora_fin', datetime.now().strftime('%H:%M:%S')), p.get('id'), session.get('empresa_id')))
+                """, (p.get('hora_fin', datetime.now(BOGOTA_TZ).strftime('%H:%M:%S')), p.get('id'), session.get('empresa_id')))
         mysql.connection.commit()
         return jsonify({"status":"success"})
     except Exception as e:
@@ -829,7 +879,7 @@ def cron_deslogueo_geocerca_especial():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cur.execute("""
         SELECT v.placa, v.ultima_latitud, v.ultima_longitud, 
-               e.base_latitud, e.base_longitud, e.radio_permitido_metros
+               e.base_latitud, e.base_longitud, e.radio_permitido_metros, v.id_empresa
         FROM vehiculos_especial v
         JOIN empresas e ON v.id_empresa = e.id
         WHERE v.estatus IN ('Logueado', 'Prelogueado') 
@@ -841,11 +891,11 @@ def cron_deslogueo_geocerca_especial():
     for v in vehiculos:
         distancia = calcular_distancia(v['ultima_latitud'], v['ultima_longitud'], v['base_latitud'], v['base_longitud'])
         if distancia <= (v['radio_permitido_metros'] or 200):
-            vehiculos_a_desloguear.append(v['placa'])
+            vehiculos_a_desloguear.append((v['placa'], v['id_empresa']))
             
     if vehiculos_a_desloguear:
-        format_strings = ','.join(['%s'] * len(vehiculos_a_desloguear))
-        cur.execute(f"UPDATE vehiculos_especial SET estatus = 'No logueado' WHERE placa IN ({format_strings})", tuple(vehiculos_a_desloguear))
+        for placa, id_empresa in vehiculos_a_desloguear:
+             cur.execute("UPDATE vehiculos_especial SET estatus = 'No logueado' WHERE placa = %s AND id_empresa = %s", (placa, id_empresa))
         mysql.connection.commit()
         
     cur.close()

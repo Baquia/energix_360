@@ -196,7 +196,9 @@
                 <p style="color: var(--text-muted); font-size: 13px;">Supervise el ciclo completo de los servicios según el rango de fechas.</p>
             </div>
 
+            <!-- Corrección SIM-069: Inyección del token CSRF en el formulario -->
             <form class="filter-bar" method="GET" action="{{ url_for('controlador_flotaespecial.dashboard_operativo') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="form-group">
                     <label>Fecha Inicio</label>
                     <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">

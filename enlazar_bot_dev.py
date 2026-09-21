@@ -92,7 +92,8 @@ def procesar_contacto(message, bot_instance, modulo_nombre):
             conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME, connect_timeout=10)
             cur = conn.cursor(MySQLdb.cursors.DictCursor) 
             
-            cur.execute("SELECT id, nombre, empresa_id FROM usuarios WHERE telefono LIKE %s", (f"%{tel_busqueda}",))
+            # Corrección SIM-013: Validación estricta para asegurar que el usuario pertenece a una empresa registrada.
+            cur.execute("SELECT id, nombre, empresa_id FROM usuarios WHERE telefono LIKE %s AND empresa_id IS NOT NULL", (f"%{tel_busqueda}",))
             usuarios = cur.fetchall()
 
             if len(usuarios) == 0:
@@ -104,7 +105,9 @@ def procesar_contacto(message, bot_instance, modulo_nombre):
             else:
                 user = usuarios[0]
                 print(f"DEBUG ✅ [{modulo_nombre}]: Vinculando a {user['nombre']}...")
-                cur.execute("UPDATE usuarios SET telegram_id = %s WHERE id = %s", (str(chat_id), user['id']))
+                
+                # Corrección SIM-014: Aislamiento Multi-Tenant asegurado inyectando el contexto de la empresa (empresa_id) en el UPDATE.
+                cur.execute("UPDATE usuarios SET telegram_id = %s WHERE id = %s AND empresa_id = %s", (str(chat_id), user['id'], user['empresa_id']))
                 conn.commit()
                 bot_instance.reply_to(message, f"✅ ¡Vínculo exitoso en {modulo_nombre} para {user['nombre']}!")
 

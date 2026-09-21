@@ -9,6 +9,9 @@
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#015249">
 
+    <!-- Google Maps JS API -->
+    <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBloN0EeBxRj9CWnHZ9Wgjz721846DT4KY&libraries=places,marker&v=weekly"></script>
+
     <style>
         /* PALETA CORPORATIVA BQA-ONE */
         :root {
@@ -87,12 +90,15 @@
 
         .content-area { flex-grow: 1; padding: 25px; overflow-y: auto; background: radial-gradient(circle at top left, var(--bg-grad-start) 0, #f3f4f6 60%, #f3f4f6 100%); }
 
-        /* Alertas Flash */
+        /* Alertas Flash y Banner de Emergencia */
         .flash-messages { width: 100%; max-width: 1000px; margin-bottom: 20px; }
         .flash-alert { padding: 12px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; border: 1px solid currentColor; margin-bottom: 10px; }
         .flash-success { background-color: #d1fae5; color: #065f46; }
         .flash-danger { background-color: #fee2e2; color: #991b1b; }
         .flash-warning { background-color: #fef3c7; color: #92400e; }
+        
+        #bannerNovedades { display: none; width: 100%; max-width: 1000px; background-color: #ef4444; color: white; padding: 15px 20px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); animation: pulseAlert 2s infinite; }
+        @keyframes pulseAlert { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
 
         /* Panel Superior Acción */
         .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;}
@@ -131,21 +137,23 @@
         .grid-form.full { grid-template-columns: 1fr; }
 
         /* ================= MODALES ================= */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; overflow-y: auto;}
         .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
-        .modal-box { background: var(--surface); width: 90%; max-width: 450px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;}
+        .modal-box { background: var(--surface); width: 90%; max-width: 450px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative; margin: auto;}
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-        .modal-header h3 { color: var(--verde); font-size: 18px; }
+        .modal-header h3 { color: var(--verde); font-size: 18px; margin: 0; }
         .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
         
-        .form-group { margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; text-align: left;}
         .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;}
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; font-family: inherit;}
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--verde); }
         
         .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-cancel { padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); background: #f9fafb; cursor: pointer; font-weight: bold; color: var(--text);}
-        
+
+        .pac-container { z-index: 9999 !important; }
+
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -169,19 +177,23 @@
         </div>
         
         <nav class="nav-menu">
-            <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="nav-item back-btn">
-                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Menú Transporte Especial</div>
+            <a href="{{ url_for('panel_principal') }}" class="nav-item back-btn">
+                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Menú Principal BQA</div>
             </a>
 
             <a href="{{ url_for('controlador_flotaespecial.dashboard_operativo') }}" class="nav-item">
-                <div class="nav-item-content"><span class="nav-icon">📊</span> Panel Operativo en Vivo</div>
+                <div class="nav-item-content"><span class="nav-icon">📡</span> Kanban en Vivo</div>
             </a>
 
-            <div class="nav-item open" onclick="toggleDropdown('epsMenu', this)">
-                <div class="nav-item-content"><span class="nav-icon">🏥</span> Gestión Operativa EPS</div>
+            <a href="{{ url_for('flotaespecial_eps.gestion_contratos') }}" class="nav-item {% if active_module == 'gestion_contratos' %}active{% endif %}">
+                <div class="nav-item-content"><span class="nav-icon">🤝</span> Gestión de Contratos</div>
+            </a>
+
+            <div class="nav-item {% if active_module in ['traslados_captura', 'traslados_asignacion', 'traslados_verificacion', 'traslados_programacion', 'traslados_asignacion_flota', 'traslados_auditoria', 'traslados_auditados'] %}open{% endif %}" onclick="toggleDropdown('epsMenu', this)">
+                <div class="nav-item-content"><span class="nav-icon">🏥</span> Flujo Operativo EPS</div>
                 <span class="dropdown-arrow">▼</span>
             </div>
-            <div class="dropdown-container open" id="epsMenu">
+            <div class="dropdown-container {% if active_module in ['traslados_captura', 'traslados_asignacion', 'traslados_verificacion', 'traslados_programacion', 'traslados_asignacion_flota', 'traslados_auditoria', 'traslados_auditados'] %}open{% endif %}" id="epsMenu">
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" class="dropdown-item {% if active_module == 'traslados_captura' %}active{% endif %}">1. Captura de Autorización</a>
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}" class="dropdown-item {% if active_module == 'traslados_asignacion' %}active{% endif %}">2. Desglose de Viajes</a>
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" class="dropdown-item {% if active_module == 'traslados_verificacion' %}active{% endif %}">3. Verificación de Datos</a>
@@ -190,9 +202,13 @@
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" class="dropdown-item {% if active_module == 'traslados_auditoria' %}active{% endif %}">6. Auditoría de Viajes</a>
                 <a href="{{ url_for('flotaespecial_eps.gestion_traslados_auditados') }}" class="dropdown-item {% if active_module == 'traslados_auditados' %}active{% endif %}">7. Historial Auditados</a>
             </div>
+            
+            <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" class="nav-item">
+                <div class="nav-item-content"><span class="nav-icon">🚐</span> Gestión de Flota</div>
+            </a>
 
-            <a href="{{ url_for('panel_principal') }}" class="nav-item" style="margin-top: 15px; border-top: 1px solid var(--border); border-radius: 0; padding-top: 15px;">
-                <div class="nav-item-content"><span class="nav-icon">🏠</span> Menú Principal BQA</div>
+            <a href="{{ url_for('controlador_flotaespecial.gestion_operadores') }}" class="nav-item">
+                <div class="nav-item-content"><span class="nav-icon">🧑‍✈️</span> Gestor Operadores</div>
             </a>
         </nav>
 
@@ -219,6 +235,12 @@
         </header>
 
         <div class="content-area">
+            
+            <div id="bannerNovedades">
+                🚨 ATENCIÓN: Hay <span id="contadorNovedades">0</span> viaje(s) con novedad activa que requieren intervención de reasignación y FUEC. 
+                <a href="{{ url_for('controlador_flotaespecial.dashboard_operativo') }}" style="color: white; text-decoration: underline; margin-left: 10px;">Ver en Kanban</a>
+            </div>
+
             <div class="flash-messages">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
@@ -231,8 +253,52 @@
                 {% endwith %}
             </div>
 
-            {% if active_module == 'traslados_captura' %}
-                <!-- ================= ETAPA 1: CAPTURA DE ÓRDENES MAESTRAS ================= -->
+            {% if active_module == 'gestion_contratos' %}
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Gestión de Contratos y Clientes</h2>
+                    </div>
+                    <button class="btn-primary" onclick="openModal('modalNuevoContrato')">➕ Nuevo Contrato</button>
+                </div>
+                
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Administre los contratos activos requeridos normativamente para la generación del FUEC.</p>
+
+                <div class="table-card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>No. Contrato</th>
+                                <th>Contratante</th>
+                                <th>Categoría</th>
+                                <th>Vigencia</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in contratos %}
+                            <tr>
+                                <td><b style="font-family: monospace; color: var(--verde);">{{ c.numero_contrato }}</b></td>
+                                <td>{{ c.contratante_nombre }}<br><small>NIT/CC: {{ c.contratante_nit_cedula }}</small></td>
+                                <td><span class="badge badge-info">{{ c.categoria_contrato }}</span></td>
+                                <td>{{ c.fecha_inicio }} <span style="color:var(--text-muted);">al</span> {{ c.fecha_fin }}</td>
+                                <td>
+                                    <form action="{{ url_for('flotaespecial_eps.gestion_contratos') }}" method="POST" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <input type="hidden" name="accion" value="eliminar_contrato">
+                                        <input type="hidden" name="contrato_id" value="{{ c.id }}">
+                                        <button type="button" class="btn-danger" style="padding: 6px 10px; font-size: 11px;" onclick="if(confirm('¿Está seguro de inactivar este contrato? Ya no estará disponible para asociar a nuevos FUEC.')) this.form.submit();">✖️ Inactivar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay contratos vigentes registrados.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% elif active_module == 'traslados_captura' %}
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
@@ -257,7 +323,6 @@
                         <input type="hidden" name="accion" value="guardar_captura">
                         <input type="hidden" name="ruta_documento" value="{{ datos_extraidos.ruta_documento if datos_extraidos else '' }}">
                         
-                        <!-- Campos Ocultos Normativos JSON -->
                         <input type="hidden" name="TipoTec" value="S">
                         <input type="hidden" name="ConTec" value="1">
                         <input type="hidden" name="NoEntrega" value="1">
@@ -368,7 +433,6 @@
                 </div>
 
             {% elif active_module == 'traslados_asignacion' %}
-                <!-- ================= ETAPA 2: DESGLOSE DE VIAJES ================= -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
@@ -413,15 +477,14 @@
                 </div>
 
             {% elif active_module == 'traslados_verificacion' %}
-                <!-- ================= ETAPA 3: VERIFICACIÓN DE DATOS Y ACOMPAÑANTE ================= -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 3: Verificación Telefónica de Datos</h2>
+                        <h2>Etapa 3: Verificación Telefónica de Datos (Paquetes)</h2>
                     </div>
                 </div>
                 
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Audite la información del paciente telefónicamente. En este paso **debe confirmar si viaja con acompañante**.</p>
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Audite la información del paciente telefónicamente. La verificación se aplicará masivamente a <b>todos los viajes IDA</b> del mismo paquete para agilizar la operación.</p>
 
                 <div class="table-card">
                     <table class="data-table">
@@ -429,8 +492,8 @@
                             <tr>
                                 <th>Prescripción</th>
                                 <th>Paciente / Teléfono</th>
-                                <th>Servicio</th>
-                                <th>ID Viaje</th>
+                                <th>Viajes (Paquete)</th>
+                                <th>ID Viaje Ref.</th>
                                 <th>Acción</th>
                             </tr>
                         </thead>
@@ -439,12 +502,13 @@
                             <tr>
                                 <td><b>{{ v.numero_prescripcion }}</b></td>
                                 <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
-                                <td><span class="badge badge-gray">{{ v.tipo_servicio }}</span></td>
+                                <td><span class="badge badge-info">{{ v.total_idas }} viajes IDA</span></td>
                                 <td><span style="font-family: monospace; font-size: 14px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span></td>
                                 <td>
                                     <button type="button" class="btn-primary" style="padding: 6px 10px; font-size: 11px;"
                                         onclick="abrirRevision(this)"
                                         data-id="{{ v.id }}"
+                                        data-idpadre="{{ v.id_viaje_padre }}"
                                         data-ruta="{{ v.ruta_documento or '' }}"
                                         data-nombre="{{ v.nombre_usuario or '' }}"
                                         data-tipodoc="{{ v.tipo_documento or '' }}"
@@ -456,19 +520,18 @@
                                         data-dep-des="{{ v.departamento_destino or '' }}"
                                         data-mun-des="{{ v.municipio_destino or '' }}"
                                         data-des="{{ v.direccion_destino or '' }}">
-                                        📞 Auditar Datos
+                                        📞 Auditar Paquete Completo
                                     </button>
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes pendientes de verificación.</td></tr>
+                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay paquetes pendientes de verificación.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
 
             {% elif active_module == 'traslados_programacion' %}
-                <!-- ================= ETAPA 4: PROGRAMACIÓN DE VIAJES ================= -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
@@ -511,7 +574,6 @@
                 </div>
 
             {% elif active_module == 'traslados_asignacion_flota' %}
-                <!-- ================= ETAPA 5: ASIGNACIÓN DE FLOTA Y FUEC ================= -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
@@ -534,7 +596,7 @@
                         </thead>
                         <tbody>
                             {% for v in viajes %}
-                            <tr>
+                            <tr {% if v.estado_novedad == 'ACTIVA' %}style="background-color: #fef2f2; border-left: 4px solid #ef4444;"{% endif %}>
                                 <td><b>{{ v.numero_prescripcion }}</b></td>
                                 <td>
                                     <span style="font-family: monospace; font-size: 15px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span><br>
@@ -544,10 +606,34 @@
                                 <td>{{ v.fecha_servicio or 'N/D' }}<br><small>{{ v.hora_inicio or '' }}</small></td>
                                 <td>
                                     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                        <button type="button" class="btn-success" style="padding: 6px 10px; font-size: 11px;"
-                                            onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}')">
-                                            🚐 Generar FUEC y Asignar
-                                        </button>
+                                        {% if v.estado_novedad == 'ACTIVA' %}
+                                            <button type="button" class="btn-danger" style="padding: 6px 10px; font-size: 11px; animation: pulseAlert 1.5s infinite;"
+                                                onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado }}', '{{ v.conductor_asignado }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                                🚨 Resolver Novedad
+                                            </button>
+                                        {% else %}
+                                            <button type="button" class="btn-success" style="padding: 6px 10px; font-size: 11px;"
+                                                onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}')">
+                                                🚐 Generar FUEC y Asignar
+                                            </button>
+                                            
+                                            <button type="button" class="btn-warning" style="padding: 6px 10px; font-size: 11px;"
+                                                onclick="abrirExcepcionIndividual(this)"
+                                                data-id="{{ v.id }}"
+                                                data-ruta="{{ v.ruta_documento or '' }}"
+                                                data-nombre="{{ v.nombre_usuario or '' }}"
+                                                data-tipodoc="{{ v.tipo_documento or '' }}"
+                                                data-idusr="{{ v.id_usuario or '' }}"
+                                                data-tel="{{ v.telefono_usuario or '' }}"
+                                                data-dep="{{ v.departamento or '' }}"
+                                                data-mun="{{ v.municipio or '' }}"
+                                                data-ori="{{ v.direccion_origen or '' }}"
+                                                data-dep-des="{{ v.departamento_destino or '' }}"
+                                                data-mun-des="{{ v.municipio_destino or '' }}"
+                                                data-des="{{ v.direccion_destino or '' }}">
+                                                ✏️ Editar Ruta (Excepción)
+                                            </button>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
@@ -559,62 +645,112 @@
                 </div>
 
             {% elif active_module == 'traslados_auditoria' %}
-                <!-- ================= ETAPA 6: AUDITORÍA DE VIAJES INDIVIDUALES ================= -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 6: Auditoría de Viajes Individuales</h2>
+                        <h2>Etapa 6: Auditoría Integral de Viajes</h2>
                     </div>
                 </div>
                 
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Revise las evidencias enviadas por los operadores en ruta. Apruebe para generar el Sello criptográfico SHA-256 o rechace para devolver el servicio a estado Asignado.</p>
+                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Revise las evidencias de los paquetes de viaje completos (Ida y Vuelta). Apruebe cada tramo para generar el Sello SHA-256 o rechace el tramo defectuoso para devolverlo al conductor.</p>
 
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID Viaje</th>
-                                <th>Paciente / Trayecto</th>
-                                <th>Operador / Vehículo</th>
-                                <th>Fecha Fin Real</th>
-                                <th>Evidencias (Reporte)</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for v in viajes %}
-                            <tr>
-                                <td><span style="font-family: monospace; font-size: 15px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span></td>
-                                <td><b>{{ v.nombre_usuario }}</b><br><small>{{ v.trayecto|default('IDA') }}</small></td>
-                                <td>{{ v.conductor_asignado }}<br><small>{{ v.vehiculo_asignado }}</small></td>
-                                <td>{{ v.fecha_fin_real or 'N/D' }}</td>
-                                <td><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 Ver Reporte Cierre</button></td>
-                                <td>
-                                    <div style="display: flex; gap: 5px;">
-                                        <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST" style="display:inline;">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <input type="hidden" name="viaje_id" value="{{ v.id }}">
-                                            <input type="hidden" name="accion" value="aprobar_auditoria">
-                                            <button type="submit" class="btn-success" style="padding: 6px 10px; font-size: 11px;">✔️ Aprobar</button>
-                                        </form>
-                                        <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST" style="display:inline;">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <input type="hidden" name="viaje_id" value="{{ v.id }}">
-                                            <input type="hidden" name="accion" value="rechazar_auditoria">
-                                            <button type="button" class="btn-danger" style="padding: 6px 10px; font-size: 11px;" onclick="if(confirm('¿Seguro que desea rechazar las evidencias y devolver el viaje a estado ASIGNADO para corrección del conductor?')) this.form.submit();">✖️ Rechazar</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes pendientes de auditoría en este momento.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                {% if viajes_agrupados %}
+                    {% for padre, tramos in viajes_agrupados.items() %}
+                    <div class="table-card" style="border-left: 4px solid var(--verde); margin-bottom: 20px;">
+                        <div class="card-header" style="background: #eefcf9; color: var(--verde-osc); display: flex; justify-content: space-between; align-items: center;">
+                            <span>📦 <b>Paquete Integral</b> | Prescripción: {{ tramos[0].numero_prescripcion }} | Paciente: {{ tramos[0].nombre_usuario }}</span>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <span>Tramos a auditar: {{ tramos|length }}</span>
+                                <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST" style="display:inline; margin: 0;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <input type="hidden" name="id_viaje_padre" value="{{ padre }}">
+                                    <input type="hidden" name="accion" value="aprobar_paquete">
+                                    <button type="submit" class="btn-success" style="padding: 6px 12px; font-size: 12px; margin: 0;" onclick="return confirm('¿Está seguro de aprobar todo el paquete integral? Se generará el Sello SHA-256 definitivo.');">✔️ Aprobar Paquete Completo</button>
+                                </form>
+                            </div>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Trayecto / ID Viaje</th>
+                                    <th>Operador / Vehículo</th>
+                                    <th>Fecha Fin Real</th>
+                                    <th>Estado Actual</th>
+                                    <th>Evidencias (Reporte)</th>
+                                    <th>Acciones por Tramo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in tramos %}
+                                <tr>
+                                    <td>
+                                        <span class="badge {% if v.trayecto == 'IDA' %}badge-info{% else %}badge-purple{% endif %}">{{ v.trayecto|default('IDA') }}</span><br>
+                                        <span style="font-family: monospace; font-size: 13px; font-weight: bold; color: var(--text);">{{ v.id_viaje }}</span>
+                                    </td>
+                                    <td>{{ v.conductor_asignado }}<br><small>{{ v.vehiculo_asignado }}</small></td>
+                                    <td>{{ v.fecha_fin_real or 'N/D' }}</td>
+                                    <td>
+                                        {% if v.estatus_servicio == 'AUDITADO' %}
+                                            <span style="color: #10b981; font-weight: bold; font-size: 11px;">✔️ Auditado</span>
+                                        {% else %}
+                                            <span style="color: #f59e0b; font-weight: bold; font-size: 11px;">⏳ Pdte. Auditar</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if v.estatus_servicio == 'AUDITADO' %}
+                                            <button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf" style="background: #d1fae5; border-color: #10b981; color: #065f46;">📄 Ver Reporte Sellado</button>
+                                        {% else %}
+                                            <button type="button" class="btn-pdf"
+                                                data-idviaje="{{ v.id_viaje }}"
+                                                data-dir-ori="{{ v.direccion_origen|default('')|replace("'", "\\'") }}"
+                                                data-mun-ori="{{ v.municipio|default('')|replace("'", "\\'") }}"
+                                                data-dep-ori="{{ v.departamento|default('')|replace("'", "\\'") }}"
+                                                data-lat-ori="{{ v.lat_origen or 'NaN' }}"
+                                                data-lng-ori="{{ v.lng_origen or 'NaN' }}"
+                                                data-lat-ori-esp="{{ v.lat_origen_esperado or 'NaN' }}"
+                                                data-lng-ori-esp="{{ v.lng_origen_esperado or 'NaN' }}"
+                                                data-dir-des="{{ v.direccion_destino|default('')|replace("'", "\\'") }}"
+                                                data-mun-des="{{ v.municipio_destino|default('')|replace("'", "\\'") }}"
+                                                data-dep-des="{{ v.departamento_destino|default('')|replace("'", "\\'") }}"
+                                                data-lat-des="{{ v.lat_destino or 'NaN' }}"
+                                                data-lng-des="{{ v.lng_destino or 'NaN' }}"
+                                                data-lat-des-esp="{{ v.lat_destino_esperado or 'NaN' }}"
+                                                data-lng-des-esp="{{ v.lng_destino_esperado or 'NaN' }}"
+                                                data-tiempo-real="{{ v.tiempo_efectivo_minutos | default(0) }}"
+                                                data-firma="{{ v.firma }}"
+                                                data-pdf="{{ v.ruta_documento }}"
+                                                onclick="abrirModalAuditoria(this)">
+                                                📍 Auditar Geo-Firma
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if v.estatus_servicio == 'TERMINADO-PDTE AUDITAR' %}
+                                        <div style="display: flex; gap: 5px;">
+                                            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST" style="display:inline;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <input type="hidden" name="viaje_id" value="{{ v.id }}">
+                                                <input type="hidden" name="accion" value="rechazar_tramo">
+                                                <button type="button" class="btn-danger" style="padding: 6px 10px; font-size: 11px;" onclick="if(confirm('¿Seguro que desea rechazar las evidencias y devolver este tramo a estado ASIGNADO para corrección del conductor?')) this.form.submit();">✖️ Rechazar</button>
+                                            </form>
+                                        </div>
+                                        {% else %}
+                                            <span style="font-size: 11px; color: var(--text-muted);">Sin acciones</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="table-card" style="padding: 30px; text-align: center; color: var(--text-muted);">
+                        No hay paquetes de viajes integrales (Ida + Vuelta) completados y pendientes de auditoría en este momento.
+                    </div>
+                {% endif %}
 
             {% elif active_module == 'traslados_auditados' %}
-                <!-- ================= ETAPA 7: HISTORIAL AUDITADOS ================= -->
                 <div class="action-header">
                     <div class="action-title-group">
                         <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
@@ -658,7 +794,64 @@
         </div>
     </main>
 
-    <!-- ================= MODAL UNIVERSAL DE CONFIRMACIÓN (REGLA 1.2) ================= -->
+    <!-- ================= MODAL NUEVO CONTRATO ================= -->
+    <div id="modalNuevoContrato" class="modal-overlay">
+        <div class="modal-box" style="max-width: 600px; width: 95%;">
+            <div class="modal-header">
+                <h3>Registrar Nuevo Contrato 📄</h3>
+                <button class="close-btn" onclick="closeModal('modalNuevoContrato')">&times;</button>
+            </div>
+            <form action="{{ url_for('flotaespecial_eps.gestion_contratos') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="guardar_contrato">
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group"><label>Número de Contrato</label><input type="text" name="numero_contrato" required></div>
+                    <div class="form-group">
+                        <label>Categoría</label>
+                        <select name="categoria_contrato" required>
+                            <option value="">Seleccione...</option>
+                            <option value="SALUD_EPS">Servicio de Salud / EPS</option>
+                            <option value="ESCOLAR">Transporte Escolar</option>
+                            <option value="EMPRESARIAL">Transporte Empresarial</option>
+                            <option value="TURISMO">Turismo</option>
+                            <option value="GRUPO_ESPECIFICO">Grupo Específico</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <h4 style="color: var(--verde-osc); margin-top: 5px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">Datos del Contratante</h4>
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                    <div class="form-group"><label>Razón Social / Nombre</label><input type="text" name="contratante_nombre" required></div>
+                    <div class="form-group"><label>NIT / CC</label><input type="text" name="contratante_nit_cedula" required></div>
+                </div>
+
+                <h4 style="color: var(--verde-osc); margin-top: 5px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">Detalles del Servicio</h4>
+                <div class="form-group"><label>Objeto del Contrato</label><input type="text" name="objeto_contrato" required></div>
+                <div class="form-group"><label>Convenio Consorcio / UT (Opcional)</label><input type="text" name="convenio_colaboracion"></div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group"><label>Fecha Inicio</label><input type="date" name="fecha_inicio" required></div>
+                    <div class="form-group"><label>Fecha Vencimiento</label><input type="date" name="fecha_fin" required></div>
+                </div>
+
+                <h4 style="color: var(--verde-osc); margin-top: 5px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">Responsable del Contrato</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group"><label>Nombres y Apellidos</label><input type="text" name="responsable_nombre" required></div>
+                    <div class="form-group"><label>Número Cédula</label><input type="text" name="responsable_cedula" required></div>
+                    <div class="form-group"><label>Teléfono</label><input type="text" name="responsable_telefono" required></div>
+                    <div class="form-group"><label>Dirección</label><input type="text" name="responsable_direccion" required></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" onclick="closeModal('modalNuevoContrato')">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar Contrato</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL UNIVERSAL DE CONFIRMACIÓN ================= -->
     <div id="modalConfirmacionUniversal" class="modal-overlay" style="z-index: 9999;">
         <div class="modal-box" style="max-width: 400px; text-align: center;">
             <h3 class="modal-title" style="justify-content: center; color: var(--verde);">Confirmar Operación</h3>
@@ -670,67 +863,99 @@
         </div>
     </div>
 
-    <!-- ================= MODAL DE VERIFICACIÓN (INCLUYE ACOMPAÑANTE, ORIGEN Y DESTINO) ================= -->
+    <!-- ================= MODAL DE VERIFICACIÓN ================= -->
     <div id="modalRevisionVerificacion" class="modal-overlay">
-        <div class="modal-box" style="max-width: 600px; width: 95%;">
+        <div class="modal-box" style="max-width: 1000px; width: 95%; overflow: visible; padding: 30px;">
             <div class="modal-header">
-                <h3>Verificación Telefónica de Datos 📞</h3>
+                <h3>Verificación / Edición Telefónica de Datos 📞</h3>
                 <button class="close-btn" onclick="closeModal('modalRevisionVerificacion')">&times;</button>
             </div>
-            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" method="POST">
+            <form id="formVerificacion" action="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="editar_y_verificar">
+                <input type="hidden" name="accion" id="rev_accion" value="editar_y_verificar">
                 <input type="hidden" name="viaje_id" id="rev_traslado_id">
+                <input type="hidden" name="id_viaje_padre" id="rev_id_viaje_padre">
+                
+                <input type="hidden" name="lat_origen_esperado" id="lat_origen_esperado">
+                <input type="hidden" name="lng_origen_esperado" id="lng_origen_esperado">
+                <input type="hidden" name="lat_destino_esperado" id="lat_destino_esperado">
+                <input type="hidden" name="lng_destino_esperado" id="lng_destino_esperado">
 
                 <h4 style="color: var(--verde-osc); margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">Datos del Paciente</h4>
-                <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre_usuario" id="rev_nombre" required></div>
-                <div class="form-group"><label>Número Doc. (ID)</label><input type="text" name="id_usuario" id="rev_idusr" required></div>
-                <div class="form-group"><label>Teléfono Contacto</label><input type="text" name="telefono_usuario" id="rev_tel"></div>
-
-                <!-- SECCIÓN INYECTADA: DATOS DE ORIGEN -->
-                <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">📍 Datos de Origen</h4>
-                <div class="form-group">
-                    <label>Departamento Origen</label>
-                    <select name="departamento_origen" id="rev_dep_ori" onchange="cargarMunicipios('rev_dep_ori', 'rev_mun_ori')" required></select>
-                </div>
-                <div class="form-group">
-                    <label>Municipio Origen</label>
-                    <select name="municipio_origen" id="rev_mun_ori" required></select>
-                </div>
-                <div class="form-group">
-                    <label>Dirección Origen Exacta</label>
-                    <input type="text" name="direccion_origen" id="rev_ori" required>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group" style="grid-column: 1 / -1;"><label>Nombre Completo</label><input type="text" name="nombre_usuario" id="rev_nombre" required></div>
+                    <div class="form-group"><label>Número Doc. (ID)</label><input type="text" name="id_usuario" id="rev_idusr" required></div>
+                    <div class="form-group"><label>Teléfono Contacto</label><input type="text" name="telefono_usuario" id="rev_tel"></div>
                 </div>
 
-                <!-- SECCIÓN INYECTADA: DATOS DE DESTINO -->
-                <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">🏁 Datos de Destino</h4>
-                <div class="form-group">
-                    <label>Departamento Destino</label>
-                    <select name="departamento_destino" id="rev_dep_des" onchange="cargarMunicipios('rev_dep_des', 'rev_mun_des')" required></select>
-                </div>
-                <div class="form-group">
-                    <label>Municipio Destino</label>
-                    <select name="municipio_destino" id="rev_mun_des" required></select>
-                </div>
-                <div class="form-group">
-                    <label>Dirección Destino Exacta</label>
-                    <input type="text" name="direccion_destino" id="rev_des" required>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        <h4 style="color: var(--verde-osc); margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">📍 Origen</h4>
+                        <div class="form-group">
+                            <label>Departamento</label>
+                            <select name="departamento_origen" id="rev_dep_ori" onchange="cargarMunicipios('rev_dep_ori', 'rev_mun_ori')" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Municipio</label>
+                            <select name="municipio_origen" id="rev_mun_ori" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label style="color: var(--verde-osc);">📄 Dirección Actual</label>
+                            <input type="text" id="rev_ori_capturada" readonly style="background-color: #e2e8f0; color: #334155; font-weight: bold; border-color: #cbd5e1;">
+                        </div>
+                        <div class="form-group">
+                            <label>🔍 Buscar / Confirmar Dirección (Autocompletado o Búsqueda Libre)</label>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="text" name="direccion_origen" id="rev_ori" required placeholder="Digite dirección, barrio o punto de referencia..." style="flex-grow: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                                <button type="button" class="btn-info" onclick="forzarBusquedaGeo('rev_ori', 'rev_mun_ori', 'rev_dep_ori', mapVerifOri, markerVerifOri, 'lat_origen_esperado', 'lng_origen_esperado', 'alerta_ori')" style="border-radius: 8px; padding: 0 15px;">🔍 Buscar en Mapa</button>
+                            </div>
+                            <div id="alerta_ori" style="display:none; color: #ef4444; font-size: 11px; margin-top: 5px; font-weight: bold;"></div>
+                            <div id="mapVerificacionOri" style="height: 200px; border-radius: 8px; border: 1px solid var(--border); margin-top: 10px; width: 100%;"></div>
+                        </div>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        <h4 style="color: var(--verde-osc); margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">🏁 Destino</h4>
+                        <div class="form-group">
+                            <label>Departamento</label>
+                            <select name="departamento_destino" id="rev_dep_des" onchange="cargarMunicipios('rev_dep_des', 'rev_mun_des')" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Municipio</label>
+                            <select name="municipio_destino" id="rev_mun_des" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label style="color: var(--verde-osc);">📄 Dirección Actual</label>
+                            <input type="text" id="rev_des_capturada" readonly style="background-color: #e2e8f0; color: #334155; font-weight: bold; border-color: #cbd5e1;">
+                        </div>
+                        <div class="form-group">
+                            <label>🔍 Buscar / Confirmar Dirección (Autocompletado o Búsqueda Libre)</label>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="text" name="direccion_destino" id="rev_des" required placeholder="Digite dirección, barrio o punto de referencia..." style="flex-grow: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                                <button type="button" class="btn-info" onclick="forzarBusquedaGeo('rev_des', 'rev_mun_des', 'rev_dep_des', mapVerifDes, markerVerifDes, 'lat_destino_esperado', 'lng_destino_esperado', 'alerta_des')" style="border-radius: 8px; padding: 0 15px;">🔍 Buscar en Mapa</button>
+                            </div>
+                            <div id="alerta_des" style="display:none; color: #ef4444; font-size: 11px; margin-top: 5px; font-weight: bold;"></div>
+                            <div id="mapVerificacionDes" style="height: 200px; border-radius: 8px; border: 1px solid var(--border); margin-top: 10px; width: 100%;"></div>
+                        </div>
+                    </div>
                 </div>
 
-                <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">👥 Confirmación de Acompañante (Obligatorio preguntar)</h4>
+                <h4 style="color: var(--verde-osc); margin-top: 15px; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 5px;">👥 Confirmación de Acompañante</h4>
                 <div class="form-group">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #111827;">
                         <input type="checkbox" name="lleva_acompanante" id="rev_chk_acompanante" onchange="toggleRevAcompanante()" style="width: auto;"> 
                         Sí, el paciente viajará con acompañante
                     </label>
                 </div>
-                <div class="form-group div-rev-acompanante" style="display: none;">
-                    <label>Nombre Completo del Acompañante</label>
-                    <input type="text" name="nombre_acompanante" id="rev_nombre_acompanante">
-                </div>
-                <div class="form-group div-rev-acompanante" style="display: none;">
-                    <label>Cédula del Acompañante</label>
-                    <input type="text" name="cedula_acompanante" id="rev_cedula_acompanante">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group div-rev-acompanante" style="display: none;">
+                        <label>Nombre Completo del Acompañante</label>
+                        <input type="text" name="nombre_acompanante" id="rev_nombre_acompanante">
+                    </div>
+                    <div class="form-group div-rev-acompanante" style="display: none;">
+                        <label>Cédula del Acompañante</label>
+                        <input type="text" name="cedula_acompanante" id="rev_cedula_acompanante">
+                    </div>
                 </div>
 
                 <div class="modal-footer">
@@ -741,7 +966,7 @@
         </div>
     </div>
 
-    <!-- ================= MODAL PROGRAMACIÓN DINÁMICA (REGLAS DIÁLISIS / CASCADA) ================= -->
+    <!-- ================= MODAL PROGRAMACIÓN DINÁMICA ================= -->
     <div id="modalProgramacion" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
@@ -756,7 +981,6 @@
                 
                 <p style="font-size: 13px; margin-bottom: 15px;">Viaje ID: <b id="prog_alfa" style="font-family: monospace; color: var(--verde);"></b><br>Paciente: <span id="prog_paciente"></span></p>
                 
-                <!-- DEFINICIÓN INICIAL DEL TIPO DE PROCEDIMIENTO -->
                 <div class="form-group" style="border-bottom: 1px solid var(--border); padding-bottom: 15px;">
                     <label style="color: #ef4444;">1. Seleccione el Tipo de Servicio (Obligatorio)</label>
                     <select name="tipo_servicio" id="select_tipo_servicio" onchange="adaptarModalProgramacion()" required>
@@ -766,7 +990,6 @@
                     </select>
                 </div>
 
-                <!-- SECCIÓN DINÁMICA: DIÁLISIS -->
                 <div id="seccion_dialisis" style="display: none;">
                     <div class="form-group">
                         <label>2. Seleccione el Turno de Diálisis (Autoprogramación)</label>
@@ -778,7 +1001,6 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN DINÁMICA: CITAS Y FRECUENCIAS (SOLO SI HAY > 1 VIAJE) -->
                 <div id="seccion_frecuencias" style="display: none;">
                     <div class="form-group">
                         <label>2. Frecuencia de Repetición (Cascada Automática)</label>
@@ -797,7 +1019,6 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN COMÚN DE FECHA Y HORA -->
                 <div id="seccion_fecha_hora" style="display: none;">
                     <div class="form-group">
                         <label>3. Fecha de Inicio del (Primer) Viaje</label>
@@ -819,22 +1040,44 @@
         </div>
     </div>
 
-    <!-- ================= MODAL ASIGNACIÓN Y FUEC ================= -->
+    <!-- ================= MODAL ASIGNACIÓN Y RESOLUCIÓN ================= -->
     <div id="modalAsignacionFlota" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>Generar FUEC y Asignar 🚐</h3>
+                <h3 id="tituloModalAsignacion">Generar FUEC y Asignar 🚐</h3>
                 <button class="close-btn" onclick="closeModal('modalAsignacionFlota')">&times;</button>
             </div>
-            <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" method="POST">
+            <form id="formAsignacionFlota" action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="asignar_flota">
+                <input type="hidden" name="accion" id="asig_accion_type" value="asignar_flota">
                 <input type="hidden" name="viaje_id" id="asig_flota_viaje_id">
+                <input type="hidden" name="tipo_novedad" id="asig_tipo_novedad">
                 
                 <p style="font-size: 13px; margin-bottom: 15px;">Viaje ID: <b id="asig_flota_alfa" style="font-family: monospace; color: var(--verde);"></b><br>Paciente: <span id="asig_flota_paciente"></span></p>
                 
+                <div id="boxLiquidacionManual" style="display: none; background: #fffbeb; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <h4 style="color: #b45309; font-size: 13px; margin-bottom: 10px;">Liquidación Vehículo Averiado</h4>
+                    <p style="font-size: 11px; color: #92400e; margin-bottom: 10px;">Indique el valor a reconocer al vehículo que sufrió el percance por el trayecto recorrido antes de la novedad.</p>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Monto Liquidación Parcial ($)</label>
+                        <input type="number" name="monto_liquidacion_manual" id="monto_liquidacion_manual" min="0" placeholder="Ej: 45000">
+                    </div>
+                </div>
+
                 <div class="form-group">
-                    <label>Seleccionar Vehículo (Placa)</label>
+                    <label>Seleccionar Contrato Activo (Para FUEC)</label>
+                    <select name="contrato_id" required>
+                        <option value="">Seleccione contrato vigente...</option>
+                        {% if contratos is defined %}
+                            {% for c in contratos %}
+                            <option value="{{ c.id }}">{{ c.numero_contrato }} - {{ c.contratante_nombre }} ({{ c.categoria_contrato }})</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Seleccionar Vehículo</label>
                     <select name="vehiculo" required>
                         <option value="">Seleccione vehículo...</option>
                         {% if vehiculos is defined %}
@@ -845,7 +1088,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Seleccionar Conductor (App Móvil)</label>
+                    <label>Seleccionar Conductor</label>
                     <select name="conductor" required>
                         <option value="">Seleccione conductor...</option>
                         {% if conductores is defined %}
@@ -856,46 +1099,122 @@
                     </select>
                 </div>
                 
-                <p style="font-size: 11px; color: #ef4444; font-weight: bold; margin-top: 10px;">⚠️ SISTEMA DE PREVENCIÓN ACTIVO: Se verificará que SOAT, RTM y Licencias estén vigentes. Si hay vencimientos, se abortará el proceso.</p>
-                <p style="font-size: 11px; color: #10b981; font-weight: bold; margin-top: 5px;">✔️ NOTIFICACIÓN TELEGRAM: Se enviará el PDF oficial del FUEC al Telegram del conductor al finalizar.</p>
-                
+                <p style="font-size: 11px; color: #ef4444; font-weight: bold; margin-top: 10px;">⚠️ SISTEMA DE PREVENCIÓN ACTIVO: Se verificará que SOAT, RTM y Licencias estén vigentes.</p>
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalAsignacionFlota')">Cancelar</button><button type="submit" class="btn-primary" style="background: #10b981;">Validar y Generar FUEC</button></div>
             </form>
         </div>
     </div>
 
+    <!-- ================= MODAL DETALLE DE NOVEDAD ================= -->
+    <div id="modalDetalleNovedad" class="modal-overlay">
+        <div class="modal-box" style="max-width: 450px;">
+            <div class="modal-header" style="border-bottom: 1px solid #fee2e2; padding-bottom: 10px;">
+                <h3 style="color: #ef4444; margin: 0;">🚨 Detalle de Novedad</h3>
+                <button class="close-btn" onclick="closeModal('modalDetalleNovedad')">&times;</button>
+            </div>
+            
+            <div style="text-align: left; margin-top: 15px;">
+                <p style="font-size: 13px; margin-bottom: 8px;"><b>Tipo:</b> <span id="det_tipo_nov" style="color: #ef4444; font-weight: bold;"></span></p>
+                <p style="font-size: 13px; margin-bottom: 8px;"><b>Vehículo Afectado:</b> <span id="det_veh_nov"></span></p>
+                <p style="font-size: 13px; margin-bottom: 15px;"><b>Operador:</b> <span id="det_op_nov"></span></p>
+                
+                <label style="font-size: 12px; font-weight: bold; color: var(--text-muted);">Descripción Reportada por el Operador:</label>
+                <div id="det_desc_nov" style="background: #f9fafb; border: 1px solid var(--border); padding: 12px; border-radius: 8px; font-size: 13px; color: var(--text); min-height: 60px; margin-top: 5px;"></div>
+            </div>
+
+            <div class="modal-footer" style="border-top: none; justify-content: center; margin-top: 25px;">
+                <button type="button" class="btn-primary" id="btnIrAResolver" style="background: #ef4444; width: 100%;">⚡ Iniciar Resolución / Reasignar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MODAL AUDITORÍA GEOESPACIAL INTERACTIVO ================= -->
+    <div id="modalAuditoriaGeo" class="modal-overlay">
+        <div class="modal-box" style="max-width: 900px; width: 95%;">
+            <div class="modal-header">
+                <h3>Auditoría Geoespacial y Evidencias 📍</h3>
+                <button class="close-btn" onclick="closeModal('modalAuditoriaGeo')">&times;</button>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+                <button id="tabGeoOri" class="btn-primary" style="background: var(--verde);" onclick="switchGeoTab('origen')">📍 Punto 1: Recogida (Origen)</button>
+                <button id="tabGeoDes" class="btn-cancel" style="margin-top:0;" onclick="switchGeoTab('destino')">🏁 Punto 2: Llegada (Destino)</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px;">
+                <div>
+                    <h4 style="color: var(--verde-osc); margin-bottom: 5px; font-size: 14px;">Trazabilidad GPS (Modificable)</h4>
+                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                        <input type="text" id="inputGeoSearch" style="flex-grow: 1; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px;" placeholder="Dirección a buscar...">
+                        <button type="button" class="btn-info" id="btnRecalcularGeo" onclick="buscarDireccionManual()" style="padding: 8px 12px;">🔍 Recalcular</button>
+                    </div>
+                    
+                    <div id="mapAuditoria" style="height: 300px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; z-index: 1;"></div>
+                    
+                    <div id="panelMetricasAuditoria" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+                        <div id="kpiDistancia" style="background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Precisión Geográfica</div>
+                            <div id="valDistancia" style="font-size: 22px; font-weight: bold; color: #4b5563; margin: 8px 0;">Calculando...</div>
+                            <div id="msgDistancia" style="font-size: 11px; color: #6b7280;">Buscando punto de referencia</div>
+                        </div>
+                        <div id="kpiTiempo" style="background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Desviación de Tiempo</div>
+                            <div id="valTiempo" style="font-size: 14px; font-weight: bold; color: #4b5563; margin: 8px 0;">Calculando...</div>
+                            <div id="msgTiempo" style="font-size: 11px; color: #6b7280;">Consultando ruta vial</div>
+                        </div>
+                    </div>
+                    
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <h4 style="color: var(--verde-osc); margin-bottom: 10px; font-size: 14px;">Firma de Conformidad</h4>
+                    <div style="flex-grow: 1; border: 1px dashed var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f9fafb; overflow: hidden; padding: 10px; min-height: 150px;">
+                        <img id="imgFirmaAuditoria" src="" alt="Sin firma" style="max-width: 100%; max-height: 180px; display: none;">
+                        <span id="txtSinFirma" style="color: var(--text-muted); font-size: 12px;">Firma no disponible</span>
+                    </div>
+                    <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
+                        <button type="button" id="btnVerPDFAuditoria" class="btn-info" style="width: 100%; padding: 12px; font-size: 13px;">📄 Ver/Descargar PDF Oficial</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 20px;">
+                <p style="font-size: 11px; color: var(--text-muted); flex-grow: 1; margin: 0; align-self: center;">Cierre este panel para Aprobar o Rechazar el tramo en la tabla principal.</p>
+                <button type="button" class="btn-cancel" onclick="closeModal('modalAuditoriaGeo')">Cerrar Panel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= DICCIONARIO Y LÓGICA JAVASCRIPT INTEGRAL ================= -->
     <script>
-        // ================= DICCIONARIO DIVIPOLA: DEPARTAMENTOS Y MUNICIPIOS =================
         const divipolaColombia = {
             "AMAZONAS": ["LETICIA", "PUERTO NARIÑO", "EL ENCANTO", "LA CHORRERA", "LA PEDRERA", "MIRITI - PARANA", "PUERTO ALEGRIA", "PUERTO ARICA", "PUERTO SANTANDER", "TARAPACA"],
-            "ANTIOQUIA": ["MEDELLIN", "ABEJORRAL", "ABRIAQUI", "ALEJANDRIA", "AMAGA", "AMALFI", "ANDES", "ANGELOPOLIS", "ANGOSTURA", "ANORI", "SANTAFE DE ANTIOQUIA", "ANZA", "APARTADO", "ARBOLETES", "ARGELIA", "ARMENIA", "BARBOSA", "BELMIRA", "BELLO", "BETANIA", "BETULIA", "CIUDAD BOLIVAR", "BRICEÑO", "BURITICA", "CACERES", "CAICEDO", "CALDAS", "CAMPAMENTO", "CAÑASGORDAS", "CARACOLI", "CARAMANTA", "CAREPA", "EL CARMEN DE VIBORAL", "CAROLINA", "CAUCASIA", "CHIGORODO", "CISNEROS", "COCORNA", "CONCEPCION", "CONCORDIA", "COPACABANA", "DABEIBA", "DONMATIAS", "EBEJICO", "EL BAGRE", "ENTRERRIOS", "ENVIGADO", "FREDONIA", "FRONTINO", "GIRALDO", "GIRARDOTA", "GOMEZ PLATA", "GRANADA", "GUADALUPE", "GUARNE", "GUATAPE", "HELICONIA", "HISPANIA", "ITAGUI", "ITUANGO", "JARDIN", "JERICO", "LA CEJA", "LA ESTRELLA", "LA PINTADA", "LA UNION", "LIBORINA", "MACEO", "MARINILLA", "MONTEBELLO", "MURINDO", "MUTATA", "NARIÑO", "NECOCLI", "NECHI", "OLAYA", "PEÑOL", "PEQUE", "PUEBLORRICO", "PUERTO BERRIO", "PUERTO NARE", "PUERTO TRIUNFO", "REMEDIOS", "RETIRO", "RIONEGRO", "SABANALARGA", "SABANETA", "SALGAR", "SAN ANDRES DE CUERQUIA", "SAN CARLOS", "SAN FRANCISCO", "SAN JERONIMO", "SAN JOSE DE LA MONTAÑA", "SAN JUAN DE URABA", "SAN LUIS", "SAN PEDRO DE LOS MILAGROS", "SAN PEDRO DE URABA", "SAN RAFAEL", "SAN ROQUE", "SAN VICENTE FERRER", "SANTA BARBARA", "SANTA ROSA DE OSOS", "SANTO DOMINGO", "EL SANTUARIO", "SEGOVIA", "SONSON", "SOPETRAN", "TAMESIS", "TARAZA", "TARSO", "TITIRIBI", "TOLEDO", "TURBO", "URAMITA", "URRAO", "VALDIVIA", "VALPARAISO", "VEGACHI", "VENECIA", "VIGIA DEL FUERTE", "YALI", "YARUMAL", "YOLOMBO", "YONDO", "ZARAGOZA"],
+            "ANTIOQUIA": ["MEDELLIN", "ABEJORRAL", "ABRIAQUI", "ALEJANDRIA", "AMAGA", "AMALFI", "ANDES", "ANGELOPOLIS", "ANGOSTURA", "ANORI", "SANTAFE DE ANTIOQUIA", "ANZA", "APARTADO", "ARBOLEDES", "ARGELIA", "ARMENIA", "BARBOSA", "BELMIRA", "BELLO", "BETANIA", "BETULIA", "CIUDAD BOLIVAR", "BRICEÑO", "BURITICA", "CACERES", "CAICEDO", "CALDAS", "CAMPAMENTO", "CAÑASGORDAS", "CARACOLI", "CARAMANTA", "CAREPA", "EL CARMEN DE VIBORAL", "CAROLINA", "CAUCASIA", "CHIGORODO", "CISNEROS", "COCORNA", "CONCEPCION", "CONCORDIA", "COPACABANA", "DABEIBA", "DONMATIAS", "EBEJICO", "EL BAGRE", "ENTRERRIOS", "ENVIGADO", "FREDONIA", "FRONTINO", "GIRALDO", "GIRARDOTA", "GOMEZ PLATA", "GRANADA", "GUADALUPE", "GUARNE", "GUATAPE", "HELICONIA", "HISPANIA", "ITAGUI", "ITUANGO", "JARDIN", "JERICO", "LA CEJA", "LA ESTRELLA", "LA PINTADA", "LA UNION", "LIBORINA", "MACEO", "MARINILLA", "MONTEBELLO", "MURINDO", "MUTATA", "NARIÑO", "NECOCLI", "NECHI", "OLAYA", "PEÑOL", "PEQUE", "PUEBLORRICO", "PUERTO BERRIO", "PUERTO NARE", "PUERTO TRIUNFO", "REMEDIOS", "RETIRO", "RIONEGRO", "SABANALARGA", "SABANETA", "SALGAR", "SAN ANDRES DE CUERQUIA", "SAN CARLOS", "SAN FRANCISCO", "SAN JERONIMO", "SAN JOSE DE LA MONTAÑA", "SAN JUAN DE URABA", "SAN LUIS", "SAN PEDRO DE LOS MILAGROS", "SAN PEDRO DE URABA", "SAN RAFAEL", "SAN ROQUE", "SAN VICENTE FERRER", "SANTA BARBARA", "SANTA ROSA DE OSOS", "SANTO DOMINGO", "EL SANTUARIO", "SEGOVIA", "SONSON", "SOPETRAN", "TAMESIS", "TARAZA", "TARSO", "TITIRIBI", "TOLEDO", "TURBO", "URAMITA", "URRAO", "VALDIVIA", "VALPARAISO", "VEGACHI", "VENECIA", "VIGIA DEL FUERTE", "YALI", "YARUMAL", "YOLOMBO", "YONDO", "ZARAGOZA"],
             "ARAUCA": ["ARAUCA", "ARAUQUITA", "CRAVO NORTE", "FORTUL", "PUERTO RONDON", "SARAVENA", "TAME"],
             "ATLANTICO": ["BARRANQUILLA", "BARANOA", "CAMPO DE LA CRUZ", "CANDELARIA", "GALAPA", "JUAN DE ACOSTA", "LURUACO", "MALAMBO", "MANATI", "PALMAR DE VARELA", "PIOJO", "POLONUEVO", "PONEDERA", "PUERTO COLOMBIA", "REPELON", "SABANAGRANDE", "SABANALARGA", "SANTA LUCIA", "SANTO TOMAS", "SOLEDAD", "SUAN", "TUBARA", "USIACURI"],
             "BOGOTA D.C.": ["BOGOTA, D.C."],
             "BOLIVAR": ["CARTAGENA DE INDIAS", "ACHI", "ALTOS DEL ROSARIO", "ARENAL", "ARJONA", "ARROYOHONDO", "BARRANCO DE LOBA", "CALAMAR", "CANTAGALLO", "CICUCO", "CORDOBA", "CLEMENCIA", "EL CARMEN DE BOLIVAR", "EL GUAMO", "EL PEÑON", "HATILLO DE LOBA", "MAGANGUE", "MAHATES", "MARGARITA", "MARIA LA BAJA", "MONTECRISTO", "MOMPOS", "MORALES", "NOROSI", "PINILLOS", "REGIDOR", "RIO VIEJO", "SAN CRISTOBAL", "SAN ESTANISLAO", "SAN FERNANDO", "SAN JACINTO", "SAN JACINTO DEL CAUCA", "SAN JUAN NEPOMUCENO", "SAN MARTIN DE LOBA", "SAN PABLO", "SANTA CATALINA", "SANTA ROSA", "SANTA ROSA DEL SUR", "SIMITI", "SOPLAVIENTO", "TALAIGUA NUEVO", "TIQUISIO", "TURBACO", "TURBANA", "VILLANUEVA", "ZAMBRANO"],
-            "BOYACA": ["TUNJA", "ALMEIDA", "AQUITANIA", "ARCABUCO", "BELEN", "BERBEO", "BETEITIVA", "BOAVITA", "BOYACA", "BRICEÑO", "BUENAVISTA", "BUSBANZA", "CALDAS", "CAMPOHERMOSO", "CERINZA", "CHINAVITA", "CHIQUINQUIRA", "CHISCAS", "CHITA", "CHITARAQUE", "CHIVATA", "CIENEGA", "COMBITA", "COPER", "CORRALES", "COVARACHIA", "CUBARA", "CUCAITA", "CUITIVA", "CHIQUIZA", "CHIVOR", "DUITAMA", "EL COCUY", "EL ESPINO", "FIRAVITOBA", "FLORESTA", "GACHANTIVA", "GAMEZA", "GARAGOA", "GUACAMAYAS", "GUATEQUE", "GUAYATA", "GsICAN", "IZA", "JENESANO", "JERICO", "LABRANZAGRANDE", "LA CAPILLA", "LA VICTORIA", "LA UVITA", "VILLA DE LEYVA", "MACANAL", "MARIPI", "MIRAFLORES", "MONGUA", "MONGUI", "MONIQUIRA", "MOTAVITA", "MUZO", "NOBSA", "NUEVO COLON", "OICATA", "OTANCHE", "PACHAVITA", "PAEZ", "PAIPA", "PAJARITO", "PANQUEBA", "PAUNA", "PAYA", "PAZ DE RIO", "PESCA", "PISBA", "PUERTO BOYACA", "QUIPAMA", "RAMIRIQUI", "RAQUIRA", "RONDON", "SABOYA", "SACHICA", "SAMACA", "SAN EDUARDO", "SAN JOSE DE PARE", "SAN LUIS DE GACENO", "SAN MATEO", "SAN MIGUEL DE SEMA", "SAN PEDRO DE IGUAQUE", "SANTA MARIA", "SANTA ROSA DE VITERBO", "SANTA SOFIA", "SANTANA", "SATIVANORTE", "SATIVASUR", "SOATA", "SOCOTA", "SOCHA", "SOGAMOSO", "SOMONDOCO", "SORA", "SOTAQUIRA", "SORACA", "SUSACON", "SUTAMARCHAN", "SUTATENZA", "TASCO", "TEORAMA", "TIBANÁ", "TIBASOSA", "TINJACA", "TIPACOQUE", "TOCA", "TOGsI", "TOPAGA", "TOTA", "TUNUNGUA", "TURMEQUE", "TUTA", "TUTAZA", "UMBITA", "VENTAQUEMADA", "VIRACACHA", "ZETAQUIRA"],
+            "BOYACA": ["TUNJA", "ALMEIDA", "AQUITANIA", "ARCABUCO", "BELEN", "BERBEO", "BETEITIVA", "BOAVITA", "BOYACA", "BRICEÑO", "BUENAVISTA", "BUSBANZA", "CALDAS", "CAMPOHERMOSO", "CERINZA", "CHINAVITA", "CHIQUINQUIRA", "CHISCAS", "CHITA", "CHITARAQUE", "CHIVATA", "CIENEGA", "COMBITA", "COPER", "CORRALES", "COVARACHIA", "CUBARA", "CUCAITA", "CUITIVA", "CHIQUIZA", "CHIVOR", "DUITAMA", "EL COCUY", "EL ESPINO", "FIRAVITOBA", "FLORESTA", "GACHANTIVA", "GAMEZA", "GARAGOA", "GUACAMAYAS", "GUATEQUE", "GUAYATA", "GUICAN", "IZA", "JENESANO", "JERICO", "LABRANZAGRANDE", "LA CAPILLA", "LA VICTORIA", "LA UVITA", "VILLA DE LEYVA", "MACANAL", "MARIPI", "MIRAFLORES", "MONGUA", "MONGUI", "MONIQUIRA", "MOTAVITA", "MUZO", "NOBSA", "NUEVO COLON", "OICATA", "OTANCHE", "PACHAVITA", "PAEZ", "PAIPA", "PAJARITO", "PANQUEBA", "PAUNA", "PAYA", "PAZ DE RIO", "PESCA", "PISBA", "PUERTO BOYACA", "QUIPAMA", "RAMIRIQUI", "RAQUIRA", "RONDON", "SABOYA", "SACHICA", "SAMACA", "SAN EDUARDO", "SAN JOSE DE PARE", "SAN LUIS DE GACENO", "SAN MATEO", "SAN MIGUEL DE SEMA", "SAN PEDRO DE IGUAQUE", "SANTA MARIA", "SANTA ROSA DE VITERBO", "SANTA SOFIA", "SANTANA", "SATIVANORTE", "SATIVASUR", "SOATA", "SOCOTA", "SOCHA", "SOGAMOSO", "SOMONDOCO", "SORA", "SOTAQUIRA", "SORACA", "SUSACON", "SUTAMARCHAN", "SUTATENZA", "TASCO", "TEORAMA", "TIBANÁ", "TIBASOSA", "TINJACA", "TIPACOQUE", "TOCA", "TOGUI", "TOPAGA", "TOTA", "TUNUNGUA", "TURMEQUE", "TUTA", "TUTAZA", "UMBITA", "VENTAQUEMADA", "VIRACACHA", "ZETAQUIRA"],
             "CALDAS": ["MANIZALES", "AGUADAS", "ANSERMA", "ARANZAZU", "BELALCAZAR", "CHINCHINA", "FILADELFIA", "LA DORADA", "LA MERCED", "MANZANARES", "MARMATO", "MARQUETALIA", "MARULANDA", "NEIRA", "NORCASIA", "PACORA", "PALESTINA", "PENSILVANIA", "RIOSUCIO", "RISARALDA", "SALAMINA", "SAMANA", "SAN JOSE", "SUPIA", "VICTORIA", "VILLAMARIA", "VITERBO"],
             "CAQUETA": ["FLORENCIA", "ALBANIA", "BELEN DE LOS ANDAQUIES", "CARTAGENA DEL CHAIRA", "CURILLO", "EL ELDON", "EL PAUTIL", "LA MONTAÑITA", "MILAN", "MORELIA", "PUERTO RICO", "SAN JOSE DEL FRAGUA", "SAN VICENTE DEL CAGUAN", "SOLANO", "SOLITA", "VALPARAISO"],
             "CASANARE": ["YOPAL", "AGUAZUL", "CHAMEZA", "HATO COROZAL", "LA SALINA", "MANI", "MONTERREY", "NUNCHIA", "OROCUE", "PAZ DE ARIPORO", "PORE", "RECETOR", "SABANALARGA", "SACAMA", "SAN LUIS DE PALENQUE", "TAMARA", "TAURAMENA", "TRINIDAD", "VILLANUEVA"],
-            "CAUCA": ["POPAYAN", "ALMAGUER", "ARGELIA", "BALBOA", "BOLIVAR", "BUENOS AIRES", "CAJIBIO", "CALDono", "CALOTO", "CORINTO", "EL TAMBO", "FLORENCIA", "GUACHENE", "GUAPI", "INZA", "JAMBALO", "LA SIERRA", "LA VEGA", "LOPEZ DE MICAY", "MERCADERES", "MIRANDA", "MORALES", "PADILLA", "PAEZ", "PATIA", "PIAMONTE", "PIENDAMO", "PUERTO TEJADA", "PURACE", "ROSAS", "SAN SEBASTIAN", "SANTANDER DE QUILICHAO", "SANTA ROSA", "SILVIA", "SOTARA", "SUAREZ", "SUCRE", "TIMBIO", "TIMBIQUI", "TORIBIO", "TOTORO", "VILLA RICA"],
+            "CAUCA": ["POPAYAN", "ALMAGUER", "ARGELIA", "BALBOA", "BOLIVAR", "BUENOS AIRES", "CAJIBIO", "CALDONO", "CALOTO", "CORINTO", "EL TAMBO", "FLORENCIA", "GUACHENE", "GUAPI", "INZA", "JAMBALO", "LA SIERRA", "LA VEGA", "LOPEZ DE MICAY", "MERCADERES", "MIRANDA", "MORALES", "PADILLA", "PAEZ", "PATIA", "PIAMONTE", "PIENDAMO", "PUERTO TEJADA", "PURACE", "ROSAS", "SAN SEBASTIAN", "SANTANDER DE QUILICHAO", "SANTA ROSA", "SILVIA", "SOTARA", "SUAREZ", "SUCRE", "TIMBIO", "TIMBIQUI", "TORIBIO", "TOTORO", "VILLA RICA"],
             "CESAR": ["VALLEDUPAR", "AGUACHICA", "AGUSTIN CODAZZI", "ASTREA", "BECERRIL", "BOSCONIA", "CHIMICHAGUA", "CHIRIGUANA", "CURUMANI", "EL COPEY", "EL PASO", "GAMARRA", "GONZALEZ", "LA GLORIA", "LA JAGUA DE IBIRICO", "MANAURE BALCON DEL CESAR", "PAILITAS", "PELAYA", "PUEBLO BELLO", "RIO DE ORO", "LA PAZ", "SAN ALBERTO", "SAN DIEGO", "SAN MARTIN", "TAMALAMEQUE"],
-            "CHOCO": ["QUIBDO", "ACANDI", "ALTO BAUDO", "BAGADO", "BAHIA SOLANO", "BAJO BAUDO", "BOJAYA", "EL CANTON DEL SAN PABLO", "CARMEN DEL DARIEN", "CERTEGUI", "CONDOTO", "EL CARMEN DE ATRATO", "EL LITORAL DEL SAN JUAN", "ISTMINA", "JURADO", "LLORO", "MEDIO ATRATO", "MEDIO BAUDO", "MEDIO SAN JUAN", "NOVITA", "NUQUI", "RACIOPARADO", "RIO IRO", "RIO QUITO", "RIOSUCIO", "SAN JOSE DEL PALMAR", "SIPÍ", "TADO", "UNGUIA", "UNION PANAMERICANA"],
-            "CORDOBA": ["MONTERIA", "AYAPEL", "BUENAVISTA", "CANALETE", "CERETE", "CHIMA", "CHINU", "CIENAGA DE ORO", "COTECOR", "LA APARTADA", "LORICA", "LOS CORDOBAS", "MOMIL", "MONTELIBANO", "MONTERIA", "MOÑITOS", "PLANETA RICA", "PUEBLO NUEVO", "PUERTO ESCONDIDO", "PUERTO LIBERTADOR", "PURISSIMA DE LA CONCEPCION", "SAHAGUN", "SAN ANDRES DE SOTAVENTO", "SAN ANTERO", "SAN BERNARDO DEL VIENTO", "SAN CARLOS", "SAN JOSE DE URE", "SAN PELAYO", "TIERRALTA", "TUCHIN", "VALENCIA"],
+            "CHOCO": ["QUIBDO", "ACANDI", "ALTO BAUDO", "BAGADO", "BAHIA SOLANO", "BAJO BAUDO", "BOJAYA", "EL CANTON DEL SAN PABLO", "CARMEN DEL DARIEN", "CERTEGUI", "CONDOTO", "EL CARMEN DE ATRATO", "EL LITORAL DEL SAN JUAN", "ISTMINA", "JURADO", "LLORO", "MEDIO ATRATO", "MEDIO BAUDO", "MEDIO SAN JUAN", "NOVITA", "NUQUI", "RACIOPARADO", "RIO IRO", "RIO QUITO", "RIOSUCIO", "SAN JOSE DEL PALMAR", "SIPI", "TADO", "UNGUIA", "UNION PANAMERICANA"],
+            "CORDOBA": ["MONTERIA", "AYAPEL", "BUENAVISTA", "CANALETE", "CERETE", "CHIMA", "CHINU", "CIENAGA DE ORO", "COTECOR", "LA APARTADA", "LORICA", "LOS CORDOBAS", "MOMIL", "MONTELIBANO", "MOÑITOS", "PLANETA RICA", "PUEBLO NUEVO", "PUERTO ESCONDIDO", "PUERTO LIBERTADOR", "PURISSIMA DE LA CONCEPCION", "SAHAGUN", "SAN ANDRES DE SOTAVENTO", "SAN ANTERO", "SAN BERNARDO DEL VIENTO", "SAN CARLOS", "SAN JOSE DE URE", "SAN PELAYO", "TIERRALTA", "TUCHIN", "VALENCIA"],
             "CUNDINAMARCA": ["BOGOTA", "AGUA DE DIOS", "ALBAN", "ANAPOIMA", "ANOLAIMA", "ARBELAEZ", "BELTRAN", "BITUIMA", "BOJACA", "CABRERA", "CACHIPAY", "CAJICA", "CAPARRAPI", "CAQUEZA", "CARMEN DE CARUPA", "CHAGUANI", "CHIA", "CHIPAQUE", "CHOACHI", "CHOCONTA", "COGUA", "COTEBA", "CUCUNUBA", "EL COLEGIO", "EL PEÑON", "EL ROSAL", "FACATATIVA", "FOMEQUE", "FOSCA", "FUNZA", "FUQUENE", "FUSAGASUGA", "GACHALA", "GACHANCIPA", "GACHETA", "GIRARDOT", "GRANADA", "GUACHETA", "GUADUAS", "GUASCA", "GUATAVITA", "GUAYABAL DE SIQUIMA", "GUAYABETAL", "GUTIERREZ", "JERUSALEN", "JUNIN", "LA CALERA", "LA MESA", "LA PALMA", "LA PEÑA", "LA VEGA", "LENGUAZAQUE", "MACHETA", "MADRID", "MANTA", "MEDINA", "MOSQUERA", "NARIÑO", "NEMOCON", "NILO", "NIMAIMA", "NOCAIMA", "VENECIA", "PACHO", "PAIME", "PANDI", "PARATEBUENO", "PASCA", "PUERTO SALGAR", "PULI", "QUEBRADANEGRA", "QUETAME", "QUIPILE", "APULO", "RICAURTE", "SAN ANTONIO DEL TEQUENDAMA", "SAN BERNARDO", "SAN CAYETANO", "SAN FRANCISCO", "SAN JUAN DE RIOSECO", "SOTATA", "SOACHA", "SOPO", "SUBACHOQUE", "SUESCA", "SUPATA", "SUSA", "SUTATAUSA", "TABIO", "TAUSA", "TENA", "TENJO", "TIBACUY", "TIBIRITA", "TOCAIMA", "TOCANCIPA", "TOPAIPI", "UBALA", "UBAQUE", "VILLA DE SAN DIEGO DE UBATE", "UNE", "UTICA", "VERGARA", "VIANI", "VILLAGOMEZ", "VILLAPINZON", "VILLETA", "VIOTA", "YACOPI", "YAPO", "ZIPACON", "ZIPAQUIRA"],
             "GUAVIARE": ["SAN JOSE DEL GUAVIARE", "CALAMAR", "EL RETORNO", "MIRAFLORES"],
             "HUILA": ["NEIVA", "ACEVEDO", "AGRADO", "AIPE", "ALGECIRAS", "ALTAMIRA", "BARAYA", "CAMPOALEGRE", "COLOMBIA", "ELIAS", "GARZON", "GIGANTE", "GUADALUPE", "HOBO", "IQUIRA", "ISNOS", "LA ARGENTINA", "LA PLATA", "NATAGA", "OPORAPA", "PAICOL", "PALERMO", "PALESTINA", "PITAL", "PITALITO", "RIVERA", "SALADOBLANCO", "SAN AGUSTIN", "SANTA MARIA", "SUAZA", "TARQUI", "TESALIA", "TELLO", "TERUEL", "TIMANA", "VILLAVIEJA", "YAGUARA"],
             "LA GUAJIRA": ["RIOHACHA", "ALBANIA", "BARRANCAS", "DIBULLA", "DISTRACCION", "EL MOLINO", "FONSECA", "HATONUEVO", "LA JAGUA DEL PILAR", "MAICAO", "MANAURE", "SAN JUAN DEL CESAR", "URIBIA", "URUMITA", "VILLANUEVA"],
             "MAGDALENA": ["SANTA MARTA", "ALGARROBO", "ARACATACA", "ARIGUANI", "CERRO DE SAN ANTONIO", "CHIBOLO", "CIENAGA", "CONCORDIA", "EL BANCO", "EL PIÑON", "EL RETEN", "FUNDACION", "GUAMAL", "NUEVA GRANADA", "PEDRAZA", "PIJIÑO DEL CARMEN", "PIVIJAY", "PLAATO", "PUEBLOVIEJO", "REMOLINO", "SABANAS DE SAN ANGEL", "SALAMINA", "SAN ZENON", "SAN SEBASTIAN DE BUENAVISTA", "SANTA ANA", "SANTA BARBARA DE PINTO", "SITIONUEVO", "TENERIFE", "ZAPAYAN", "ZONA BANANERA"],
             "META": ["VILLAVICENCIO", "ACACIAS", "BARRANCA DE UPÍA", "CABUYARO", "CASTILLA LA NUEVA", "CUBARRAL", "CUMARAL", "EL CALVARIO", "EL CASTILLO", "EL DORADO", "FUENTE DE ORO", "GRANADA", "GUAMAL", "MAPIRIPAN", "MESETAS", "LA MACARENA", "URIBE", "LEJANIAS", "PUERTO CONCORDIA", "PUERTO GAITAN", "PUERTO LOPEZ", "PUERTO LLERAS", "PUERTO RICO", "RESTREPO", "SAN CARLOS DE GUAROA", "SAN JUAN DE ARAMA", "SAN JUANITO", "SAN MARTIN", "VISTAHERMOSA"],
-            "NARIÑO": ["PASTO", "ALBAN", "ALDANA", "ANCUYA", "ARBOLEDA", "BARBACOAS", "BELEN", "BUESACO", "COLON", "CONSACA", "CONTADERO", "CORDOBA", "CUASPUD", "CUMBAL", "CUMBITARA", "CHACHAGsI", "EL CHARCO", "EL PEÑOL", "EL ROSARIO", "EL TABLON DE GOMEZ", "EL TAMBO", "FUNES", "GUACHUCAL", "GUAITARILLA", "GUALMATAN", "ILES", "IMUES", "IPIALES", "LA CRUZ", "LA FLORIDA", "LA LLANADA", "LA TOLA", "LA UNION", "LEIVA", "LINARES", "LOS ANDES", "MAGsI", "MALLAMA", "MOSQUERA", "NARIÑO", "OLAYA HERRERA", "OSPINA", "FRANCISCO PIZARRO", "POLICARPA", "POTOSI", "PROVIDENCIA", "PUERRES", "PUPIALES", "RICAURTE", "ROBERTO PAYAN", "SAMANIEGO", "SAN BERNARDO", "SAN LORENZO", "SAN PABLO", "SAN PEDRO DE CARTAGO", "SANDONA", "SANTA BARBARA", "SANTACRUZ", "SAPUYES", "TAMINANGO", "TANGUA", "TUMACO", "TUQUERRES", "YACUANQUER"],
+            "NARIÑO": ["PASTO", "ALBAN", "ALDANA", "ANCUYA", "ARBOLEDA", "BARBACOAS", "BELEN", "BUESACO", "COLON", "CONSACA", "CONTADERO", "CORDOBA", "CUASPUD", "CUMBAL", "CUMBITARA", "CHACHAGUI", "EL CHARCO", "EL PEÑOL", "EL ROSARIO", "EL TABLON DE GOMEZ", "EL TAMBO", "FUNES", "GUACHUCAL", "GUAITARILLA", "GUALMATAN", "ILES", "IMUES", "IPIALES", "LA CRUZ", "LA FLORIDA", "LA LLANADA", "LA TOLA", "LA UNION", "LEIVA", "LINARES", "LOS ANDES", "MAGUI", "MALLAMA", "MOSQUERA", "NARIÑO", "OLAYA HERRERA", "OSPINA", "FRANCISCO PIZARRO", "POLICARPA", "POTOSI", "PROVIDENCIA", "PUERRES", "PUPIALES", "RICAURTE", "ROBERTO PAYAN", "SAMANIEGO", "SAN BERNARDO", "SAN LORENZO", "SAN PABLO", "SAN PEDRO DE CARTAGO", "SANDONA", "SANTA BARBARA", "SANTACRUZ", "SAPUYES", "TAMINANGO", "TANGUA", "TUMACO", "TUQUERRES", "YACUANQUER"],
             "NORTE DE SANTANDER": ["CUCUTA", "ABREGO", "ARBOLEDAS", "BOCHALEMA", "BUCARASICA", "CACOTA", "CACHIRA", "CHINACOTA", "CHITAGA", "CONVENCION", "CUCUTILLA", "DURANIA", "EL CARMEN", "EL ZULIA", "GRAMALOTE", "HACARI", "HERRAN", "LABATECA", "LA ESPERANZA", "LA PLAYA", "LOS PATIOS", "LURDES", "MUTISCUA", "OCAÑA", "PAMPLONA", "PAMPLONITA", "PUERTO SANTANDER", "RAGONVALIA", "SALAZAR", "SAN CALIXTO", "SAN CAYETANO", "SANTIAGO", "SARDINATA", "SILOS", "TEORAMA", "TIBU", "TOLEDO", "VILLA CARO", "VILLA DEL ROSARIO"],
             "PUTUMAYO": ["MOCOA", "COLON", "ORITO", "PUERTO ASIS", "PUERTO CAICEDO", "PUERTO GUZMAN", "PUERTO LEGUIZAMO", "SIBUNDOY", "SAN FRANCISCO", "SAN MIGUEL", "SANTIAGO", "VALLE DEL GUAMUEZ", "VILLAGARZON"],
             "QUINDIO": ["ARMENIA", "BUENAVISTA", "CALARCA", "CIRCASIA", "CORDOBA", "FILANDIA", "GENOVA", "LA TEBAIDA", "MONTENEGRO", "PIJAO", "QUIMBAYA", "SALENTO"],
             "RISARALDA": ["PEREIRA", "APIA", "BALBOA", "BELEN DE UMBRIA", "DOSQUEBRADAS", "GUATICA", "LA CELIA", "LA VIRGINIA", "MARSELLA", "MISTRATO", "PUEBLO RICO", "QUINCHIA", "SANTA ROSA DE CABAL", "SANTUARIO"],
             "SAN ANDRES": ["SAN ANDRES", "PROVIDENCIA"],
             "SANTANDER": ["BUCARAMANGA", "AGUADA", "ALBANIA", "ARATOCA", "BARBOSA", "BARICHARA", "BARRANCABERMEJA", "BETULIA", "BOLIVAR", "CABRERA", "CALIFORNIA", "CAPITANEJO", "CARCASI", "CEPITA", "CERRITO", "CHARALA", "CHARTA", "CHIMA", "CHIPATA", "CIMITARRA", "CONCEPCION", "CONFINES", "CONTRATACION", "COROMORO", "CURITI", "EL CARMEN DE CHUCURI", "EL GUACAMAYO", "EL PEÑON", "EL PLAYON", "ENCINO", "ENCISO", "FLORIAN", "FLORIDABLANCA", "GALAN", "GAMBITA", "GIRON", "GUACA", "GUADALUPE", "GUAPOTA", "GUAVATA", "GUEPSA", "HATO", "JESUS MARIA", "JORDAN", "LA BELLEZA", "LANDAZURI", "LA PAZ", "LEBRIJA", "LOS SANTOS", "MACARAVITA", "MALAGA", "MATANZA", "MOGOTES", "MOLAGAVITA", "OCAMONTE", "OIBA", "ONZAGA", "PALMAR", "PALMAS DEL SOCORRO", "PIEDECUESTA", "PINCHOTE", "PUENTE NACIONAL", "PUERTO PARRA", "PUERTO WILCHES", "RIONEGRO", "SABANA DE TORRES", "SAN ANDRES", "SAN BENITO", "SAN GIL", "SAN JOAQUIN", "SAN JOSE DE MIRANDA", "SAN MIGUEL", "SAN VICENTE DE CHUCURI", "SANTA BARBARA", "SANTA HELENA DEL OPON", "SIMACOTA", "SOCORRO", "SUAITA", "SUCRE", "SURATA", "TONA", "VALLE DE SAN JOSE", "VELEZ", "VETAS", "VILLANUEVA", "ZAPATOCA"],
-            "SUCRE": ["SINCELEJO", "BUENAVISTA", "CAJAS", "COLOSO", "COROZAL", "COVEÑAS", "CHALAN", "EL ROBLE", "GALERAS", "GUARANDA", "LA UNION", "LOS PALMITOS", "MAJAGUAL", "MORROA", "OVEJAS", "PALMITO", "SAMPUES", "SAN BENITO ABAD", "SAN JUAN DE BETULIA", "SAN MARCOS", "SAN ONofre", "SAN PEDRO", "SINCE", "SUCRE", "TOLU", "TOLUVIEJO"],
-            "TOLIMA": ["IBAGUE", "ALPUJARRA", "ALVARADO", "AMBALEMA", "ANZOATEGUI", "ARMERO", "ATACO", "CAJAMARCA", "CARMEN DE APICALA", "CASABIANCA", "CHAPARRAL", "COELLO", "COYAIMA", "CUNDAY", "DOLORES", "ESPINAL", "FALAN", "FLANDES", "FRESNO", "GUAMO", "HERVEO", "HONDA", "ICONONZO", "LERIDA", "LIBANO", "MARIQUITA", "MELGAR", "MURILLO", "NATAGAIMA", "ORTEGA", "PALOCABILDO", "PIEDRAS", "PLANADAS", "PRADO", "PURIFICACION", "RIOBLANCO", "RONCESVALLES", "ROVIRA", "SALDAÑA", "SAN ANTONIO", "SAN LUIS", "SANTA ISABEL", "SUAREZ", "VALLE DE SAN JUAN", "VENADILLO", "VILLAHERMOSA", "VILLARRICA"],
+            "SUCRE": ["SINCELEJO", "BUENAVISTA", "CAJAS", "COLOSO", "COROZAL", "COVEÑAS", "CHALAN", "EL ROBLE", "GALERAS", "GUARANDA", "LA UNION", "LOS PALMITOS", "MAJAGUAL", "MORROA", "OVEJAS", "PALMITO", "SAMPUES", "SAN BENITO ABAD", "SAN JUAN DE BETULIA", "SAN MARCOS", "SAN ONOFRE", "SAN PEDRO", "SINCE", "SUCRE", "TOLU", "TOLUVIEJO"],
+            "TOLIMA": ["IBAGUE", "ALPUJARRA", "ALVARADO", "AMBALEMA", "ANZOATEGUI", "ARMERO", "ATACO", "CAJAMARCA", "CARMEN DE APICALA", "CASABIANCA", "CHAPARRAL", "COELLO", "COYAIMA", "CUNDAY", "DOLORES", "ESPINAL", "FALAN", "FLANDES", "FRESNO", "GUAMO", "HERVEO", "HONDA", "ICONONZO", "LERIDA", "LIBANO", "MARIQUITA", "MELGAR", "MURILLO", "NATAGAIMA", "ORTEGA", "PALOCABILDO", "PIEDRAS", "PLANADAS", "PRADO", "PURIFICACION", "RIOBLANCO", "RONCESVALLES", "ROVIRA", "SALDAÑA", "SAN ANTONIO", "SAN LUIS", "SANTA ISABEL", "SUAREZ", "VALLE DEL SAN JUAN", "VENADILLO", "VILLAHERMOSA", "VILLARRICA"],
             "VALLE DEL CAUCA": ["CALI", "ALCALA", "ANDALUCIA", "ANSERMANUEVO", "ARGELIA", "BOLIVAR", "BUENAVENTURA", "GUADALAJARA DE BUGA", "BUGALAGRANDE", "CAICEDONIA", "CALIMA", "CANDELARIA", "CARTAGO", "DAGUA", "EL AGUILA", "EL CAIRO", "EL CERRITO", "EL DOVIO", "FLORIDA", "GINEBRA", "GUACARI", "JAMUNDI", "LA CUMBRE", "LA UNION", "LA VICTORIA", "VIJES", "OBANDO", "PALMIRA", "PRADERA", "RESTREPO", "RIOFRIO", "ROLDANILLO", "SAN PEDRO", "SEVILLA", "TORO", "TRUJILLO", "TULUA", "ULLOA", "VERSALLES", "YOTOCO", "YUMBO", "ZARZAL"],
             "VAUPES": ["MITU", "CARURU", "TARAIRA", "PAPUNAHUA", "YAVARATE"],
             "VICHADA": ["PUERTO CARREÑO", "LA PRIMAVERA", "SAN JOSE DE OCUNE", "CUMARIBO"]
@@ -933,10 +1252,151 @@
             });
         }
 
+        let mapVerifOri, mapVerifDes;
+        let markerVerifOri, markerVerifDes;
+        let markerOriEstatico, markerDesEstatico;
+
+        function geocodificarYUbicar(direccion, municipio, departamento, mapObj, markerInteractivo, markerEstatico, hiddenLatId, hiddenLngId) {
+            if (!direccion || !mapObj || !markerInteractivo) return;
+            const geocoder = new google.maps.Geocoder();
+            const query = `${direccion}${municipio ? ', ' + municipio : ''}${departamento ? ', ' + departamento : ''}, Colombia`;
+            geocoder.geocode({ address: query }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    const loc = results[0].geometry.location;
+                    mapObj.setCenter(loc);
+                    mapObj.setZoom(16);
+                    markerInteractivo.setPosition(loc);
+                    if(markerEstatico) {
+                        markerEstatico.setPosition(loc);
+                        markerEstatico.setTitle(`Original (PDF): ${direccion}`);
+                    }
+                    const hLat = document.getElementById(hiddenLatId);
+                    const hLng = document.getElementById(hiddenLngId);
+                    if (hLat) hLat.value = loc.lat();
+                    if (hLng) hLng.value = loc.lng();
+                }
+            });
+        }
+
+        function forzarBusquedaGeo(inputId, munId, depId, mapObj, markerObj, latId, lngId, alertId) {
+            const addr = document.getElementById(inputId).value.trim();
+            const mun = document.getElementById(munId).value;
+            const dep = document.getElementById(depId).value;
+            const alertEl = document.getElementById(alertId);
+            
+            if (!addr) return;
+            
+            const geocoder = new google.maps.Geocoder();
+            const query = `${addr}, ${mun}, ${dep}, Colombia`;
+            
+            geocoder.geocode({ address: query }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    const loc = results[0].geometry.location;
+                    mapObj.setCenter(loc);
+                    mapObj.setZoom(16);
+                    markerObj.setPosition(loc);
+                    document.getElementById(latId).value = loc.lat();
+                    document.getElementById(lngId).value = loc.lng();
+                    if(alertEl) alertEl.style.display = 'none';
+                } else {
+                    if(alertEl) {
+                        alertEl.innerText = "Lugar exacto no encontrado. Intente buscar un sitio de interés cercano (ej. colegio, parque comercial o avenida principal) y arrastre el pin a la posición final.";
+                        alertEl.style.display = 'block';
+                    }
+                }
+            });
+        }
+
+        async function instanciarMapasVerificacion() {
+            const oriCap = document.getElementById('rev_ori_capturada')?.value || '';
+            const desCap = document.getElementById('rev_des_capturada')?.value || '';
+            const depOri = document.getElementById('rev_dep_ori')?.value || '';
+            const munOri = document.getElementById('rev_mun_ori')?.value || '';
+            const depDes = document.getElementById('rev_dep_des')?.value || '';
+            const munDes = document.getElementById('rev_mun_des')?.value || '';
+
+            if (mapVerifOri && mapVerifDes) {
+                google.maps.event.trigger(mapVerifOri, 'resize');
+                google.maps.event.trigger(mapVerifDes, 'resize');
+                geocodificarYUbicar(oriCap, munOri, depOri, mapVerifOri, markerVerifOri, markerOriEstatico, 'lat_origen_esperado', 'lng_origen_esperado');
+                geocodificarYUbicar(desCap, munDes, depDes, mapVerifDes, markerVerifDes, markerDesEstatico, 'lat_destino_esperado', 'lng_destino_esperado');
+                return;
+            }
+            try {
+                const { Map } = await google.maps.importLibrary("maps");
+                const { Marker } = await google.maps.importLibrary("marker");
+                
+                const defaultCenter = { lat: 4.4389, lng: -75.2322 }; 
+                
+                mapVerifOri = new Map(document.getElementById('mapVerificacionOri'), { zoom: 13, center: defaultCenter, mapTypeControl: false, streetViewControl: false });
+                markerVerifOri = new Marker({ map: mapVerifOri, draggable: true, position: defaultCenter, title: "Origen Nuevo (Arrastre para ajustar)", icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' });
+                markerOriEstatico = new Marker({ map: mapVerifOri, draggable: false, position: defaultCenter, title: "Origen Original (Mipres)", icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' });
+                
+                markerVerifOri.addListener('dragend', function() {
+                    const pos = markerVerifOri.getPosition();
+                    document.getElementById('lat_origen_esperado').value = pos.lat();
+                    document.getElementById('lng_origen_esperado').value = pos.lng();
+                });
+
+                const inputOri = document.getElementById('rev_ori');
+                const autoOri = new google.maps.places.Autocomplete(inputOri, { componentRestrictions: { country: 'co' } });
+                autoOri.addListener('place_changed', () => {
+                    const place = autoOri.getPlace();
+                    if (place.geometry && place.geometry.location) {
+                        mapVerifOri.setCenter(place.geometry.location);
+                        mapVerifOri.setZoom(16);
+                        markerVerifOri.setPosition(place.geometry.location);
+                        document.getElementById('lat_origen_esperado').value = place.geometry.location.lat();
+                        document.getElementById('lng_origen_esperado').value = place.geometry.location.lng();
+                        document.getElementById('alerta_ori').style.display = 'none';
+                    } else {
+                        forzarBusquedaGeo('rev_ori', 'rev_mun_ori', 'rev_dep_ori', mapVerifOri, markerVerifOri, 'lat_origen_esperado', 'lng_origen_esperado', 'alerta_ori');
+                    }
+                });
+                inputOri.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') { e.preventDefault(); forzarBusquedaGeo('rev_ori', 'rev_mun_ori', 'rev_dep_ori', mapVerifOri, markerVerifOri, 'lat_origen_esperado', 'lng_origen_esperado', 'alerta_ori'); }
+                });
+
+                mapVerifDes = new Map(document.getElementById('mapVerificacionDes'), { zoom: 13, center: defaultCenter, mapTypeControl: false, streetViewControl: false });
+                markerVerifDes = new Marker({ map: mapVerifDes, draggable: true, position: defaultCenter, title: "Destino Nuevo (Arrastre para ajustar)", icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png' });
+                markerDesEstatico = new Marker({ map: mapVerifDes, draggable: false, position: defaultCenter, title: "Destino Original (Mipres)", icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' });
+                
+                markerVerifDes.addListener('dragend', function() {
+                    const pos = markerVerifDes.getPosition();
+                    document.getElementById('lat_destino_esperado').value = pos.lat();
+                    document.getElementById('lng_destino_esperado').value = pos.lng();
+                });
+
+                const inputDes = document.getElementById('rev_des');
+                const autoDes = new google.maps.places.Autocomplete(inputDes, { componentRestrictions: { country: 'co' } });
+                autoDes.addListener('place_changed', () => {
+                    const place = autoDes.getPlace();
+                    if (place.geometry && place.geometry.location) {
+                        mapVerifDes.setCenter(place.geometry.location);
+                        mapVerifDes.setZoom(16);
+                        markerVerifDes.setPosition(place.geometry.location);
+                        document.getElementById('lat_destino_esperado').value = place.location.lat();
+                        document.getElementById('lng_destino_esperado').value = place.location.lng();
+                        document.getElementById('alerta_des').style.display = 'none';
+                    } else {
+                        forzarBusquedaGeo('rev_des', 'rev_mun_des', 'rev_dep_des', mapVerifDes, markerVerifDes, 'lat_destino_esperado', 'lng_destino_esperado', 'alerta_des');
+                    }
+                });
+                inputDes.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') { e.preventDefault(); forzarBusquedaGeo('rev_des', 'rev_mun_des', 'rev_dep_des', mapVerifDes, markerVerifDes, 'lat_destino_esperado', 'lng_destino_esperado', 'alerta_des'); }
+                });
+
+                geocodificarYUbicar(oriCap, munOri, depOri, mapVerifOri, markerVerifOri, markerOriEstatico, 'lat_origen_esperado', 'lng_origen_esperado');
+                geocodificarYUbicar(desCap, munDes, depDes, mapVerifDes, markerVerifDes, markerDesEstatico, 'lat_destino_esperado', 'lng_destino_esperado');
+
+            } catch (error) {
+                console.error("Error inicializando mapas diferidos:", error);
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             initSelectoresDivipola();
             
-            // Si hay datos ocultos de captura, autoseleccionar
             const hiddenDep = document.getElementById('hidden_dep_captura');
             const hiddenMun = document.getElementById('hidden_mun_captura');
             if(hiddenDep && hiddenDep.value && document.getElementById('cap_dep_ori')) {
@@ -948,7 +1408,6 @@
             }
         });
 
-        // ================= INTERCEPTOR UNIVERSAL =================
         let formPendienteUniversal = null;
         
         document.addEventListener('submit', function(e) {
@@ -971,11 +1430,53 @@
             if (formPendienteUniversal) {
                 formPendienteUniversal.setAttribute('data-confirmed', 'true');
                 document.getElementById('modalConfirmacionUniversal').classList.remove('active');
-                formPendienteUniversal.submit();
+                
+                if (isChainedAction && formPendienteUniversal.id === 'formVerificacion') {
+                    const formData = new FormData(formPendienteUniversal);
+                    fetch(formPendienteUniversal.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            closeModal('modalRevisionVerificacion');
+                            abrirAsignacionFlota(currentVueltaData.id, currentVueltaData.id_viaje, currentVueltaData.nombre_usuario, true);
+                        } else {
+                            alert('Error: ' + data.message);
+                            formPendienteUniversal.removeAttribute('data-confirmed');
+                        }
+                    }).catch(err => {
+                        alert('Error de red al verificar.');
+                        formPendienteUniversal.removeAttribute('data-confirmed');
+                    });
+                } else if (isChainedAction && formPendienteUniversal.id === 'formAsignacionFlota') {
+                    const formData = new FormData(formPendienteUniversal);
+                    fetch(formPendienteUniversal.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            closeModal('modalAsignacionFlota');
+                            window.location.reload();
+                        } else {
+                            alert('Error: ' + data.message);
+                            formPendienteUniversal.removeAttribute('data-confirmed');
+                        }
+                    }).catch(err => {
+                        alert('Error de red al asignar flota.');
+                        formPendienteUniversal.removeAttribute('data-confirmed');
+                    });
+                } else {
+                    formPendienteUniversal.submit();
+                }
             }
         }
 
-        // ================= LÓGICA DE ACOMPAÑANTES =================
         function toggleRevAcompanante() {
             const isChecked = document.getElementById('rev_chk_acompanante').checked;
             const divs = document.querySelectorAll('.div-rev-acompanante');
@@ -986,14 +1487,12 @@
             });
         }
 
-        // ================= LÓGICA DE PROGRAMACIÓN DINÁMICA =================
         function abrirProgramacion(id, alfa, paciente, total_idas) {
             document.getElementById('prog_viaje_id').value = id;
             document.getElementById('prog_alfa').innerText = alfa;
             document.getElementById('prog_paciente').innerText = paciente;
             document.getElementById('prog_total_idas').value = total_idas || 1;
             
-            // Reiniciar y Ocultar todo
             document.getElementById('select_tipo_servicio').value = '';
             document.getElementById('seccion_dialisis').style.display = 'none';
             document.getElementById('seccion_frecuencias').style.display = 'none';
@@ -1022,7 +1521,6 @@
             const selTurno = document.getElementById('select_turno');
             const selFrecuencia = document.getElementById('select_frecuencia');
             
-            // Reiniciar valores y validez
             selTurno.value = ''; selTurno.required = false;
             selFrecuencia.value = ''; selFrecuencia.required = false;
             document.getElementById('prog_fecha').value = '';
@@ -1110,9 +1608,11 @@
             }
         }
 
-        // ================= FUNCIONES DE APERTURA MODALES RESTANTES =================
-        function abrirRevision(btn) {
+        function poblarModalVerificacion(btn, accionForm) {
+            document.getElementById('rev_accion').value = accionForm;
             document.getElementById('rev_traslado_id').value = btn.getAttribute('data-id') || "";
+            document.getElementById('rev_id_viaje_padre').value = btn.getAttribute('data-idpadre') || "";
+            
             document.getElementById('rev_nombre').value = btn.getAttribute('data-nombre') || "";
             
             let tipoDocValue = (btn.getAttribute('data-tipodoc') || "").trim();
@@ -1137,8 +1637,13 @@
                 }
             }
 
+            let capturedOri = btn.getAttribute('data-ori') || "";
+            let capturedDes = btn.getAttribute('data-des') || "";
+
+            let elOriCap = document.getElementById('rev_ori_capturada');
+            if (elOriCap) elOriCap.value = capturedOri;
             let elOri = document.getElementById('rev_ori');
-            if (elOri) elOri.value = btn.getAttribute('data-ori') || "";
+            if (elOri) elOri.value = capturedOri;
 
             let depDesValue = (btn.getAttribute('data-dep-des') || "").toUpperCase().trim();
             let munDesValue = (btn.getAttribute('data-mun-des') || "").toUpperCase().trim();
@@ -1153,16 +1658,43 @@
                 }
             }
 
+            let elDesCap = document.getElementById('rev_des_capturada');
+            if (elDesCap) elDesCap.value = capturedDes;
             let elDes = document.getElementById('rev_des');
-            if (elDes) elDes.value = btn.getAttribute('data-des') || "";
+            if (elDes) elDes.value = capturedDes;
+
+            document.getElementById('lat_origen_esperado').value = "";
+            document.getElementById('lng_origen_esperado').value = "";
+            document.getElementById('lat_destino_esperado').value = "";
+            document.getElementById('lng_destino_esperado').value = "";
 
             openModal('modalRevisionVerificacion');
+            setTimeout(() => {
+                instanciarMapasVerificacion();
+            }, 150);
         }
 
-        function abrirAsignacionFlota(id, alfa, paciente) {
+        function abrirRevision(btn) {
+            isChainedAction = false;
+            poblarModalVerificacion(btn, 'editar_y_verificar');
+        }
+
+        function abrirExcepcionIndividual(btn) {
+            isChainedAction = false;
+            poblarModalVerificacion(btn, 'editar_excepcion_individual');
+        }
+
+        function abrirAsignacionFlota(id, alfa, paciente, isChained = false) {
+            isChainedAction = isChained;
             document.getElementById('asig_flota_viaje_id').value = id;
             document.getElementById('asig_flota_alfa').innerText = alfa;
             document.getElementById('asig_flota_paciente').innerText = paciente;
+            
+            document.getElementById('boxLiquidacionManual').style.display = 'none';
+            document.getElementById('monto_liquidacion_manual').required = false;
+            document.getElementById('asig_accion_type').value = 'asignar_flota';
+            document.getElementById('tituloModalAsignacion').innerText = 'Generar FUEC y Asignar 🚐';
+
             openModal('modalAsignacionFlota');
         }
 
@@ -1189,6 +1721,612 @@
                 alert('No se adjuntó un documento PDF para esta orden.');
             }
         }
+
+        function notificarVuelta(viajeId) {
+            if (!confirm('¿Desea enviar (o reenviar) la notificación de este viaje al conductor por Telegram?')) return;
+            fetch("{{ url_for('controlador_flotaespecial.api_notificar_viaje') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+                body: JSON.stringify({ viaje_id: viajeId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Notificación enviada exitosamente al operador.');
+                } else {
+                    alert('Error al notificar: ' + data.message);
+                }
+            })
+            .catch(err => alert('Fallo de conexión al enviar notificación.'));
+        }
+
+        let isChainedAction = false;
+        let currentVueltaData = null;
+
+        function ocultarDelKanban(viajeId) {
+            if (!confirm('¿Desea avanzar la tarjeta y activar la siguiente fase del ciclo?')) return;
+            
+            fetch("{{ url_for('controlador_flotaespecial.api_ocultar_kanban') }}", {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ viaje_id: viajeId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    if (data.viaje_vuelta) {
+                        isChainedAction = true;
+                        currentVueltaData = data.viaje_vuelta;
+                        const v = currentVueltaData;
+                        const fakeBtn = document.createElement('button');
+                        fakeBtn.setAttribute('data-id', v.id || '');
+                        fakeBtn.setAttribute('data-idpadre', v.id_viaje_padre || '');
+                        fakeBtn.setAttribute('data-nombre', v.nombre_usuario || '');
+                        fakeBtn.setAttribute('data-tipodoc', v.tipo_documento || '');
+                        fakeBtn.setAttribute('data-idusr', v.id_usuario || '');
+                        fakeBtn.setAttribute('data-tel', v.telefono_usuario || '');
+                        fakeBtn.setAttribute('data-dep', v.departamento || '');
+                        fakeBtn.setAttribute('data-mun', v.municipio || '');
+                        fakeBtn.setAttribute('data-ori', v.direccion_origen || '');
+                        fakeBtn.setAttribute('data-dep-des', v.departamento_destino || '');
+                        fakeBtn.setAttribute('data-mun-des', v.municipio_destino || '');
+                        fakeBtn.setAttribute('data-des', v.direccion_destino || '');
+                        fakeBtn.setAttribute('data-ruta', v.ruta_documento || '');
+
+                        poblarModalVerificacion(fakeBtn, 'editar_y_verificar');
+                    } else {
+                        window.location.reload();
+                    }
+                } else {
+                    alert('Error al actualizar fase: ' + data.message);
+                }
+            })
+            .catch(err => alert('Fallo de conexión al avanzar fase.'));
+        }
+
+        function verDetalleNovedad(idBD, idViaje, tipo, veh, cond, desc, paciente) {
+            document.getElementById('det_tipo_nov').innerText = tipo;
+            document.getElementById('det_veh_nov').innerText = veh || 'N/A';
+            document.getElementById('det_op_nov').innerText = cond || 'N/A';
+            document.getElementById('det_desc_nov').innerText = desc;
+            
+            const btnResolver = document.getElementById('btnIrAResolver');
+            btnResolver.onclick = () => {
+                closeModal('modalDetalleNovedad');
+                prepararResolucion(idBD, idViaje, paciente, tipo, veh);
+            };
+            openModal('modalDetalleNovedad');
+        }
+
+        function prepararResolucion(idBD, idViaje, nombrePaciente, tipoNovedad, vehiculoActual) {
+            document.getElementById('asig_flota_viaje_id').value = idBD;
+            document.getElementById('asig_flota_alfa').innerText = idViaje;
+            document.getElementById('asig_flota_paciente').innerText = nombrePaciente;
+            document.getElementById('asig_tipo_novedad').value = tipoNovedad;
+            
+            document.getElementById('asig_accion_type').value = 'resolver_novedad';
+            document.getElementById('tituloModalAsignacion').innerText = 'Resolver Contingencia 🚨';
+            
+            const boxLiq = document.getElementById('boxLiquidacionManual');
+            if (tipoNovedad === 'NOVEDAD_RECORRIDO') {
+                boxLiq.style.display = 'block';
+                document.getElementById('monto_liquidacion_manual').required = true;
+            } else {
+                boxLiq.style.display = 'none';
+                document.getElementById('monto_liquidacion_manual').required = false;
+            }
+            
+            openModal('modalAsignacionFlota');
+        }
+
+        let previousNovedadesCount = 0;
+        function pollNovedadesGlobal() {
+            fetch("{{ url_for('controlador_flotaespecial.api_operativa_vivo') }}?t=" + new Date().getTime())
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    const numNovedades = data.data.novedades_activas.length;
+                    const banner = document.getElementById('bannerNovedades');
+                    if (numNovedades > 0) {
+                        banner.style.display = 'block';
+                        document.getElementById('contadorNovedades').innerText = numNovedades;
+                    } else {
+                        banner.style.display = 'none';
+                    }
+                    previousNovedadesCount = numNovedades;
+
+                    const contParte1 = document.getElementById('contenedor_parte1');
+                    const spanContador1 = document.getElementById('contador_parte1');
+                    if (contParte1 && spanContador1) {
+                        const lista1 = data.data.parte1_ida_programados;
+                        spanContador1.innerText = lista1.length + " pendientes";
+                        
+                        if (lista1.length > 0) {
+                            let html1 = '';
+                            lista1.forEach(v => {
+                                let urgenciaClass = v.is_urgencia ? 'urgencia-12h' : '';
+                                html1 += `
+                                <div class="kanban-card border-top-info ${urgenciaClass}">
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                                        <span class="id-token">${v.id_viaje || ''}</span>
+                                        <span class="badge badge-info">${v.estatus_servicio || ''}</span>
+                                    </div>
+                                    <div style="font-size: 12px; margin-bottom: 5px;"><b>Prescripción:</b> ${v.numero_prescripcion || ''}</div>
+                                    <div style="font-size: 13px; margin-bottom: 2px;"><b>${v.nombre_usuario || ''}</b></div>
+                                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">ID: ${v.id_usuario || ''} | Tel: ${v.telefono_usuario || ''}</div>
+                                    <div style="font-size: 12px; margin-bottom: 5px;"><b>Destino:</b> ${v.direccion_destino || ''}</div>
+                                    <div style="font-size: 12px; margin-bottom: 10px; color: #b45309;"><b>Prog:</b> ${v.hora_inicio || 'Pendiente'}</div>
+                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                        <button type="button" class="btn-info" style="padding: 5px 8px; font-size: 11px; flex-grow: 1;"
+                                            onclick="abrirRevision(this)"
+                                            data-id="${v.id || ''}"
+                                            data-idpadre="${v.id_viaje_padre || ''}"
+                                            data-ruta="${(v.ruta_documento || '').replace(/"/g, '&quot;')}"
+                                            data-nombre="${(v.nombre_usuario || '').replace(/"/g, '&quot;')}"
+                                            data-tipodoc="${(v.tipo_documento || '').replace(/"/g, '&quot;')}"
+                                            data-idusr="${(v.id_usuario || '').replace(/"/g, '&quot;')}"
+                                            data-tel="${(v.telefono_usuario || '').replace(/"/g, '&quot;')}"
+                                            data-dep="${(v.departamento || '').replace(/"/g, '&quot;')}"
+                                            data-mun="${(v.municipio || '').replace(/"/g, '&quot;')}"
+                                            data-ori="${(v.direccion_origen || '').replace(/"/g, '&quot;')}"
+                                            data-dep-des="${(v.departamento_destino || '').replace(/"/g, '&quot;')}"
+                                            data-mun-des="${(v.municipio_destino || '').replace(/"/g, '&quot;')}"
+                                            data-des="${(v.direccion_destino || '').replace(/"/g, '&quot;')}">
+                                            📞 Verificación
+                                        </button>
+                                        <button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf" style="flex-grow: 1;">📄 PDF</button>
+                                    </div>
+                                </div>
+                                `;
+                            });
+                            contParte1.innerHTML = html1;
+                        } else {
+                            contParte1.innerHTML = '<div id="no_viajes_parte1" style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 20px; background: var(--surface); border-radius: 10px; border: 1px solid var(--border);">No hay viajes IDA programados pendientes de asignación.</div>';
+                        }
+                    }
+
+                    const c1 = data.data.parte2_col1;
+                    document.getElementById('count_col1').innerText = c1.length;
+                    const c1Cont = document.getElementById('container_col1');
+                    if(c1.length > 0) {
+                        let html = '';
+                        c1.forEach(v => {
+                            let badgeClass = v.estatus_servicio === 'NOVEDAD_RECORRIDO' ? 'badge-danger' : 'badge-success';
+                            html += `
+                            <div class="kanban-card border-top-success">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                    <span class="id-token">${v.id_viaje || ''}</span>
+                                    <span class="badge ${badgeClass}" style="font-size: 9px;">${v.estatus_servicio}</span>
+                                </div>
+                                <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario || ''}</b></div>
+                                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">${v.conductor_asignado || 'N/D'} (${v.vehiculo_asignado || 'N/D'})</div>
+                                <div style="text-align: right;"><button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf">📄 PDF</button></div>
+                            </div>`;
+                        });
+                        c1Cont.innerHTML = html;
+                    } else { c1Cont.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>'; }
+
+                    const c2 = data.data.parte2_col2;
+                    document.getElementById('count_col2').innerText = c2.length;
+                    const c2Cont = document.getElementById('container_col2');
+                    if(c2.length > 0) {
+                        let html = '';
+                        c2.forEach(v => {
+                            html += `
+                            <div class="kanban-card" style="border-top: 4px solid #6b7280;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                    <span class="id-token">${v.id_viaje || ''}</span>
+                                    <span class="badge badge-gray" style="font-size: 9px;">TERMINADO</span>
+                                </div>
+                                <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario || ''}</b></div>
+                                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">${v.conductor_asignado || ''} (${v.vehiculo_asignado || ''})</div>
+                                <div style="display: flex; gap: 5px;">
+                                    <button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf">📄 PDF</button>
+                                    <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="ocultarDelKanban('${v.id}')">Siguiente Fase: Activar Vuelta ➡️</button>
+                                </div>
+                            </div>`;
+                        });
+                        c2Cont.innerHTML = html;
+                    } else { c2Cont.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>'; }
+
+                    const c3 = data.data.parte2_col3;
+                    document.getElementById('count_col3').innerText = c3.length;
+                    const c3Cont = document.getElementById('container_col3');
+                    if(c3.length > 0) {
+                        let html = '';
+                        c3.forEach(v => {
+                            html += `
+                            <div class="kanban-card border-top-purple">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                    <span class="id-token">${v.id_viaje || ''}</span>
+                                    <span class="badge badge-purple" style="font-size: 9px;">${v.estatus_servicio}</span>
+                                </div>
+                                <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario || ''}</b></div>
+                                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Tel: ${v.telefono_usuario || ''}</div>
+                                <div style="font-size: 11px; margin-bottom: 8px; line-height: 1.3;">${v.direccion_origen || ''}<br>➡️ ${v.direccion_destino || ''}</div>
+                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                    ${v.estatus_servicio === 'ASIGNADO' ? `
+                                        <div style="width: 100%; padding: 6px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; font-size: 10px; color: #065f46; text-align: center; font-weight: bold; margin-bottom: 5px;">
+                                            ✔️ Asignado a: ${v.conductor_asignado || 'Operador'}
+                                        </div>
+                                        <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; width: 100%;" onclick="notificarVuelta('${v.id}')">
+                                            🔔 Enviar Notificación al Operador
+                                        </button>
+                                    ` : `
+                                        <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;"
+                                            onclick="abrirRevision(this)"
+                                            data-id="${v.id || ''}" data-idpadre="${v.id_viaje_padre || ''}" data-ruta="${(v.ruta_documento || '').replace(/"/g, '&quot;')}" data-nombre="${(v.nombre_usuario || '').replace(/"/g, '&quot;')}" data-tipodoc="${(v.tipo_documento || '').replace(/"/g, '&quot;')}" data-idusr="${(v.id_usuario || '').replace(/"/g, '&quot;')}" data-tel="${(v.telefono_usuario || '').replace(/"/g, '&quot;')}" data-dep="${(v.departamento || '').replace(/"/g, '&quot;')}" data-mun="${(v.municipio || '').replace(/"/g, '&quot;')}" data-ori="${(v.direccion_origen || '').replace(/"/g, '&quot;')}" data-dep-des="${(v.departamento_destino || '').replace(/"/g, '&quot;')}" data-mun-des="${(v.municipio_destino || '').replace(/"/g, '&quot;')}" data-des="${(v.direccion_destino || '').replace(/"/g, '&quot;')}">
+                                            📞 Verificación
+                                        </button>
+                                        <button type="button" class="btn-success" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="abrirAsignacionFlota('${v.id}', '${v.id_viaje}', '${(v.nombre_usuario || '').replace(/"/g, '&quot;')}')">
+                                            🚐 Asignar FUEC
+                                        </button>
+                                    `}
+                                </div>
+                            </div>`;
+                        });
+                        c3Cont.innerHTML = html;
+                    } else { c3Cont.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>'; }
+
+                    const c4 = data.data.parte2_col4;
+                    document.getElementById('count_col4').innerText = c4.length;
+                    const c4Cont = document.getElementById('container_col4');
+                    if(c4.length > 0) {
+                        let html = '';
+                        c4.forEach(v => {
+                            let badgeClass = v.estatus_servicio === 'NOVEDAD_RECORRIDO' ? 'badge-danger' : 'badge-warning';
+                            html += `
+                            <div class="kanban-card border-top-warning">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                    <span class="id-token">${v.id_viaje || ''}</span>
+                                    <span class="badge ${badgeClass}" style="font-size: 9px;">${v.estatus_servicio}</span>
+                                </div>
+                                <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario || ''}</b></div>
+                                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">${v.conductor_asignado || 'N/D'} (${v.vehiculo_asignado || 'N/D'})</div>
+                                <div style="text-align: right;"><button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf">📄 PDF</button></div>
+                            </div>`;
+                        });
+                        c4Cont.innerHTML = html;
+                    } else { c4Cont.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>'; }
+
+                    const c5 = data.data.parte2_col5;
+                    document.getElementById('count_col5').innerText = c5.length;
+                    const c5Cont = document.getElementById('container_col5');
+                    if(c5.length > 0) {
+                        let html = '';
+                        c5.forEach(v => {
+                            html += `
+                            <div class="kanban-card" style="border-top: 4px solid #ef4444;" id="row_vuelta_${v.id}">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                    <span class="id-token">${v.id_viaje || ''}</span>
+                                    <span class="badge badge-danger" style="font-size: 9px;">TERMINADO</span>
+                                </div>
+                                <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario || ''}</b></div>
+                                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">${v.conductor_asignado || ''} (${v.vehiculo_asignado || ''})</div>
+                                <div style="display: flex; gap: 5px;">
+                                    <button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf">📄 PDF</button>
+                                    <button type="button" class="btn-danger" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="ocultarDelKanban('${v.id}')">✖️ Finalizar Ciclo</button>
+                                </div>
+                            </div>`;
+                        });
+                        c5Cont.innerHTML = html;
+                    } else { c5Cont.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>'; }
+                }
+            }).catch(e => {});
+        }
+
+        let currentAuditData = {};
+        let currentGeoTab = 'origen';
+        let mapAuditoria = null;
+        let markerEsperadoAud = null;
+        let markerRealAud = null;
+
+        function calcularDistanciaHaversine(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        async function abrirModalAuditoria(btn) {
+            currentAuditData = {
+                idViaje: btn.getAttribute('data-idviaje'),
+                tiempoReal: parseInt(btn.getAttribute('data-tiempo-real')) || 0,
+                origen: {
+                    dir: btn.getAttribute('data-dir-ori'),
+                    mun: btn.getAttribute('data-mun-ori'),
+                    dep: btn.getAttribute('data-dep-ori'),
+                    lat: parseFloat(btn.getAttribute('data-lat-ori')),
+                    lng: parseFloat(btn.getAttribute('data-lng-ori')),
+                    lat_esp: parseFloat(btn.getAttribute('data-lat-ori-esp')),
+                    lng_esp: parseFloat(btn.getAttribute('data-lng-ori-esp'))
+                },
+                destino: {
+                    dir: btn.getAttribute('data-dir-des'),
+                    mun: btn.getAttribute('data-mun-des'),
+                    dep: btn.getAttribute('data-dep-des'),
+                    lat: parseFloat(btn.getAttribute('data-lat-des')),
+                    lng: parseFloat(btn.getAttribute('data-lng-des')),
+                    lat_esp: parseFloat(btn.getAttribute('data-lat-des-esp')),
+                    lng_esp: parseFloat(btn.getAttribute('data-lng-des-esp'))
+                },
+                firma: btn.getAttribute('data-firma'),
+                pdf: btn.getAttribute('data-pdf')
+            };
+
+            openModal('modalAuditoriaGeo');
+
+            const imgFirma = document.getElementById('imgFirmaAuditoria');
+            const txtFirma = document.getElementById('txtSinFirma');
+            if (currentAuditData.firma && currentAuditData.firma !== 'None' && currentAuditData.firma.trim() !== '') {
+                imgFirma.src = currentAuditData.firma.startsWith('static/') ? '/' + currentAuditData.firma : '/static/' + currentAuditData.firma;
+                imgFirma.style.display = 'block';
+                txtFirma.style.display = 'none';
+            } else {
+                imgFirma.style.display = 'none';
+                txtFirma.style.display = 'block';
+            }
+
+            document.getElementById('btnVerPDFAuditoria').onclick = function() {
+                abrirPDF(currentAuditData.pdf);
+            };
+
+            const kpiTiempo = document.getElementById('kpiTiempo');
+            const valTiempo = document.getElementById('valTiempo');
+            const msgTiempo = document.getElementById('msgTiempo');
+            
+            kpiTiempo.style.background = '#f3f4f6';
+            kpiTiempo.style.borderColor = 'var(--border)';
+            valTiempo.style.color = '#4b5563';
+            valTiempo.innerText = 'Calculando...';
+            msgTiempo.innerText = 'Consultando ruta vial';
+
+            const latOriE = currentAuditData.origen.lat_esp;
+            const lngOriE = currentAuditData.origen.lng_esp;
+            const latDesE = currentAuditData.destino.lat_esp;
+            const lngDesE = currentAuditData.destino.lng_esp;
+
+            if (latOriE && lngOriE && latDesE && lngDesE && !isNaN(latOriE) && !isNaN(latDesE)) {
+                try {
+                    const service = new google.maps.DistanceMatrixService();
+                    service.getDistanceMatrix({
+                        origins: [{lat: latOriE, lng: lngOriE}],
+                        destinations: [{lat: latDesE, lng: lngDesE}],
+                        travelMode: 'DRIVING'
+                    }, (response, status) => {
+                        if(status === 'OK' && response.rows[0].elements[0].status === 'OK') {
+                            const minsTeorico = Math.round(response.rows[0].elements[0].duration.value / 60);
+                            const diff = currentAuditData.tiempoReal - minsTeorico;
+                            const diffSign = diff > 0 ? '+' : '';
+                            
+                            valTiempo.innerHTML = `<span style="font-size: 12px; font-weight: normal; display: block; margin-bottom: 5px;">Real: ${currentAuditData.tiempoReal}m | Teórico: ${minsTeorico}m</span><span style="font-size: 22px;">${diffSign}${diff} min</span>`;
+                            
+                            if (currentAuditData.tiempoReal === 0) {
+                                kpiTiempo.style.background = '#fef3c7'; kpiTiempo.style.borderColor = '#f59e0b';
+                                valTiempo.style.color = '#92400e';
+                                msgTiempo.innerHTML = `⚠️ Posible anomalía de reloj`;
+                                msgTiempo.style.color = '#92400e';
+                            } else if(Math.abs(diff) <= 15) {
+                                kpiTiempo.style.background = '#d1fae5'; kpiTiempo.style.borderColor = '#10b981';
+                                valTiempo.style.color = '#065f46';
+                                msgTiempo.innerHTML = `🟢 Desviación normal`;
+                                msgTiempo.style.color = '#065f46';
+                            } else if (diff > 15) {
+                                kpiTiempo.style.background = '#fef3c7'; kpiTiempo.style.borderColor = '#f59e0b';
+                                valTiempo.style.color = '#92400e';
+                                msgTiempo.innerHTML = `🟡 Retraso detectado`;
+                                msgTiempo.style.color = '#92400e';
+                            } else {
+                                kpiTiempo.style.background = '#fee2e2'; kpiTiempo.style.borderColor = '#ef4444';
+                                valTiempo.style.color = '#991b1b';
+                                msgTiempo.innerHTML = `🔴 Desfase anómalo (Muy rápido)`;
+                                msgTiempo.style.color = '#991b1b';
+                            }
+                        } else {
+                            valTiempo.innerText = 'N/A';
+                            msgTiempo.innerText = "⚠️ Ruta no encontrada en Maps";
+                        }
+                    });
+                } catch(e) {
+                    valTiempo.innerText = 'Error';
+                    msgTiempo.innerText = "⚠️ Error de conexión a la API";
+                }
+            } else {
+                valTiempo.innerText = 'N/A';
+                msgTiempo.innerText = "⚠️ Faltan coordenadas teóricas";
+            }
+
+            if (!mapAuditoria) {
+                try {
+                    const { Map } = await google.maps.importLibrary("maps");
+                    mapAuditoria = new Map(document.getElementById('mapAuditoria'), {
+                        center: { lat: 4.5709, lng: -74.2973 },
+                        zoom: 6, mapTypeControl: false, streetViewControl: false
+                    });
+                } catch(e) {}
+            }
+            
+            setTimeout(() => { 
+                if (mapAuditoria) google.maps.event.trigger(mapAuditoria, 'resize'); 
+            }, 300);
+
+            switchGeoTab('origen');
+        }
+
+        function switchGeoTab(tab) {
+            currentGeoTab = tab;
+            const btnOri = document.getElementById('tabGeoOri');
+            const btnDes = document.getElementById('tabGeoDes');
+            
+            if(tab === 'origen') {
+                btnOri.className = 'btn-primary'; btnOri.style.background = 'var(--verde)';
+                btnDes.className = 'btn-cancel'; btnDes.style.marginTop = '0';
+            } else {
+                btnDes.className = 'btn-primary'; btnDes.style.background = 'var(--verde)';
+                btnOri.className = 'btn-cancel'; btnOri.style.marginTop = '0';
+            }
+
+            const data = currentAuditData[tab];
+            const strDir = (data.dir && data.dir !== 'None') ? data.dir.trim() : '';
+            const strMun = (data.mun && data.mun !== 'None') ? data.mun.trim() : '';
+            const strDep = (data.dep && data.dep !== 'None') ? data.dep.trim() : '';
+            
+            let searchArr = [];
+            if(strDir) searchArr.push(strDir);
+            if(strMun) searchArr.push(strMun);
+            if(strDep) searchArr.push(strDep);
+            searchArr.push("Colombia");
+            
+            const searchStr = searchArr.join(", ");
+            document.getElementById('inputGeoSearch').value = searchStr;
+            
+            ejecutarGeocodificacionYMapa(searchStr, data.lat, data.lng, data.lat_esp, data.lng_esp);
+        }
+
+        function buscarDireccionManual() {
+            const manualStr = document.getElementById('inputGeoSearch').value.trim();
+            if(!manualStr) return;
+            const data = currentAuditData[currentGeoTab];
+            ejecutarGeocodificacionYMapa(manualStr, data.lat, data.lng, null, null);
+        }
+
+        async function ejecutarGeocodificacionYMapa(searchStr, latReal, lngReal, latEsp, lngEsp) {
+            const kpiDist = document.getElementById('kpiDistancia');
+            const valDist = document.getElementById('valDistancia');
+            const msgDist = document.getElementById('msgDistancia');
+            const btnRecalcular = document.getElementById('btnRecalcularGeo');
+            
+            kpiDist.style.background = '#f3f4f6';
+            kpiDist.style.borderColor = 'var(--border)';
+            valDist.style.color = '#4b5563';
+            valDist.innerText = 'Calculando...';
+            msgDist.innerText = 'Buscando proximidad';
+            msgDist.style.color = '#6b7280';
+            
+            if(btnRecalcular) {
+                btnRecalcular.innerText = "⏳ Buscando...";
+                btnRecalcular.disabled = true;
+            }
+
+            if (markerEsperadoAud) markerEsperadoAud.setMap(null);
+            if (markerRealAud) markerRealAud.setMap(null);
+
+            let validReal = (!isNaN(latReal) && !isNaN(lngReal));
+            let validEsp = (latEsp != null && lngEsp != null && !isNaN(latEsp) && !isNaN(lngEsp));
+
+            try {
+                const { Marker } = await google.maps.importLibrary("marker");
+                
+                let infoWindowReal = new google.maps.InfoWindow({ content: "<div style='font-family:Verdana; font-size:12px;'><b>Ubicación Real</b><br>Capturada por GPS</div>" });
+                let infoWindowEsperado = new google.maps.InfoWindow();
+
+                if (validReal) {
+                    markerRealAud = new Marker({ position: { lat: latReal, lng: lngReal }, map: mapAuditoria, title: "Ubicación Real" });
+                    infoWindowReal.open(mapAuditoria, markerRealAud);
+                    mapAuditoria.setCenter({ lat: latReal, lng: lngReal });
+                    mapAuditoria.setZoom(14);
+                }
+
+                if (validEsp) {
+                    _renderizarPinEsperado(latEsp, lngEsp, "Ubicación Validada (Etapa 3)");
+                    _finalizarMapeo(validReal, latReal, lngReal, latEsp, lngEsp);
+                } 
+                else if (searchStr && searchStr !== 'Colombia') {
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ 'address': searchStr }, function(results, status) {
+                        if (status === 'OK') {
+                            const loc = results[0].geometry.location;
+                            const cLatEsp = loc.lat();
+                            const cLngEsp = loc.lng();
+                            _renderizarPinEsperado(cLatEsp, cLngEsp, searchStr);
+                            _finalizarMapeo(validReal, latReal, lngReal, cLatEsp, cLngEsp);
+                        } else {
+                            kpiDist.style.background = '#fee2e2'; kpiDist.style.borderColor = '#ef4444';
+                            valDist.innerText = "Error";
+                            valDist.style.color = '#991b1b';
+                            msgDist.innerText = `⚠️ Mapa no reconoció dirección`;
+                            msgDist.style.color = '#991b1b';
+                        }
+                        if(btnRecalcular) { btnRecalcular.innerText = "🔍 Recalcular"; btnRecalcular.disabled = false; }
+                    });
+                } else {
+                    kpiDist.style.background = '#fef3c7'; kpiDist.style.borderColor = '#f59e0b';
+                    valDist.innerText = "N/A";
+                    valDist.style.color = '#92400e';
+                    msgDist.innerText = '⚠️ Sin dirección a buscar';
+                    msgDist.style.color = '#92400e';
+                    if(btnRecalcular) { btnRecalcular.innerText = "🔍 Recalcular"; btnRecalcular.disabled = false; }
+                }
+
+                function _renderizarPinEsperado(latE, lngE, titulo) {
+                    markerEsperadoAud = new Marker({ position: { lat: latE, lng: lngE }, map: mapAuditoria, icon: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' });
+                    infoWindowEsperado.setContent(`<div style='font-family:Verdana; font-size:12px;'><b>Ubicación Esperada</b><br>${titulo}</div>`);
+                    infoWindowEsperado.open(mapAuditoria, markerEsperadoAud);
+                }
+
+                function _finalizarMapeo(vReal, lReal, lnReal, lEsp, lnEsp) {
+                    if (vReal) {
+                        const bounds = new google.maps.LatLngBounds();
+                        bounds.extend(markerRealAud.getPosition());
+                        bounds.extend(markerEsperadoAud.getPosition());
+                        mapAuditoria.fitBounds(bounds);
+
+                        const listener = google.maps.event.addListener(mapAuditoria, "idle", function() { 
+                            if (mapAuditoria.getZoom() > 16) mapAuditoria.setZoom(16); 
+                            google.maps.event.removeListener(listener); 
+                        });
+
+                        const distanciaMetros = calcularDistanciaHaversine(lReal, lnReal, lEsp, lnEsp);
+                        
+                        if (distanciaMetros <= 500) {
+                            kpiDist.style.background = '#d1fae5'; kpiDist.style.borderColor = '#10b981';
+                            valDist.style.color = '#065f46';
+                            valDist.innerText = Math.round(distanciaMetros) + " m";
+                            msgDist.innerText = '🟢 Excelente precisión';
+                            msgDist.style.color = '#065f46';
+                        } else if (distanciaMetros <= 2000) {
+                            kpiDist.style.background = '#fef3c7'; kpiDist.style.borderColor = '#f59e0b';
+                            valDist.style.color = '#92400e';
+                            valDist.innerText = Math.round(distanciaMetros) + " m";
+                            msgDist.innerText = '🟡 Advertencia de distancia';
+                            msgDist.style.color = '#92400e';
+                        } else {
+                            kpiDist.style.background = '#fee2e2'; kpiDist.style.borderColor = '#ef4444';
+                            valDist.style.color = '#991b1b';
+                            valDist.innerText = (distanciaMetros/1000).toFixed(1) + " km";
+                            msgDist.innerText = '🔴 Alerta de dispersión';
+                            msgDist.style.color = '#991b1b';
+                        }
+                    } else {
+                        mapAuditoria.setCenter({lat: lEsp, lng: lnEsp});
+                        mapAuditoria.setZoom(15);
+                        kpiDist.style.background = '#fef3c7'; kpiDist.style.borderColor = '#f59e0b';
+                        valDist.style.color = '#92400e';
+                        valDist.innerText = "N/A";
+                        msgDist.innerText = '⚠️ Sin telemetría GPS';
+                        msgDist.style.color = '#92400e';
+                    }
+                    if(btnRecalcular) { btnRecalcular.innerText = "🔍 Recalcular"; btnRecalcular.disabled = false; }
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        }
+        
+        document.addEventListener("DOMContentLoaded", function() {
+            setInterval(pollNovedadesGlobal, 5000);
+            setTimeout(pollNovedadesGlobal, 1000);
+        });
+
     </script>
 </body>
 </html>

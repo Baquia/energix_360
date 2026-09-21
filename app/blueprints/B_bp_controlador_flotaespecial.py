@@ -1,14 +1,16 @@
 # app/blueprints/B_bp_controlador_flotaespecial.py
 import os
 import hashlib
+import pytz
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash, jsonify
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash, jsonify, current_app
 from app import mysql, bcrypt
 from app.utils import login_required_custom
 from functools import wraps
 import MySQLdb.cursors
 
 bp_controlador_flotaespecial = Blueprint('controlador_flotaespecial', __name__, url_prefix='/gestor_flotaespecial')
+BOGOTA_TZ = pytz.timezone('America/Bogota')
 
 def controlador_flotaespecial_required(f):
     @wraps(f)
@@ -23,7 +25,7 @@ def controlador_flotaespecial_required(f):
     return decorated_function
 
 # =========================================================
-# 1. SUB-MENÚ INTERMEDIO DE SELECCIÓN (EL ENRUTADOR CAE AQUÍ)
+# 1. SUB-MENÚ INTERMEDIO DE SELECCIÓN
 # =========================================================
 @bp_controlador_flotaespecial.route('/dashboard')
 @login_required_custom
@@ -39,44 +41,47 @@ def dashboard_controlador():
     )
 
 # =========================================================
-# 2. DASHBOARD DE KPIS OPERATIVOS (ESTÁTICO/HISTÓRICO)
+# 2. DASHBOARD OPERATIVO DE CONTROL Y MONITOREO
 # =========================================================
 @bp_controlador_flotaespecial.route('/operativa')
 @login_required_custom
 @controlador_flotaespecial_required
 def dashboard_operativo():
     empresa_id = session.get('empresa_id')
-    
-    hoy = datetime.now()
-    inicio_mes = hoy.replace(day=1).strftime('%Y-%m-%d')
-    fin_mes = hoy.strftime('%Y-%m-%d')
-    
-    fecha_inicio = request.args.get('fecha_inicio', inicio_mes)
-    fecha_fin = request.args.get('fecha_fin', fin_mes)
+    empresa_nit = session.get('nit')
     
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
+    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN oculto_kanban BOOLEAN DEFAULT FALSE")
+    except: pass
+    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN vuelta_activada BOOLEAN DEFAULT FALSE")
+    except: pass
+    
+    # KPIs generales activos o del día (Se elimina filtro de fechas y se hace 100% dinámico)
     cur.execute("""
         SELECT 
             COUNT(*) as total,
             SUM(CASE WHEN estatus_servicio = 'CAPTURADO' THEN 1 ELSE 0 END) as capturados,
             SUM(CASE WHEN estatus_servicio = 'PROGRAMADO' THEN 1 ELSE 0 END) as programados,
             SUM(CASE WHEN estatus_servicio = 'VERIFICADO' THEN 1 ELSE 0 END) as verificados,
-            SUM(CASE WHEN estatus_servicio = 'ASIGNADO' THEN 1 ELSE 0 END) as asignados,
-            SUM(CASE WHEN estatus_servicio = 'EN EJECUCION' THEN 1 ELSE 0 END) as ejecucion,
+            SUM(CASE WHEN estatus_servicio IN ('ASIGNADO', 'PDTE. ASIGNAR VUELTA') THEN 1 ELSE 0 END) as asignados,
+            SUM(CASE WHEN estatus_servicio IN ('EN EJECUCION', 'NOVEDAD_RECORRIDO') THEN 1 ELSE 0 END) as ejecucion,
             SUM(CASE WHEN estatus_servicio IN ('TERMINADO-PDTE AUDITAR', 'AUDITADO') THEN 1 ELSE 0 END) as ejecutados
         FROM control_viajes_flota_especial 
-        WHERE id_empresa = %s AND (fecha_servicio BETWEEN %s AND %s OR fecha_servicio IS NULL)
-    """, (empresa_id, fecha_inicio, fecha_fin))
+        WHERE id_empresa = %s AND (fecha_servicio = CURDATE() OR estatus_servicio NOT IN ('AUDITADO'))
+    """, (empresa_id,))
     kpis = cur.fetchone()
     
     if not kpis or kpis['total'] is None:
         kpis = {'total': 0, 'capturados': 0, 'programados': 0, 'verificados': 0, 'asignados': 0, 'ejecucion': 0, 'ejecutados': 0}
 
+    # Consulta maestra de viajes operativos en vivo
     cur.execute("""
-        SELECT c.id_viaje, c.fecha_servicio, c.hora_inicio, c.vehiculo_asignado, c.conductor_asignado, 
+        SELECT c.id, c.id_viaje, c.fecha_servicio, c.hora_inicio, c.vehiculo_asignado, c.conductor_asignado, 
                c.nombre_usuario, c.telefono_usuario, c.direccion_origen, c.direccion_destino, c.estatus_servicio,
-               c.numero_prescripcion, c.id_eps_cliente AS ips, c.trayecto,
+               c.numero_prescripcion, c.numero_autorizacion, c.id_eps_cliente AS ips, c.trayecto, c.id_viaje_padre,
+               c.departamento, c.municipio, c.departamento_destino, c.municipio_destino, c.id_usuario, c.tipo_documento,
+               c.estado_novedad, c.descripcion_novedad, c.lleva_acompanante, c.nombre_acompanante, c.cedula_acompanante, c.vuelta_activada,
                COALESCE(c.ruta_documento, m.ruta_documento) as ruta_documento
         FROM control_viajes_flota_especial c
         LEFT JOIN (
@@ -87,18 +92,76 @@ def dashboard_operativo():
           ON c.numero_autorizacion = m.numero_autorizacion 
           AND (c.numero_prescripcion = m.numero_prescripcion OR c.numero_prescripcion IS NULL OR m.numero_prescripcion IS NULL) 
           AND c.id_empresa = m.id_empresa
-        WHERE c.id_empresa = %s AND (c.fecha_servicio BETWEEN %s AND %s OR c.fecha_servicio IS NULL)
+        WHERE c.id_empresa = %s 
+          AND c.estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA', 'ASIGNADO', 'EN EJECUCION', 'TERMINADO-PDTE AUDITAR', 'NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO', 'CAPTURADO', 'VERIFICADO')
+          AND (c.oculto_kanban = FALSE OR c.oculto_kanban IS NULL)
         ORDER BY c.fecha_servicio ASC, c.hora_inicio ASC
-    """, (empresa_id, fecha_inicio, fecha_fin))
+    """, (empresa_id,))
     viajes = cur.fetchall()
+
+    # Cargar flota, conductores y contratos vigentes
+    cur.execute("SELECT placa, clase AS tipo FROM vehiculos_especial WHERE id_empresa = %s OR id_empresa = %s", (empresa_id, empresa_nit))
+    vehiculos = cur.fetchall()
+
+    cur.execute("SELECT id, nombre, cedula, telegram_id FROM usuarios WHERE (empresa_id = %s OR empresa_id = %s) AND perfil IN ('operador_flotaespecial', 'auxiliar_transporte_especial')", (empresa_id, empresa_nit))
+    cond_usrs = list(cur.fetchall())
+
+    cur.execute("SELECT id, nombre, cedula, vencimiento_licencia_conduccion FROM conductores_flotaespecial WHERE id_empresa = %s OR id_empresa = %s", (empresa_id, empresa_nit))
+    cond_flota = list(cur.fetchall())
+
+    cond_dict = {c['cedula']: c for c in cond_usrs}
+    for c in cond_flota:
+        if c['cedula'] not in cond_dict:
+            cond_dict[c['cedula']] = c
+    conductores = list(cond_dict.values())
+
+    cur.execute("SELECT id, contratante_nombre, numero_contrato, categoria_contrato FROM contratos_transporte_especial WHERE (id_empresa = %s OR id_empresa = %s) AND estado = 'ACTIVO'", (empresa_id, empresa_nit))
+    contratos = cur.fetchall()
+
     cur.close()
 
-    viajes_capturados = [v for v in viajes if v['estatus_servicio'] == 'CAPTURADO']
-    viajes_programados = [v for v in viajes if v['estatus_servicio'] == 'PROGRAMADO']
-    viajes_verificados = [v for v in viajes if v['estatus_servicio'] == 'VERIFICADO']
-    viajes_asignados = [v for v in viajes if v['estatus_servicio'] == 'ASIGNADO']
-    viajes_ejecucion = [v for v in viajes if v['estatus_servicio'] == 'EN EJECUCION']
-    viajes_ejecutados = [v for v in viajes if v['estatus_servicio'] in ('TERMINADO-PDTE AUDITAR', 'AUDITADO')]
+    now_col = datetime.now(BOGOTA_TZ).replace(tzinfo=None)
+    for v in viajes:
+        h_init = v.get('hora_inicio')
+        f_serv = v.get('fecha_servicio')
+        v['is_urgencia'] = False
+        v['is_36h'] = False
+        
+        if h_init is not None and f_serv is not None:
+            try:
+                if isinstance(h_init, timedelta):
+                    dt_val = datetime.combine(f_serv, datetime.min.time()) + h_init
+                    h_str = (datetime.min + h_init).time().strftime('%H:%M:%S')
+                else:
+                    dt_val = datetime.combine(f_serv, h_init)
+                    h_str = h_init.strftime('%H:%M:%S')
+                    
+                diff_hours = (dt_val - now_col).total_seconds() / 3600.0
+                
+                if diff_hours <= 36.0:
+                    v['is_36h'] = True
+                if diff_hours <= 12.0:
+                    v['is_urgencia'] = True
+                    
+                v['hora_inicio_str'] = f"{f_serv} | {h_str}"
+            except:
+                v['hora_inicio_str'] = f"{f_serv} | {h_init}"
+                v['is_36h'] = True
+        else:
+            v['hora_inicio_str'] = f"{f_serv} | Pendiente" if f_serv else "Pendiente"
+            v['is_36h'] = True
+            
+        v['hora_inicio'] = v['hora_inicio_str']
+        v['trayecto'] = (v.get('trayecto') or 'IDA').upper()
+        v['estatus_servicio'] = (v.get('estatus_servicio') or '').upper()
+
+    # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN (Con Filtro 36 Horas)
+    parte1_ida_programados = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] == 'PROGRAMADO' and v['is_36h']]
+    parte2_col1 = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] in ('EN EJECUCION', 'NOVEDAD_RECORRIDO')]
+    parte2_col2 = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] in ('TERMINADO-PDTE AUDITAR', 'AUDITADO')]
+    parte2_col3 = [v for v in viajes if v['trayecto'] == 'VUELTA' and v.get('vuelta_activada') and v['estatus_servicio'] not in ('EN EJECUCION', 'NOVEDAD_RECORRIDO', 'TERMINADO-PDTE AUDITAR', 'AUDITADO')]
+    parte2_col4 = [v for v in viajes if v['trayecto'] == 'VUELTA' and v['estatus_servicio'] in ('EN EJECUCION', 'NOVEDAD_RECORRIDO')]
+    parte2_col5 = [v for v in viajes if v['trayecto'] == 'VUELTA' and v['estatus_servicio'] in ('TERMINADO-PDTE AUDITAR', 'AUDITADO')]
 
     return render_template(
         'B_dashboard_operativo_eps.html',
@@ -107,17 +170,20 @@ def dashboard_operativo():
         nombre=session.get('nombre'),
         active_module='dashboard',
         kpis=kpis,
-        filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin},
-        viajes_capturados=viajes_capturados,
-        viajes_programados=viajes_programados,
-        viajes_verificados=viajes_verificados,
-        viajes_asignados=viajes_asignados,
-        viajes_ejecucion=viajes_ejecucion,
-        viajes_ejecutados=viajes_ejecutados
+        filtros={},
+        parte1_ida_programados=parte1_ida_programados,
+        parte2_col1=parte2_col1,
+        parte2_col2=parte2_col2,
+        parte2_col3=parte2_col3,
+        parte2_col4=parte2_col4,
+        parte2_col5=parte2_col5,
+        vehiculos=vehiculos,
+        conductores=conductores,
+        contratos=contratos
     )
 
 # =========================================================
-# 2.1 MOTOR DE DATOS EN VIVO (SHORT-POLLING KANBAN + LISTA)
+# 2.1 MOTOR DE DATOS EN VIVO (SHORT-POLLING DEL TABLERO)
 # =========================================================
 @bp_controlador_flotaespecial.route('/api/operativa/vivo', methods=['GET'])
 @login_required_custom
@@ -126,63 +192,96 @@ def api_operativa_vivo():
     empresa_id = session.get('empresa_id')
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        # Asegurar existencia de la columna de ocultamiento visual
-        try:
-            cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN oculto_kanban BOOLEAN DEFAULT FALSE")
-        except:
-            pass
-
-        # REGLA ACTUALIZADA: Se excluyen los viajes que el controlador ha marcado como ocultos (oculto_kanban = TRUE)
         cur.execute("""
-            SELECT id, id_viaje, numero_autorizacion, numero_prescripcion, nombre_usuario, id_usuario, 
-                   direccion_origen, direccion_destino, telefono_usuario,
-                   hora_inicio, fecha_servicio, trayecto, estatus_servicio, vehiculo_asignado, conductor_asignado, id_viaje_padre
-            FROM control_viajes_flota_especial 
-            WHERE id_empresa = %s 
-              AND estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA', 'ASIGNADO', 'EN EJECUCION', 'TERMINADO-PDTE AUDITAR')
-              AND (oculto_kanban = FALSE OR oculto_kanban IS NULL)
-            ORDER BY fecha_servicio ASC, hora_inicio ASC
+            SELECT c.id, c.id_viaje, c.numero_autorizacion, c.numero_prescripcion, c.nombre_usuario, c.id_usuario, 
+                   c.direccion_origen, c.direccion_destino, c.departamento, c.municipio, c.departamento_destino, c.municipio_destino,
+                   c.telefono_usuario, c.hora_inicio, c.fecha_servicio, c.trayecto, c.estatus_servicio, c.vehiculo_asignado, 
+                   c.conductor_asignado, c.id_viaje_padre, c.estado_novedad, c.descripcion_novedad, c.tipo_documento, c.vuelta_activada,
+                   COALESCE(c.ruta_documento, m.ruta_documento) as ruta_documento
+            FROM control_viajes_flota_especial c
+            LEFT JOIN (
+                SELECT numero_autorizacion, numero_prescripcion, id_empresa, MAX(ruta_documento) as ruta_documento 
+                FROM maestra_traslados_eps_tespecial 
+                GROUP BY numero_autorizacion, numero_prescripcion, id_empresa
+            ) m 
+              ON c.numero_autorizacion = m.numero_autorizacion 
+              AND (c.numero_prescripcion = m.numero_prescripcion OR c.numero_prescripcion IS NULL OR m.numero_prescripcion IS NULL) 
+              AND c.id_empresa = m.id_empresa
+            WHERE c.id_empresa = %s 
+              AND c.estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA', 'ASIGNADO', 'EN EJECUCION', 'TERMINADO-PDTE AUDITAR', 'NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO', 'CAPTURADO', 'VERIFICADO')
+              AND (c.oculto_kanban = FALSE OR c.oculto_kanban IS NULL)
+            ORDER BY c.fecha_servicio ASC, c.hora_inicio ASC
         """, (empresa_id,))
         viajes = cur.fetchall()
 
         datos = {
-            "verificacion_previaje": [], # 0. Lista Superior Requerida
-            "ida_en_progreso": [],       # 1. Columna Kanban
-            "ida_terminadas": [],        # 2. Columna Kanban
-            "vuelta_pendientes": [],     # 3. Columna Kanban
-            "vuelta_en_progreso": [],    # 4. Columna Kanban
-            "vuelta_terminadas": []      # 5. Columna Kanban
+            "novedades_activas": [],
+            "parte1_ida_programados": [],
+            "parte2_col1": [],
+            "parte2_col2": [],
+            "parte2_col3": [],
+            "parte2_col4": [],
+            "parte2_col5": []
         }
+
+        now_col = datetime.now(BOGOTA_TZ).replace(tzinfo=None)
 
         for v in viajes:
             h_init = v.get('hora_inicio')
             f_serv = v.get('fecha_servicio')
+            v['is_urgencia'] = False
+            v['is_36h'] = False
+            
             if h_init is not None and f_serv is not None:
-                v['hora_inicio'] = f"{f_serv} | {h_init}"
+                try:
+                    if isinstance(h_init, timedelta):
+                        dt_val = datetime.combine(f_serv, datetime.min.time()) + h_init
+                        h_str = (datetime.min + h_init).time().strftime('%H:%M:%S')
+                    else:
+                        dt_val = datetime.combine(f_serv, h_init)
+                        h_str = h_init.strftime('%H:%M:%S')
+                        
+                    diff_hours = (dt_val - now_col).total_seconds() / 3600.0
+                    
+                    if diff_hours <= 36.0:
+                        v['is_36h'] = True
+                    if diff_hours <= 12.0:
+                        v['is_urgencia'] = True
+                        
+                    v['hora_inicio_str'] = f"{f_serv} | {h_str}"
+                except:
+                    v['hora_inicio_str'] = f"{f_serv} | {h_init}"
+                    v['is_36h'] = True
             else:
-                v['hora_inicio'] = f"{f_serv} | Pendiente" if f_serv else "Pendiente"
+                v['hora_inicio_str'] = f"{f_serv} | Pendiente" if f_serv else "Pendiente"
+                v['is_36h'] = True
                 
+            v['hora_inicio'] = v['hora_inicio_str']
             trayecto = (v.get('trayecto') or 'IDA').upper()
             estatus = (v.get('estatus_servicio') or '').upper()
             
             v['trayecto'] = trayecto
             v['estatus_servicio'] = estatus
 
+            if estatus in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO']:
+                datos["novedades_activas"].append(v)
+            
+            # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN
             if trayecto == 'IDA':
-                if estatus == 'PROGRAMADO':
-                    datos["verificacion_previaje"].append(v)
-                elif estatus in ['ASIGNADO', 'EN EJECUCION']:
-                    datos["ida_en_progreso"].append(v)
-                elif estatus == 'TERMINADO-PDTE AUDITAR':
-                    datos["ida_terminadas"].append(v)
+                if estatus == 'PROGRAMADO' and v['is_36h']:
+                    datos["parte1_ida_programados"].append(v)
+                elif estatus in ['EN EJECUCION', 'NOVEDAD_RECORRIDO']:
+                    datos["parte2_col1"].append(v)
+                elif estatus in ['TERMINADO-PDTE AUDITAR', 'AUDITADO']:
+                    datos["parte2_col2"].append(v)
                     
             elif trayecto == 'VUELTA':
-                if estatus == 'PDTE. ASIGNAR VUELTA':
-                    datos["vuelta_pendientes"].append(v)
-                elif estatus in ['ASIGNADO', 'EN EJECUCION']:
-                    datos["vuelta_en_progreso"].append(v)
-                elif estatus == 'TERMINADO-PDTE AUDITAR':
-                    datos["vuelta_terminadas"].append(v)
+                if v.get('vuelta_activada') and estatus not in ['EN EJECUCION', 'NOVEDAD_RECORRIDO', 'TERMINADO-PDTE AUDITAR', 'AUDITADO']:
+                    datos["parte2_col3"].append(v)
+                elif estatus in ['EN EJECUCION', 'NOVEDAD_RECORRIDO']:
+                    datos["parte2_col4"].append(v)
+                elif estatus in ['TERMINADO-PDTE AUDITAR', 'AUDITADO']:
+                    datos["parte2_col5"].append(v)
 
         return jsonify({"status": "success", "data": datos}), 200
     except Exception as e:
@@ -191,7 +290,7 @@ def api_operativa_vivo():
         cur.close()
 
 # =========================================================
-# 2.2 MOTOR PARA OCULTAR TARJETAS TERMINADAS DEL KANBAN
+# 2.2 OCULTAR VIAJES Y DESENCADENAR VUELTA
 # =========================================================
 @bp_controlador_flotaespecial.route('/api/operativa/ocultar_kanban', methods=['POST'])
 @login_required_custom
@@ -204,24 +303,134 @@ def api_ocultar_kanban():
     if not viaje_id:
         return jsonify({"status": "error", "message": "ID de viaje no proporcionado"}), 400
 
-    cur = mysql.connection.cursor()
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        try:
-            cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN oculto_kanban BOOLEAN DEFAULT FALSE")
-        except:
-            pass
+        try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN oculto_kanban BOOLEAN DEFAULT FALSE")
+        except: pass
+        try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN vuelta_activada BOOLEAN DEFAULT FALSE")
+        except: pass
 
-        cur.execute("""
-            UPDATE control_viajes_flota_especial 
-            SET oculto_kanban = TRUE
-            WHERE id = %s AND id_empresa = %s
-        """, (viaje_id, empresa_id))
+        cur.execute("SELECT trayecto, id_viaje_padre FROM control_viajes_flota_especial WHERE id = %s AND id_empresa = %s", (viaje_id, empresa_id))
+        viaje_actual = cur.fetchone()
         
-        mysql.connection.commit()
-        return jsonify({"status": "success", "message": "Viaje retirado del tablero operativo."}), 200
+        if viaje_actual:
+            # 1. Ocultar el viaje en el que se hizo clic
+            cur.execute("""
+                UPDATE control_viajes_flota_especial 
+                SET oculto_kanban = TRUE
+                WHERE id = %s AND id_empresa = %s
+            """, (viaje_id, empresa_id))
+            
+            # 2. Activar la vuelta si el que se ocultó fue IDA
+            trayecto = (viaje_actual.get('trayecto') or 'IDA').upper()
+            id_padre = viaje_actual.get('id_viaje_padre')
+            viaje_vuelta = None
+            
+            if trayecto == 'IDA' and id_padre:
+                cur.execute("""
+                    UPDATE control_viajes_flota_especial 
+                    SET vuelta_activada = TRUE 
+                    WHERE id_viaje_padre = %s AND trayecto = 'VUELTA' AND id_empresa = %s
+                """, (id_padre, empresa_id))
+                
+                # Obtener datos de la vuelta para auto-lanzar los modales
+                cur.execute("""
+                    SELECT id, id_viaje_padre, id_viaje, numero_prescripcion, nombre_usuario, 
+                           telefono_usuario, direccion_origen, direccion_destino, 
+                           departamento, municipio, departamento_destino, municipio_destino,
+                           id_usuario, tipo_documento, ruta_documento
+                    FROM control_viajes_flota_especial 
+                    WHERE id_viaje_padre = %s AND trayecto = 'VUELTA' AND id_empresa = %s
+                """, (id_padre, empresa_id))
+                viaje_vuelta = cur.fetchone()
+            
+            mysql.connection.commit()
+            return jsonify({
+                "status": "success", 
+                "message": "Viaje procesado y retirado de la vista.",
+                "viaje_vuelta": viaje_vuelta
+            }), 200
+        else:
+            return jsonify({"status": "error", "message": "No se encontró el viaje especificado."}), 404
 
     except Exception as e:
         mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+# =========================================================
+# 2.3 RE-NOTIFICACIÓN MANUAL AL OPERADOR
+# =========================================================
+@bp_controlador_flotaespecial.route('/api/operativa/notificar', methods=['POST'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_notificar_viaje():
+    empresa_id = session.get('empresa_id')
+    empresa_nombre = session.get('empresa')
+    datos = request.get_json(silent=True) or {}
+    viaje_id = datos.get('viaje_id')
+
+    if not viaje_id:
+        return jsonify({"status": "error", "message": "ID de viaje no proporcionado"}), 400
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("""
+            SELECT c.*, f.ruta_pdf_fuec 
+            FROM control_viajes_flota_especial c
+            LEFT JOIN fuec f ON c.id_viaje = f.id_traslado_eps AND f.id_empresa = c.id_empresa
+            WHERE c.id = %s AND c.id_empresa = %s
+        """, (viaje_id, empresa_id))
+        viaje = cur.fetchone()
+
+        if not viaje:
+            return jsonify({"status": "error", "message": "No se encontró el viaje."}), 404
+            
+        if not viaje.get('conductor_asignado'):
+            return jsonify({"status": "error", "message": "El viaje no tiene un conductor asignado."}), 400
+
+        cur.execute("SELECT telegram_id FROM usuarios WHERE nombre = %s AND empresa_id = %s", (viaje['conductor_asignado'], empresa_id))
+        usr = cur.fetchone()
+        if not usr or not usr.get('telegram_id'):
+            return jsonify({"status": "error", "message": "El operador asignado no tiene su cuenta de Telegram enlazada."}), 400
+
+        telegram_id = usr['telegram_id']
+        telefono_paciente = viaje.get('telefono_usuario') or 'N/D'
+        info_acompanante = ""
+        if viaje.get('lleva_acompanante'):
+            info_acompanante = f"👥 <b>Acompañante:</b> {viaje.get('nombre_acompanante', 'Sí')}\n"
+
+        mensaje_tg = (
+            f"🟢 <b>NUEVA ASIGNACIÓN / RECORDATORIO DE VIAJE (FUEC)</b>\n\n"
+            f"🏢 <b>Empresa:</b> {empresa_nombre}\n"
+            f"🆔 <b>Prescripción:</b> {viaje.get('numero_prescripcion')}\n"
+            f"🚙 <b>Vehículo:</b> {viaje.get('vehiculo_asignado')}\n\n"
+            f"📋 <b>PROGRAMACIÓN:</b>\n"
+            f"ID Viaje: <code>{viaje['id_viaje']}</code>\n"
+            f"Trayecto: {viaje.get('trayecto', 'IDA')}\n"
+            f"Paciente: {viaje['nombre_usuario']}\n"
+            f"📞 <b>Teléfono:</b> {telefono_paciente}\n"
+            f"{info_acompanante}"
+            f"Fecha: {viaje.get('fecha_servicio', 'N/D')} | Hora: {viaje.get('hora_inicio', 'N/D')}\n"
+            f"Origen: {viaje['direccion_origen']}\n"
+            f"Destino: {viaje['direccion_destino']}"
+        )
+
+        ruta_pdf_abs = None
+        if viaje.get('ruta_pdf_fuec'):
+            ruta_pdf_abs = os.path.join(current_app.static_folder, viaje['ruta_pdf_fuec'])
+        
+        from app.blueprints.B_bp_flotaespecial_eps import _enviar_documento_telegram_hilo, _enviar_mensajes_telegram_hilo
+        
+        if ruta_pdf_abs and os.path.exists(ruta_pdf_abs):
+            _enviar_documento_telegram_hilo([telegram_id], mensaje_tg, ruta_pdf_abs)
+        else:
+            _enviar_mensajes_telegram_hilo([telegram_id], mensaje_tg.replace("<b>", "*").replace("</b>", "*").replace("<code>", "`").replace("</code>", "`"))
+
+        return jsonify({"status": "success", "message": "Notificación enviada al operador."}), 200
+
+    except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         cur.close()
@@ -256,7 +465,7 @@ def gestion_operadores():
             if nombre and cedula and perfil:
                 cur = mysql.connection.cursor()
                 try:
-                    cur.execute("SELECT id FROM usuarios WHERE cedula = %s", (cedula,))
+                    cur.execute("SELECT id FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula, empresa_id))
                     if cur.fetchone():
                         flash(f"La identificación {cedula} ya está registrada.", "danger")
                     else:

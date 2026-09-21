@@ -29,9 +29,9 @@ def preoperacional_tc():
         empresa_id = session.get("empresa_id")
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # REGLA: Candado para evitar doble inspección en un mismo día
+        # REGLA (Ajuste Anti-Error 1054): Candado para evitar doble inspección usando SELECT 1
         cur.execute("""
-            SELECT id FROM inspeccion_preoperacional 
+            SELECT 1 FROM inspeccion_preoperacional 
             WHERE id_empresa = %s AND placa_vehiculo = %s 
             AND fecha_inspeccion = CURDATE() AND vehiculo_aprobado = 1
             LIMIT 1
@@ -50,11 +50,10 @@ def preoperacional_tc():
             cur.execute("SELECT * FROM vehiculos WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
             vehiculo = cur.fetchone()
         else:
-            # Soporte Multi-Flota: Búsqueda en Transporte Especial
-            cur.execute("SELECT id, placa, clase as tipo, marca as referencia, estatus FROM vehiculos_especial WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
+            # Soporte Multi-Flota (Ajuste Anti-Error 1054): Removido 'id' de la consulta
+            cur.execute("SELECT placa, clase as tipo, marca as referencia, estatus FROM vehiculos_especial WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
             vehiculo = cur.fetchone()
             if vehiculo:
-                # Homologamos la variable 'tipo' para que la plantilla HTML no falle
                 vehiculo['tipo_vehiculo'] = vehiculo.get('tipo', 'Especial')
         
         if not vehiculo:
@@ -98,12 +97,14 @@ def validar_qr():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
-    # Soporte Multi-Flota en escáner global
-    cur.execute("SELECT id, empresa, id_empresa, 'carga' as flota_tipo FROM vehiculos WHERE placa = %s LIMIT 1", (placa,))
+    # Soporte Multi-Flota en escáner global (Ajuste Anti-Error 1054)
+    # Corrección SIM-063: Aislamiento Multi-Tenant
+    cur.execute("SELECT placa, empresa, id_empresa, 'carga' as flota_tipo FROM vehiculos WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, session_nit))
     v = cur.fetchone()
     
     if not v:
-        cur.execute("SELECT id, id_empresa, 'especial' as flota_tipo FROM vehiculos_especial WHERE placa = %s LIMIT 1", (placa,))
+        # Corrección SIM-064: Aislamiento Multi-Tenant
+        cur.execute("SELECT placa, id_empresa, 'especial' as flota_tipo FROM vehiculos_especial WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, session_nit))
         v = cur.fetchone()
 
     if not v:
@@ -114,9 +115,9 @@ def validar_qr():
         cur.close()
         return jsonify(success=False, message="Consistencia rota: El vehículo no es suyo."), 403
 
-    # REGLA: Bypass si ya existe inspección aprobada hoy
+    # REGLA: Bypass si ya existe inspección aprobada hoy (Ajuste Anti-Error 1054)
     cur.execute("""
-        SELECT id FROM inspeccion_preoperacional 
+        SELECT 1 FROM inspeccion_preoperacional 
         WHERE id_empresa = %s AND placa_vehiculo = %s 
         AND fecha_inspeccion = CURDATE() AND vehiculo_aprobado = 1
         LIMIT 1
@@ -125,8 +126,9 @@ def validar_qr():
 
     nuevo_estatus = 'Logueado' if inspeccion_hoy else 'Prelogueado'
 
+    # (Ajuste Anti-Error 1054): Actualizamos con placa e id_empresa en lugar de id
     if v["flota_tipo"] == 'carga':
-        cur.execute("UPDATE vehiculos SET estatus=%s WHERE id=%s", (nuevo_estatus, v["id"]))
+        cur.execute("UPDATE vehiculos SET estatus=%s WHERE placa=%s AND id_empresa=%s", (nuevo_estatus, placa, session_nit))
         session["placa_prelogueada"] = placa
         
         if inspeccion_hoy:
@@ -135,7 +137,7 @@ def validar_qr():
                 VALUES (%s, %s, %s, NOW(), 'ACTIVA')
             """, (session_nit, session.get("usuario_id"), placa))
     else:
-        cur.execute("UPDATE vehiculos_especial SET estatus=%s WHERE id=%s", (nuevo_estatus, v["id"]))
+        cur.execute("UPDATE vehiculos_especial SET estatus=%s WHERE placa=%s AND id_empresa=%s", (nuevo_estatus, placa, session_nit))
         session["placa_prelogueada_especial"] = placa
         
         try:
@@ -219,7 +221,7 @@ def guardar_inspeccion():
         novedades_rojas = []
         novedades_amarillas = []
 
-        # Valores neutros para la sección documental (Eliminada del frontend)
+        # Valores neutros para la sección documental
         doc_values = {
             'doc_licencia_conduccion': 1,
             'doc_soat_vigente': 1,
@@ -280,8 +282,6 @@ def guardar_inspeccion():
                 except: pass
 
         kilometraje = get_int('kilometraje', 0)
-        
-        # Eliminamos la captura de la ruta desde el form y asignamos por defecto
         ruta = 'No aplica'
 
         query = """
@@ -322,8 +322,8 @@ def guardar_inspeccion():
         )
         cur.execute(query, params)
         
-        # Soporte Multi-Flota: Actualización de estatus Logueado y Redirección correcta
         if tipo_flota == 'carga':
+            # Corrección SIM-065, SIM-066, SIM-067: Aislamiento Multi-Tenant en actualización
             cur.execute("UPDATE vehiculos SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
             cur.execute("""
                 INSERT INTO historial_sesiones_flota (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion, latitud, longitud)
@@ -334,8 +334,8 @@ def guardar_inspeccion():
             try: return redirect(url_for('router_universal', modulo='flota'))
             except: return redirect(url_for('flotacarga.dashboard_operador'))
         else:
+            # Corrección SIM-068: Aislamiento Multi-Tenant en actualización de flota especial
             cur.execute("UPDATE vehiculos_especial SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
-            # La sesión en historial_sesiones_flotaespecial se creó en el paso de prelogin/QR
             mysql.connection.commit()
             flash(f"La inspección se ha registrado y auditado exitosamente. Consecutivo: {consecutivo}", "success")
             return redirect(url_for('operador_flotaespecial.dashboard_operador_especial'))

@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <title>Administración del Sistema | BQA-ONE</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <meta name="theme-color" content="#015249">
+
+  <style>
+    /* ========================================= */
+    /* VARIABLES Y DISEÑO HÍBRIDO (PC/MÓVIL)     */
+    /* ========================================= */
+    :root {
+      --color-primary: #015249;
+      --color-primary-dark: #003832;
+      --header-height: 60px;
+      --bg-light: #f6f7f8;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-light);
+      color: #1f2937;
+      padding-top: var(--header-height);
+      overflow-x: hidden;
+    }
+
+    /* HEADER FIJO */
+    .header {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: var(--header-height);
+      background: white; z-index: 1040;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 15px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .btn-hamburguesa {
+      display: none; background: none; border: none; font-size: 1.6rem;
+      color: var(--color-primary); cursor: pointer; padding: 5px; margin-right: 10px;
+    }
+
+    /* LAYOUT PRINCIPAL */
+    .layout {
+      display: flex; max-width: 1600px; margin: 0 auto; padding: 20px; gap: 20px; position: relative;
+    }
+
+    /* SIDEBAR */
+    .sidebar-left {
+      flex: 0 0 260px; width: 260px;
+      background: linear-gradient(180deg, var(--color-primary) 0%, #002521 100%);
+      color: white; border-radius: 12px; height: calc(100vh - 90px);
+      position: sticky; top: 80px; overflow-y: auto;
+      box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05); z-index: 1000;
+      transition: transform 0.3s ease;
+    }
+
+    .main-content {
+      flex: 1; min-width: 0;
+    }
+
+    .sidebar-section-title {
+      padding: 15px 20px 10px 20px; font-size: 0.75rem; font-weight: 700;
+      color: rgba(255, 255, 255, 0.5); text-transform: uppercase;
+      letter-spacing: 1px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-item {
+      display: flex; align-items: center; width: 100%; padding: 12px 20px;
+      color: #e2e8f0; background: transparent; border: none; text-align: left;
+      font-size: 0.95rem; border-left: 4px solid transparent; cursor: pointer;
+      text-decoration: none;
+    }
+    .nav-item:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+    .icon-spacer { display: inline-flex; width: 25px; justify-content: center; margin-right: 10px; }
+
+    @media (max-width: 992px) {
+      .btn-hamburguesa { display: block; }
+      .layout { display: block; padding: 10px; }
+      .sidebar-left {
+        position: fixed; top: 0; left: 0; height: 100vh; width: 280px;
+        border-radius: 0; transform: translateX(-105%); z-index: 2000;
+      }
+      .sidebar-left.show { transform: translateX(0); }
+      .sidebar-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.6); z-index: 1999; display: none; backdrop-filter: blur(2px);
+      }
+      .sidebar-overlay.show { display: block; }
+    }
+  </style>
+
+  <script>
+    let empresasData = [];
+    document.addEventListener("DOMContentLoaded", function() {
+      try {
+        const dataElement = document.getElementById('empresas-data');
+        if (dataElement && dataElement.textContent.trim() !== '') {
+          empresasData = JSON.parse(dataElement.textContent);
+          window.empresasData = empresasData;
+        }
+      } catch (e) { console.warn("Error parseando empresasData:", e); }
+    });
+  </script>
+</head>
+<body>
+
+  <div id="mobileOverlay" class="sidebar-overlay" onclick="toggleMenu()"></div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="d-flex align-items-center">
+      <button class="btn-hamburguesa" onclick="toggleMenu()">☰</button>
+      <h4 class="m-0 fw-bold" style="color: var(--color-primary);">Administración del Sistema</h4>
+    </div>
+    <div class="d-none d-md-block text-center text-muted small fw-bold">
+      {{ nombre }} | {{ empresa }}
+    </div>
+    <div>
+      <a href="/logout" class="btn btn-outline-danger btn-sm">Salir</a>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- BARRA LATERAL -->
+    <div class="sidebar-left" id="sidebarMenu">
+      <div class="d-lg-none p-3 border-bottom border-secondary mb-2 text-end">
+        <button class="btn btn-sm btn-light w-100" onclick="toggleMenu()">✕ Cerrar Menú</button>
+      </div>
+      
+      <div class="sidebar-section-title">NAVEGACIÓN</div>
+      <a href="/901811727.html" class="nav-item">
+        <span class="icon-spacer">⬅️</span> Volver al Hub Principal
+      </a>
+      
+      <div class="sidebar-section-title mt-3">GESTIÓN DE ENTIDADES</div>
+      <button class="nav-item" onclick="mostrarSeccion('gestionEmpresas'); cargarTablaEmpresas();">
+        <span class="icon-spacer">🏢</span> Empresas
+      </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionTiposEmpresa'); cargarTablaTiposEmpresa();">
+        <span class="icon-spacer">🏷️</span> Tipos de Empresa
+      </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionUsuarios'); cargarTablaUsuarios();">
+        <span class="icon-spacer">👥</span> Usuarios
+      </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionPerfiles'); cargarTablaPerfiles();">
+        <span class="icon-spacer">🔑</span> Perfiles
+      </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionProveedores'); cargarTablaProveedores();">
+        <span class="icon-spacer">🚚</span> Proveedores
+      </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionContactos'); cargarTablaContactos();">
+        <span class="icon-spacer">📞</span> Contactos
+      </button>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="main-content">
+      <div id="adminDashboardContainer">
+
+          <!-- Mensaje inicial de espera -->
+          <div id="msgBienvenidaAdmin" class="text-center py-5 bg-white rounded shadow-sm p-4">
+              <h4 class="text-muted fw-bold">Centro de Administración del Sistema</h4>
+              <p class="text-secondary">Seleccione una opción del submenú lateral para gestionar usuarios, empresas o perfiles.</p>
+          </div>
+
+          <!-- 1. GESTIÓN DE EMPRESAS -->
+          <div id="gestionEmpresas" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Gestión de Empresas</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Empresa')">+ Nueva Empresa</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>NIT</th>
+                      <th>Nombre Comercial</th>
+                      <th>Tipo Empresa</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyEmpresas"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 2. GESTIÓN TIPOS DE EMPRESA -->
+          <div id="gestionTiposEmpresa" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Tipos de Empresa</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('TipoEmpresa')">+ Nuevo Tipo</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>Nombre del Tipo</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyTiposEmpresa"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 3. GESTIÓN DE USUARIOS -->
+          <div id="gestionUsuarios" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Gestión de Usuarios</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Usuario')">+ Nuevo Usuario</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>Cédula</th>
+                      <th>Nombre</th>
+                      <th>Perfil</th>
+                      <th>Empresa</th>
+                      <th>Teléfono</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyUsuarios"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 4. GESTIÓN DE PERFILES -->
+          <div id="gestionPerfiles" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Gestión de Perfiles</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Perfil')">+ Nuevo Perfil</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>NIT</th>
+                      <th>Empresa</th>
+                      <th>Operación</th>
+                      <th>Perfil</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyPerfiles"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 5. GESTIÓN DE PROVEEDORES -->
+          <div id="gestionProveedores" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Gestión de Proveedores</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Proveedor')">+ Nuevo Proveedor</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>NIT/ID</th>
+                      <th>Proveedor</th>
+                      <th>Precio Kg</th>
+                      <th>Emails</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyProveedores"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 6. GESTIÓN DE CONTACTOS -->
+          <div id="gestionContactos" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Contactos de Alertas</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Contacto')">+ Nuevo Contacto</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Área</th>
+                      <th>Email Destino</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyContactos"></tbody>
+                </table>
+              </div>
+          </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL MAESTRO DE EDICIÓN / CREACIÓN -->
+  <div class="modal fade" id="modalMaestro" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+              <div class="modal-header bg-primary text-white">
+                  <h5 class="modal-title fw-bold" id="modalTituloMaestro">Formulario</h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body" id="contenedorCamposMaestro"></div>
+              <div class="modal-footer bg-light">
+                  <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                  <button type="button" class="btn btn-success fw-bold px-4 shadow-sm" onclick="guardarMaestro()">✅ Guardar Cambios</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- INYECCIÓN DE DATOS DESDE FLASK -->
+  <script id="tipos-empresa-data" type="application/json">
+    {{ tipos_empresa | default([]) | tojson | safe }}
+  </script>
+  <script id="empresas-data" type="application/json">
+    {{ empresas | default([]) | tojson | safe }}
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- JAVASCRIPT EXCLUSIVO DEL MÓDULO CRUD (ADMIN) -->
+  <script>
+      let currentMode = "";
+      let currentAction = "crear";
+      let currentUrl = "";
+
+      let tiposEmpresaData = [];
+      document.addEventListener("DOMContentLoaded", function() {
+          try {
+              const txt = document.getElementById('tipos-empresa-data');
+              if(txt) tiposEmpresaData = JSON.parse(txt.textContent);
+          } catch(e) {}
+      });
+
+      function toggleMenu() {
+        const sidebar = document.getElementById('sidebarMenu');
+        const overlay = document.getElementById('mobileOverlay');
+        sidebar.classList.toggle('show');
+        overlay.classList.toggle('show');
+      }
+
+      function mostrarSeccion(idSeccion) {
+        document.querySelectorAll('#adminDashboardContainer .form-section').forEach(el => el.style.display = 'none');
+        document.getElementById('msgBienvenidaAdmin').style.display = 'none';
+        const sec = document.getElementById(idSeccion);
+        if(sec) sec.style.display = 'block';
+        if (window.innerWidth < 992) toggleMenu();
+      }
+
+      window.cerrarVistasAdmin = function() {
+          document.querySelectorAll('#adminDashboardContainer .form-section').forEach(el => el.style.display = 'none');
+          document.getElementById('msgBienvenidaAdmin').style.display = 'block';
+      }
+
+      window.cargarTablaEmpresas = function() {
+          const b = document.getElementById('bodyEmpresas');
+          b.innerHTML = '';
+          if (window.empresasData) {
+              window.empresasData.forEach(e => {
+                  const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(e))));
+                  b.innerHTML += `<tr>
+                      <td class="text-muted small">${e.nit}</td>
+                      <td class="fw-bold">${e.nombre_comercial}</td>
+                      <td><span class="badge bg-secondary">${e.tipo_empresa || 'general'}</span></td>
+                      <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Empresa', '${dataStr}')">✏️ Editar</button></td>
+                  </tr>`;
+              });
+          }
+      }
+
+      window.cargarTablaTiposEmpresa = function() {
+          fetch('/obtener_todos_tipos_empresa').then(r => r.json()).then(d => {
+              const b = document.getElementById('bodyTiposEmpresa'); b.innerHTML = '';
+              d.tipos.forEach(t => {
+                  const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(t))));
+                  b.innerHTML += `<tr><td class="fw-bold text-primary">${t.tipo}</td><td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('TipoEmpresa', '${dataStr}')">✏️ Editar</button></td></tr>`;
+              });
+          });
+      }
+
+      window.cargarTablaUsuarios = function() {
+          fetch('/obtener_todos_usuarios').then(r => r.json()).then(d => {
+              const b = document.getElementById('bodyUsuarios'); b.innerHTML = '';
+              d.users.forEach(u => {
+                  const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(u))));
+                  b.innerHTML += `<tr>
+                      <td class="small text-muted">${u.cedula}</td>
+                      <td class="fw-bold">${u.nombre}</td>
+                      <td><span class="badge bg-info text-dark shadow-sm">${u.perfil}</span></td>
+                      <td class="small fw-bold">${u.empresa}</td>
+                      <td>${u.telefono || '-'}</td>
+                      <td>
+                          <button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Usuario', '${dataStr}')">✏️ Editar</button>
+                          <button class="btn btn-sm btn-outline-danger fw-bold ms-1" onclick="eliminarUsuario('${u.cedula}')">🗑️</button>
+                      </td>
+                  </tr>`;
+              });
+          });
+      }
+
+      window.cargarTablaPerfiles = function() {
+          fetch('/obtener_todos_perfiles').then(r => r.json()).then(d => {
+              const b = document.getElementById('bodyPerfiles'); b.innerHTML = '';
+              d.profiles.forEach(p => {
+                  const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(p))));
+                  b.innerHTML += `<tr>
+                      <td class="small text-muted">${p.nit}</td>
+                      <td class="fw-bold">${p.empresa}</td>
+                      <td class="small text-uppercase">${p.operacion}</td>
+                      <td><span class="badge bg-success shadow-sm">${p.perfil}</span></td>
+                      <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Perfil', '${dataStr}')">✏️ Editar</button></td>
+                  </tr>`;
+              });
+          });
+      }
+
+      window.cargarTablaProveedores = function() {
+          fetch('/obtener_todos_proveedores').then(r => r.json()).then(d => {
+              const b = document.getElementById('bodyProveedores'); b.innerHTML = '';
+              d.providers.forEach(p => {
+                  const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(p))));
+                  b.innerHTML += `<tr>
+                      <td class="small text-muted">${p.id_proveedor}</td>
+                      <td class="fw-bold">${p.proveedor}</td>
+                      <td class="text-success fw-bold">$${p.precio}</td>
+                      <td><small>${p.email1}</small></td>
+                      <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Proveedor', '${dataStr}')">✏️ Editar</button></td>
+                  </tr>`;
+              });
+          });
+      }
+
+      window.cargarTablaContactos = function() {
+          fetch('/obtener_todos_contactos').then(r => r.json()).then(d => {
+              const b = document.getElementById('bodyContactos'); b.innerHTML = '';
+              d.contacts.forEach(c => {
+                  const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(c))));
+                  b.innerHTML += `<tr>
+                      <td class="fw-bold">${c.empresa}</td>
+                      <td><span class="badge bg-warning text-dark shadow-sm">${c.area_contacto}</span></td>
+                      <td class="text-danger fw-bold small">${c.email}</td>
+                      <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Contacto', '${dataStr}')">✏️ Editar</button></td>
+                  </tr>`;
+              });
+          });
+      }
+
+      function eliminarUsuario(cedula) {
+          if (confirm("¿Estás seguro de que deseas eliminar permanentemente este usuario? Esta acción no se puede deshacer.")) {
+              const fd = new FormData();
+              fd.append('accion', 'eliminar');
+              fd.append('cedula', cedula);
+              fetch('/gestionar_usuario', { method: 'POST', body: fd })
+              .then(r => r.json()).then(d => {
+                  alert(d.message);
+                  if (d.success) window.cargarTablaUsuarios();
+              }).catch(err => { alert("Error de conexión al intentar eliminar."); });
+          }
+      }
+
+      window.nuevoItem = function(tipo) {
+          currentMode = tipo; currentAction = "crear";
+          document.getElementById('modalTituloMaestro').innerText = "Crear Nuevo: " + tipo;
+          renderizarFormMaestro(tipo, {});
+          new bootstrap.Modal(document.getElementById('modalMaestro')).show();
+      }
+
+      window.editarRegistro = function(tipo, datosBase64) {
+          currentMode = tipo; currentAction = "editar";
+          document.getElementById('modalTituloMaestro').innerText = "Editar Registro: " + tipo;
+          const data = JSON.parse(decodeURIComponent(escape(atob(datosBase64))));
+          renderizarFormMaestro(tipo, data);
+          new bootstrap.Modal(document.getElementById('modalMaestro')).show();
+      }
+
+      function renderizarFormMaestro(tipo, data) {
+          let html = `<input type="hidden" id="form_accion_maestro" value="${currentAction}">`;
+          
+          let optsEmpresas = '<option value="">Seleccione Empresa...</option>';
+          if (window.empresasData) {
+              window.empresasData.forEach(e => {
+                  let sel = (data.empresa === e.nombre_comercial || data.empresa_select === e.nombre_comercial || data.nit === e.nit) ? 'selected' : '';
+                  optsEmpresas += `<option value="${e.nombre_comercial}" data-nit="${e.nit}" ${sel}>${e.nombre_comercial}</option>`;
+              });
+          }
+
+          if (tipo === 'Empresa') {
+              currentUrl = "/gestionar_empresa";
+              let optsTipos = '<option value="">Seleccione...</option>';
+              tiposEmpresaData.forEach(t => {
+                  let sel = (data.tipo_empresa === t) ? 'selected' : '';
+                  optsTipos += `<option value="${t}" ${sel}>${t}</option>`;
+              });
+              html += `
+                  <label class="fw-bold small mt-2 text-primary">NIT</label>
+                  <input type="text" id="f_nit" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+                  <label class="fw-bold small mt-2">Nombre Comercial</label>
+                  <input type="text" id="f_nom" class="form-control" value="${data.nombre_comercial || ''}">
+                  <label class="fw-bold small mt-2">Tipo de Empresa</label>
+                  <select id="f_tipo" class="form-select">${optsTipos}</select>
+                  <label class="fw-bold small mt-4 mb-2 text-success">Módulos Autorizados (Auto-detectados)</label>
+                  <div id="contenedor_switches_modulos" class="row g-2">
+                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando módulos...</span>
+                  </div>`;
+          } 
+          else if (tipo === 'TipoEmpresa') {
+              currentUrl = "/gestionar_tipo_empresa";
+              html += `
+                  <input type="hidden" id="f_tid" value="${data.id || ''}">
+                  <label class="fw-bold small mt-2">Nombre del Tipo</label>
+                  <input type="text" id="f_tnom" class="form-control fw-bold" value="${data.tipo || ''}">`;
+          } 
+          else if (tipo === 'Proveedor') {
+              currentUrl = "/gestionar_proveedor";
+              html += `
+                  <label class="fw-bold small mt-2 text-primary">NIT/ID Proveedor</label>
+                  <input type="text" id="f_idp" class="form-control" value="${data.id_proveedor || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+                  <label class="fw-bold small mt-2">Nombre Proveedor</label>
+                  <input type="text" id="f_prov" class="form-control fw-bold" value="${data.proveedor || ''}">
+                  <label class="fw-bold small text-success mt-2">Precio por Kg ($)</label>
+                  <input type="number" id="f_prec" class="form-control border-success fw-bold" value="${data.precio || 0}">
+                  <label class="fw-bold small mt-2">Email Principal</label>
+                  <input type="email" id="f_e1" class="form-control" value="${data.email1 || ''}">
+                  <label class="fw-bold small mt-2">Email Secundario</label>
+                  <input type="email" id="f_e2" class="form-control" value="${data.email2 || ''}">`;
+          } 
+          else if (tipo === 'Usuario') {
+              currentUrl = "/gestionar_usuario";
+              html += `
+                  <label class="fw-bold small mt-2 text-primary">Cédula</label>
+                  <input type="text" id="f_ced" class="form-control" value="${data.cedula || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+                  <label class="fw-bold small mt-2">Nombre Completo</label>
+                  <input type="text" id="f_unom" class="form-control fw-bold" value="${data.nombre || ''}">
+                  <label class="fw-bold small mt-2 text-secondary">Asignar a Empresa</label>
+                  <select id="f_enom" class="form-select fw-bold" onchange="document.getElementById('f_eid').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select>
+                  <input type="hidden" id="f_eid" value="${data.empresa_id || ''}">
+                  <label class="fw-bold small mt-2 text-info">Perfil del Sistema</label>
+                  <input type="text" id="f_perf" class="form-control fw-bold border-info" value="${data.perfil || ''}" placeholder="Ej: operador_logistica">
+                  <div class="row mt-2">
+                      <div class="col-6">
+                          <label class="fw-bold small text-primary">Telegram ID</label>
+                          <input type="text" id="f_tlg" class="form-control border-primary bg-light small" value="${data.telegram_id || ''}" readonly placeholder="Bot Automático">
+                      </div>
+                      <div class="col-6">
+                          <label class="fw-bold small">Teléfono</label>
+                          <input type="text" id="f_tel" class="form-control" value="${data.telefono || ''}" oninput="if(this.value !== '${data.telefono || ''}') { document.getElementById('f_tlg').value = ''; }">
+                      </div>
+                  </div>
+                  <label class="fw-bold small text-danger mt-3">Contraseña ${currentAction === 'editar' ? '(Dejar vacío para NO cambiar)' : '*'}</label>
+                  <input type="password" id="f_pass" class="form-control border-danger">
+                  <input type="hidden" id="f_tuser" value="cliente">
+                  <input type="hidden" id="f_clase" value="op">`;
+          } 
+          else if (tipo === 'Perfil') {
+              currentUrl = "/gestionar_perfil";
+              html += `
+                  <input type="hidden" id="f_pid" value="${data.id || ''}">
+                  <label class="fw-bold small mt-2">Empresa (Inquilino)</label>
+                  <select id="f_enom_p" class="form-select fw-bold" onchange="document.getElementById('f_nit_p').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select>
+                  <input type="hidden" id="f_nit_p" value="${data.nit || ''}">
+                  <label class="fw-bold small mt-2">Módulo / Operación</label>
+                  <input type="text" id="f_op" class="form-control" value="${data.operacion || ''}" placeholder="Ej: gas">
+                  <label class="fw-bold small text-success mt-2">Identificador del Perfil</label>
+                  <input type="text" id="f_perf_p" class="form-control border-success fw-bold" value="${data.perfil || ''}" placeholder="Ej: supervisor_gas">
+                  <label class="fw-bold small text-danger mt-2">Ruta Física (HTML o ViewFunc)</label>
+                  <input type="text" id="f_archivo" class="form-control border-danger fw-bold" value="${data.archivo_destino || ''}" placeholder="Ej: 901811727_energia.html">`;
+          } 
+          else if (tipo === 'Contacto') {
+              currentUrl = "/gestionar_contacto";
+              html += `
+                  <input type="hidden" id="f_cid" value="${data.id || ''}">
+                  <label class="fw-bold small mt-2">Empresa</label>
+                  <select id="f_enom_c" class="form-select fw-bold" onchange="document.getElementById('f_eid_c').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select>
+                  <input type="hidden" id="f_eid_c" value="${data.id_empresa || ''}">
+                  <label class="fw-bold small text-warning mt-2">Área del Contacto</label>
+                  <input type="text" id="f_area" class="form-control border-warning fw-bold" value="${data.area_contacto || ''}" placeholder="Ej: gerenciagranjas">
+                  <label class="fw-bold small text-danger mt-2">Email para Alertas</label>
+                  <input type="email" id="f_email" class="form-control border-danger fw-bold" value="${data.email || ''}">`;
+          }
+
+          document.getElementById('contenedorCamposMaestro').innerHTML = html;
+
+          if (tipo === 'Empresa') {
+              fetch('/api/modulos_sistema_disponibles').then(r => r.json()).then(res => {
+                  const contenedor = document.getElementById('contenedor_switches_modulos');
+                  if (contenedor && res.success) {
+                      contenedor.innerHTML = '';
+                      const modulosActivos = data.modulos_activos || [];
+                      res.modulos.forEach(mod => {
+                          const isChecked = modulosActivos.includes(mod) ? 'checked' : '';
+                          contenedor.innerHTML += `
+                              <div class="col-6">
+                                  <div class="form-check form-switch p-2 border rounded bg-light">
+                                      <input class="form-check-input chk-modulo ms-1 me-2" type="checkbox" value="${mod}" id="mod_${mod}" ${isChecked}>
+                                      <label class="form-check-label text-capitalize small fw-bold" for="mod_${mod}">${mod}</label>
+                                  </div>
+                              </div>`;
+                      });
+                  }
+              }).catch(err => {
+                  const contenedor = document.getElementById('contenedor_switches_modulos');
+                  if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error escaneando módulos del sistema.</span>';
+              });
+          }
+      }
+
+      window.guardarMaestro = function() {
+          const fd = new FormData();
+          fd.append('accion', document.getElementById('form_accion_maestro').value);
+
+          if (currentMode === 'Empresa') {
+              fd.append('nit', document.getElementById('f_nit').value);
+              fd.append('nombre_comercial', document.getElementById('f_nom').value);
+              fd.append('tipo_empresa', document.getElementById('f_tipo').value);
+              document.querySelectorAll('.chk-modulo:checked').forEach(chk => { fd.append('modulos[]', chk.value); });
+          } 
+          else if (currentMode === 'TipoEmpresa') {
+              fd.append('id', document.getElementById('f_tid') ? document.getElementById('f_tid').value : '');
+              fd.append('tipo', document.getElementById('f_tnom') ? document.getElementById('f_tnom').value : '');
+          } 
+          else if (currentMode === 'Proveedor') {
+              fd.append('id_proveedor', document.getElementById('f_idp').value);
+              fd.append('proveedor', document.getElementById('f_prov').value);
+              fd.append('precio', document.getElementById('f_prec').value);
+              fd.append('email1', document.getElementById('f_e1').value);
+              fd.append('email2', document.getElementById('f_e2').value);
+          } 
+          else if (currentMode === 'Usuario') {
+              fd.append('cedula', document.getElementById('f_ced').value);
+              fd.append('nombre', document.getElementById('f_unom').value);
+              fd.append('perfil', document.getElementById('f_perf').value);
+              fd.append('telegram_id', document.getElementById('f_tlg').value);
+              fd.append('telefono', document.getElementById('f_tel').value);
+              fd.append('password', document.getElementById('f_pass').value);
+              fd.append('empresa_id', document.getElementById('f_eid').value);
+              fd.append('empresa_select', document.getElementById('f_enom').value);
+              fd.append('tipo_usuario', document.getElementById('f_tuser').value);
+              fd.append('clase', document.getElementById('f_clase').value);
+          } 
+          else if (currentMode === 'Perfil') {
+              fd.append('id', document.getElementById('f_pid').value);
+              fd.append('empresa_select', document.getElementById('f_enom_p').value);
+              fd.append('nit', document.getElementById('f_nit_p').value);
+              fd.append('operacion', document.getElementById('f_op').value);
+              fd.append('perfil', document.getElementById('f_perf_p').value);
+              fd.append('archivo_destino', document.getElementById('f_archivo').value);
+          } 
+          else if (currentMode === 'Contacto') {
+              fd.append('id', document.getElementById('f_cid').value);
+              fd.append('empresa_nombre', document.getElementById('f_enom_c').value);
+              fd.append('id_empresa', document.getElementById('f_eid_c').value);
+              fd.append('area_contacto', document.getElementById('f_area').value);
+              fd.append('email', document.getElementById('f_email').value);
+          }
+
+          fetch(currentUrl, { method: 'POST', body: fd })
+          .then(r => r.json()).then(d => {
+              alert(d.message);
+              if (d.success) {
+                  bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
+                  if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa') location.reload();
+                  else if (currentMode === 'Usuario') window.cargarTablaUsuarios();
+                  else if (currentMode === 'Proveedor') window.cargarTablaProveedores();
+                  else if (currentMode === 'Perfil') window.cargarTablaPerfiles();
+                  else if (currentMode === 'Contacto') window.cargarTablaContactos();
+              }
+          }).catch(err => { alert("Error crítico al guardar. Verifique conexión."); });
+      }
+  </script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!-- app/templates/B_verificar_fuec.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Verificación Oficial FUEC | BQA-ONE</title>
+    <style>
+        :root {
+            --mintransporte: #004884;
+            --verde: #015249;
+            --surface: #ffffff;
+            --text: #1f2937;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --radius: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; }
+        body { background-color: #f3f4f6; color: var(--text); padding: 15px; }
+        
+        .container { max-width: 600px; margin: 0 auto; background: var(--surface); border-radius: var(--radius); box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid var(--border); }
+        .header { padding: 20px; text-align: center; border-bottom: 2px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #fff; }
+        .header img { max-height: 45px; object-fit: contain; }
+        
+        .badge { padding: 15px; text-align: center; font-size: 18px; font-weight: bold; color: #fff; letter-spacing: 1px; }
+        .badge.valid { background-color: #16a34a; }
+        .badge.invalid { background-color: #dc2626; }
+        
+        .content { padding: 20px; }
+        .section-title { font-size: 14px; font-weight: bold; color: var(--mintransporte); border-bottom: 1px solid var(--mintransporte); padding-bottom: 5px; margin-top: 20px; margin-bottom: 10px; text-transform: uppercase; }
+        
+        .data-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .data-item { background: #f9fafb; padding: 10px; border-radius: 6px; border: 1px solid var(--border); }
+        .data-label { font-size: 11px; color: var(--text-muted); font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+        .data-val { font-size: 14px; font-weight: bold; color: var(--text); word-break: break-word;}
+        
+        .fuec-number { text-align: center; font-size: 22px; font-weight: bold; color: var(--mintransporte); font-family: monospace; letter-spacing: 2px; margin: 15px 0; padding: 10px; background: #e0f2fe; border-radius: 8px; border: 1px dashed #7dd3fc;}
+        
+        .footer { background: #f3f4f6; padding: 15px; text-align: center; font-size: 10px; color: var(--text-muted); border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <!-- Logos exigidos por la Ficha Técnica Oficial -->
+            <img src="{{ url_for('static', filename='logo_mintransporte.png') }}" alt="Mintransporte" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Ministerio_de_Transporte_%28Colombia%29_logo.svg/1200px-Ministerio_de_Transporte_%28Colombia%29_logo.svg.png'">
+            {% if empresa %}
+            <img src="{{ url_for('static', filename='logo_' ~ empresa.nit ~ '.PNG') }}" alt="{{ empresa.nombre_comercial }}" onerror="this.style.display='none'">
+            {% endif %}
+        </div>
+
+        {% if estado == 'INEXISTENTE' %}
+        <div class="badge invalid">❌ FUEC INEXISTENTE O ANULADO</div>
+        <div class="content">
+            <p style="text-align: center; padding: 20px; color: var(--text-muted);">El código escaneado no corresponde a un FUEC válido registrado en la base de datos central de BQA-ONE.</p>
+        </div>
+        {% else %}
+            {% if estado == 'VALIDO' %}
+            <div class="badge valid">✔️ FUEC VÁLIDO Y ACTIVO</div>
+            {% else %}
+            <div class="badge invalid">⚠️ FUEC VENCIDO</div>
+            {% endif %}
+
+            <div class="content">
+                <p style="text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 5px;">FORMATO ÚNICO DE EXTRACTO DEL CONTRATO N°</p>
+                <div class="fuec-number">{{ fuec.consecutivo_oficial }}</div>
+
+                <div class="section-title">1. Datos de la Empresa y Contrato</div>
+                <div class="data-grid">
+                    <div class="data-item">
+                        <div class="data-label">Razón Social Empresa de Transporte</div>
+                        <div class="data-val">{{ empresa.nombre_comercial }} (NIT: {{ empresa.nit }})</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Resolución de Habilitación</div>
+                        <div class="data-val">{{ empresa.numero_resolucion_habilitacion }} de 20{{ empresa.anio_habilitacion }}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Contratante</div>
+                        <div class="data-val">{{ fuec.contratante_nombre }} (NIT/CC: {{ fuec.contratante_nit_cedula }})</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Objeto del Contrato</div>
+                        <div class="data-val">{{ fuec.objeto_contrato }}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Origen - Destino</div>
+                        <div class="data-val">{{ fuec.origen }} - {{ fuec.destino }}</div>
+                    </div>
+                    {% if fuec.convenio_colaboracion %}
+                    <div class="data-item">
+                        <div class="data-label">Convenio Consorcio / Unión Temporal Con:</div>
+                        <div class="data-val">{{ fuec.convenio_colaboracion }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="section-title">2. Vigencia del Contrato</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="data-item">
+                        <div class="data-label">Fecha de Inicio</div>
+                        <div class="data-val">{{ fuec.fecha_inicio_vigencia.strftime('%d/%m/%Y') }}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Fecha de Vencimiento</div>
+                        <div class="data-val">{{ fuec.fecha_fin_vigencia.strftime('%d/%m/%Y') }}</div>
+                    </div>
+                </div>
+
+                <div class="section-title">3. Características del Vehículo</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="data-item">
+                        <div class="data-label">Placa</div>
+                        <div class="data-val">{{ vehiculo.placa }}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Clase / Marca</div>
+                        <div class="data-val">{{ vehiculo.clase }} / {{ vehiculo.marca }}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Modelo</div>
+                        <div class="data-val">{{ vehiculo.modelo }}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Tarjeta de Operación</div>
+                        <div class="data-val">{{ vehiculo.tarjeta_operacion }}</div>
+                    </div>
+                </div>
+
+                <div class="section-title">4. Conductores Asignados</div>
+                <div class="data-grid">
+                    {% for c in conductores %}
+                    <div class="data-item" style="border-left: 3px solid var(--mintransporte);">
+                        <div class="data-label">Conductor {{ loop.index }}</div>
+                        <div class="data-val">{{ c.nombre }}</div>
+                        <div style="font-size: 12px; color: #4b5563; margin-top: 4px;">CC: {{ c.cedula }} | Licencia: {{ c.licencia }} (Vence: {{ c.vigencia_licencia }})</div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Validación: Se omite si es SALUD_EPS según normativa -->
+                {% if fuec.categoria_contrato != 'SALUD_EPS' %}
+                <div class="section-title">5. Pasajeros / Usuarios Autorizados</div>
+                <div class="data-grid">
+                    <div class="data-item">
+                        {% if pasajeros %}
+                            <ul style="padding-left: 20px; font-size: 13px; color: var(--text);">
+                            {% for p in pasajeros %}
+                                <li>{{ p.nombre }} ({{ p.identificacion }})</li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="data-val" style="font-weight: normal; font-size: 13px;">Ver listado anexo al contrato original.</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <div class="footer">
+            Sistema de Control y Trazabilidad en Línea - <b>BQA-ONE</b><br>
+            Validación Oficial según Resolución 0006652 de 2019
+        </div>
+    </div>
+</body>
+</html>

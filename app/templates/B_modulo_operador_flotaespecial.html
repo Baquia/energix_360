@@ -72,6 +72,9 @@
         .btn-submit { background: var(--verde); color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
         .btn-success { background: #10b981; color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
         .btn-cancel { background: #f3f4f6; color: #4b5563; border: 1px solid var(--border); padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
+        
+        .btn-danger-outline { background: transparent; color: #ef4444; border: 1px solid #ef4444; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; margin-top: 15px; transition: 0.2s;}
+        .btn-danger-outline:hover { background: #fee2e2; }
 
         /* HITOS Y FIRMA */
         .hitos-container { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
@@ -150,6 +153,11 @@
                                 📝 Completar Declaración y Cerrar Viaje
                             </button>
                         </div>
+                        
+                        <!-- FASE 2: BOTÓN DE NOVEDAD EN RUTA -->
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button type="button" class="btn-danger-outline" onclick="abrirModalNovedad()">🚨 Reportar Novedad / Falla Mecánica</button>
+                        </div>
                     </div>
 
                 {% else %}
@@ -173,6 +181,10 @@
                                     <button onclick="iniciarViajeManual()" class="btn-card" style="background: var(--verde); padding: 16px 20px; border-radius: 10px; border: none; color: white; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px;">
                                         <span>▶</span> Iniciar Recorrido
                                     </button>
+                                </div>
+                                <!-- FASE 2: BOTÓN DE NOVEDAD PRE-VIAJE -->
+                                <div style="text-align: center; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+                                    <button type="button" class="btn-danger-outline" onclick="abrirModalNovedad()">🚨 Reportar Imprevisto (No puedo iniciar)</button>
                                 </div>
                             </div>
 
@@ -213,6 +225,40 @@
             <p class="modal-text">Apunte la cámara al código QR ubicado en la cabina de la unidad.</p>
             <div id="qr-reader"></div>
             <button onclick="cerrarScannerQR()" class="btn-cancel">Cancelar Escaneo</button>
+        </div>
+    </div>
+
+    <!-- FASE 2: MODAL DE REPORTE DE NOVEDAD -->
+    <div id="modalNovedad" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-title">
+                <span style="color: #ef4444;">🚨 Reportar Novedad</span>
+                <button onclick="document.getElementById('modalNovedad').style.display='none'" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <p class="modal-text" style="font-size: 12px; margin-bottom: 15px;">Seleccione el tipo de evento e ingrese los detalles. Esto notificará inmediatamente al controlador.</p>
+            
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="font-size: 13px; font-weight: bold; color: var(--text);">Tipo de Contingencia:</label>
+                <select id="selTipoNovedad" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--border);">
+                    <option value="">Seleccione...</option>
+                    <option value="NOVEDAD_PRE_VIAJE">Fuerza Mayor ANTES de iniciar (Ej. Ausencia, Choque previo)</option>
+                    <option value="NOVEDAD_RECORRIDO">Falla Mecánica EN RUTA (Requiere Trasbordo)</option>
+                </select>
+            </div>
+            
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="font-size: 13px; font-weight: bold; color: var(--text);">Código del Viaje Afectado:</label>
+                <input type="text" id="txtIdViajeNovedad" value="{{ session.get('codigo_viaje_alfanumerico', '') }}" placeholder="Ej: ABC12D_IDA" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--border); font-family: monospace;">
+                <small style="color: #6b7280; font-size: 11px;">(Si ya estaba en recorrido, se auto-rellena)</small>
+            </div>
+            
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="font-size: 13px; font-weight: bold; color: var(--text);">Justificación / Detalles:</label>
+                <textarea id="txtDescNovedad" rows="3" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--border);" placeholder="Describa brevemente lo ocurrido..."></textarea>
+            </div>
+
+            <button type="button" class="btn-submit" id="btnEnviarNovedad" style="background: #ef4444;" onclick="enviarReporteNovedad()">Enviar Reporte al Controlador</button>
+            <button type="button" class="btn-cancel" onclick="document.getElementById('modalNovedad').style.display='none'">Cancelar</button>
         </div>
     </div>
 
@@ -538,7 +584,6 @@
                 }
             })
             .catch(e => {
-                // Muestra el error real (sea de servidor, validación de placa o red)
                 alert("Falla en la operación: " + e.message);
             });
         }
@@ -697,7 +742,7 @@
         }
 
         // ============================================
-        // LÓGICA DE FIRMA CANVAS Y MODAL (CORREGIDO)
+        // LÓGICA DE FIRMA CANVAS Y MODAL
         // ============================================
         let ctxFirma = null;
         let isDrawing = false;
@@ -757,16 +802,97 @@
             const modal = document.getElementById('modalFirma');
             modal.style.display = 'flex';
             
-            // Recalcular y fijar el canvas de firma en base a su visualización real en pantalla
             setTimeout(() => {
                 const canvas = document.getElementById('signaturePad');
                 if(canvas) {
                     const rect = canvas.parentElement.getBoundingClientRect();
-                    canvas.width = rect.width - 60; // Descontar padding del modal box
+                    canvas.width = rect.width - 60; 
                     canvas.height = 150;
-                    initFirmaCanvas(); // Reinicializar contexto tras cambio de tamaño
+                    initFirmaCanvas(); 
                 }
             }, 50);
+        }
+
+        // ============================================
+        // FASE 2: LÓGICA DE REPORTE DE NOVEDADES
+        // ============================================
+        function abrirModalNovedad() {
+            const modal = document.getElementById('modalNovedad');
+            modal.style.display = 'flex';
+            
+            // Limpiar campos previos
+            document.getElementById('selTipoNovedad').value = "";
+            document.getElementById('txtDescNovedad').value = "";
+            
+            const isViajeActivo = {% if session.get('viaje_activo_especial') %}true{% else %}false{% endif %};
+            if(isViajeActivo) {
+                document.getElementById('selTipoNovedad').value = "NOVEDAD_RECORRIDO";
+            }
+        }
+
+        function enviarReporteNovedad() {
+            const tipo = document.getElementById('selTipoNovedad').value;
+            const desc = document.getElementById('txtDescNovedad').value.trim();
+            const idViaje = document.getElementById('txtIdViajeNovedad').value.trim();
+
+            if (!tipo || !desc || !idViaje) {
+                alert("Debe completar todos los campos obligatorios para enviar el reporte.");
+                return;
+            }
+
+            const btn = document.getElementById('btnEnviarNovedad');
+            btn.disabled = true;
+            btn.innerHTML = 'Enviando...';
+
+            if (tipo === 'NOVEDAD_RECORRIDO' && navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(pos) {
+                        _ejecutarPostNovedad(tipo, desc, idViaje, pos.coords.latitude, pos.coords.longitude, btn);
+                    },
+                    function(err) {
+                        alert("No se pudo obtener ubicación GPS, pero se enviará el reporte.");
+                        _ejecutarPostNovedad(tipo, desc, idViaje, null, null, btn);
+                    },
+                    { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+                );
+            } else {
+                _ejecutarPostNovedad(tipo, desc, idViaje, null, null, btn);
+            }
+        }
+
+        function _ejecutarPostNovedad(tipo, desc, idViaje, lat, lng, btnRef) {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            
+            fetch("{{ url_for('operador_flotaespecial.reportar_novedad_especial') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({
+                    id_traslado_eps: idViaje,
+                    tipo_novedad: tipo,
+                    descripcion: desc,
+                    lat: lat,
+                    lng: lng
+                })
+            }).then(res => res.json())
+              .then(data => {
+                  if(data.status === 'success') {
+                      alert("⚠️ Contingencia notificada. El centro de control se encargará de la reasignación.");
+                      if (tipo === 'NOVEDAD_RECORRIDO' || document.getElementById('txtIdViajeNovedad').value.toUpperCase() === '{{ session.get("codigo_viaje_alfanumerico") }}') {
+                          limpiarViajeLocal();
+                          window.location.reload();
+                      } else {
+                          document.getElementById('modalNovedad').style.display = 'none';
+                      }
+                  } else {
+                      alert("Error: " + data.message);
+                      btnRef.disabled = false;
+                      btnRef.innerHTML = 'Enviar Reporte al Controlador';
+                  }
+              }).catch(e => {
+                  alert("Fallo de conexión al enviar novedad.");
+                  btnRef.disabled = false;
+                  btnRef.innerHTML = 'Enviar Reporte al Controlador';
+              });
         }
 
         // ============================================
@@ -783,7 +909,6 @@
 
         function finalizarFlujoUI() {
             limpiarViajeLocal();
-            // Nueva instrucción: Limpieza total y reinicio a la pantalla principal
             alert("✅ Recorrido finalizado exitosamente. Ya puede recibir o iniciar una nueva asignación.");
             window.location.reload();
         }

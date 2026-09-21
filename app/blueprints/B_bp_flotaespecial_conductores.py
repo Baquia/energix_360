@@ -128,7 +128,8 @@ def gestion_conductores():
                 try:
                     if accion == 'crear':
                         # 1. Crear en tabla usuarios (Perfil: operador_flotaespecial)
-                        cur.execute("SELECT id FROM usuarios WHERE cedula = %s", (cedula,))
+                        # Corrección SIM-017: Aislamiento Multi-Tenant asegurado en la validación de usuario existente
+                        cur.execute("SELECT id FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula, empresa_id))
                         if cur.fetchone():
                             flash(f"La cédula {cedula} ya está registrada como usuario.", "danger")
                             return redirect(url_for('flotaespecial_conductores.gestion_conductores'))
@@ -165,9 +166,10 @@ def gestion_conductores():
                               vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
                               vencimiento_ss, conductor_id, empresa_id))
                         
-                        if r_ced: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_cedula=%s WHERE id=%s", (r_ced, conductor_id))
-                        if r_lic: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_licencia=%s WHERE id=%s", (r_lic, conductor_id))
-                        if r_ss: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_seguridad_social=%s WHERE id=%s", (r_ss, conductor_id))
+                        # Correcciones SIM-018, SIM-019, SIM-020: Aislamiento Multi-Tenant asegurado en la actualización de archivos
+                        if r_ced: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_cedula=%s WHERE id=%s AND id_empresa=%s", (r_ced, conductor_id, empresa_id))
+                        if r_lic: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_licencia=%s WHERE id=%s AND id_empresa=%s", (r_lic, conductor_id, empresa_id))
+                        if r_ss: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_seguridad_social=%s WHERE id=%s AND id_empresa=%s", (r_ss, conductor_id, empresa_id))
                         
                         # Actualizar usuario relacionado
                         cur.execute("UPDATE usuarios SET nombre=%s, telegram_id=%s WHERE cedula=%s AND empresa_id=%s", (nombre, telegram_id or None, cedula, empresa_id))

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <title>Auditoría y Sistema | BQA-ONE</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <meta name="theme-color" content="#015249">
+
+  <style>
+    /* ========================================= */
+    /* VARIABLES Y DISEÑO HÍBRIDO (PC/MÓVIL)     */
+    /* ========================================= */
+    :root {
+      --color-primary: #015249;
+      --color-primary-dark: #003832;
+      --header-height: 60px;
+      --bg-light: #f6f7f8;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-light);
+      color: #1f2937;
+      padding-top: var(--header-height);
+      overflow-x: hidden;
+    }
+
+    /* HEADER FIJO */
+    .header {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: var(--header-height);
+      background: white; z-index: 1040;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 15px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .btn-hamburguesa {
+      display: none; background: none; border: none; font-size: 1.6rem;
+      color: var(--color-primary); cursor: pointer; padding: 5px; margin-right: 10px;
+    }
+
+    /* LAYOUT PRINCIPAL */
+    .layout {
+      display: flex; max-width: 1600px; margin: 0 auto; padding: 20px; gap: 20px; position: relative;
+    }
+
+    /* SIDEBAR */
+    .sidebar-left {
+      flex: 0 0 260px; width: 260px;
+      background: linear-gradient(180deg, var(--color-primary) 0%, #002521 100%);
+      color: white; border-radius: 12px; height: calc(100vh - 90px);
+      position: sticky; top: 80px; overflow-y: auto;
+      box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05); z-index: 1000;
+      transition: transform 0.3s ease;
+    }
+
+    .main-content {
+      flex: 1; min-width: 0;
+    }
+
+    .sidebar-section-title {
+      padding: 15px 20px 10px 20px; font-size: 0.75rem; font-weight: 700;
+      color: rgba(255, 255, 255, 0.5); text-transform: uppercase;
+      letter-spacing: 1px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-item {
+      display: flex; align-items: center; width: 100%; padding: 12px 20px;
+      color: #e2e8f0; background: transparent; border: none; text-align: left;
+      font-size: 0.95rem; border-left: 4px solid transparent; cursor: pointer;
+      text-decoration: none;
+    }
+    .nav-item:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+    .icon-spacer { display: inline-flex; width: 25px; justify-content: center; margin-right: 10px; }
+
+    /* ========================================= */
+    /* ESTILOS DE AUDITORÍA Y TIMELINE           */
+    /* ========================================= */
+    .audit-container {
+      background: white;
+      border-radius: 10px;
+      padding: 25px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      min-height: 70vh;
+    }
+
+    .timeline {
+      border-left: 2px solid #e0e0e0;
+      padding-left: 30px;
+      margin-top: 20px;
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 25px;
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      border-left: 4px solid #ccc;
+    }
+
+    .timeline-dot {
+      position: absolute;
+      left: -39px;
+      top: 15px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      border: 3px solid #ccc;
+    }
+
+    .mod-glp { border-color: #015249; }
+    .mod-glp .timeline-dot { border-color: #015249; }
+    .mod-alerta { border-color: #ef4444; }
+    .mod-alerta .timeline-dot { border-color: #ef4444; }
+
+    .live-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background-color: #22c55e;
+      border-radius: 50%;
+      margin-right: 5px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    .pregunta-overlay {
+      position: fixed; inset: 0; background: rgba(0, 50, 40, 0.7);
+      backdrop-filter: blur(3px); z-index: 9999; display: flex;
+      justify-content: center; align-items: center;
+    }
+    .pregunta-card {
+      background: white; padding: 30px; border-radius: 15px;
+      width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    @media (max-width: 992px) {
+      .btn-hamburguesa { display: block; }
+      .layout { display: block; padding: 10px; }
+      .sidebar-left {
+        position: fixed; top: 0; left: 0; height: 100vh; width: 280px;
+        border-radius: 0; transform: translateX(-105%); z-index: 2000;
+      }
+      .sidebar-left.show { transform: translateX(0); }
+      .sidebar-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.6); z-index: 1999; display: none; backdrop-filter: blur(2px);
+      }
+      .sidebar-overlay.show { display: block; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="mobileOverlay" class="sidebar-overlay" onclick="toggleMenu()"></div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="d-flex align-items-center">
+      <button class="btn-hamburguesa" onclick="toggleMenu()">☰</button>
+      <h4 class="m-0 fw-bold" style="color: var(--color-primary);">Auditoría y Sistema</h4>
+    </div>
+    <div class="d-none d-md-block text-center text-muted small fw-bold">
+      {{ nombre }} | {{ empresa }}
+    </div>
+    <div>
+      <a href="/logout" class="btn btn-outline-danger btn-sm">Salir</a>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- BARRA LATERAL -->
+    <div class="sidebar-left" id="sidebarMenu">
+      <div class="d-lg-none p-3 border-bottom border-secondary mb-2 text-end">
+        <button class="btn btn-sm btn-light w-100" onclick="toggleMenu()">✕ Cerrar Menú</button>
+      </div>
+      
+      <div class="sidebar-section-title">NAVEGACIÓN</div>
+      <a href="/router/webmaster_main" class="nav-item">
+        <span class="icon-spacer">⬅️</span> Volver al Hub Principal
+      </a>
+      
+      <div class="sidebar-section-title mt-3">HERRAMIENTAS</div>
+      <button class="nav-item bg-light text-dark fw-bold border-start border-4 border-info mt-2 mx-3 rounded-end" style="width: auto;" onclick="ejecutarHealthCheck()">
+        <span class="icon-spacer">🩺</span> Diagnóstico de Servidor
+      </button>
+      
+      <!-- NUEVA HERRAMIENTA: UNIFICADOR DE ARCHIVOS IA -->
+      <button class="nav-item bg-light text-dark fw-bold border-start border-4 border-primary mt-2 mx-3 rounded-end" style="width: auto;" onclick="abrirModalUnificador()">
+        <span class="icon-spacer">🧩</span> Unificar Archivos (IA)
+      </button>
+      
+      <div class="sidebar-section-title mt-4">FILTRAR EVENTOS POR</div>
+      <div class="px-3">
+        <select id="selectEmpresaAudit" class="form-select form-select-sm fw-bold shadow-sm" onchange="iniciarMonitoreo()">
+          <option value="">Seleccione Empresa...</option>
+          {% for emp in empresas %}
+            <option value="{{ emp.nit }}">{{ emp.nombre_comercial }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="main-content">
+      <div class="audit-container">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+          <div>
+            <h4 class="fw-bold mb-0" style="color: var(--color-primary);">
+              Bitácora de Eventos (Audit.log)
+            </h4>
+            <p class="text-muted small mb-0 mt-1">Historial de acciones de usuarios en tiempo real.</p>
+          </div>
+          <div id="indicadorVivo" style="display: none;">
+            <span class="badge rounded-pill bg-dark py-2 px-3 fw-bold border border-secondary shadow-sm">
+              <span class="live-indicator"></span> Monitoreo en Vivo
+            </span>
+          </div>
+        </div>
+
+        <!-- TIMELINE -->
+        <div id="auditTimeline" class="timeline">
+          <div class="text-center text-muted mt-5">
+            <span style="font-size: 3rem;">🕵️‍♂️</span><br>
+            <h5 class="mt-3">Selecciona una empresa en el menú lateral</h5>
+            <p class="small">Para iniciar el monitoreo de eventos en vivo.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL UNIFICADOR DE ARCHIVOS PARA IA -->
+  <div class="modal fade" id="modalUnificadorIA" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+              <div class="modal-header bg-primary text-white">
+                  <h5 class="modal-title fw-bold">🧩 Unificar Archivos para IA</h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body bg-light">
+                  <p class="small text-muted mb-3">Selecciona varios archivos locales (Python, HTML, JS, etc.). Puedes abrir distintas carpetas y los archivos se irán acumulando en la lista de abajo para generar un solo documento de texto unificado.</p>
+                  
+                  <label class="fw-bold small text-primary">Agregar archivos (Se acumulan en la lista):</label>
+                  <input type="file" id="archivosIA" class="form-control mb-3" multiple>
+                  
+                  <!-- LISTA DE ARCHIVOS ACUMULADOS -->
+                  <ul id="listaArchivosAcumulados" class="list-group mb-3 text-start small border-0"></ul>
+                  
+                  <label class="fw-bold small text-primary">Nombre del archivo resultante:</label>
+                  <div class="input-group mb-3">
+                      <input type="text" id="nombreArchivoIA" class="form-control" placeholder="Ej: codigo_unificado" value="codigo_unificado">
+                      <span class="input-group-text bg-white">.txt</span>
+                  </div>
+                  
+                  <div id="resumenArchivos" class="small fw-bold text-success mb-3"></div>
+              </div>
+              <div class="modal-footer bg-white">
+                  <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                  <button type="button" class="btn btn-primary fw-bold" onclick="procesarUnificacionIA()">Descargar Unificado</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function toggleMenu() {
+      const sidebar = document.getElementById('sidebarMenu');
+      const overlay = document.getElementById('mobileOverlay');
+      sidebar.classList.toggle('show');
+      overlay.classList.toggle('show');
+    }
+
+    // =========================================================================
+    // LÓGICA DE AUDITORÍA (MIGRADA INTACTA DEL MONOLITO)
+    // =========================================================================
+    let auditInterval = null;
+
+    function iniciarMonitoreo() {
+      const nit = document.getElementById('selectEmpresaAudit').value;
+      const indicador = document.getElementById('indicadorVivo');
+      const container = document.getElementById('auditTimeline');
+      
+      if (!nit) {
+        if (auditInterval) clearInterval(auditInterval);
+        indicador.style.display = 'none';
+        container.innerHTML = '<div class="text-center text-muted mt-5"><span style="font-size: 3rem;">🕵️‍♂️</span><br><h5 class="mt-3">Selecciona una empresa...</h5></div>';
+        return;
+      }
+
+      indicador.style.display = 'block';
+      container.innerHTML = '<div class="text-center text-primary mt-4"><div class="spinner-border"></div><div class="mt-2 fw-bold">Conectando con la bitácora...</div></div>';
+      
+      fetchAuditData(nit);
+      
+      // Reiniciar el loop
+      if (auditInterval) clearInterval(auditInterval);
+      auditInterval = setInterval(() => { fetchAuditData(nit); }, 5000);
+      
+      // Ocultar menú en móviles al seleccionar
+      if (window.innerWidth < 992) toggleMenu();
+    }
+
+    function fetchAuditData(nit) {
+      const fd = new FormData(); 
+      fd.append('empresa_id', nit);
+      
+      fetch('/obtener_audit_log', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => { 
+            if (data.success) renderTimeline(data.logs); 
+        })
+        .catch(err => console.error("Error conectando con audit.log:", err));
+    }
+
+    function renderTimeline(logs) {
+      const container = document.getElementById('auditTimeline');
+
+      if (logs.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted mt-5">No hay eventos recientes registrados para esta empresa.</div>';
+        return;
+      }
+
+      let html = '';
+
+      logs.forEach(log => {
+        let modClass = 'mod-admin'; 
+        if (log.modulo === 'GLP' || log.modulo === 'gas') modClass = 'mod-glp';
+
+        const nivel = (log.nivel || 'INFO').toUpperCase();
+        let iconStatus = '✅';        
+        let titleColor = '#198754';   
+
+        if (nivel.includes('ERROR') || nivel.includes('ALERTA') || nivel.includes('FALLO') || nivel.includes('CRITICO') || nivel.includes('RECHAZO')) {
+          modClass = 'mod-alerta';  
+          iconStatus = '❌';        
+          titleColor = '#dc3545';   
+        }
+        else if (nivel.includes('WARN') || nivel.includes('ADVERTENCIA')) {
+          iconStatus = '⚠️';
+          titleColor = '#f59e0b';   
+        }
+
+        const userIcon = log.usuario === 'Sistema' ? '🤖' : '👤';
+
+        html += `
+            <div class="timeline-item ${modClass}">
+                <div class="timeline-dot"></div>
+                <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                    <span class="badge bg-secondary">${log.modulo.toUpperCase()}</span>
+                    <span class="text-muted small fw-bold">🕒 ${log.fecha}</span>
+                </div>
+                
+                <div class="fs-6 mb-1" style="color: ${titleColor}; font-weight: 700;">
+                    ${iconStatus} ${log.accion}
+                </div>
+                
+                <div class="d-flex justify-content-between mt-2">
+                    <div class="small fw-bold" style="color:#475569;">${userIcon} ${log.usuario}</div>
+                </div>
+                
+                <div class="mt-2 p-2 bg-white rounded border small text-muted font-monospace lh-sm">
+                    ${log.detalle}
+                </div>
+            </div>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // =========================================================================
+    // LÓGICA DE HEALTH CHECK (MIGRADA INTACTA)
+    // =========================================================================
+    function ejecutarHealthCheck() {
+      const loader = document.createElement('div');
+      loader.className = 'pregunta-overlay';
+      loader.innerHTML = `<div class="pregunta-card text-center"><div class="spinner-border text-primary mb-3"></div><h5 class="fw-bold">Auditando Sistema...</h5><p class="small text-muted">Midiendo latencia BD y memoria RAM.</p></div>`;
+      document.body.appendChild(loader);
+
+      fetch('/api/health_check').then(r => r.json()).then(data => {
+        loader.remove();
+        
+        let dbColor = data.database.latency_ms < 50 ? 'success' : (data.database.latency_ms < 150 ? 'warning' : 'danger');
+        let ramColor = data.server.ram_percent < 80 ? 'success' : 'danger';
+
+        const html = `
+            <div class="pregunta-overlay" style="z-index:99999;">
+                <div class="pregunta-card">
+                    <h5 class="fw-bold mb-3 text-center text-primary">🩺 Health Check BQA-ONE</h5>
+                    
+                    <ul class="list-group list-group-flush mb-4">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Base de Datos:</strong> 
+                            <span class="badge bg-${dbColor} rounded-pill fs-6">${data.database.status.toUpperCase()} (${data.database.latency_ms} ms)</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Servidor (RAM):</strong> 
+                            <span class="badge bg-${ramColor} rounded-pill fs-6">${data.server.ram_percent}% Uso</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>Blueprints en Memoria:</strong> 
+                            <span class="badge bg-info text-dark rounded-pill fw-bold">${data.blueprints_activos} Activos</span>
+                        </li>
+                    </ul>
+                    
+                    <button class="btn btn-outline-secondary w-100 fw-bold" onclick="this.closest('.pregunta-overlay').remove()">Cerrar Diagnóstico</button>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', html);
+      }).catch(err => {
+        loader.remove();
+        alert("Error de conexión al servidor al ejecutar Health Check.");
+      });
+    }
+
+    // =========================================================================
+    // NUEVA LÓGICA: UNIFICADOR DE ARCHIVOS PARA IA (VERSIÓN ACUMULADOR)
+    // =========================================================================
+    let archivosAcumuladosIA = [];
+
+    function abrirModalUnificador() {
+        document.getElementById('archivosIA').value = '';
+        archivosAcumuladosIA = [];
+        renderizarListaArchivosIA();
+        document.getElementById('nombreArchivoIA').value = 'codigo_unificado';
+        new bootstrap.Modal(document.getElementById('modalUnificadorIA')).show();
+    }
+
+    document.getElementById('archivosIA').addEventListener('change', function(e) {
+        const files = e.target.files;
+        if (files.length > 0) {
+            // Añadir los archivos seleccionados al array global
+            for (let i = 0; i < files.length; i++) {
+                archivosAcumuladosIA.push(files[i]);
+            }
+        }
+        // Limpiar el input para permitir seleccionar archivos de otra carpeta
+        e.target.value = '';
+        renderizarListaArchivosIA();
+    });
+
+    function renderizarListaArchivosIA() {
+        const lista = document.getElementById('listaArchivosAcumulados');
+        const resumen = document.getElementById('resumenArchivos');
+        lista.innerHTML = '';
+        
+        if (archivosAcumuladosIA.length === 0) {
+            resumen.innerHTML = '';
+            return;
+        }
+
+        // Renderizar cada archivo acumulado
+        archivosAcumuladosIA.forEach((file, index) => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center py-1 bg-white shadow-sm mb-1 rounded border';
+            li.innerHTML = `
+                <span class="text-truncate" style="max-width: 85%;" title="${file.name}">📄 <strong>${file.name}</strong> <span class="text-muted" style="font-size: 0.75rem;">(${(file.size / 1024).toFixed(1)} KB)</span></span>
+                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="eliminarArchivoIA(${index})" title="Eliminar archivo">✕</button>
+            `;
+            lista.appendChild(li);
+        });
+
+        resumen.innerHTML = `✅ ${archivosAcumuladosIA.length} archivo(s) listos para unificar.`;
+    }
+
+    function eliminarArchivoIA(index) {
+        archivosAcumuladosIA.splice(index, 1);
+        renderizarListaArchivosIA();
+    }
+
+    async function procesarUnificacionIA() {
+        let baseName = document.getElementById('nombreArchivoIA').value.trim();
+        
+        if (archivosAcumuladosIA.length === 0) {
+            alert("Por favor, agrega al menos un archivo a la lista.");
+            return;
+        }
+        if (!baseName) {
+            baseName = "codigo_unificado";
+        }
+        
+        let contenidoFinal = "";
+        const separadorLinea = "================================================================================\n";
+        
+        // Iterar sobre el array acumulador y unirlos asíncronamente
+        for (let i = 0; i < archivosAcumuladosIA.length; i++) {
+            const file = archivosAcumuladosIA[i];
+            try {
+                const text = await leerArchivoAsync(file);
+                
+                contenidoFinal += separadorLinea;
+                contenidoFinal += `ARCHIVO [${i + 1}/${archivosAcumuladosIA.length}]: ${file.name}\n`;
+                contenidoFinal += separadorLinea;
+                contenidoFinal += "\n" + text + "\n\n";
+                contenidoFinal += separadorLinea;
+                contenidoFinal += `FIN DE ARCHIVO: ${file.name}\n`;
+                contenidoFinal += separadorLinea + "\n\n";
+            } catch (error) {
+                console.error("Error leyendo archivo: ", file.name, error);
+                alert(`Hubo un problema leyendo el archivo ${file.name}.`);
+            }
+        }
+        
+        // Crear el Blob en memoria y forzar la descarga en el cliente
+        const blob = new Blob([contenidoFinal], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${baseName}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Limpiar el objeto de memoria
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+        
+        bootstrap.Modal.getInstance(document.getElementById('modalUnificadorIA')).hide();
+    }
+
+    // Promesa para leer el contenido del archivo con FileReader
+    function leerArchivoAsync(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(e);
+            reader.readAsText(file);
+        });
+    }
+  </script>
+</body>
+</html>

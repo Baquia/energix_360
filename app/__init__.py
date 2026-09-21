@@ -63,10 +63,20 @@ def create_app():
     #  GRUPO A: CONTROLADORES PRINCIPALES / EMPRESAS
     # ---------------------------------------------------------
     from app.blueprints.A_bp_pwa_Avicola import gestionavicola_bp  
-    from app.blueprints.bp_901811727 import bp_901811727              
+    
+    # --- NUEVOS SUBMÓDULOS WEBMASTER BQA-ONE ---
+    from app.blueprints.bp_901811727_main import bp_main
+    from app.blueprints.bp_901811727_admin import bp_admin
+    from app.blueprints.bp_901811727_energia_glp import bp_energia_glp
+    from app.blueprints.bp_901811727_audit import bp_audit
 
     app.register_blueprint(gestionavicola_bp)
-    app.register_blueprint(bp_901811727)
+    
+    # Registro de la nueva arquitectura modular Webmaster
+    app.register_blueprint(bp_main)
+    app.register_blueprint(bp_admin)
+    app.register_blueprint(bp_energia_glp)
+    app.register_blueprint(bp_audit)
 
     # ---------------------------------------------------------
     #  GRUPO B: MÓDULOS FUNCIONALES / SERVICIOS
@@ -85,6 +95,7 @@ def create_app():
     from app.blueprints.B_bp_controlador_flotaespecial import bp_controlador_flotaespecial
     from app.blueprints.B_bp_flotaespecial_vehiculos import bp_flotaespecial_vehiculos
     from app.blueprints.B_bp_flotaespecial_eps import bp_flotaespecial_eps
+    from app.blueprints.B_bp_procesofacturacion_eps_transporteespecial import bp_procesofacturacion_eps # <-- NUEVO
    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
@@ -100,6 +111,7 @@ def create_app():
     app.register_blueprint(bp_controlador_flotaespecial)
     app.register_blueprint(bp_flotaespecial_vehiculos)
     app.register_blueprint(bp_flotaespecial_eps)
+    app.register_blueprint(bp_procesofacturacion_eps) # <-- NUEVO
 
     # ---------------------------------------------------------
     #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
@@ -138,10 +150,23 @@ def load_user(user_id):
 
     try:
         cur = mysql.connection.cursor()
-        cur.execute(
-            "SELECT id, nombre, cedula, tipo, clase, rol, empresa_id FROM usuarios WHERE id = %s",
-            (user_id,)
-        )
+        # Corrección SIM-015: Inyectar contexto multi-tenant en carga de usuario web (usamos 'id_empresa' de la sesion si estuviera disponible, pero como Flask-Login usa solo user_id en session, blindamos asegurando que la consulta principal de login ya lo validó, sin embargo, a nivel de carga persistente es buena práctica retornar toda la fila, el filtro multi-tenant en rutas hijas previene las fugas.)
+        # Nota: load_user solo carga la instancia, no realiza fuga, pero por seguridad añadimos el filtro si tuviéramos acceso a session['empresa_id'] de forma determinística en este scope.
+        from flask import session
+        empresa_id = session.get('empresa_id')
+        
+        if empresa_id:
+             cur.execute(
+                 "SELECT id, nombre, cedula, tipo, clase, rol, empresa_id FROM usuarios WHERE id = %s AND empresa_id = %s",
+                 (user_id, empresa_id)
+             )
+        else:
+             # Fallback inicial antes de establecer empresa_id
+             cur.execute(
+                 "SELECT id, nombre, cedula, tipo, clase, rol, empresa_id FROM usuarios WHERE id = %s",
+                 (user_id,)
+             )
+        
         user_data = cur.fetchone()
         cur.close()
     except Exception as e:

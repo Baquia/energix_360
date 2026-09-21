@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <title>Gestión Energética | BQA-ONE</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <meta name="theme-color" content="#015249">
+
+  <!-- Dependencias necesarias para GLP y futuros energéticos -->
+  <script src="/static/js/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    /* VARIABLES Y DISEÑO HÍBRIDO (PC/MÓVIL) */
+    :root {
+      --color-primary: #015249;
+      --color-primary-dark: #003832;
+      --header-height: 60px;
+      --bg-light: #f6f7f8;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-light);
+      color: #1f2937;
+      padding-top: var(--header-height);
+      overflow-x: hidden;
+    }
+
+    /* HEADER FIJO */
+    .header {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: var(--header-height);
+      background: white; z-index: 1040;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 15px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .btn-hamburguesa {
+      display: none; background: none; border: none; font-size: 1.6rem;
+      color: var(--color-primary); cursor: pointer; padding: 5px; margin-right: 10px;
+    }
+
+    /* LAYOUT PRINCIPAL */
+    .layout {
+      display: flex; max-width: 1600px; margin: 0 auto; padding: 20px; gap: 20px; position: relative;
+    }
+
+    /* SIDEBAR */
+    .sidebar-left {
+      flex: 0 0 260px; width: 260px;
+      background: linear-gradient(180deg, var(--color-primary) 0%, #002521 100%);
+      color: white; border-radius: 12px; height: calc(100vh - 90px);
+      position: sticky; top: 80px; overflow-y: auto;
+      box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05); z-index: 1000;
+      transition: transform 0.3s ease;
+    }
+
+    .main-content {
+      flex: 1; min-width: 0;
+    }
+
+    .sidebar-section-title {
+      padding: 15px 20px 10px 20px; font-size: 0.75rem; font-weight: 700;
+      color: rgba(255, 255, 255, 0.5); text-transform: uppercase;
+      letter-spacing: 1px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* ELEMENTOS NAVEGACIÓN SIDEBAR EXCLUSIVAMENTE */
+    .sidebar-left .nav-item {
+      display: flex; align-items: center; width: 100%; padding: 12px 20px;
+      color: #e2e8f0; background: transparent; border: none; text-align: left;
+      font-size: 0.95rem; border-left: 4px solid transparent; cursor: pointer;
+      text-decoration: none;
+    }
+    .sidebar-left .nav-item:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+    .icon-spacer { display: inline-flex; width: 25px; justify-content: center; margin-right: 10px; }
+
+    /* ESTILOS DE PESTAÑAS (TABS) PARA ENERGÍA (DESPLIEGUE HORIZONTAL) */
+    .nav-tabs {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .nav-tabs .nav-item {
+      width: auto;
+    }
+    .nav-tabs .nav-link {
+      color: #6b7280;
+      font-weight: 600;
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 12px 20px;
+      transition: all 0.2s ease;
+    }
+    .nav-tabs .nav-link:hover {
+      color: var(--color-primary);
+      border-color: rgba(1, 82, 73, 0.3);
+    }
+    .nav-tabs .nav-link.active {
+      color: var(--color-primary);
+      border-bottom: 3px solid var(--color-primary);
+      background-color: transparent;
+    }
+
+    @media (max-width: 992px) {
+      .btn-hamburguesa { display: block; }
+      .layout { display: block; padding: 10px; }
+      .sidebar-left {
+        position: fixed; top: 0; left: 0; height: 100vh; width: 280px;
+        border-radius: 0; transform: translateX(-105%); z-index: 2000;
+      }
+      .sidebar-left.show { transform: translateX(0); }
+      .sidebar-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.6); z-index: 1999; display: none; backdrop-filter: blur(2px);
+      }
+      .sidebar-overlay.show { display: block; }
+      .nav-tabs { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
+    }
+  </style>
+
+  <!-- Script global para parseo de datos de empresas -->
+  <script>
+    let empresasData = [];
+    document.addEventListener("DOMContentLoaded", function() {
+      try {
+        const dataElement = document.getElementById('empresas-data');
+        if (dataElement && dataElement.textContent.trim() !== '') {
+          empresasData = JSON.parse(dataElement.textContent);
+        }
+      } catch (e) { console.warn("Error parseando empresasData:", e); }
+    });
+  </script>
+</head>
+<body>
+  <div id="mobileOverlay" class="sidebar-overlay" onclick="toggleMenu()"></div>
+
+  <div class="header">
+    <div class="d-flex align-items-center">
+      <button class="btn-hamburguesa" onclick="toggleMenu()">☰</button>
+      <h4 class="m-0 fw-bold" style="color: var(--color-primary);">Gestión Energética</h4>
+    </div>
+    <div class="d-none d-md-block text-center text-muted small fw-bold">
+      {{ nombre }} | {{ empresa }}
+    </div>
+    <div>
+      <a href="/logout" class="btn btn-outline-danger btn-sm">Salir</a>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- BARRA LATERAL -->
+    <div class="sidebar-left" id="sidebarMenu">
+      <div class="d-lg-none p-3 border-bottom border-secondary mb-2 text-end">
+        <button class="btn btn-sm btn-light w-100" onclick="toggleMenu()">✕ Cerrar Menú</button>
+      </div>
+      
+      <div class="sidebar-section-title">NAVEGACIÓN</div>
+      <a href="/901811727.html" class="nav-item">
+        <span class="icon-spacer">⬅️</span> Volver al Hub Principal
+      </a>
+      
+      <div class="sidebar-section-title mt-3">MÓDULOS ACTIVOS</div>
+      <div id="listaClientesEnergia">
+        {% for cliente in clientes %}
+        <button class="nav-item" onclick="seleccionarClienteEnergia('{{ cliente.nit }}')">
+          <span class="icon-spacer">🏢</span> {{ cliente.nombre_comercial }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="main-content">
+      
+      <!-- PESTAÑAS (TABS) DE ENERGÉTICOS -->
+      <ul class="nav nav-tabs mb-4 border-bottom-0" id="energiaTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="glp-tab" data-bs-toggle="tab" data-bs-target="#glp" type="button" role="tab">🔥 GLP / Gas Avícola</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="electricidad-tab" data-bs-toggle="tab" data-bs-target="#electricidad" type="button" role="tab">⚡ Electricidad</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="solar-tab" data-bs-toggle="tab" data-bs-target="#solar" type="button" role="tab">☀️ Solar</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="diesel-tab" data-bs-toggle="tab" data-bs-target="#diesel" type="button" role="tab">⛽ Diésel / Gasolina</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="carbon-tab" data-bs-toggle="tab" data-bs-target="#carbon" type="button" role="tab">🪨 Carbón</button>
+        </li>
+      </ul>
+
+      <!-- CONTENEDOR DE SUBMÓDULOS -->
+      <div class="tab-content" id="energiaTabsContent">
+        
+        <!-- SUBMÓDULO: GLP -->
+        <div class="tab-pane fade show active" id="glp" role="tabpanel" tabindex="0">
+          {% include '901811727_energia_glp.html' %}
+        </div>
+
+        <!-- SUBMÓDULO: ELECTRICIDAD -->
+        <div class="tab-pane fade" id="electricidad" role="tabpanel" tabindex="0">
+          <div class="card border-0 shadow-sm p-5 text-center mt-3">
+            <h3 class="text-muted">Módulo de Electricidad</h3>
+            <p>Sección en construcción para monitoreo de red eléctrica y consumo KWh.</p>
+          </div>
+        </div>
+
+        <!-- SUBMÓDULO: SOLAR -->
+        <div class="tab-pane fade" id="solar" role="tabpanel" tabindex="0">
+          <div class="card border-0 shadow-sm p-5 text-center mt-3">
+            <h3 class="text-muted">Módulo de Energía Solar</h3>
+            <p>Sección en construcción para generación fotovoltaica e inversores.</p>
+          </div>
+        </div>
+
+        <!-- SUBMÓDULO: DIÉSEL / GASOLINA -->
+        <div class="tab-pane fade" id="diesel" role="tabpanel" tabindex="0">
+          <div class="card border-0 shadow-sm p-5 text-center mt-3">
+            <h3 class="text-muted">Módulo de Diésel / Gasolina</h3>
+            <p>Sección en construcción para control de plantas eléctricas y motobombas.</p>
+          </div>
+        </div>
+        
+        <!-- SUBMÓDULO: CARBÓN -->
+        <div class="tab-pane fade" id="carbon" role="tabpanel" tabindex="0">
+          <div class="card border-0 shadow-sm p-5 text-center mt-3">
+            <h3 class="text-muted">Módulo de Carbón</h3>
+            <p>Sección en construcción para control de inventarios de sólidos térmicos.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Inyección de Datos Globales para el Frontend -->
+  <script id="empresas-data" type="application/json">
+    {{ empresas | default([]) | tojson | safe }}
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function toggleMenu() {
+      const sidebar = document.getElementById('sidebarMenu');
+      const overlay = document.getElementById('mobileOverlay');
+      sidebar.classList.toggle('show');
+      overlay.classList.toggle('show');
+    }
+
+    function seleccionarClienteEnergia(nit) {
+        if (typeof activarMenuEnergiaCliente === 'function') {
+            activarMenuEnergiaCliente(nit);
+        }
+        if (window.innerWidth < 992) {
+          toggleMenu();
+        }
+    }
+  </script>
+</body>
+</html>
