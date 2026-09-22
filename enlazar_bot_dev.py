@@ -9,14 +9,13 @@ from telebot.apihelper import ApiTelegramException
 # =======================================================
 # CONFIGURACIÓN DE ENTORNO Y BASE DE DATOS
 # =======================================================
-# Cambia a "produccion" cuando subas este archivo a PythonAnywhere
-ENTORNO = "desarrollo"
+ENTORNO = "produccion"
 
 if ENTORNO == "desarrollo":
     DB_HOST = "127.0.0.1"
     DB_USER = "root"
     DB_PASS = ""
-    DB_NAME = "energix_360"  # <-- Ajusta si el nombre difiere en tu XAMPP local
+    DB_NAME = "energix_360"
 else:
     DB_HOST = "baquiasoft.mysql.pythonanywhere-services.com"
     DB_USER = "baquiasoft"
@@ -26,13 +25,13 @@ else:
 # Token original del módulo GLP
 TOKEN_GLP = "8526515342:AAFDZuD3Qu-3Sc5VRfN9Wf_NoGh44YE25oE"
 
-# NUEVO Token para Transporte Especial
+# Token del módulo Transporte Especial
 TOKEN_ESPECIAL = "8841682239:AAFOj8TpeOW4ulhIkNoIyGaTZ2MLlI9ydVo"
 
 bot_glp = telebot.TeleBot(TOKEN_GLP)
 bot_especial = telebot.TeleBot(TOKEN_ESPECIAL)
 
-# Limpiar Webhooks antes de iniciar Polling (Evita conflictos silenciosos de red)
+# Limpiar Webhooks antes de iniciar Polling
 try:
     bot_glp.remove_webhook()
     print("DEBUG 🧹 [GLP]: Webhook eliminado correctamente.")
@@ -76,8 +75,10 @@ def recibir_contacto_especial(message):
     procesar_contacto(message, bot_especial, "Transporte Especial")
 
 # =======================================================
-# FUNCIÓN COMPARTIDA DE BASE DE DATOS (Con Reconexión)
+# FUNCIÓN COMPARTIDA DE BASE DE DATOS
 # =======================================================
+NUMERO_WEBMASTER = "3150777490"
+
 def procesar_contacto(message, bot_instance, modulo_nombre):
     if message.contact:
         tel = message.contact.phone_number.replace("+", "").replace(" ", "")
@@ -92,21 +93,46 @@ def procesar_contacto(message, bot_instance, modulo_nombre):
             conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME, connect_timeout=10)
             cur = conn.cursor(MySQLdb.cursors.DictCursor) 
             
-            # Corrección SIM-013: Validación estricta para asegurar que el usuario pertenece a una empresa registrada.
-            cur.execute("SELECT id, nombre, empresa_id FROM usuarios WHERE telefono LIKE %s AND empresa_id IS NOT NULL", (f"%{tel_busqueda}",))
+            # EXCEPCIÓN EXCLUSIVA: Si el número recibido es el del Webmaster (3150777490)
+            if tel_busqueda in NUMERO_WEBMASTER or NUMERO_WEBMASTER in tel:
+                if modulo_nombre == "Transporte Especial":
+                    query_sql = """
+                        SELECT id, nombre, empresa_id 
+                        FROM usuarios 
+                        WHERE telefono LIKE %s 
+                          AND empresa_id IS NOT NULL 
+                          AND perfil IN ('operador_flotaespecial', 'controlador_flotaespecial')
+                    """
+                else:
+                    query_sql = """
+                        SELECT id, nombre, empresa_id 
+                        FROM usuarios 
+                        WHERE telefono LIKE %s 
+                          AND empresa_id IS NOT NULL 
+                          AND (perfil NOT IN ('operador_flotaespecial', 'controlador_flotaespecial') OR perfil IS NULL)
+                    """
+            else:
+                # REGLA ESTÁNDAR: Para todos los demás números de la plataforma
+                query_sql = """
+                    SELECT id, nombre, empresa_id 
+                    FROM usuarios 
+                    WHERE telefono LIKE %s 
+                      AND empresa_id IS NOT NULL
+                """
+
+            cur.execute(query_sql, (f"%{tel_busqueda}",))
             usuarios = cur.fetchall()
 
             if len(usuarios) == 0:
                 print(f"DEBUG ❌ [{modulo_nombre}]: No se encontró nadie en la BD.")
-                bot_instance.reply_to(message, f"El número {tel} no existe en Energix 360.")
+                bot_instance.reply_to(message, f"El número {tel} no está registrado en el sistema para {modulo_nombre}.")
             elif len(usuarios) > 1:
                 print(f"DEBUG ⚠️ [{modulo_nombre}]: Se encontraron {len(usuarios)} usuarios duplicados.")
                 bot_instance.reply_to(message, "Error: Tu número está duplicado en el sistema. Contacta a soporte.")
             else:
                 user = usuarios[0]
-                print(f"DEBUG ✅ [{modulo_nombre}]: Vinculando a {user['nombre']}...")
+                print(f"DEBUG ✅ [{modulo_nombre}]: Vinculando a {user['nombre']} (Empresa ID: {user['empresa_id']})...")
                 
-                # Corrección SIM-014: Aislamiento Multi-Tenant asegurado inyectando el contexto de la empresa (empresa_id) en el UPDATE.
                 cur.execute("UPDATE usuarios SET telegram_id = %s WHERE id = %s AND empresa_id = %s", (str(chat_id), user['id'], user['empresa_id']))
                 conn.commit()
                 bot_instance.reply_to(message, f"✅ ¡Vínculo exitoso en {modulo_nombre} para {user['nombre']}!")
@@ -126,7 +152,7 @@ def procesar_contacto(message, bot_instance, modulo_nombre):
                 except: pass
 
 # =======================================================
-# MOTORES DE EJECUCIÓN EN PARALELO (HILOS CON TOLERANCIA)
+# MOTORES DE EJECUCIÓN EN PARALELO
 # =======================================================
 def correr_bot_glp():
     print("🚀 BOT GLP CORRIENDO...")
