@@ -4,7 +4,6 @@ import re
 import uuid
 import random
 import string
-import math
 import requests
 import threading
 import hashlib
@@ -31,41 +30,6 @@ from reportlab.graphics.barcode import qr
 bp_flotaespecial_eps = Blueprint('flotaespecial_eps', __name__, url_prefix='/gestor_flotaespecial/eps_bp')
 
 BOGOTA_TZ = pytz.timezone('America/Bogota')
-
-# =========================================================
-# HELPER: CÁLCULOS AUDITORÍA BACKEND (HAVERSINE Y GOOGLE API)
-# =========================================================
-def _calcular_haversine_py(lat1, lon1, lat2, lon2):
-    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
-        return 0
-    try:
-        lat1, lon1, lat2, lon2 = float(lat1), float(lon1), float(lat2), float(lon2)
-    except (ValueError, TypeError):
-        return 0
-    R = 6371000.0  # Radio terrestre en metros
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
-
-def _obtener_tiempo_teorico_google(lat_ori, lng_ori, lat_des, lng_des):
-    if not lat_ori or not lng_ori or not lat_des or not lng_des:
-        return 0
-    try:
-        api_key = "AIzaSyBloN0EeBxRj9CWnHZ9Wgjz721846DT4KY"
-        url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={lat_ori},{lng_ori}&destinations={lat_des},{lng_des}&mode=driving&key={api_key}"
-        resp = requests.get(url, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get('status') == 'OK':
-                elem = data['rows'][0]['elements'][0]
-                if elem.get('status') == 'OK':
-                    segundos = elem['duration']['value']
-                    return int(round(segundos / 60.0))
-    except Exception as e:
-        print(f"Error consultando Distance Matrix Backend: {e}")
-    return 0
 
 # =========================================================
 # HELPER: CONVERSIÓN DE FECHA HTML (YYYY-MM-DD)
@@ -337,11 +301,6 @@ def asegurar_tablas_transporte_especial(cur):
             fecha_fin_real DATETIME NULL,
             recordatorio_enviado BOOLEAN DEFAULT FALSE,
             auditor_nombre VARCHAR(100) NULL,
-            auditor_cedula VARCHAR(50) NULL,
-            distancia_desviacion_origen_metros INT DEFAULT 0,
-            distancia_desviacion_destino_metros INT DEFAULT 0,
-            tiempo_teorico_minutos INT DEFAULT 0,
-            tiempo_desviacion_minutos INT DEFAULT 0,
             fecha_auditoria DATETIME NULL,
             hash_auditoria VARCHAR(255) NULL,
             ruta_pdf_unificado VARCHAR(255) NULL,
@@ -371,11 +330,11 @@ def asegurar_tablas_transporte_especial(cur):
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """)
 
-    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN tipo_documento VARCHAR(20) AFTER nombre_usuario;")
+    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN tipo_documento VARCHAR(20) AFTER nombre_usuario")
     except: pass
-    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN departamento_destino VARCHAR(100) AFTER direccion_origen;")
+    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN departamento_destino VARCHAR(100) AFTER direccion_origen")
     except: pass
-    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN municipio_destino VARCHAR(100) AFTER departamento_destino;")
+    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN municipio_destino VARCHAR(100) AFTER departamento_destino")
     except: pass
     
     try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN consecutivo_viaje VARCHAR(50) NULL, ADD COLUMN foto_origen VARCHAR(255) NULL, ADD COLUMN foto_destino VARCHAR(255) NULL, ADD COLUMN foto_paciente VARCHAR(255) NULL, ADD COLUMN firma VARCHAR(255) NULL, ADD COLUMN hash_seguridad VARCHAR(255) NULL, ADD COLUMN lat_origen DECIMAL(10,8) NULL, ADD COLUMN lng_origen DECIMAL(11,8) NULL, ADD COLUMN hora_origen DATETIME NULL, ADD COLUMN lat_destino DECIMAL(10,8) NULL, ADD COLUMN lng_destino DECIMAL(11,8) NULL, ADD COLUMN hora_destino DATETIME NULL, ADD COLUMN tiempo_efectivo_minutos INT DEFAULT 0;")
@@ -384,26 +343,17 @@ def asegurar_tablas_transporte_especial(cur):
     try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN lat_origen_esperado DECIMAL(10,8) NULL, ADD COLUMN lng_origen_esperado DECIMAL(11,8) NULL, ADD COLUMN lat_destino_esperado DECIMAL(10,8) NULL, ADD COLUMN lng_destino_esperado DECIMAL(11,8) NULL;")
     except: pass
     
-    # Migraciones individuales para prevenir colapso de columna en MySQL
-    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN auditor_cedula VARCHAR(50) NULL;")
+    try: cur.execute("ALTER TABLE maestra_traslados_eps_tespecial ADD COLUMN departamento_destino VARCHAR(100) AFTER direccion_origen")
     except: pass
-    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN distancia_desviacion_origen_metros INT DEFAULT 0;")
-    except: pass
-    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN distancia_desviacion_destino_metros INT DEFAULT 0;")
-    except: pass
-    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN tiempo_teorico_minutos INT DEFAULT 0;")
-    except: pass
-    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN tiempo_desviacion_minutos INT DEFAULT 0;")
-    except: pass
-
-    try: cur.execute("ALTER TABLE maestra_traslados_eps_tespecial ADD COLUMN departamento_destino VARCHAR(100) AFTER direccion_origen;")
-    except: pass
-    try: cur.execute("ALTER TABLE maestra_traslados_eps_tespecial ADD COLUMN municipio_destino VARCHAR(100) AFTER departamento_destino;")
+    try: cur.execute("ALTER TABLE maestra_traslados_eps_tespecial ADD COLUMN municipio_destino VARCHAR(100) AFTER departamento_destino")
     except: pass
 
     try: cur.execute("ALTER TABLE empresas ADD COLUMN codigo_direccion_territorial VARCHAR(10) NULL, ADD COLUMN numero_resolucion_habilitacion VARCHAR(50) NULL, ADD COLUMN anio_habilitacion VARCHAR(4) NULL, ADD COLUMN firma_representante_legal VARCHAR(255) NULL;")
     except: pass
     try: cur.execute("ALTER TABLE fuec ADD COLUMN consecutivo_oficial VARCHAR(50) NULL, ADD COLUMN id_contrato INT NULL, ADD COLUMN categoria_contrato VARCHAR(50) NULL;")
+    except: pass
+    
+    try: cur.execute("ALTER TABLE vehiculos_especial ADD COLUMN capacidad_pasajeros INT DEFAULT 4;")
     except: pass
 
 def controlador_flotaespecial_required(f):
@@ -1083,11 +1033,13 @@ def gestion_traslados_asignacion_flota():
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
         try:
-            if accion == 'asignar_flota':
+            if accion in ['asignar_flota', 'resolver_novedad']:
                 viaje_id = request.form.get('viaje_id')
                 vehiculo_placa = request.form.get('vehiculo')
                 conductor = request.form.get('conductor')
                 contrato_id = request.form.get('contrato_id')
+                tipo_novedad = request.form.get('tipo_novedad')
+                monto_liquidacion_manual = request.form.get('monto_liquidacion_manual')
                 
                 if not contrato_id:
                     flash('Debe seleccionar un contrato vigente para generar el FUEC.', 'danger')
@@ -1156,6 +1108,20 @@ def gestion_traslados_asignacion_flota():
                 
                 cur.execute("SELECT * FROM control_viajes_flota_especial WHERE id = %s AND id_empresa = %s", (viaje_id, empresa_id))
                 viaje_data = cur.fetchone()
+
+                if accion == 'resolver_novedad':
+                    try:
+                        cur.execute("UPDATE fuec SET categoria_contrato = CONCAT(categoria_contrato, '-ANULADO') WHERE id_traslado_eps = %s AND id_empresa = %s", (viaje_data['id_viaje'], empresa_id))
+                    except:
+                        pass
+                    es_trasbordo = 1 if tipo_novedad == 'NOVEDAD_RECORRIDO' else 0
+                    cur.execute("""
+                        UPDATE control_viajes_flota_especial 
+                        SET estado_novedad = 'RESUELTA', 
+                            monto_liquidacion_manual = %s, 
+                            es_trasbordo = %s 
+                        WHERE id = %s AND id_empresa = %s
+                    """, (monto_liquidacion_manual if monto_liquidacion_manual else None, es_trasbordo, viaje_id, empresa_id))
 
                 anio_actual = str(datetime.now(BOGOTA_TZ).year)
                 cur.execute("SELECT COUNT(*) as c FROM fuec WHERE id_empresa = %s AND YEAR(fecha_inicio_vigencia) = %s", (empresa_id, anio_actual))
@@ -1286,38 +1252,61 @@ def gestion_traslados_asignacion_flota():
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (empresa_id, consecutivo_oficial, consecutivo_oficial, cons_extracto, vehiculo_placa, cond_docs['cedula'], viaje_data['id_viaje'], contrato_id, contrato['categoria_contrato'], contrato['numero_contrato'], contrato['contratante_nombre'], contrato['contratante_nit_cedula'], viaje_data.get('direccion_origen'), viaje_data.get('direccion_destino'), f_ini, f_fin, ruta_relativa, url_verificacion))
 
+                # Actualizar el viaje con el nuevo vehículo y conductor
                 cur.execute("UPDATE control_viajes_flota_especial SET vehiculo_asignado = %s, conductor_asignado = %s, estatus_servicio = 'ASIGNADO' WHERE id = %s AND id_empresa = %s", (vehiculo_placa, conductor, viaje_id, empresa_id))
                 
-                if cond_docs.get('telegram_id'):
-                    f_serv = viaje_data.get('fecha_servicio') or 'Pendiente'
-                    h_ini = viaje_data.get('hora_inicio') or 'Pendiente'
-                    telefono_paciente = viaje_data.get('telefono_usuario') or 'N/D'
+                # REVISIÓN CRÍTICA DE NOTIFICACIÓN TELEGRAM (Fallback y Escapado de HTML)
+                cur.execute("SELECT telegram_id FROM usuarios WHERE nombre = %s AND (empresa_id = %s OR empresa_id = %s) LIMIT 1", (conductor, empresa_id, empresa_nit))
+                usr_op = cur.fetchone()
+                
+                if usr_op and usr_op.get('telegram_id'):
+                    import html
+                    f_serv = html.escape(str(viaje_data.get('fecha_servicio') or 'Pendiente'))
+                    h_ini = html.escape(str(viaje_data.get('hora_inicio') or 'Pendiente'))
+                    telefono_pac = html.escape(str(viaje_data.get('telefono_usuario') or 'N/D'))
+                    nombre_pac = html.escape(str(viaje_data.get('nombre_usuario') or 'N/D'))
+                    dir_ori = html.escape(str(viaje_data.get('direccion_origen') or 'N/D'))
+                    dir_des = html.escape(str(viaje_data.get('direccion_destino') or 'N/D'))
+                    id_v = html.escape(str(viaje_data.get('id_viaje') or 'N/D'))
+                    trayecto = html.escape(str(viaje_data.get('trayecto') or 'IDA'))
+                    prescripcion = html.escape(str(viaje_data.get('numero_prescripcion') or 'N/A'))
+                    
                     info_acompanante = ""
                     if viaje_data.get('lleva_acompanante'):
-                        info_acompanante = f"👥 <b>Acompañante:</b> {viaje_data.get('nombre_acompanante', 'Sí')}\n"
+                        info_acompanante = f"👥 <b>Acompañante:</b> {html.escape(str(viaje_data.get('nombre_acompanante', 'Sí')))}\n"
 
                     mensaje_tg = (
                         f"🟢 <b>NUEVA ASIGNACIÓN DE VIAJE (FUEC)</b>\n\n"
-                        f"🏢 <b>Empresa:</b> {empresa_nombre}\n"
-                        f"🆔 <b>Prescripción:</b> {viaje_data.get('numero_prescripcion')}\n"
-                        f"🚙 <b>Vehículo:</b> {vehiculo_placa}\n\n"
+                        f"🏢 <b>Empresa:</b> {html.escape(str(empresa_nombre))}\n"
+                        f"🆔 <b>Prescripción:</b> {prescripcion}\n"
+                        f"🚙 <b>Vehículo:</b> {html.escape(str(vehiculo_placa))}\n\n"
                         f"📋 <b>PROGRAMACIÓN:</b>\n"
-                        f"ID Viaje: <code>{viaje_data['id_viaje']}</code>\n"
-                        f"Trayecto: {viaje_data.get('trayecto', 'IDA')}\n"
-                        f"Paciente: {viaje_data['nombre_usuario']}\n"
-                        f"📞 <b>Teléfono:</b> {telefono_paciente}\n"
+                        f"ID Viaje: <code>{id_v}</code>\n"
+                        f"Trayecto: {trayecto}\n"
+                        f"Paciente: {nombre_pac}\n"
+                        f"📞 <b>Teléfono:</b> {telefono_pac}\n"
                         f"{info_acompanante}"
                         f"Fecha: {f_serv} | Hora: {h_ini}\n"
-                        f"Origen: {viaje_data['direccion_origen']}\n"
-                        f"Destino: {viaje_data['direccion_destino']}"
+                        f"Origen: {dir_ori}\n"
+                        f"Destino: {dir_des}"
                     )
-                    _enviar_documento_telegram_hilo([cond_docs['telegram_id']], mensaje_tg, ruta_pdf_abs)
+                    
+                    if os.path.exists(ruta_pdf_abs):
+                        _enviar_documento_telegram_hilo([usr_op['telegram_id']], mensaje_tg, ruta_pdf_abs)
+                    else:
+                        _enviar_mensajes_telegram_hilo([usr_op['telegram_id']], mensaje_tg.replace("<b>", "*").replace("</b>", "*").replace("<code>", "`").replace("</code>", "`"))
                 
                 mysql.connection.commit()
-                if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    flash('Flota asignada y FUEC oficial generado exitosamente.', 'success')
+                if accion == 'resolver_novedad':
+                    if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        flash('Novedad resuelta: Flota reasignada y nuevo FUEC oficial generado exitosamente.', 'success')
+                    else:
+                        return jsonify({"status": "success"})
                 else:
-                    return jsonify({"status": "success"})
+                    if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        flash('Flota asignada y FUEC oficial generado exitosamente.', 'success')
+                    else:
+                        return jsonify({"status": "success"})
 
         except Exception as e:
             mysql.connection.rollback()
@@ -1332,10 +1321,22 @@ def gestion_traslados_asignacion_flota():
             return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
         
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT * FROM control_viajes_flota_especial WHERE id_empresa = %s AND estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA') ORDER BY fecha_servicio ASC", (empresa_id,))
+    cur.execute("""
+        SELECT * FROM control_viajes_flota_especial 
+        WHERE id_empresa = %s 
+          AND (estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA') OR estado_novedad = 'ACTIVA')
+        ORDER BY fecha_servicio ASC
+    """, (empresa_id,))
     viajes_programados = cur.fetchall()
     
-    cur.execute("SELECT placa, clase AS tipo FROM vehiculos_especial WHERE id_empresa = %s OR id_empresa = %s", (empresa_id, empresa_nit))
+    cur.execute("""
+        SELECT v.placa, v.clase AS tipo, COALESCE(v.capacidad_pasajeros, 4) as capacidad_pasajeros,
+               (SELECT COUNT(*) FROM control_viajes_flota_especial c 
+                WHERE c.vehiculo_asignado = v.placa AND c.estatus_servicio IN ('ASIGNADO', 'EN EJECUCION') 
+                AND c.fecha_servicio = CURDATE() AND c.id_empresa = %s) as ocupacion_actual
+        FROM vehiculos_especial v 
+        WHERE v.id_empresa = %s OR v.id_empresa = %s
+    """, (empresa_id, empresa_id, empresa_nit))
     vehiculos = cur.fetchall()
     
     cur.execute("SELECT id, nombre, cedula, telegram_id FROM usuarios WHERE (empresa_id = %s OR empresa_id = %s) AND perfil IN ('operador_flotaespecial', 'auxiliar_transporte_especial')", (empresa_id, empresa_nit))
@@ -1361,31 +1362,24 @@ def gestion_traslados_asignacion_flota():
     return render_template('B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_asignacion_flota', viajes=viajes_programados, vehiculos=vehiculos, conductores=conductores, contratos=contratos)
 
 # =========================================================
-# ETAPAS 6 Y 7: AUDITORÍA Y RESULTADOS (CON CÁLCULOS INALTERABLES)
+# ETAPAS 6 Y 7: AUDITORÍA Y RESULTADOS
 # =========================================================
 @bp_flotaespecial_eps.route('/auditoria', methods=['GET', 'POST'])
 @login_required_custom
 @controlador_flotaespecial_required
 def gestion_traslados_auditoria():
     empresa_id = session.get('empresa_id')
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    
-    # Migración asegurada en cada render o POST de auditoría
-    asegurar_tablas_transporte_especial(cur)
-    mysql.connection.commit()
     
     if request.method == 'POST':
         accion = request.form.get('accion')
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         try:
             if accion == 'aprobar_paquete':
                 raiz_viaje = request.form.get('id_viaje_padre')
                 
                 cur.execute("""
                     SELECT id, estatus_servicio, numero_autorizacion, numero_prescripcion, 
-                           id_viaje, ruta_documento, hash_seguridad,
-                           lat_origen, lng_origen, lat_origen_esperado, lng_origen_esperado,
-                           lat_destino, lng_destino, lat_destino_esperado, lng_destino_esperado,
-                           tiempo_efectivo_minutos
+                           id_viaje, ruta_documento, hash_seguridad
                     FROM control_viajes_flota_especial
                     WHERE SUBSTRING_INDEX(id_viaje, '_', 1) = %s AND id_empresa = %s AND estatus_servicio = 'TERMINADO-PDTE AUDITAR'
                 """, (raiz_viaje, empresa_id))
@@ -1405,46 +1399,21 @@ def gestion_traslados_auditoria():
                             pass
 
                     if hash_seg:
-                        auditor_nombre = session.get('nombre')
-                        auditor_cedula = str(session.get('cedula') or session.get('usuario_id') or 'N/A')
+                        auditor = session.get('nombre')
                         fecha_auditoria = datetime.now(BOGOTA_TZ)
                         
-                        # Cálculos autónomos de desviaciones en Backend
-                        dist_ori_m = int(round(_calcular_haversine_py(
-                            viaje.get('lat_origen'), viaje.get('lng_origen'),
-                            viaje.get('lat_origen_esperado'), viaje.get('lng_origen_esperado')
-                        )))
-                        
-                        dist_des_m = int(round(_calcular_haversine_py(
-                            viaje.get('lat_destino'), viaje.get('lng_destino'),
-                            viaje.get('lat_destino_esperado'), viaje.get('lng_destino_esperado')
-                        )))
-                        
-                        tiempo_teorico = _obtener_tiempo_teorico_google(
-                            viaje.get('lat_origen_esperado'), viaje.get('lng_origen_esperado'),
-                            viaje.get('lat_destino_esperado'), viaje.get('lng_destino_esperado')
-                        )
-                        
-                        tiempo_real = viaje.get('tiempo_efectivo_minutos') or 0
-                        tiempo_desviacion = tiempo_real - tiempo_teorico
-
-                        cadena_auditoria = f"{hash_seg}|{viaje['id_viaje']}|{auditor_nombre}|{auditor_cedula}|{fecha_auditoria.strftime('%Y-%m-%d %H:%M:%S')}"
+                        cadena_auditoria = f"{hash_seg}|{viaje['id_viaje']}|{auditor}|{fecha_auditoria.strftime('%Y-%m-%d %H:%M:%S')}"
                         hash_auditoria = hashlib.sha256(cadena_auditoria.encode('utf-8')).hexdigest()
                         
                         cur.execute("""
                             UPDATE control_viajes_flota_especial 
                             SET estatus_servicio = 'AUDITADO',
                                 auditor_nombre = %s,
-                                auditor_cedula = %s,
-                                distancia_desviacion_origen_metros = %s,
-                                distancia_desviacion_destino_metros = %s,
-                                tiempo_teorico_minutos = %s,
-                                tiempo_desviacion_minutos = %s,
                                 fecha_auditoria = %s,
                                 hash_auditoria = %s,
                                 ruta_pdf_unificado = %s
                             WHERE id = %s AND id_empresa = %s
-                        """, (auditor_nombre, auditor_cedula, dist_ori_m, dist_des_m, tiempo_teorico, tiempo_desviacion, fecha_auditoria, hash_auditoria, viaje['ruta_documento'], viaje['id'], empresa_id))
+                        """, (auditor, fecha_auditoria, hash_auditoria, viaje['ruta_documento'], viaje['id'], empresa_id))
                         
                         cur.execute("""
                             UPDATE maestra_traslados_eps_tespecial 
@@ -1454,7 +1423,7 @@ def gestion_traslados_auditoria():
                         auditados_count += 1
                         
                 if auditados_count > 0:
-                    flash(f'Sello SHA-256 verificado y métricas archivadas correctamente. Paquete aprobado ({auditados_count} tramos validados).', 'success')
+                    flash(f'Sello SHA-256 verificado y estatus actualizado. Paquete aprobado ({auditados_count} tramos validados).', 'success')
                 else:
                     flash('Error: No se pudieron validar los hashes de seguridad en este paquete.', 'danger')
                     
@@ -1471,6 +1440,8 @@ def gestion_traslados_auditoria():
             cur.close()
         return redirect(url_for('flotaespecial_eps.gestion_traslados_auditoria'))
         
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    
     cur.execute("""
         SELECT SUBSTRING_INDEX(id_viaje, '_', 1) as raiz_viaje
         FROM control_viajes_flota_especial
@@ -1516,8 +1487,7 @@ def gestion_traslados_auditados():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cur.execute("""
         SELECT id_viaje, numero_autorizacion, nombre_usuario, id_eps_cliente AS eps_cliente, operador_ejecucion, 
-               vehiculo_asignado, fecha_fin_real, auditor_nombre, auditor_cedula, fecha_auditoria, hash_auditoria,
-               distancia_desviacion_origen_metros, distancia_desviacion_destino_metros, tiempo_teorico_minutos, tiempo_desviacion_minutos,
+               vehiculo_asignado, fecha_fin_real, auditor_nombre, fecha_auditoria, hash_auditoria,
                COALESCE(ruta_pdf_unificado, ruta_documento) as ruta_documento
         FROM control_viajes_flota_especial 
         WHERE id_empresa = %s AND estatus_servicio = 'AUDITADO' 

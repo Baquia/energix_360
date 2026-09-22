@@ -302,7 +302,7 @@ def iniciar_viaje_especial():
         cur.close()
 
 # ==============================================================================
-# FASE 1: NUEVO ENDPOINT PARA REPORTE DE NOVEDAD DESDE LA APP MÓVIL
+# FASE 1: REPORTE DE NOVEDAD DESDE LA APP MÓVIL (CORREGIDO BLOQUEO DB)
 # ==============================================================================
 @bp_operador_flotaespecial.route('/api/viaje_especial/reportar_novedad', methods=['POST'])
 @login_required_custom
@@ -323,19 +323,7 @@ def reportar_novedad_especial():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        try:
-            cur.execute("""
-                ALTER TABLE control_viajes_flota_especial 
-                ADD COLUMN estado_novedad VARCHAR(50) NULL, 
-                ADD COLUMN descripcion_novedad TEXT NULL, 
-                ADD COLUMN fecha_novedad DATETIME NULL, 
-                ADD COLUMN monto_liquidacion_manual DECIMAL(10,2) NULL, 
-                ADD COLUMN es_trasbordo BOOLEAN DEFAULT FALSE, 
-                ADD COLUMN fuec_anulado VARCHAR(50) NULL;
-            """)
-        except:
-            pass
-
+        # Se elimina el ALTER TABLE para evitar bloqueos por el Metadata Lock
         cur.execute("SELECT id, estatus_servicio FROM control_viajes_flota_especial WHERE id_viaje = %s AND id_empresa = %s", (id_viaje_alfanumerico, empresa_id))
         viaje_info = cur.fetchone()
         

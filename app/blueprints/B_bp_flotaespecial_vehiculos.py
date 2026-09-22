@@ -7,6 +7,11 @@ import uuid
 import requests
 import threading
 import urllib.parse
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+
 from flask import Blueprint, render_template, session, redirect, url_for, request, flash, send_file, current_app, jsonify
 from werkzeug.utils import secure_filename
 from app import mysql, bcrypt
@@ -41,6 +46,9 @@ def controlador_flotaespecial_required(f):
 # HELPER: MIGRACIÓN DE TABLAS Y COLUMNAS
 # =========================================================
 def asegurar_tablas_y_columnas(cur):
+    try: cur.execute("ALTER TABLE usuarios ADD COLUMN email VARCHAR(150)")
+    except: pass
+
     # 1. Vehículos
     columnas_vehiculos = [
         ("vin", "VARCHAR(100)"), ("numero_serie", "VARCHAR(100)"), ("restriccion_movilidad", "VARCHAR(100)"),
@@ -49,7 +57,8 @@ def asegurar_tablas_y_columnas(cur):
         ("fecha_expedicion_licencia", "DATE"), ("servicio", "VARCHAR(50)"), ("modalidad_servicio", "VARCHAR(100)"),
         ("nivel_servicio", "VARCHAR(100)"), ("radio_accion", "VARCHAR(100)"), ("fecha_expedicion_tarjeta_operacion", "DATE"),
         ("fecha_inicio_tarjeta_operacion", "DATE"), ("ruta_pdf_tarjeta_operacion", "VARCHAR(255)"),
-        ("fecha_inicio_rcc_rce", "DATE"), ("ruta_pdf_rcc_rce", "VARCHAR(255)"), ("empresa_transporte", "VARCHAR(150)")
+        ("fecha_inicio_rcc_rce", "DATE"), ("ruta_pdf_rcc_rce", "VARCHAR(255)"), ("empresa_transporte", "VARCHAR(150)"),
+        ("conductor_asignado", "VARCHAR(150)"), ("departamento_base", "VARCHAR(100)"), ("municipio_base", "VARCHAR(100)")
     ]
     for col, tipo in columnas_vehiculos:
         try: cur.execute(f"ALTER TABLE vehiculos_especial ADD COLUMN {col} {tipo}")
@@ -123,7 +132,7 @@ def asegurar_tablas_y_columnas(cur):
     """)
 
 # =========================================================
-# HELPER: NOTIFICACIONES TELEGRAM
+# HELPER: NOTIFICACIONES TELEGRAM Y EMAIL
 # =========================================================
 def _enviar_mensajes_telegram_hilo(chat_ids, mensaje):
     TOKEN = "8841682239:AAFOj8TpeOW4ulhIkNoIyGaTZ2MLlI9ydVo"
@@ -140,6 +149,158 @@ def _enviar_mensajes_telegram_hilo(chat_ids, mensaje):
     hilo = threading.Thread(target=tarea_envio)
     hilo.daemon = True
     hilo.start()
+
+def _enviar_email_reporte_hilo(destinatarios, pdf_bytes, empresa_nombre):
+    destinatarios_validos = [d for d in destinatarios if d and '@' in d]
+    if not destinatarios_validos: 
+        return
+        
+    def tarea_envio():
+        try:
+            host = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+            port = int(os.environ.get('EMAIL_PORT', 587))
+            user = os.environ.get('EMAIL_USER', 'bqa-one@baquia-esm.com')
+            password = os.environ.get('EMAIL_PASS', 'mgtmyopdvginesae')
+            sender = os.environ.get('EMAIL_FROM', 'bqa-one@baquia-esm.com')
+
+            msg = MIMEMultipart()
+            msg['From'] = sender
+            msg['To'] = ", ".join(destinatarios_validos)
+            msg['Subject'] = f"Reporte Mensual de Vencimientos Flota - {empresa_nombre}"
+            
+            body = f"Cordial saludo,\n\nAdjunto enviamos el Reporte Mensual de Vencimientos de documentos (Vehículos y Conductores) correspondientes a la flota de {empresa_nombre}.\n\nAtentamente,\nSistema de Auditoría BQA-ONE"
+            msg.attach(MIMEText(body, 'plain'))
+            
+            part = MIMEApplication(pdf_bytes, Name="Reporte_Vencimientos.pdf")
+            part['Content-Disposition'] = 'attachment; filename="Reporte_Vencimientos.pdf"'
+            msg.attach(part)
+            
+            server = smtplib.SMTP(host, port)
+            server.starttls()
+            server.login(user, password)
+            server.sendmail(sender, destinatarios_validos, msg.as_string())
+            server.quit()
+        except Exception as e:
+            pass
+            
+    hilo = threading.Thread(target=tarea_envio)
+    hilo.daemon = True
+    hilo.start()
+
+def _generar_pdf_vencimientos_buffer(empresa_nombre, nit_empresa, alertas_vehiculos, alertas_conductores):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#015249'), alignment=1, spaceAfter=20)
+    cell_style = ParagraphStyle('CellText', parent=styles['Normal'], fontSize=9)
+    
+    story.append(Paragraph(f"<b>REPORTE DE AUDITORÍA: VENCIMIENTOS DOCUMENTALES</b>", title_style))
+    story.append(Paragraph(f"<b>Empresa Operadora:</b> {empresa_nombre} (NIT: {nit_empresa})", styles['Normal']))
+    story.append(Paragraph(f"<b>Fecha de Generación:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
+    story.append(Spacer(1, 20))
+    
+    # Tabla Vehículos
+    story.append(Paragraph("<b>1. Alertas Críticas - Flota Vehicular</b>", styles['Heading3']))
+    story.append(Spacer(1, 5))
+    if alertas_vehiculos:
+        data = [["Placa", "Documento a Renovar", "Estado Actual", "Fecha Límite"]]
+        for a in alertas_vehiculos: 
+            data.append([Paragraph(a[0], cell_style), Paragraph(a[1], cell_style), Paragraph(a[2], cell_style), Paragraph(a[3], cell_style)])
+        t = Table(data, colWidths=[80, 200, 120, 100])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#015249')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
+        ]))
+        story.append(t)
+    else:
+        story.append(Paragraph("<i>Toda la flota registra documentación al día.</i>", styles['Normal']))
+        
+    story.append(Spacer(1, 25))
+    
+    # Tabla Conductores
+    story.append(Paragraph("<b>2. Alertas Críticas - Personal Operativo</b>", styles['Heading3']))
+    story.append(Spacer(1, 5))
+    if alertas_conductores:
+        data = [["Nombre del Conductor (CC)", "Documento a Renovar", "Estado Actual", "Fecha Límite"]]
+        for a in alertas_conductores: 
+            data.append([Paragraph(a[0], cell_style), Paragraph(a[1], cell_style), Paragraph(a[2], cell_style), Paragraph(a[3], cell_style)])
+        t = Table(data, colWidths=[160, 160, 90, 90])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#015249')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
+        ]))
+        story.append(t)
+    else:
+        story.append(Paragraph("<i>Todo el personal operativo registra documentación al día.</i>", styles['Normal']))
+        
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+def _obtener_alertas_empresa(empresa_id, cur):
+    hoy = datetime.now().date()
+    limite_alerta = hoy + timedelta(days=30)
+    
+    cur.execute("SELECT placa, fecha_matricula, vencimiento_soat, vencimiento_rcc_rce, vencimiento_rtm FROM vehiculos_especial WHERE id_empresa = %s", (empresa_id,))
+    vehiculos = cur.fetchall()
+    alertas_vehiculos = []
+    
+    for v in vehiculos:
+        placa = v['placa']
+        rtm_requerida = True
+        if v.get('fecha_matricula'):
+            f_mat = v['fecha_matricula']
+            if isinstance(f_mat, str):
+                try: f_mat = datetime.strptime(f_mat, '%Y-%m-%d').date()
+                except ValueError: pass
+            if isinstance(f_mat, date):
+                try: f_limite = f_mat.replace(year=f_mat.year + 5)
+                except ValueError: f_limite = f_mat.replace(year=f_mat.year + 5, day=28)
+                if hoy <= f_limite: rtm_requerida = False
+        
+        docs = [
+            ('SOAT', v.get('vencimiento_soat'), True),
+            ('Póliza RCC', v.get('vencimiento_rcc_rce'), True),
+            ('Tecnomecánica (RTM)', v.get('vencimiento_rtm'), rtm_requerida)
+        ]
+        for doc_nombre, fecha_vence, requerido in docs:
+            if not requerido: continue
+            if not fecha_vence: alertas_vehiculos.append((placa, doc_nombre, "FALTANTE", "N/A"))
+            elif isinstance(fecha_vence, str): 
+                try: fecha_vence = datetime.strptime(fecha_vence, '%Y-%m-%d').date()
+                except: continue
+            if isinstance(fecha_vence, date):
+                if fecha_vence <= hoy: alertas_vehiculos.append((placa, doc_nombre, "VENCIDO", str(fecha_vence)))
+                elif fecha_vence <= limite_alerta: alertas_vehiculos.append((placa, doc_nombre, "PROXIMO_VENCER", str(fecha_vence)))
+
+    cur.execute("SELECT cedula, nombre, vencimiento_licencia_conduccion, vencimiento_seguridad_social FROM conductores_flotaespecial WHERE id_empresa = %s", (empresa_id,))
+    conductores = cur.fetchall()
+    alertas_conductores = []
+    
+    for c in conductores:
+        cedula, nombre = c['cedula'], c['nombre']
+        docs = [
+            ('Licencia de Conducción', c.get('vencimiento_licencia_conduccion')),
+            ('Seguridad Social (Planilla)', c.get('vencimiento_seguridad_social'))
+        ]
+        for doc_nombre, fecha_vence in docs:
+            if not fecha_vence: alertas_conductores.append((f"{nombre} ({cedula})", doc_nombre, "FALTANTE", "N/A"))
+            elif isinstance(fecha_vence, str):
+                try: fecha_vence = datetime.strptime(fecha_vence, '%Y-%m-%d').date()
+                except: continue
+            if isinstance(fecha_vence, date):
+                if fecha_vence <= hoy: alertas_conductores.append((f"{nombre} ({cedula})", doc_nombre, "VENCIDO", str(fecha_vence)))
+                elif fecha_vence <= limite_alerta: alertas_conductores.append((f"{nombre} ({cedula})", doc_nombre, "PROXIMO_VENCER", str(fecha_vence)))
+            
+    return alertas_vehiculos, alertas_conductores
 
 # =========================================================
 # HELPER: GUARDAR PDF MANUAL
@@ -353,6 +514,10 @@ def gestion_vehiculos():
             restriccion_movilidad = request.form.get('restriccion_movilidad', '').strip()
             blindaje = request.form.get('blindaje', '').strip()
             
+            conductor_asignado = request.form.get('conductor_asignado', '').strip()
+            departamento_base = request.form.get('departamento_base', '').strip()
+            municipio_base = request.form.get('municipio_base', '').strip()
+            
             tipo_vinculacion = request.form.get('tipo_vinculacion', 'Propio').strip()
             empresa_vinculadora = request.form.get('empresa_vinculadora', '').strip()
             
@@ -364,7 +529,7 @@ def gestion_vehiculos():
                 empresa_transporte = empresa_vinculadora
                 nit_empresa_vinculadora = request.form.get('nit_empresa_vinculadora', '').strip()
                 if empresa_vinculadora:
-                    cur.execute("SELECT nit FROM empresas_transporte_especial WHERE nombre=%s AND id_empresa=%s", (empresa_vinculadora, empresa_id))
+                    cur.execute("SELECT nit FROM empresas_transporte_especial WHERE nombre=%s AND id_empresa=%s", (empresa_id,))
                     t_data = cur.fetchone()
                     if t_data and t_data['nit']:
                         nit_empresa_vinculadora = t_data['nit']
@@ -411,10 +576,12 @@ def gestion_vehiculos():
                              numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
                              numero_poliza_soat, aseguradora_soat, vencimiento_soat,
                              numero_certificado_rtm, vencimiento_rtm,
-                             ruta_pdf_tarjeta_propiedad, ruta_pdf_tarjeta_operacion, ruta_pdf_rcc_rce, ruta_pdf_soat, ruta_pdf_tecnomecanica) 
+                             ruta_pdf_tarjeta_propiedad, ruta_pdf_tarjeta_operacion, ruta_pdf_rcc_rce, ruta_pdf_soat, ruta_pdf_tecnomecanica,
+                             conductor_asignado, departamento_base, municipio_base) 
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                    %s, %s, %s)
                         """, (
                             empresa_id, placa, clase, carroceria, marca, linea, modelo, color, combustible,
                             cilindraje, capacidad, potencia_hp, puertas, vin, chasis, motor, numero_serie,
@@ -427,7 +594,8 @@ def gestion_vehiculos():
                             numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
                             numero_poliza_soat, aseguradora_soat, vencimiento_soat,
                             numero_certificado_rtm, vencimiento_rtm,
-                            r_prop or '', r_ope or '', r_rcc or '', r_soat or '', r_rtm or ''
+                            r_prop or '', r_ope or '', r_rcc or '', r_soat or '', r_rtm or '',
+                            conductor_asignado, departamento_base, municipio_base
                         ))
                         mysql.connection.commit()
                         flash(f"Vehículo especial {placa} registrado manualmente con éxito.", "success")
@@ -446,7 +614,8 @@ def gestion_vehiculos():
                                 fecha_inicio_tarjeta_operacion=%s, vencimiento_tarjeta_operacion=%s,
                                 numero_poliza_rcc_rce=%s, aseguradora_rcc_rce=%s, fecha_inicio_rcc_rce=%s, vencimiento_rcc_rce=%s,
                                 numero_poliza_soat=%s, aseguradora_soat=%s, vencimiento_soat=%s,
-                                numero_certificado_rtm=%s, vencimiento_rtm=%s
+                                numero_certificado_rtm=%s, vencimiento_rtm=%s,
+                                conductor_asignado=%s, departamento_base=%s, municipio_base=%s
                             WHERE id=%s AND id_empresa=%s
                         """, (
                             placa, clase, carroceria, marca, linea, modelo, color, combustible,
@@ -460,6 +629,7 @@ def gestion_vehiculos():
                             numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
                             numero_poliza_soat, aseguradora_soat, vencimiento_soat,
                             numero_certificado_rtm, vencimiento_rtm,
+                            conductor_asignado, departamento_base, municipio_base,
                             v_id, empresa_id
                         ))
                         if r_prop: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_tarjeta_propiedad=%s WHERE id=%s", (r_prop, v_id))
@@ -582,6 +752,12 @@ def gestion_vehiculos():
         
         conductores_activos = [c for c in conductores_db if c.get('estatus') in ['Logueado', 'Prelogueado']]
         
+        # ----------------------------------------------------
+        # NUEVA CONSULTA DE ACCESOS PARA LISTA DESPLEGABLE
+        # ----------------------------------------------------
+        cur.execute("SELECT id, nombre, cedula FROM usuarios WHERE empresa_id = %s AND perfil = 'operador_flotaespecial' ORDER BY nombre ASC", (empresa_id,))
+        operadores_flota = cur.fetchall()
+        
         kpis = {
             'total_flota': len(vehiculos_db),
             'exentos_rtm': exentos_rtm_count,
@@ -595,11 +771,12 @@ def gestion_vehiculos():
             'B_modulo_flotaespecial_vehiculos.html',
             nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
             active_module='vehiculos', vehiculos=vehiculos_db, terceros=terceros_db,
-            kpis=kpis, conductores_activos=conductores_activos
+            kpis=kpis, conductores_activos=conductores_activos, conductores=conductores_db,
+            operadores_flota=operadores_flota
         )
 
 # =========================================================
-# ENDPOINTS AJAX: VISORES INDIVIDUALES
+# ENDPOINTS AJAX: VISORES INDIVIDUALES Y DESCARGAS
 # =========================================================
 @bp_flotaespecial_vehiculos.route('/visor_individual_conductor', methods=['GET'])
 @login_required_custom
@@ -692,8 +869,27 @@ def visor_tiempos_conduccion():
     finally:
         cur.close()
 
+@bp_flotaespecial_vehiculos.route('/reporte_vencimientos_pdf', methods=['GET'])
+@login_required_custom
+@controlador_flotaespecial_required
+def descargar_reporte_vencimientos_pdf():
+    empresa_id = session.get('empresa_id')
+    empresa_nombre = session.get('empresa')
+    nit_empresa = session.get('nit')
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        alertas_vehiculos, alertas_conductores = _obtener_alertas_empresa(empresa_id, cur)
+        pdf_buffer = _generar_pdf_vencimientos_buffer(empresa_nombre, nit_empresa, alertas_vehiculos, alertas_conductores)
+        return send_file(pdf_buffer, as_attachment=True, download_name=f"Reporte_Vencimientos_{nit_empresa}.pdf", mimetype='application/pdf')
+    except Exception as e:
+        flash(f"Error generando el reporte PDF: {str(e)}", "danger")
+        return redirect(url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='vehiculos'))
+    finally:
+        cur.close()
+
 # =========================================================
-# CRON: AUDITORÍA DE VENCIMIENTOS (VEHÍCULOS Y CONDUCTORES)
+# CRON: AUDITORÍA DE VENCIMIENTOS (PDF Y CORREO)
 # =========================================================
 @bp_flotaespecial_vehiculos.route('/cron/auditoria_vencimientos', methods=['GET'])
 def cron_auditoria_vencimientos():
@@ -703,10 +899,7 @@ def cron_auditoria_vencimientos():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        hoy = datetime.now().date()
-        limite_alerta = hoy + timedelta(days=30)
-        
-        cur.execute("SELECT id, nombre_comercial FROM empresas")
+        cur.execute("SELECT id, nombre_comercial, nit FROM empresas")
         empresas = cur.fetchall()
 
         alertas_generadas = 0
@@ -714,115 +907,54 @@ def cron_auditoria_vencimientos():
         for emp in empresas:
             empresa_id = emp['id']
             empresa_nombre = emp['nombre_comercial']
-            alertas_controlador = []
+            nit_empresa = emp.get('nit', 'N/A')
 
-            cur.execute("SELECT telegram_id FROM usuarios WHERE empresa_id = %s AND perfil = 'controlador_flotaespecial'", (empresa_id,))
-            controladores = cur.fetchall()
-            telegram_controlador = [c['telegram_id'] for c in controladores if c.get('telegram_id')]
+            # 1. Obtener y evaluar alertas
+            alertas_vehiculos, alertas_conductores = _obtener_alertas_empresa(empresa_id, cur)
+            
+            # Registrar en tabla historial y enviar telegram individual
+            for a in alertas_vehiculos:
+                cur.execute("INSERT INTO historial_verificaciones_flotaespecial (id_empresa, tipo_entidad, identificador, documento_verificado, estado_documento) VALUES (%s, %s, %s, %s, %s)", (empresa_id, 'VEHICULO', a[0], a[1], a[2]))
+                if a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE']:
+                    cur.execute("SELECT u.telegram_id FROM vehiculos_especial v LEFT JOIN usuarios u ON v.conductor_asignado = u.nombre AND v.id_empresa = u.empresa_id WHERE v.placa = %s AND v.id_empresa = %s LIMIT 1", (a[0], empresa_id))
+                    usr = cur.fetchone()
+                    if usr and usr.get('telegram_id'):
+                        msg = f"⚠️ *Alerta Documental - Vehículo {a[0]}*\nTienes documentos por renovar:\n- {a[1]}: {a[2]} ({a[3]})"
+                        _enviar_mensajes_telegram_hilo([usr['telegram_id']], msg)
+                        
+            for a in alertas_conductores:
+                cedula_match = re.search(r'\((.*?)\)', a[0])
+                cedula_str = cedula_match.group(1) if cedula_match else a[0]
+                cur.execute("INSERT INTO historial_verificaciones_flotaespecial (id_empresa, tipo_entidad, identificador, documento_verificado, estado_documento) VALUES (%s, %s, %s, %s, %s)", (empresa_id, 'CONDUCTOR', cedula_str, a[1], a[2]))
+                if a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE']:
+                    cur.execute("SELECT telegram_id FROM usuarios WHERE cedula = %s AND empresa_id = %s LIMIT 1", (cedula_str, empresa_id))
+                    usr = cur.fetchone()
+                    if usr and usr.get('telegram_id'):
+                        msg = f"⚠️ *Alerta Documental - Personal*\nTus documentos están por renovar:\n- {a[1]}: {a[2]} ({a[3]})"
+                        _enviar_mensajes_telegram_hilo([usr['telegram_id']], msg)
 
-            # 1. Auditar Vehículos
-            cur.execute("""
-                SELECT v.placa, v.fecha_matricula, v.vencimiento_soat, v.vencimiento_rcc_rce, v.vencimiento_rtm,
-                       u.telegram_id AS telegram_operador, u.nombre AS nombre_operador
-                FROM vehiculos_especial v
-                LEFT JOIN usuarios u ON v.cedula_operador COLLATE utf8mb4_unicode_ci = u.cedula COLLATE utf8mb4_unicode_ci AND v.id_empresa = u.empresa_id
-                WHERE v.id_empresa = %s
-            """, (empresa_id,))
-            vehiculos = cur.fetchall()
+            hay_alertas = any(a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE'] for a in alertas_vehiculos) or any(a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE'] for a in alertas_conductores)
 
-            for v in vehiculos:
-                placa = v['placa']
-                mensajes_vehiculo = []
+            # 2. Enviar consolidado PDF y Telegram a Controladores si existen alertas
+            if hay_alertas:
+                cur.execute("SELECT telegram_id, email FROM usuarios WHERE empresa_id = %s AND perfil = 'controlador_flotaespecial'", (empresa_id,))
+                controladores = cur.fetchall()
+                
+                telegram_controlador = [c['telegram_id'] for c in controladores if c.get('telegram_id')]
+                email_controlador = [c['email'] for c in controladores if c.get('email')]
 
-                rtm_requerida = True
-                if v.get('fecha_matricula'):
-                    f_mat = v['fecha_matricula']
-                    try: f_limite = f_mat.replace(year=f_mat.year + 5)
-                    except ValueError: f_limite = f_mat.replace(year=f_mat.year + 5, day=28)
-                    if hoy <= f_limite:
-                        rtm_requerida = False
+                if email_controlador:
+                    pdf_buffer = _generar_pdf_vencimientos_buffer(empresa_nombre, nit_empresa, alertas_vehiculos, alertas_conductores)
+                    _enviar_email_reporte_hilo(email_controlador, pdf_buffer.getvalue(), empresa_nombre)
 
-                documentos_veh = [
-                    ('SOAT', v.get('vencimiento_soat'), True),
-                    ('Póliza RCC', v.get('vencimiento_rcc_rce'), True),
-                    ('Tecnomecánica (RTM)', v.get('vencimiento_rtm'), rtm_requerida)
-                ]
-
-                for doc_nombre, fecha_vence, requerido in documentos_veh:
-                    if not requerido:
-                        estado = "EXENTO (Menor 5 Años)"
-                        cur.execute("INSERT INTO historial_verificaciones_flotaespecial (id_empresa, tipo_entidad, identificador, documento_verificado, estado_documento) VALUES (%s, %s, %s, %s, %s)", (empresa_id, 'VEHICULO', placa, doc_nombre, estado))
-                        continue
-
-                    if not fecha_vence:
-                        estado = "FALTANTE"
-                        mensajes_vehiculo.append(f"❌ {doc_nombre}: Faltante en sistema.")
-                    elif fecha_vence <= hoy:
-                        estado = "VENCIDO"
-                        mensajes_vehiculo.append(f"🔴 {doc_nombre}: VENCIDO ({fecha_vence})")
-                    elif fecha_vence <= limite_alerta:
-                        estado = "PROXIMO_VENCER"
-                        mensajes_vehiculo.append(f"🟡 {doc_nombre}: Vence el {fecha_vence}")
-                    else:
-                        estado = "VIGENTE"
-                    
-                    cur.execute("INSERT INTO historial_verificaciones_flotaespecial (id_empresa, tipo_entidad, identificador, documento_verificado, estado_documento) VALUES (%s, %s, %s, %s, %s)", (empresa_id, 'VEHICULO', placa, doc_nombre, estado))
-
-                if mensajes_vehiculo:
-                    msg_txt = "\n".join(mensajes_vehiculo)
-                    alertas_controlador.append(f"🚐 *Vehículo {placa}:*\n{msg_txt}")
-                    if v.get('telegram_operador'):
-                        _enviar_mensajes_telegram_hilo([v['telegram_operador']], f"⚠️ *Alerta Documental - Vehículo {placa}*\nHola {v['nombre_operador']}, tienes documentos del vehículo próximos a vencer o vencidos:\n\n{msg_txt}")
-                        alertas_generadas += 1
-
-            # 2. Auditar Conductores
-            cur.execute("""
-                SELECT c.cedula, c.nombre, c.vencimiento_licencia_conduccion, c.vencimiento_seguridad_social, u.telegram_id
-                FROM conductores_flotaespecial c
-                LEFT JOIN usuarios u ON c.cedula COLLATE utf8mb4_unicode_ci = u.cedula COLLATE utf8mb4_unicode_ci AND c.id_empresa = u.empresa_id
-                WHERE c.id_empresa = %s
-            """, (empresa_id,))
-            conductores = cur.fetchall()
-
-            for c in conductores:
-                cedula = c['cedula']
-                mensajes_conductor = []
-
-                documentos_cond = [
-                    ('Licencia de Conducción', c.get('vencimiento_licencia_conduccion')),
-                    ('Seguridad Social (Planilla)', c.get('vencimiento_seguridad_social'))
-                ]
-
-                for doc_nombre, fecha_vence in documentos_cond:
-                    if not fecha_vence:
-                        estado = "FALTANTE"
-                        mensajes_conductor.append(f"❌ {doc_nombre}: Faltante en sistema.")
-                    elif fecha_vence <= hoy:
-                        estado = "VENCIDO"
-                        mensajes_conductor.append(f"🔴 {doc_nombre}: VENCIDO ({fecha_vence})")
-                    elif fecha_vence <= limite_alerta:
-                        estado = "PROXIMO_VENCER"
-                        mensajes_conductor.append(f"🟡 {doc_nombre}: Vence el {fecha_vence}")
-                    else:
-                        estado = "VIGENTE"
-                    
-                    cur.execute("INSERT INTO historial_verificaciones_flotaespecial (id_empresa, tipo_entidad, identificador, documento_verificado, estado_documento) VALUES (%s, %s, %s, %s, %s)", (empresa_id, 'CONDUCTOR', cedula, doc_nombre, estado))
-
-                if mensajes_conductor:
-                    msg_txt = "\n".join(mensajes_conductor)
-                    alertas_controlador.append(f"👨‍✈️ *Conductor {c['nombre']}:*\n{msg_txt}")
-                    if c.get('telegram_id'):
-                        _enviar_mensajes_telegram_hilo([c.get('telegram_id')], f"⚠️ *Alerta Documental - Personal*\nHola {c['nombre']}, tus documentos están próximos a vencer o vencidos:\n\n{msg_txt}\n\nPor favor, actualiza tu expediente.")
-                        alertas_generadas += 1
-
-            if alertas_controlador and telegram_controlador:
-                cuerpo_reporte = "\n\n".join(alertas_controlador)
-                mensaje_gerencial = f"📊 *REPORTE MENSUAL DE VENCIMIENTOS*\n🏢 {empresa_nombre}\n\nLos siguientes recursos requieren atención inmediata:\n\n{cuerpo_reporte}"
-                _enviar_mensajes_telegram_hilo(telegram_controlador, mensaje_gerencial)
+                if telegram_controlador:
+                    mensaje_telegram = f"📊 *REPORTE MENSUAL DE VENCIMIENTOS*\n🏢 {empresa_nombre}\n\nEl reporte de auditoría documental ha sido generado exitosamente. Se ha enviado el documento PDF detallado al correo electrónico de los administradores inscritos."
+                    _enviar_mensajes_telegram_hilo(telegram_controlador, mensaje_telegram)
+                
                 alertas_generadas += 1
 
         mysql.connection.commit()
-        return jsonify({"status": "success", "mensajes_telegram_generados": alertas_generadas}), 200
+        return jsonify({"status": "success", "reportes_procesados": alertas_generadas}), 200
 
     except Exception as e:
         mysql.connection.rollback()
@@ -1016,7 +1148,7 @@ def descargar_preoperacional_pdf(consecutivo):
     return send_file(buffer, as_attachment=True, download_name=f"Preoperacional_Especial_{consecutivo}.pdf", mimetype='application/pdf')
 
 # =========================================================
-# DESCARGA QR ESTRUCTURADO EN PDF (NUEVO REQUERIMIENTO)
+# DESCARGA QR ESTRUCTURADO EN PDF
 # =========================================================
 @bp_flotaespecial_vehiculos.route('/vehiculo/qr_pdf/<placa>', methods=['GET'])
 @login_required_custom

@@ -101,7 +101,7 @@
         .btn-close-view { background: #e5e7eb; color: #4b5563; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; font-weight: bold;}
         .btn-close-view:hover { background: #d1d5db; color: #111827; }
         
-        .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 6px;}
+        .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 6px; text-decoration: none;}
         .btn-primary:hover { background: var(--verde-osc); }
         .btn-info { background: #0ea5e9; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; transition: 0.2s;}
         .btn-info:hover { background: #0284c7; }
@@ -432,6 +432,7 @@
                         <h2>Gestión de Vehículos Especiales</h2>
                     </div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <a href="{{ url_for('flotaespecial_vehiculos.descargar_reporte_vencimientos_pdf') }}" class="btn-primary" style="background: #0ea5e9; text-decoration: none;"><span>📄</span> Descargar Reporte Mensual</a>
                         <button class="btn-primary" style="background: #6366f1;" onclick="abrirModalAuditoriaTiempos()"><span>⏱️</span> Auditoría Tiempos Conducción</button>
                         <button class="btn-primary" onclick="openModal('modalVehiculo')"><span>➕</span> Ingresar Manualmente</button>
                     </div>
@@ -573,6 +574,9 @@
                                             data-rsoat="{{ v.ruta_pdf_soat }}"
                                             data-rrtm="{{ v.ruta_pdf_tecnomecanica }}"
                                             data-rtm_exento="{{ 'true' if v.rtm_exento else 'false' }}"
+                                            data-cond="{{ v.conductor_asignado }}"
+                                            data-dep="{{ v.departamento_base }}"
+                                            data-mun="{{ v.municipio_base }}"
                                             onclick="abrirEditarVehiculo(this)">✏️</button>
                                     <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarVehiculo('{{ v.id }}', '{{ v.placa }}')">🗑️</button>
                                 </td>
@@ -591,6 +595,15 @@
             </div>
         </div>
     </main>
+
+    <!-- ================= DATALIST PARA OPERADORES DE FLOTA (COMPARTIDO) ================= -->
+    <datalist id="lista_operadores">
+        {% if operadores_flota is defined %}
+            {% for op in operadores_flota %}
+                <option value="{{ op.nombre }}">{{ op.nombre }} ({{ op.cedula }})</option>
+            {% endfor %}
+        {% endif %}
+    </datalist>
 
    <!-- ================= MODAL AUDITORÍA TIEMPOS DE CONDUCCIÓN (NUEVO) ================= -->
     <div id="modalAuditoriaTiempos" class="modal-overlay">
@@ -673,6 +686,20 @@
                     </select>
                 </div>
                 <div class="form-group"><label>Organismo de Tránsito</label><input type="text" name="organismo_transito"></div>
+                
+                <div class="form-group">
+                    <label>Conductor Asignado</label>
+                    <input type="text" name="conductor_asignado" list="lista_operadores" placeholder="Escriba para buscar conductor..." autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Departamento Base</label>
+                    <select name="departamento_base" id="v_dep_base" onchange="cargarMunicipios('v_dep_base', 'v_mun_base')"></select>
+                </div>
+                <div class="form-group">
+                    <label>Municipio Base</label>
+                    <select name="municipio_base" id="v_mun_base"></select>
+                </div>
+
                 <div class="form-group"><label>Fecha Matrícula</label><input type="date" name="fecha_matricula"></div>
                 <div class="form-group"><label>Fecha Exp. Licencia</label><input type="date" name="fecha_expedicion_licencia"></div>
                 <div class="form-group" style="grid-column: 1 / -1;"><label>Limitación a la Propiedad (Prenda)</label><input type="text" name="limitacion_propiedad"></div>
@@ -760,6 +787,20 @@
                 <div class="form-group"><label>Servicio</label><input type="text" name="servicio" id="edit_servicio"></div>
                 <div class="form-group"><label>Tipo de Vinculación</label><select name="tipo_vinculacion" id="edit_prop"><option value="Propio">Propio</option><option value="Tercero">Tercero / Afiliado</option></select></div>
                 <div class="form-group"><label>Organismo Tránsito</label><input type="text" name="organismo_transito" id="edit_org"></div>
+                
+                <div class="form-group">
+                    <label>Conductor Asignado</label>
+                    <input type="text" name="conductor_asignado" id="edit_cond" list="lista_operadores" placeholder="Escriba para buscar conductor..." autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Departamento Base</label>
+                    <select name="departamento_base" id="edit_dep_base" onchange="cargarMunicipios('edit_dep_base', 'edit_mun_base')"></select>
+                </div>
+                <div class="form-group">
+                    <label>Municipio Base</label>
+                    <select name="municipio_base" id="edit_mun_base"></select>
+                </div>
+
                 <div class="form-group"><label>Fecha Matrícula</label><input type="date" name="fecha_matricula" id="edit_fmat"></div>
                 <div class="form-group"><label>Fecha Exp. Licencia</label><input type="date" name="fecha_expedicion_licencia" id="edit_flic"></div>
                 <div class="form-group" style="grid-column: 1 / -1;"><label>Limitación Propiedad (Prenda)</label><input type="text" name="limitacion_propiedad" id="edit_lim"></div>
@@ -1175,10 +1216,17 @@
         }
 
         function initSelectoresDivipola() {
-            const depSelect = document.getElementById('c_dep_base');
             let optionsHTML = '<option value="">Seleccione Departamento...</option>';
             Object.keys(divipolaColombia).sort().forEach(dep => { optionsHTML += `<option value="${dep}">${dep}</option>`; });
-            if (depSelect) depSelect.innerHTML = optionsHTML;
+            
+            const depSelectCond = document.getElementById('c_dep_base');
+            if (depSelectCond) depSelectCond.innerHTML = optionsHTML;
+            
+            const depSelectVeh = document.getElementById('v_dep_base');
+            if (depSelectVeh) depSelectVeh.innerHTML = optionsHTML;
+            
+            const depSelectEditVeh = document.getElementById('edit_dep_base');
+            if (depSelectEditVeh) depSelectEditVeh.innerHTML = optionsHTML;
         }
 
         document.addEventListener("DOMContentLoaded", initSelectoresDivipola);
@@ -1310,7 +1358,6 @@
         function descargarQR() {
             const placa = document.getElementById('qrPlaca').innerText;
             if (!placa) return;
-            // Redirige al nuevo endpoint backend que genera el documento PDF formal
             window.location.href = `/gestor_flotaespecial/vehiculos_bp/vehiculo/qr_pdf/${encodeURIComponent(placa)}`;
         }
 
@@ -1359,6 +1406,16 @@
             
             document.getElementById('edit_nrtm').value = (d.nrtm !== 'None' && d.nrtm) ? d.nrtm : '';
             document.getElementById('edit_fvenrtm').value = (d.fvenrtm !== 'None' && d.fvenrtm) ? d.fvenrtm : '';
+            
+            document.getElementById('edit_cond').value = (d.cond !== 'None' && d.cond) ? d.cond : '';
+            
+            let depSelectEdit = document.getElementById('edit_dep_base');
+            if (d.dep && d.dep !== 'None') {
+                depSelectEdit.value = d.dep;
+                cargarMunicipios('edit_dep_base', 'edit_mun_base');
+                let munSelectEdit = document.getElementById('edit_mun_base');
+                if (d.mun && d.mun !== 'None') munSelectEdit.value = d.mun;
+            }
             
             openModal('modalEditarVehiculo');
         }

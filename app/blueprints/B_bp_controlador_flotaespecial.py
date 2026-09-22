@@ -155,8 +155,8 @@ def dashboard_operativo():
         v['trayecto'] = (v.get('trayecto') or 'IDA').upper()
         v['estatus_servicio'] = (v.get('estatus_servicio') or '').upper()
 
-    # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN (Con Filtro 36 Horas)
-    parte1_ida_programados = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] == 'PROGRAMADO' and v['is_36h']]
+    # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN (Con corrección de visibilidad para novedades)
+    parte1_ida_programados = [v for v in viajes if v['trayecto'] == 'IDA' and ((v['estatus_servicio'] == 'PROGRAMADO' and v['is_36h']) or v['estatus_servicio'] == 'NOVEDAD_PRE_VIAJE')]
     parte2_col1 = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] in ('EN EJECUCION', 'NOVEDAD_RECORRIDO')]
     parte2_col2 = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] in ('TERMINADO-PDTE AUDITAR', 'AUDITADO')]
     parte2_col3 = [v for v in viajes if v['trayecto'] == 'VUELTA' and v.get('vuelta_activada') and v['estatus_servicio'] not in ('EN EJECUCION', 'NOVEDAD_RECORRIDO', 'TERMINADO-PDTE AUDITAR', 'AUDITADO')]
@@ -266,9 +266,9 @@ def api_operativa_vivo():
             if estatus in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO']:
                 datos["novedades_activas"].append(v)
             
-            # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN
+            # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN (Con corrección de visibilidad para novedades)
             if trayecto == 'IDA':
-                if estatus == 'PROGRAMADO' and v['is_36h']:
+                if (estatus == 'PROGRAMADO' and v['is_36h']) or estatus == 'NOVEDAD_PRE_VIAJE':
                     datos["parte1_ida_programados"].append(v)
                 elif estatus in ['EN EJECUCION', 'NOVEDAD_RECORRIDO']:
                     datos["parte2_col1"].append(v)

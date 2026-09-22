@@ -100,6 +100,17 @@
         #bannerNovedades { display: none; width: 100%; max-width: 1000px; background-color: #ef4444; color: white; padding: 15px 20px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); animation: pulseAlert 2s infinite; }
         @keyframes pulseAlert { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
 
+        /* Notificación Visual Persistente */
+        @keyframes criticalFlash {
+            0% { box-shadow: 0 0 10px #ef4444; border-color: #ef4444; background-color: #fee2e2; }
+            50% { box-shadow: 0 0 25px #ef4444; border-color: #dc2626; background-color: #fca5a5; }
+            100% { box-shadow: 0 0 10px #ef4444; border-color: #ef4444; background-color: #fee2e2; }
+        }
+        .flash-critical {
+            animation: criticalFlash 1.5s infinite !important;
+            border-width: 2px !important;
+        }
+
         /* Alerta Urgencia (Menos de 12 Horas) */
         @keyframes titileoUrgencia {
             0% { border-color: #ef4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.2); }
@@ -274,7 +285,6 @@
 
         <div class="content-area">
             
-            <!-- Banner Alertas Novedades -->
             <div id="bannerNovedades">
                 🚨 ATENCIÓN: Hay <span id="contadorNovedades">0</span> viaje(s) con novedad activa que requieren intervención de reasignación y FUEC. 
                 <a href="{{ url_for('controlador_flotaespecial.dashboard_operativo') }}" style="color: white; text-decoration: underline; margin-left: 10px;">Ver en Kanban</a>
@@ -323,7 +333,7 @@
                     
                     <div id="contenedor_parte1" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
                         {% for v in parte1_ida_programados %}
-                        <div class="kanban-card border-top-info {% if v.is_urgencia %}urgencia-12h{% endif %}">
+                        <div class="kanban-card border-top-info {% if v.is_urgencia %}urgencia-12h{% endif %}" data-id="{{ v.id }}">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                                 <span class="id-token">{{ v.id_viaje }}</span>
                                 <span class="badge badge-info">{{ v.estatus_servicio }}</span>
@@ -333,25 +343,20 @@
                             <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">ID: {{ v.id_usuario }} | Tel: {{ v.telefono_usuario }}</div>
                             <div style="font-size: 12px; margin-bottom: 5px;"><b>Destino:</b> {{ v.direccion_destino }}</div>
                             <div style="font-size: 12px; margin-bottom: 10px; color: #b45309;"><b>Prog:</b> {{ v.fecha_servicio or 'N/D' }} {{ v.hora_inicio or '' }}</div>
-                            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                <button type="button" class="btn-info" style="padding: 5px 8px; font-size: 11px; flex-grow: 1;"
-                                    onclick="abrirRevision(this)"
-                                    data-id="{{ v.id }}"
-                                    data-idpadre="{{ v.id_viaje_padre }}"
-                                    data-ruta="{{ (v.ruta_documento or '')|replace('\"', '&quot;') }}"
-                                    data-nombre="{{ (v.nombre_usuario or '')|replace('\"', '&quot;') }}"
-                                    data-tipodoc="{{ (v.tipo_documento or '')|replace('\"', '&quot;') }}"
-                                    data-idusr="{{ (v.id_usuario or '')|replace('\"', '&quot;') }}"
-                                    data-tel="{{ (v.telefono_usuario or '')|replace('\"', '&quot;') }}"
-                                    data-dep="{{ (v.departamento or '')|replace('\"', '&quot;') }}"
-                                    data-mun="{{ (v.municipio or '')|replace('\"', '&quot;') }}"
-                                    data-ori="{{ (v.direccion_origen or '')|replace('\"', '&quot;') }}"
-                                    data-dep-des="{{ (v.departamento_destino or '')|replace('\"', '&quot;') }}"
-                                    data-mun-des="{{ (v.municipio_destino or '')|replace('\"', '&quot;') }}"
-                                    data-des="{{ (v.direccion_destino or '')|replace('\"', '&quot;') }}">
-                                    📞 Verificación
-                                </button>
-                                <button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf" style="flex-grow: 1;">📄 PDF</button>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                {% if v.estado_novedad == 'ACTIVA' %}
+                                    <button type="button" class="btn-danger" style="font-size: 10px; padding: 4px 6px; width: 100%; text-align: center; animation: pulseAlert 1.5s infinite;"
+                                        onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado|default('N/A') }}', '{{ v.conductor_asignado|default('N/A') }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                        🚨 Resolver Novedad
+                                    </button>
+                                {% endif %}
+                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                    <button type="button" class="btn-success" style="padding: 5px 8px; font-size: 11px; flex-grow: 1;"
+                                        onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ (v.nombre_usuario or '')|replace('\"', '&quot;') }}')">
+                                        🚐 Asignar FUEC
+                                    </button>
+                                    <button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf" style="flex-grow: 1;">📄 PDF</button>
+                                </div>
                             </div>
                         </div>
                         {% else %}
@@ -376,14 +381,22 @@
                         </div>
                         <div id="container_col1" style="display: flex; flex-direction: column; gap: 10px;">
                             {% for v in parte2_col1 %}
-                            <div class="kanban-card border-top-success">
+                            <div class="kanban-card border-top-success {% if v.estatus_servicio in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO'] %}flash-critical{% endif %}" data-id="{{ v.id }}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">{{ v.id_viaje }}</span>
                                     <span class="badge {% if v.estatus_servicio == 'NOVEDAD_RECORRIDO' %}badge-danger{% else %}badge-success{% endif %}" style="font-size: 9px;">{{ v.estatus_servicio }}</span>
                                 </div>
                                 <div style="font-size: 12px; margin-bottom: 2px;"><b>{{ v.nombre_usuario }}</b></div>
                                 <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">{{ v.conductor_asignado or 'N/D' }} ({{ v.vehiculo_asignado or 'N/D' }})</div>
-                                <div style="text-align: right;"><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 PDF</button></div>
+                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                    {% if v.estado_novedad == 'ACTIVA' %}
+                                        <button type="button" class="btn-danger" style="font-size: 10px; padding: 4px 6px; width: 100%; text-align: center; animation: pulseAlert 1.5s infinite;"
+                                            onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado|default('N/A') }}', '{{ v.conductor_asignado|default('N/A') }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                            🚨 Resolver Novedad
+                                        </button>
+                                    {% endif %}
+                                    <button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 PDF</button>
+                                </div>
                             </div>
                             {% else %}
                             <div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>
@@ -399,7 +412,7 @@
                         </div>
                         <div id="container_col2" style="display: flex; flex-direction: column; gap: 10px;">
                             {% for v in parte2_col2 %}
-                            <div class="kanban-card" style="border-top: 4px solid #6b7280;">
+                            <div class="kanban-card" style="border-top: 4px solid #6b7280;" data-id="{{ v.id }}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">{{ v.id_viaje }}</span>
                                     <span class="badge badge-gray" style="font-size: 9px;">TERMINADO</span>
@@ -425,7 +438,7 @@
                         </div>
                         <div id="container_col3" style="display: flex; flex-direction: column; gap: 10px;">
                             {% for v in parte2_col3 %}
-                            <div class="kanban-card border-top-purple">
+                            <div class="kanban-card border-top-purple {% if v.estatus_servicio in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO'] %}flash-critical{% endif %}" data-id="{{ v.id }}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">{{ v.id_viaje }}</span>
                                     <span class="badge badge-purple" style="font-size: 9px;">{{ v.estatus_servicio }}</span>
@@ -433,24 +446,32 @@
                                 <div style="font-size: 12px; margin-bottom: 2px;"><b>{{ v.nombre_usuario }}</b></div>
                                 <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Tel: {{ v.telefono_usuario }}</div>
                                 <div style="font-size: 11px; margin-bottom: 8px; line-height: 1.3;">{{ v.direccion_origen }}<br>➡️ {{ v.direccion_destino }}</div>
-                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                    {% if v.estatus_servicio == 'ASIGNADO' %}
-                                        <div style="width: 100%; padding: 6px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; font-size: 10px; color: #065f46; text-align: center; font-weight: bold; margin-bottom: 5px;">
-                                            ✔️ Asignado a: {{ v.conductor_asignado }}
-                                        </div>
-                                        <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; width: 100%;" onclick="notificarVuelta('{{ v.id }}')">
-                                            🔔 Enviar Notificación al Operador
-                                        </button>
-                                    {% else %}
-                                        <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;"
-                                            onclick="abrirRevision(this)"
-                                            data-id="{{ v.id }}" data-idpadre="{{ v.id_viaje_padre }}" data-ruta="{{ v.ruta_documento or '' }}" data-nombre="{{ v.nombre_usuario or '' }}" data-tipodoc="{{ v.tipo_documento or '' }}" data-idusr="{{ v.id_usuario or '' }}" data-tel="{{ v.telefono_usuario or '' }}" data-dep="{{ v.departamento or '' }}" data-mun="{{ v.municipio or '' }}" data-ori="{{ v.direccion_origen or '' }}" data-dep-des="{{ v.departamento_destino or '' }}" data-mun-des="{{ v.municipio_destino or '' }}" data-des="{{ v.direccion_destino or '' }}">
-                                            📞 Verificación
-                                        </button>
-                                        <button type="button" class="btn-success" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ (v.nombre_usuario or '')|replace('\"', '&quot;') }}')">
-                                            🚐 Asignar FUEC
+                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                    {% if v.estado_novedad == 'ACTIVA' %}
+                                        <button type="button" class="btn-danger" style="font-size: 10px; padding: 4px 6px; width: 100%; margin-bottom: 5px; animation: pulseAlert 1.5s infinite;"
+                                            onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado|default('N/A') }}', '{{ v.conductor_asignado|default('N/A') }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                            🚨 Resolver Novedad
                                         </button>
                                     {% endif %}
+                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                        {% if v.estatus_servicio == 'ASIGNADO' %}
+                                            <div style="width: 100%; padding: 6px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; font-size: 10px; color: #065f46; text-align: center; font-weight: bold; margin-bottom: 5px;">
+                                                ✔️ Asignado a: {{ v.conductor_asignado }}
+                                            </div>
+                                            <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; width: 100%;" onclick="notificarVuelta('{{ v.id }}')">
+                                                🔔 Enviar Notificación al Operador
+                                            </button>
+                                        {% else %}
+                                            <button type="button" class="btn-success" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ (v.nombre_usuario or '')|replace('\"', '&quot;') }}')">
+                                                🚐 Asignar FUEC
+                                            </button>
+                                            <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;"
+                                                onclick="abrirRevision(this)"
+                                                data-id="{{ v.id }}" data-idpadre="{{ v.id_viaje_padre }}" data-ruta="{{ v.ruta_documento or '' }}" data-nombre="{{ v.nombre_usuario or '' }}" data-tipodoc="{{ v.tipo_documento or '' }}" data-idusr="{{ v.id_usuario or '' }}" data-tel="{{ v.telefono_usuario or '' }}" data-dep="{{ v.departamento or '' }}" data-mun="{{ v.municipio or '' }}" data-ori="{{ v.direccion_origen or '' }}" data-dep-des="{{ v.departamento_destino or '' }}" data-mun-des="{{ v.municipio_destino or '' }}" data-des="{{ v.direccion_destino or '' }}">
+                                                📞 Verificación
+                                            </button>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                             {% else %}
@@ -467,14 +488,22 @@
                         </div>
                         <div id="container_col4" style="display: flex; flex-direction: column; gap: 10px;">
                             {% for v in parte2_col4 %}
-                            <div class="kanban-card border-top-warning">
+                            <div class="kanban-card border-top-warning {% if v.estatus_servicio in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO'] %}flash-critical{% endif %}" data-id="{{ v.id }}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">{{ v.id_viaje }}</span>
                                     <span class="badge {% if v.estatus_servicio == 'NOVEDAD_RECORRIDO' %}badge-danger{% else %}badge-warning{% endif %}" style="font-size: 9px;">{{ v.estatus_servicio }}</span>
                                 </div>
                                 <div style="font-size: 12px; margin-bottom: 2px;"><b>{{ v.nombre_usuario }}</b></div>
                                 <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">{{ v.conductor_asignado or 'N/D' }} ({{ v.vehiculo_asignado or 'N/D' }})</div>
-                                <div style="text-align: right;"><button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 PDF</button></div>
+                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                    {% if v.estado_novedad == 'ACTIVA' %}
+                                        <button type="button" class="btn-danger" style="font-size: 10px; padding: 4px 6px; width: 100%; text-align: center; animation: pulseAlert 1.5s infinite;"
+                                            onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado|default('N/A') }}', '{{ v.conductor_asignado|default('N/A') }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                            🚨 Resolver Novedad
+                                        </button>
+                                    {% endif %}
+                                    <button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 PDF</button>
+                                </div>
                             </div>
                             {% else %}
                             <div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>
@@ -490,7 +519,7 @@
                         </div>
                         <div id="container_col5" style="display: flex; flex-direction: column; gap: 10px;">
                             {% for v in parte2_col5 %}
-                            <div class="kanban-card" style="border-top: 4px solid #ef4444;" id="row_vuelta_{{ v.id }}">
+                            <div class="kanban-card" style="border-top: 4px solid #ef4444;" id="row_vuelta_{{ v.id }}" data-id="{{ v.id }}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">{{ v.id_viaje }}</span>
                                     <span class="badge badge-danger" style="font-size: 9px;">TERMINADO</span>
@@ -982,6 +1011,7 @@
                                                 data-lng-des="{{ v.lng_destino or 'NaN' }}"
                                                 data-lat-des-esp="{{ v.lat_destino_esperado or 'NaN' }}"
                                                 data-lng-des-esp="{{ v.lng_destino_esperado or 'NaN' }}"
+                                                data-tiempo-real="{{ v.tiempo_efectivo_minutos | default(0) }}"
                                                 data-firma="{{ v.firma }}"
                                                 data-pdf="{{ v.ruta_documento }}"
                                                 onclick="abrirModalAuditoria(this)">
@@ -1315,7 +1345,7 @@
         </div>
     </div>
 
-    <!-- ================= MODAL ASIGNACIÓN Y RESOLUCIÓN (FASE 3) ================= -->
+    <!-- ================= MODAL ASIGNACIÓN Y RESOLUCIÓN ================= -->
     <div id="modalAsignacionFlota" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
@@ -1330,7 +1360,6 @@
                 
                 <p style="font-size: 13px; margin-bottom: 15px;">Viaje ID: <b id="asig_flota_alfa" style="font-family: monospace; color: var(--verde);"></b><br>Paciente: <span id="asig_flota_paciente"></span></p>
                 
-                <!-- FASE 3: Bloque de Liquidación Manual -->
                 <div id="boxLiquidacionManual" style="display: none; background: #fffbeb; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <h4 style="color: #b45309; font-size: 13px; margin-bottom: 10px;">Liquidación Vehículo Averiado</h4>
                     <p style="font-size: 11px; color: #92400e; margin-bottom: 10px;">Indique el valor a reconocer al vehículo que sufrió el percance por el trayecto recorrido antes de la novedad.</p>
@@ -1352,19 +1381,28 @@
                     </select>
                 </div>
 
+                <!-- Selección Vehículo con calculador de capacidad -->
                 <div class="form-group">
-                    <label>Seleccionar Vehículo (Capacidad Residual Calculada)</label>
-                    <select name="vehiculo" required>
+                    <label>Seleccionar Vehículo <span id="lbl_capacidad" style="float:right; color:#10b981; font-weight:bold;"></span></label>
+                    <select name="vehiculo" id="asig_vehiculo" required onchange="evaluarCapacidad()">
                         <option value="">Seleccione vehículo...</option>
                         {% if vehiculos is defined %}
                             {% for v in vehiculos %}
-                            <option value="{{ v.placa }}">{{ v.placa }} ({{ v.tipo }})</option>
+                            <option value="{{ v.placa }}" data-capacidad="{{ v.capacidad_pasajeros|default(4) }}" data-ocupacion="{{ v.ocupacion_actual|default(0) }}">{{ v.placa }} ({{ v.tipo }})</option>
                             {% endfor %}
                         {% endif %}
                     </select>
                 </div>
+                
+                <!-- Caja de sugerencia de agrupación de viajes -->
+                <div id="boxAgrupacion" style="display: none; background: #eefcf9; border: 1px solid #10b981; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                    <h4 style="color: #065f46; font-size: 13px; margin-bottom: 8px;">🔄 Agrupación de Viajes Sugerida</h4>
+                    <p style="font-size: 11px; color: #047857; margin-bottom: 10px;">Vehículo con capacidad residual disponible. Puede agrupar estos viajes (diferencia de programación máxima 40 minutos):</p>
+                    <div id="listaAgrupacion" style="display: flex; flex-direction: column; gap: 5px;"></div>
+                </div>
+
                 <div class="form-group">
-                    <label>Seleccionar Conductor (App Móvil)</label>
+                    <label>Seleccionar Conductor</label>
                     <select name="conductor" required>
                         <option value="">Seleccione conductor...</option>
                         {% if conductores is defined %}
@@ -1375,15 +1413,13 @@
                     </select>
                 </div>
                 
-                <p style="font-size: 11px; color: #ef4444; font-weight: bold; margin-top: 10px;">⚠️ SISTEMA DE PREVENCIÓN ACTIVO: Se verificará que SOAT, RTM y Licencias estén vigentes. Si hay vencimientos, se abortará el proceso.</p>
-                <p style="font-size: 11px; color: #10b981; font-weight: bold; margin-top: 5px;">✔️ NOTIFICACIÓN TELEGRAM: Se enviará el PDF oficial del FUEC al Telegram del conductor al finalizar.</p>
-                
+                <p style="font-size: 11px; color: #ef4444; font-weight: bold; margin-top: 10px;">⚠️ SISTEMA DE PREVENCIÓN ACTIVO: Se verificará que SOAT, RTM y Licencias estén vigentes.</p>
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalAsignacionFlota')">Cancelar</button><button type="submit" class="btn-primary" style="background: #10b981;">Validar y Generar FUEC</button></div>
             </form>
         </div>
     </div>
 
-    <!-- ================= MODAL DETALLE DE NOVEDAD (FASE 3) ================= -->
+    <!-- ================= MODAL DETALLE DE NOVEDAD ================= -->
     <div id="modalDetalleNovedad" class="modal-overlay">
         <div class="modal-box" style="max-width: 450px;">
             <div class="modal-header" style="border-bottom: 1px solid #fee2e2; padding-bottom: 10px;">
@@ -1426,12 +1462,27 @@
                     <h4 style="color: var(--verde-osc); margin-bottom: 5px; font-size: 14px;">Trazabilidad GPS (Modificable)</h4>
                     <div style="display: flex; gap: 5px; margin-bottom: 10px;">
                         <input type="text" id="inputGeoSearch" style="flex-grow: 1; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px;" placeholder="Dirección a buscar...">
-                        <button type="button" class="btn-info" onclick="buscarDireccionManual()" style="padding: 8px 12px;">🔍 Recalcular</button>
+                        <button type="button" class="btn-info" id="btnRecalcularGeo" onclick="buscarDireccionManual()" style="padding: 8px 12px;">🔍 Recalcular</button>
                     </div>
+                    
                     <div id="mapAuditoria" style="height: 300px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; z-index: 1;"></div>
-                    <div id="semaforoDistancia" style="padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 13px;">
-                        Calculando proximidad...
+                    
+                    <!-- NUEVO TABLERO KPI DE MÉTRICAS -->
+                    <div id="panelMetricasAuditoria" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+                        <!-- KPI Distancia -->
+                        <div id="kpiDistancia" style="background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Precisión Geográfica</div>
+                            <div id="valDistancia" style="font-size: 22px; font-weight: bold; color: #4b5563; margin: 8px 0;">Calculando...</div>
+                            <div id="msgDistancia" style="font-size: 11px; color: #6b7280;">Buscando punto de referencia</div>
+                        </div>
+                        <!-- KPI Tiempo -->
+                        <div id="kpiTiempo" style="background: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-size: 11px; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">Desviación de Tiempo</div>
+                            <div id="valTiempo" style="font-size: 14px; font-weight: bold; color: #4b5563; margin: 8px 0;">Calculando...</div>
+                            <div id="msgTiempo" style="font-size: 11px; color: #6b7280;">Consultando ruta vial</div>
+                        </div>
                     </div>
+                    
                 </div>
                 <!-- Columna Firma y Acciones -->
                 <div style="display: flex; flex-direction: column;">
@@ -1489,6 +1540,20 @@
             "VAUPES": ["MITU", "CARURU", "TARAIRA", "PAPUNAHUA", "YAVARATE"],
             "VICHADA": ["PUERTO CARREÑO", "LA PRIMAVERA", "SAN JOSE DE OCUNE", "CUMARIBO"]
         };
+
+        // Variable global para agrupación y monitoreo
+        window.viajesAgrupables = [
+            {% if parte1_ida_programados is defined %}
+                {% for v in parte1_ida_programados %}
+                { id: "{{ v.id }}", alfa: "{{ v.id_viaje }}", paciente: "{{ v.nombre_usuario }}", fecha: "{{ v.fecha_servicio }}", hora: "{{ (v.hora_inicio|string).split('|')[-1].strip()[:5] if '|' in (v.hora_inicio|string) else (v.hora_inicio|string)[:5] }}" },
+                {% endfor %}
+            {% endif %}
+            {% if parte2_col3 is defined %}
+                {% for v in parte2_col3 %}
+                { id: "{{ v.id }}", alfa: "{{ v.id_viaje }}", paciente: "{{ v.nombre_usuario }}", fecha: "{{ v.fecha_servicio }}", hora: "{{ (v.hora_inicio|string).split('|')[-1].strip()[:5] if '|' in (v.hora_inicio|string) else (v.hora_inicio|string)[:5] }}" },
+                {% endfor %}
+            {% endif %}
+        ];
 
         function cargarMunicipios(depSelectId, munSelectId) {
             const depSelect = document.getElementById(depSelectId);
@@ -1701,7 +1766,6 @@
                 formPendienteUniversal.setAttribute('data-confirmed', 'true');
                 document.getElementById('modalConfirmacionUniversal').classList.remove('active');
                 
-                // Procesamiento AJAX para Formularios en Cadena
                 if (isChainedAction && formPendienteUniversal.id === 'formVerificacion') {
                     const formData = new FormData(formPendienteUniversal);
                     fetch(formPendienteUniversal.action, {
@@ -1993,7 +2057,6 @@
             }
         }
 
-        // ================= NOTIFICACIÓN MANUAL DE RESPALDO =================
         function notificarVuelta(viajeId) {
             if (!confirm('¿Desea enviar (o reenviar) la notificación de este viaje al conductor por Telegram?')) return;
             fetch("{{ url_for('controlador_flotaespecial.api_notificar_viaje') }}", {
@@ -2012,7 +2075,6 @@
             .catch(err => alert('Fallo de conexión al enviar notificación.'));
         }
 
-        // ================= LÓGICA KANBAN Y OCULTAR REGISTROS =================
         let isChainedAction = false;
         let currentVueltaData = null;
 
@@ -2095,13 +2157,28 @@
             openModal('modalAsignacionFlota');
         }
 
+        function _getNovedadBtn(v) {
+            if (v.estado_novedad === 'ACTIVA') {
+                let desc = (v.descripcion_novedad || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                let nom = (v.nombre_usuario || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                let veh = (v.vehiculo_asignado || 'N/A').replace(/'/g, "\\'");
+                let cond = (v.conductor_asignado || 'N/A').replace(/'/g, "\\'");
+                return `<button type="button" class="btn-danger" style="font-size: 10px; padding: 4px 6px; width: 100%; text-align: center; animation: pulseAlert 1.5s infinite;"
+                    onclick="verDetalleNovedad('${v.id}', '${v.id_viaje}', '${v.estatus_servicio}', '${veh}', '${cond}', '${desc}', '${nom}')">
+                    🚨 Resolver Novedad
+                </button>`;
+            }
+            return '';
+        }
+
         let previousNovedadesCount = 0;
         function pollNovedadesGlobal() {
             fetch("{{ url_for('controlador_flotaespecial.api_operativa_vivo') }}?t=" + new Date().getTime())
             .then(res => res.json())
             .then(data => {
                 if(data.status === 'success') {
-                    const numNovedades = data.data.novedades_activas.length;
+                    const novedadesActivas = data.data.novedades_activas;
+                    const numNovedades = novedadesActivas.length;
                     const banner = document.getElementById('bannerNovedades');
                     if (numNovedades > 0) {
                         banner.style.display = 'block';
@@ -2111,7 +2188,16 @@
                     }
                     previousNovedadesCount = numNovedades;
 
-                    // Actualizar PARTE 1 (Bolsa)
+                    novedadesActivas.forEach(v => {
+                        if (v.estatus_servicio === 'NOVEDAD_PRE_VIAJE') {
+                            if (v.trayecto === 'IDA' && !data.data.parte2_col1.some(x => x.id === v.id) && !data.data.parte1_ida_programados.some(x => x.id === v.id)) {
+                                data.data.parte2_col1.push(v);
+                            } else if (v.trayecto === 'VUELTA' && !data.data.parte2_col4.some(x => x.id === v.id) && !data.data.parte2_col3.some(x => x.id === v.id)) {
+                                data.data.parte2_col4.push(v);
+                            }
+                        }
+                    });
+
                     const contParte1 = document.getElementById('contenedor_parte1');
                     const spanContador1 = document.getElementById('contador_parte1');
                     if (contParte1 && spanContador1) {
@@ -2122,8 +2208,9 @@
                             let html1 = '';
                             lista1.forEach(v => {
                                 let urgenciaClass = v.is_urgencia ? 'urgencia-12h' : '';
+                                let flashClass = (v.estatus_servicio === 'NOVEDAD_PRE_VIAJE' || v.estatus_servicio === 'NOVEDAD_RECORRIDO') ? 'flash-critical' : '';
                                 html1 += `
-                                <div class="kanban-card border-top-info ${urgenciaClass}">
+                                <div class="kanban-card border-top-info ${urgenciaClass} ${flashClass}" data-id="${v.id}">
                                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                                         <span class="id-token">${v.id_viaje || ''}</span>
                                         <span class="badge badge-info">${v.estatus_servicio || ''}</span>
@@ -2133,25 +2220,15 @@
                                     <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">ID: ${v.id_usuario || ''} | Tel: ${v.telefono_usuario || ''}</div>
                                     <div style="font-size: 12px; margin-bottom: 5px;"><b>Destino:</b> ${v.direccion_destino || ''}</div>
                                     <div style="font-size: 12px; margin-bottom: 10px; color: #b45309;"><b>Prog:</b> ${v.hora_inicio || 'Pendiente'}</div>
-                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                        <button type="button" class="btn-info" style="padding: 5px 8px; font-size: 11px; flex-grow: 1;"
-                                            onclick="abrirRevision(this)"
-                                            data-id="${v.id || ''}"
-                                            data-idpadre="${v.id_viaje_padre || ''}"
-                                            data-ruta="${(v.ruta_documento || '').replace(/"/g, '&quot;')}"
-                                            data-nombre="${(v.nombre_usuario || '').replace(/"/g, '&quot;')}"
-                                            data-tipodoc="${(v.tipo_documento || '').replace(/"/g, '&quot;')}"
-                                            data-idusr="${(v.id_usuario || '').replace(/"/g, '&quot;')}"
-                                            data-tel="${(v.telefono_usuario || '').replace(/"/g, '&quot;')}"
-                                            data-dep="${(v.departamento || '').replace(/"/g, '&quot;')}"
-                                            data-mun="${(v.municipio || '').replace(/"/g, '&quot;')}"
-                                            data-ori="${(v.direccion_origen || '').replace(/"/g, '&quot;')}"
-                                            data-dep-des="${(v.departamento_destino || '').replace(/"/g, '&quot;')}"
-                                            data-mun-des="${(v.municipio_destino || '').replace(/"/g, '&quot;')}"
-                                            data-des="${(v.direccion_destino || '').replace(/"/g, '&quot;')}">
-                                            📞 Verificación
-                                        </button>
-                                        <button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf" style="flex-grow: 1;">📄 PDF</button>
+                                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                                        ${_getNovedadBtn(v)}
+                                        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                            <button type="button" class="btn-success" style="padding: 5px 8px; font-size: 11px; flex-grow: 1;"
+                                                onclick="abrirAsignacionFlota('${v.id || ''}', '${v.id_viaje || ''}', '${(v.nombre_usuario || '').replace(/"/g, '&quot;')}')">
+                                                🚐 Asignar FUEC
+                                            </button>
+                                            <button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf" style="flex-grow: 1;">📄 PDF</button>
+                                        </div>
                                     </div>
                                 </div>
                                 `;
@@ -2162,7 +2239,6 @@
                         }
                     }
 
-                    // Renderizar COL 1: IDA Ejecucion
                     const c1 = data.data.parte2_col1;
                     document.getElementById('count_col1').innerText = c1.length;
                     const c1Cont = document.getElementById('container_col1');
@@ -2170,21 +2246,24 @@
                         let html = '';
                         c1.forEach(v => {
                             let badgeClass = v.estatus_servicio === 'NOVEDAD_RECORRIDO' ? 'badge-danger' : 'badge-success';
+                            let flashClass = (v.estatus_servicio === 'NOVEDAD_PRE_VIAJE' || v.estatus_servicio === 'NOVEDAD_RECORRIDO') ? 'flash-critical' : '';
                             html += `
-                            <div class="kanban-card border-top-success">
+                            <div class="kanban-card border-top-success ${flashClass}" data-id="${v.id}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">${v.id_viaje || ''}</span>
                                     <span class="badge ${badgeClass}" style="font-size: 9px;">${v.estatus_servicio}</span>
                                 </div>
                                 <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario || ''}</b></div>
                                 <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">${v.conductor_asignado || 'N/D'} (${v.vehiculo_asignado || 'N/D'})</div>
-                                <div style="text-align: right;"><button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf">📄 PDF</button></div>
+                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                    ${_getNovedadBtn(v)}
+                                    <button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf">📄 PDF</button>
+                                </div>
                             </div>`;
                         });
                         c1Cont.innerHTML = html;
                     } else { c1Cont.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>'; }
 
-                    // Renderizar COL 2: IDA Terminados
                     const c2 = data.data.parte2_col2;
                     document.getElementById('count_col2').innerText = c2.length;
                     const c2Cont = document.getElementById('container_col2');
@@ -2192,7 +2271,7 @@
                         let html = '';
                         c2.forEach(v => {
                             html += `
-                            <div class="kanban-card" style="border-top: 4px solid #6b7280;">
+                            <div class="kanban-card" style="border-top: 4px solid #6b7280;" data-id="${v.id}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">${v.id_viaje || ''}</span>
                                     <span class="badge badge-gray" style="font-size: 9px;">TERMINADO</span>
@@ -2208,15 +2287,15 @@
                         c2Cont.innerHTML = html;
                     } else { c2Cont.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>'; }
 
-                    // Renderizar COL 3: VUELTA Pendientes (CON FIX ASIGNADO Y NOTIFICACIÓN)
                     const c3 = data.data.parte2_col3;
                     document.getElementById('count_col3').innerText = c3.length;
                     const c3Cont = document.getElementById('container_col3');
                     if(c3.length > 0) {
                         let html = '';
                         c3.forEach(v => {
+                            let flashClass = (v.estatus_servicio === 'NOVEDAD_PRE_VIAJE' || v.estatus_servicio === 'NOVEDAD_RECORRIDO') ? 'flash-critical' : '';
                             html += `
-                            <div class="kanban-card border-top-purple">
+                            <div class="kanban-card border-top-purple ${flashClass}" data-id="${v.id}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">${v.id_viaje || ''}</span>
                                     <span class="badge badge-purple" style="font-size: 9px;">${v.estatus_servicio}</span>
@@ -2224,31 +2303,33 @@
                                 <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario || ''}</b></div>
                                 <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Tel: ${v.telefono_usuario || ''}</div>
                                 <div style="font-size: 11px; margin-bottom: 8px; line-height: 1.3;">${v.direccion_origen || ''}<br>➡️ ${v.direccion_destino || ''}</div>
-                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                    ${v.estatus_servicio === 'ASIGNADO' ? `
-                                        <div style="width: 100%; padding: 6px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; font-size: 10px; color: #065f46; text-align: center; font-weight: bold; margin-bottom: 5px;">
-                                            ✔️ Asignado a: ${v.conductor_asignado || 'Operador'}
-                                        </div>
-                                        <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; width: 100%;" onclick="notificarVuelta('${v.id}')">
-                                            🔔 Enviar Notificación al Operador
-                                        </button>
-                                    ` : `
-                                        <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;"
-                                            onclick="abrirRevision(this)"
-                                            data-id="${v.id || ''}" data-idpadre="${v.id_viaje_padre || ''}" data-ruta="${(v.ruta_documento || '').replace(/"/g, '&quot;')}" data-nombre="${(v.nombre_usuario || '').replace(/"/g, '&quot;')}" data-tipodoc="${(v.tipo_documento || '').replace(/"/g, '&quot;')}" data-idusr="${(v.id_usuario || '').replace(/"/g, '&quot;')}" data-tel="${(v.telefono_usuario || '').replace(/"/g, '&quot;')}" data-dep="${(v.departamento || '').replace(/"/g, '&quot;')}" data-mun="${(v.municipio || '').replace(/"/g, '&quot;')}" data-ori="${(v.direccion_origen || '').replace(/"/g, '&quot;')}" data-dep-des="${(v.departamento_destino || '').replace(/"/g, '&quot;')}" data-mun-des="${(v.municipio_destino || '').replace(/"/g, '&quot;')}" data-des="${(v.direccion_destino || '').replace(/"/g, '&quot;')}">
-                                            📞 Verificación
-                                        </button>
-                                        <button type="button" class="btn-success" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="abrirAsignacionFlota('${v.id}', '${v.id_viaje}', '${(v.nombre_usuario || '').replace(/"/g, '&quot;')}')">
-                                            🚐 Asignar FUEC
-                                        </button>
-                                    `}
+                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                    ${_getNovedadBtn(v)}
+                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                        ${v.estatus_servicio === 'ASIGNADO' ? `
+                                            <div style="width: 100%; padding: 6px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; font-size: 10px; color: #065f46; text-align: center; font-weight: bold; margin-bottom: 5px;">
+                                                ✔️ Asignado a: ${v.conductor_asignado || 'Operador'}
+                                            </div>
+                                            <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; width: 100%;" onclick="notificarVuelta('${v.id}')">
+                                                🔔 Enviar Notificación al Operador
+                                            </button>
+                                        ` : `
+                                            <button type="button" class="btn-success" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="abrirAsignacionFlota('${v.id}', '${v.id_viaje}', '${(v.nombre_usuario || '').replace(/"/g, '&quot;')}')">
+                                                🚐 Asignar FUEC
+                                            </button>
+                                            <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;"
+                                                onclick="abrirRevision(this)"
+                                                data-id="${v.id || ''}" data-idpadre="${v.id_viaje_padre || ''}" data-ruta="${(v.ruta_documento || '').replace(/"/g, '&quot;')}" data-nombre="${(v.nombre_usuario || '').replace(/"/g, '&quot;')}" data-tipodoc="${(v.tipo_documento || '').replace(/"/g, '&quot;')}" data-idusr="${(v.id_usuario || '').replace(/"/g, '&quot;')}" data-tel="${(v.telefono_usuario || '').replace(/"/g, '&quot;')}" data-dep="${(v.departamento || '').replace(/"/g, '&quot;')}" data-mun="${(v.municipio || '').replace(/"/g, '&quot;')}" data-ori="${(v.direccion_origen || '').replace(/"/g, '&quot;')}" data-dep-des="${(v.departamento_destino || '').replace(/"/g, '&quot;')}" data-mun-des="${(v.municipio_destino || '').replace(/"/g, '&quot;')}" data-des="${(v.direccion_destino || '').replace(/"/g, '&quot;')}">
+                                                📞 Verificación
+                                            </button>
+                                        `}
+                                    </div>
                                 </div>
                             </div>`;
                         });
                         c3Cont.innerHTML = html;
                     } else { c3Cont.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>'; }
 
-                    // Renderizar COL 4: VUELTA Ejecucion
                     const c4 = data.data.parte2_col4;
                     document.getElementById('count_col4').innerText = c4.length;
                     const c4Cont = document.getElementById('container_col4');
@@ -2256,21 +2337,24 @@
                         let html = '';
                         c4.forEach(v => {
                             let badgeClass = v.estatus_servicio === 'NOVEDAD_RECORRIDO' ? 'badge-danger' : 'badge-warning';
+                            let flashClass = (v.estatus_servicio === 'NOVEDAD_PRE_VIAJE' || v.estatus_servicio === 'NOVEDAD_RECORRIDO') ? 'flash-critical' : '';
                             html += `
-                            <div class="kanban-card border-top-warning">
+                            <div class="kanban-card border-top-warning ${flashClass}" data-id="${v.id}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">${v.id_viaje || ''}</span>
                                     <span class="badge ${badgeClass}" style="font-size: 9px;">${v.estatus_servicio}</span>
                                 </div>
                                 <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario || ''}</b></div>
                                 <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">${v.conductor_asignado || 'N/D'} (${v.vehiculo_asignado || 'N/D'})</div>
-                                <div style="text-align: right;"><button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf">📄 PDF</button></div>
+                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                    ${_getNovedadBtn(v)}
+                                    <button onclick="abrirPDF('${(v.ruta_documento || '').replace(/"/g, '&quot;')}')" class="btn-pdf">📄 PDF</button>
+                                </div>
                             </div>`;
                         });
                         c4Cont.innerHTML = html;
                     } else { c4Cont.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>'; }
 
-                    // Renderizar COL 5: VUELTA Terminados
                     const c5 = data.data.parte2_col5;
                     document.getElementById('count_col5').innerText = c5.length;
                     const c5Cont = document.getElementById('container_col5');
@@ -2278,7 +2362,7 @@
                         let html = '';
                         c5.forEach(v => {
                             html += `
-                            <div class="kanban-card" style="border-top: 4px solid #ef4444;" id="row_vuelta_${v.id}">
+                            <div class="kanban-card" style="border-top: 4px solid #ef4444;" id="row_vuelta_${v.id}" data-id="${v.id}">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <span class="id-token">${v.id_viaje || ''}</span>
                                     <span class="badge badge-danger" style="font-size: 9px;">TERMINADO</span>
@@ -2297,7 +2381,6 @@
             }).catch(e => {});
         }
 
-        // ================= LÓGICA DE AUDITORÍA GEOESPACIAL INTERACTIVA =================
         let currentAuditData = {};
         let currentGeoTab = 'origen';
         let mapAuditoria = null;
@@ -2320,6 +2403,7 @@
         async function abrirModalAuditoria(btn) {
             currentAuditData = {
                 idViaje: btn.getAttribute('data-idviaje'),
+                tiempoReal: parseInt(btn.getAttribute('data-tiempo-real')) || 0,
                 origen: {
                     dir: btn.getAttribute('data-dir-ori'),
                     mun: btn.getAttribute('data-mun-ori'),
@@ -2358,6 +2442,71 @@
             document.getElementById('btnVerPDFAuditoria').onclick = function() {
                 abrirPDF(currentAuditData.pdf);
             };
+
+            const kpiTiempo = document.getElementById('kpiTiempo');
+            const valTiempo = document.getElementById('valTiempo');
+            const msgTiempo = document.getElementById('msgTiempo');
+            
+            kpiTiempo.style.background = '#f3f4f6';
+            kpiTiempo.style.borderColor = 'var(--border)';
+            valTiempo.style.color = '#4b5563';
+            valTiempo.innerText = 'Calculando...';
+            msgTiempo.innerText = 'Consultando ruta vial';
+
+            const latOriE = currentAuditData.origen.lat_esp;
+            const lngOriE = currentAuditData.origen.lng_esp;
+            const latDesE = currentAuditData.destino.lat_esp;
+            const lngDesE = currentAuditData.destino.lng_esp;
+
+            if (latOriE && lngOriE && latDesE && lngDesE && !isNaN(latOriE) && !isNaN(latDesE)) {
+                try {
+                    const service = new google.maps.DistanceMatrixService();
+                    service.getDistanceMatrix({
+                        origins: [{lat: latOriE, lng: lngOriE}],
+                        destinations: [{lat: latDesE, lng: lngDesE}],
+                        travelMode: 'DRIVING'
+                    }, (response, status) => {
+                        if(status === 'OK' && response.rows[0].elements[0].status === 'OK') {
+                            const minsTeorico = Math.round(response.rows[0].elements[0].duration.value / 60);
+                            const diff = currentAuditData.tiempoReal - minsTeorico;
+                            const diffSign = diff > 0 ? '+' : '';
+                            
+                            valTiempo.innerHTML = `<span style="font-size: 12px; font-weight: normal; display: block; margin-bottom: 5px;">Real: ${currentAuditData.tiempoReal}m | Teórico: ${minsTeorico}m</span><span style="font-size: 22px;">${diffSign}${diff} min</span>`;
+                            
+                            if (currentAuditData.tiempoReal === 0) {
+                                kpiTiempo.style.background = '#fef3c7'; kpiTiempo.style.borderColor = '#f59e0b';
+                                valTiempo.style.color = '#92400e';
+                                msgTiempo.innerHTML = `⚠️ Posible anomalía de reloj`;
+                                msgTiempo.style.color = '#92400e';
+                            } else if(Math.abs(diff) <= 15) {
+                                kpiTiempo.style.background = '#d1fae5'; kpiTiempo.style.borderColor = '#10b981';
+                                valTiempo.style.color = '#065f46';
+                                msgTiempo.innerHTML = `🟢 Desviación normal`;
+                                msgTiempo.style.color = '#065f46';
+                            } else if (diff > 15) {
+                                kpiTiempo.style.background = '#fef3c7'; kpiTiempo.style.borderColor = '#f59e0b';
+                                valTiempo.style.color = '#92400e';
+                                msgTiempo.innerHTML = `🟡 Retraso detectado`;
+                                msgTiempo.style.color = '#92400e';
+                            } else {
+                                kpiTiempo.style.background = '#fee2e2'; kpiTiempo.style.borderColor = '#ef4444';
+                                valTiempo.style.color = '#991b1b';
+                                msgTiempo.innerHTML = `🔴 Desfase anómalo (Muy rápido)`;
+                                msgTiempo.style.color = '#991b1b';
+                            }
+                        } else {
+                            valTiempo.innerText = 'N/A';
+                            msgTiempo.innerText = "⚠️ Ruta no encontrada en Maps";
+                        }
+                    });
+                } catch(e) {
+                    valTiempo.innerText = 'Error';
+                    msgTiempo.innerText = "⚠️ Error de conexión a la API";
+                }
+            } else {
+                valTiempo.innerText = 'N/A';
+                msgTiempo.innerText = "⚠️ Faltan coordenadas teóricas";
+            }
 
             if (!mapAuditoria) {
                 try {
@@ -2414,12 +2563,17 @@
         }
 
         async function ejecutarGeocodificacionYMapa(searchStr, latReal, lngReal, latEsp, lngEsp) {
-            const semaforo = document.getElementById('semaforoDistancia');
+            const kpiDist = document.getElementById('kpiDistancia');
+            const valDist = document.getElementById('valDistancia');
+            const msgDist = document.getElementById('msgDistancia');
             const btnRecalcular = document.getElementById('btnRecalcularGeo');
             
-            semaforo.style.background = '#f3f4f6';
-            semaforo.style.color = '#4b5563';
-            semaforo.innerText = 'Calculando proximidad...';
+            kpiDist.style.background = '#f3f4f6';
+            kpiDist.style.borderColor = 'var(--border)';
+            valDist.style.color = '#4b5563';
+            valDist.innerText = 'Calculando...';
+            msgDist.innerText = 'Buscando proximidad';
+            msgDist.style.color = '#6b7280';
             
             if(btnRecalcular) {
                 btnRecalcular.innerText = "⏳ Buscando...";
@@ -2433,10 +2587,10 @@
             let validEsp = (latEsp != null && lngEsp != null && !isNaN(latEsp) && !isNaN(lngEsp));
 
             try {
-                const { Marker, InfoWindow } = await google.maps.importLibrary("marker");
+                const { Marker } = await google.maps.importLibrary("marker");
                 
-                let infoWindowReal = new InfoWindow({ content: "<div style='font-family:Verdana; font-size:12px;'><b>Ubicación Real</b><br>Capturada por GPS</div>" });
-                let infoWindowEsperado = new InfoWindow();
+                let infoWindowReal = new google.maps.InfoWindow({ content: "<div style='font-family:Verdana; font-size:12px;'><b>Ubicación Real</b><br>Capturada por GPS</div>" });
+                let infoWindowEsperado = new google.maps.InfoWindow();
 
                 if (validReal) {
                     markerRealAud = new Marker({ position: { lat: latReal, lng: lngReal }, map: mapAuditoria, title: "Ubicación Real" });
@@ -2459,13 +2613,20 @@
                             _renderizarPinEsperado(cLatEsp, cLngEsp, searchStr);
                             _finalizarMapeo(validReal, latReal, lngReal, cLatEsp, cLngEsp);
                         } else {
-                            semaforo.style.background = '#fee2e2'; semaforo.style.color = '#991b1b';
-                            semaforo.innerText = `⚠️ El mapa no reconoció la dirección.`;
+                            kpiDist.style.background = '#fee2e2'; kpiDist.style.borderColor = '#ef4444';
+                            valDist.innerText = "Error";
+                            valDist.style.color = '#991b1b';
+                            msgDist.innerText = `⚠️ Mapa no reconoció dirección`;
+                            msgDist.style.color = '#991b1b';
                         }
                         if(btnRecalcular) { btnRecalcular.innerText = "🔍 Recalcular"; btnRecalcular.disabled = false; }
                     });
                 } else {
-                    semaforo.innerText = '⚠️ Sin dirección registrada para buscar.';
+                    kpiDist.style.background = '#fef3c7'; kpiDist.style.borderColor = '#f59e0b';
+                    valDist.innerText = "N/A";
+                    valDist.style.color = '#92400e';
+                    msgDist.innerText = '⚠️ Sin dirección a buscar';
+                    msgDist.style.color = '#92400e';
                     if(btnRecalcular) { btnRecalcular.innerText = "🔍 Recalcular"; btnRecalcular.disabled = false; }
                 }
 
@@ -2490,24 +2651,38 @@
                         const distanciaMetros = calcularDistanciaHaversine(lReal, lnReal, lEsp, lnEsp);
                         
                         if (distanciaMetros <= 500) {
-                            semaforo.style.background = '#d1fae5'; semaforo.style.color = '#065f46';
-                            semaforo.innerText = `🟢 Excelente: A ${Math.round(distanciaMetros)}m del punto esperado.`;
+                            kpiDist.style.background = '#d1fae5'; kpiDist.style.borderColor = '#10b981';
+                            valDist.style.color = '#065f46';
+                            valDist.innerText = Math.round(distanciaMetros) + " m";
+                            msgDist.innerText = '🟢 Excelente precisión';
+                            msgDist.style.color = '#065f46';
                         } else if (distanciaMetros <= 2000) {
-                            semaforo.style.background = '#fef3c7'; semaforo.style.color = '#92400e';
-                            semaforo.innerText = `🟡 Advertencia: A ${Math.round(distanciaMetros)}m del punto esperado.`;
+                            kpiDist.style.background = '#fef3c7'; kpiDist.style.borderColor = '#f59e0b';
+                            valDist.style.color = '#92400e';
+                            valDist.innerText = Math.round(distanciaMetros) + " m";
+                            msgDist.innerText = '🟡 Advertencia de distancia';
+                            msgDist.style.color = '#92400e';
                         } else {
-                            semaforo.style.background = '#fee2e2'; semaforo.style.color = '#991b1b';
-                            semaforo.innerText = `🔴 Alerta: A ${Math.round(distanciaMetros/1000)}km del punto esperado.`;
+                            kpiDist.style.background = '#fee2e2'; kpiDist.style.borderColor = '#ef4444';
+                            valDist.style.color = '#991b1b';
+                            valDist.innerText = (distanciaMetros/1000).toFixed(1) + " km";
+                            msgDist.innerText = '🔴 Alerta de dispersión';
+                            msgDist.style.color = '#991b1b';
                         }
                     } else {
                         mapAuditoria.setCenter({lat: lEsp, lng: lnEsp});
                         mapAuditoria.setZoom(15);
-                        semaforo.style.background = '#fef3c7'; semaforo.style.color = '#92400e';
-                        semaforo.innerText = '⚠️ Viaje de transición sin telemetría GPS real.';
+                        kpiDist.style.background = '#fef3c7'; kpiDist.style.borderColor = '#f59e0b';
+                        valDist.style.color = '#92400e';
+                        valDist.innerText = "N/A";
+                        msgDist.innerText = '⚠️ Sin telemetría GPS';
+                        msgDist.style.color = '#92400e';
                     }
                     if(btnRecalcular) { btnRecalcular.innerText = "🔍 Recalcular"; btnRecalcular.disabled = false; }
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.error(e);
+            }
         }
         
         document.addEventListener("DOMContentLoaded", function() {
