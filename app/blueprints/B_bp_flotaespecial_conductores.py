@@ -66,6 +66,9 @@ def asegurar_tablas_conductores(cur):
     except: pass
     try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN ultima_longitud VARCHAR(100) DEFAULT NULL")
     except: pass
+    # Agregar dentro de la función asegurar_tablas_conductores(cur) en B_bp_flotaespecial_conductores.py
+    try: cur.execute("ALTER TABLE usuarios ADD COLUMN email VARCHAR(150) DEFAULT NULL")
+    except: pass
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS historial_verificaciones_flotaespecial (
