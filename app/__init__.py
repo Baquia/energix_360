@@ -95,7 +95,8 @@ def create_app():
     from app.blueprints.B_bp_controlador_flotaespecial import bp_controlador_flotaespecial
     from app.blueprints.B_bp_flotaespecial_vehiculos import bp_flotaespecial_vehiculos
     from app.blueprints.B_bp_flotaespecial_eps import bp_flotaespecial_eps
-    from app.blueprints.B_bp_procesofacturacion_eps_transporteespecial import bp_procesofacturacion_eps # <-- NUEVO
+    from app.blueprints.B_bp_procesofacturacion_eps_transporteespecial import bp_procesofacturacion_eps
+    from app.blueprints.B_bp_flotaespecial_conductores import bp_flotaespecial_conductores # <-- NUEVO CONDUCTORES
    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
@@ -111,7 +112,8 @@ def create_app():
     app.register_blueprint(bp_controlador_flotaespecial)
     app.register_blueprint(bp_flotaespecial_vehiculos)
     app.register_blueprint(bp_flotaespecial_eps)
-    app.register_blueprint(bp_procesofacturacion_eps) # <-- NUEVO
+    app.register_blueprint(bp_procesofacturacion_eps)
+    app.register_blueprint(bp_flotaespecial_conductores) # <-- NUEVO CONDUCTORES
 
     # ---------------------------------------------------------
     #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
@@ -150,8 +152,6 @@ def load_user(user_id):
 
     try:
         cur = mysql.connection.cursor()
-        # Corrección SIM-015: Inyectar contexto multi-tenant en carga de usuario web (usamos 'id_empresa' de la sesion si estuviera disponible, pero como Flask-Login usa solo user_id en session, blindamos asegurando que la consulta principal de login ya lo validó, sin embargo, a nivel de carga persistente es buena práctica retornar toda la fila, el filtro multi-tenant en rutas hijas previene las fugas.)
-        # Nota: load_user solo carga la instancia, no realiza fuga, pero por seguridad añadimos el filtro si tuviéramos acceso a session['empresa_id'] de forma determinística en este scope.
         from flask import session
         empresa_id = session.get('empresa_id')
         
@@ -161,7 +161,6 @@ def load_user(user_id):
                  (user_id, empresa_id)
              )
         else:
-             # Fallback inicial antes de establecer empresa_id
              cur.execute(
                  "SELECT id, nombre, cedula, tipo, clase, rol, empresa_id FROM usuarios WHERE id = %s",
                  (user_id,)

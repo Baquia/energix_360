@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#015249">
 
     <style>
-        /* PALETA CORPORATIVA BQA-ONE (Heredada) */
+        /* PALETA CORPORATIVA BQA-ONE */
         :root {
             --verde: #015249;        
             --verde-osc: #003b35;    
@@ -78,9 +78,17 @@
         .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); }
         .data-table tr:hover { background-color: #fdfdfd; }
         
+        .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        .badge-gray { background: #f3f4f6; color: #4b5563; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+
         .btn-icon { background: none; border: none; cursor: pointer; font-size: 16px; margin-left: 10px; transition: 0.2s; }
         .btn-icon.edit:hover { color: #f59e0b; transform: scale(1.1); }
         .btn-icon.delete:hover { color: #ef4444; transform: scale(1.1); }
+        .btn-icon.map:hover { color: #0ea5e9; transform: scale(1.1); }
+        .btn-icon.qr:hover { color: #10b981; transform: scale(1.1); }
+        
         .btn-pdf-mini { background: #eefcf9; color: var(--verde); border: 1px solid #ccfbf1; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; margin-bottom: 3px;}
         .btn-pdf-mini:hover { background: #ccfbf1; }
 
@@ -124,15 +132,20 @@
             <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="nav-item back-btn">
                 <div class="nav-item-content"><span class="nav-icon">⬅️</span> Volver al Panel Central</div>
             </a>
+            
             <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='vehiculos') }}" class="nav-item">
                 <div class="nav-item-content"><span class="nav-icon">🚐</span> Vehículos</div>
             </a>
+            
+            <!-- ENLACE ESTRICTO AL MÓDULO EXCLUSIVO DE CONDUCTORES -->
             <a href="{{ url_for('flotaespecial_conductores.gestion_conductores') }}" class="nav-item active">
                 <div class="nav-item-content"><span class="nav-icon">👨‍✈️</span> Conductores</div>
             </a>
+            
             <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='preoperacionales') }}" class="nav-item">
                 <div class="nav-item-content"><span class="nav-icon">📋</span> Preoperacionales</div>
             </a>
+            
             <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='terceros') }}" class="nav-item">
                 <div class="nav-item-content"><span class="nav-icon">🏢</span> Empresas Terceras</div>
             </a>
@@ -191,9 +204,11 @@
                     <thead>
                         <tr>
                             <th>Nombre / Cédula</th>
+                            <th>Contacto (Tel/Email)</th>
                             <th>Ubicación Base</th>
+                            <th>Estatus Operativo</th>
                             <th>Licencia (Vence)</th>
-                            <th>Seg. Social (Pagado/Vence)</th>
+                            <th>Seg. Social (Vence)</th>
                             <th>Documentos (PDF)</th>
                             <th>Acciones</th>
                         </tr>
@@ -202,12 +217,19 @@
                         {% for c in conductores %}
                         <tr>
                             <td><b style="color: var(--verde);">{{ c.nombre }}</b><br><small>{{ c.cedula }}</small></td>
+                            <td>{{ c.telefono or 'N/D' }}<br><small>{{ c.email or 'N/D' }}</small></td>
                             <td>{{ c.municipio_base or 'N/D' }}<br><small>{{ c.departamento_base or '' }}</small></td>
-                            <td>{{ c.numero_licencia_conduccion or 'N/D' }}<br><small>{{ c.vencimiento_licencia_conduccion or 'N/D' }}</small></td>
                             <td>
-                                P: {{ c.ultimo_pago_seguridad_social or 'N/D' }}<br>
-                                <b>V: {{ c.vencimiento_seguridad_social or 'N/D' }}</b>
+                                {% if c.estatus == 'Logueado' %}
+                                    <span class="badge badge-success">Logueado (Activo)</span>
+                                {% elif c.estatus == 'Prelogueado' %}
+                                    <span class="badge badge-warning">Prelogueado</span>
+                                {% else %}
+                                    <span class="badge badge-gray">No Logueado</span>
+                                {% endif %}
                             </td>
+                            <td>{{ c.numero_licencia_conduccion or 'N/D' }}<br><small>{{ c.vencimiento_licencia_conduccion or 'N/D' }}</small></td>
+                            <td><b>{{ c.vencimiento_seguridad_social or 'N/D' }}</b></td>
                             <td>
                                 <div style="display: flex; flex-direction: column; gap: 2px;">
                                     {% if c.ruta_pdf_cedula %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_cedula }}')" class="btn-pdf-mini">📄 Cédula</a> {% endif %}
@@ -223,6 +245,8 @@
                                         data-id="{{ c.id }}"
                                         data-nombre="{{ c.nombre }}"
                                         data-cedula="{{ c.cedula }}"
+                                        data-telefono="{{ c.telefono }}"
+                                        data-email="{{ c.email }}"
                                         data-dep="{{ c.departamento_base }}"
                                         data-mun="{{ c.municipio_base }}"
                                         data-lic="{{ c.numero_licencia_conduccion }}"
@@ -231,13 +255,12 @@
                                         data-afp="{{ c.fondo_pensiones }}"
                                         data-arl="{{ c.arl }}"
                                         data-pago="{{ c.ultimo_pago_seguridad_social }}"
-                                        data-tg="{{ c.telegram_id }}"
                                         onclick="abrirEditarConductor(this)">✏️</button>
                                 <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarConductor('{{ c.id }}', '{{ c.cedula }}', '{{ c.nombre }}')">🗑️</button>
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay conductores registrados en la base de datos.</td></tr>
+                        <tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay conductores registrados en la base de datos.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -267,7 +290,21 @@
                 <div class="form-group">
                     <label>Número de Cédula *</label>
                     <input type="text" name="cedula" id="c_cedula" required style="font-weight: bold;">
-                    <small style="color: #6b7280; font-size: 10px;">(Se usará como contraseña de acceso al sistema)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="text" name="telefono" id="c_telefono">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" id="c_email">
+                </div>
+
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Contraseña de Acceso (Perfil Operador)</label>
+                    <input type="password" name="password" id="c_password">
+                    <small style="color: #f59e0b; font-size: 10px;">En creación es obligatoria. En edición, si se deja en blanco, se conservará la contraseña actual.</small>
                 </div>
                 
                 <div class="form-group">
@@ -279,10 +316,11 @@
                     <select name="municipio_base" id="c_mun_base"></select>
                 </div>
 
+                <!-- CAMPO TELEGRAM ID BLOQUEADO (REGLA DE SEGURIDAD) -->
                 <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>ID Telegram (Notificaciones Automáticas)</label>
-                    <input type="text" name="telegram_id" id="c_telegram">
-                    <small style="color: #f59e0b; font-size: 10px;">Requerido para alertas de vencimiento y asignación de viajes.</small>
+                    <label style="color: #ef4444;">ID Telegram (Bloqueado por Seguridad)</label>
+                    <input type="text" name="telegram_id" id="c_telegram" readonly style="background-color: #f3f4f6; color: #9ca3af; cursor: not-allowed; border-color: #e5e7eb;" value="BLOQUEADO" title="No se permite ingresar Telegram ID en este módulo">
+                    <small style="color: #ef4444; font-size: 10px;">🚫 El registro de Telegram ha sido restringido para este perfil.</small>
                 </div>
 
                 <div class="section-divider"><h4>🪪 Licencia de Conducción</h4></div>
@@ -320,8 +358,9 @@
             
             <div class="grid-form" style="background: #f9fafb; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
                 <div class="form-group"><label>Nombre y Cédula</label><div id="vis_id" class="readonly-box" style="font-weight: bold; color: var(--verde); font-size: 15px;"></div></div>
+                <div class="form-group"><label>Contacto (Tel / Email)</label><div id="vis_contacto" class="readonly-box"></div></div>
                 <div class="form-group"><label>Ubicación Base</label><div id="vis_ubicacion" class="readonly-box"></div></div>
-                <div class="form-group"><label>Telegram ID</label><div id="vis_tg" class="readonly-box"></div></div>
+                <div class="form-group"><label>Estatus / Telegram ID</label><div id="vis_tg" class="readonly-box"></div></div>
                 <div class="form-group"><label>Licencia de Conducción</label><div id="vis_lic" class="readonly-box"></div></div>
                 <div class="form-group"><label>Afiliaciones (EPS / AFP / ARL)</label><div id="vis_afil" class="readonly-box"></div></div>
                 <div class="form-group"><label>Seguridad Social (Pago / Vence)</label><div id="vis_ss" class="readonly-box"></div></div>
@@ -439,6 +478,7 @@
             document.getElementById('tituloModalConductor').innerText = 'Registrar Nuevo Conductor';
             document.getElementById('accionConductor').value = 'crear';
             document.getElementById('c_cedula').readOnly = false;
+            document.getElementById('c_password').required = true;
             document.getElementById('btnGuardarConductor').innerText = 'Guardar Conductor';
             openModal('modalConductor');
         }
@@ -448,12 +488,16 @@
             document.getElementById('formConductor').reset();
             document.getElementById('tituloModalConductor').innerText = 'Editar Expediente Conductor';
             document.getElementById('accionConductor').value = 'editar';
+            document.getElementById('c_password').required = false;
             document.getElementById('btnGuardarConductor').innerText = 'Guardar Cambios';
             
             document.getElementById('conductor_id').value = d.id;
             document.getElementById('c_nombre').value = d.nombre;
             document.getElementById('c_cedula').value = d.cedula;
             document.getElementById('c_cedula').readOnly = true; 
+            document.getElementById('c_telefono').value = (d.telefono !== 'None' && d.telefono) ? d.telefono : '';
+            document.getElementById('c_email').value = (d.email !== 'None' && d.email) ? d.email : '';
+            document.getElementById('c_password').value = ''; 
 
             let depSelect = document.getElementById('c_dep_base');
             if (d.dep && d.dep !== 'None') {
@@ -469,7 +513,6 @@
             document.getElementById('c_afp').value = (d.afp !== 'None') ? d.afp : '';
             document.getElementById('c_arl').value = (d.arl !== 'None') ? d.arl : '';
             document.getElementById('c_pago_ss').value = (d.pago !== 'None') ? d.pago : '';
-            document.getElementById('c_telegram').value = (d.tg !== 'None') ? d.tg : '';
 
             openModal('modalConductor');
         }
@@ -481,7 +524,6 @@
             openModal('modalEliminarConductor');
         }
 
-        // ================= VISOR INDIVIDUAL (AJAX) =================
         async function buscarYMostrarVisor() {
             let cedula = document.getElementById('input_consulta_cedula').value.trim();
             if (!cedula) { alert("Ingrese un número de cédula válido."); return; }
@@ -494,8 +536,9 @@
                     const c = data.conductor;
                     document.getElementById('vis_nombre_titulo').innerText = c.nombre;
                     document.getElementById('vis_id').innerText = `${c.nombre} (CC: ${c.cedula})`;
+                    document.getElementById('vis_contacto').innerText = `${c.telefono || 'N/D'} / ${c.email || 'N/D'}`;
                     document.getElementById('vis_ubicacion').innerText = `${c.municipio_base || 'N/D'} - ${c.departamento_base || 'N/D'}`;
-                    document.getElementById('vis_tg').innerText = c.telegram_id || 'No registrado';
+                    document.getElementById('vis_tg').innerText = `${c.estatus || 'No Logueado'} / ${c.telegram_id || 'No registrado'}`;
                     document.getElementById('vis_lic').innerText = `N° ${c.numero_licencia_conduccion || 'N/D'} | Vence: ${c.vencimiento_licencia_conduccion || 'N/D'}`;
                     document.getElementById('vis_afil').innerText = `EPS: ${c.eps || 'N/D'} | AFP: ${c.fondo_pensiones || 'N/D'} | ARL: ${c.arl || 'N/D'}`;
                     document.getElementById('vis_ss').innerText = `Pago: ${c.ultimo_pago_seguridad_social || 'N/D'} | Vence: ${c.vencimiento_seguridad_social || 'N/D'}`;

@@ -46,9 +46,6 @@ def controlador_flotaespecial_required(f):
 # HELPER: MIGRACIÓN DE TABLAS Y COLUMNAS
 # =========================================================
 def asegurar_tablas_y_columnas(cur):
-    try: cur.execute("ALTER TABLE usuarios ADD COLUMN email VARCHAR(150)")
-    except: pass
-
     # 1. Vehículos
     columnas_vehiculos = [
         ("vin", "VARCHAR(100)"), ("numero_serie", "VARCHAR(100)"), ("restriccion_movilidad", "VARCHAR(100)"),
@@ -79,42 +76,7 @@ def asegurar_tablas_y_columnas(cur):
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     """)
 
-    # 3. Conductores (Integración)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS conductores_flotaespecial (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            id_empresa INT NOT NULL,
-            nombre VARCHAR(150) NOT NULL,
-            cedula VARCHAR(50) NOT NULL,
-            departamento_base VARCHAR(100) DEFAULT NULL,
-            municipio_base VARCHAR(100) DEFAULT NULL,
-            numero_licencia_conduccion VARCHAR(100) DEFAULT NULL,
-            vencimiento_licencia_conduccion DATE DEFAULT NULL,
-            eps VARCHAR(100) DEFAULT NULL,
-            fondo_pensiones VARCHAR(100) DEFAULT NULL,
-            arl VARCHAR(100) DEFAULT NULL,
-            ultimo_pago_seguridad_social DATE DEFAULT NULL,
-            vencimiento_seguridad_social DATE DEFAULT NULL,
-            ruta_pdf_cedula VARCHAR(255) DEFAULT NULL,
-            ruta_pdf_licencia VARCHAR(255) DEFAULT NULL,
-            ruta_pdf_seguridad_social VARCHAR(255) DEFAULT NULL,
-            estatus VARCHAR(50) DEFAULT 'No Logueado',
-            ultima_latitud VARCHAR(100) DEFAULT NULL,
-            ultima_longitud VARCHAR(100) DEFAULT NULL,
-            fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
-            INDEX(id_empresa),
-            INDEX(cedula)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    """)
-
-    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN estatus VARCHAR(50) DEFAULT 'No Logueado'")
-    except: pass
-    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN ultima_latitud VARCHAR(100) DEFAULT NULL")
-    except: pass
-    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN ultima_longitud VARCHAR(100) DEFAULT NULL")
-    except: pass
-
-    # 4. Historial Auditoría Vencimientos
+    # 3. Historial Auditoría Vencimientos
     cur.execute("""
         CREATE TABLE IF NOT EXISTS historial_verificaciones_flotaespecial (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -315,7 +277,7 @@ def guardar_pdf_manual(file_obj, prefix, subfolder='vehiculos'):
     return None
 
 # =========================================================
-# RUTAS UNIFICADAS: GESTIÓN DE VEHÍCULOS, CONDUCTORES, TERCEROS Y PREOPERACIONALES
+# RUTAS: GESTIÓN DE VEHÍCULOS, TERCEROS Y PREOPERACIONALES
 # =========================================================
 @bp_flotaespecial_vehiculos.route('/', methods=['GET', 'POST'])
 @login_required_custom
@@ -333,102 +295,9 @@ def gestion_vehiculos():
         accion = request.form.get('accion')
         
         # ----------------------------------------------------
-        # GESTIÓN DE CONDUCTORES
-        # ----------------------------------------------------
-        if accion in ['crear_conductor', 'editar_conductor']:
-            conductor_id = request.form.get('conductor_id')
-            nombre = request.form.get('nombre', '').strip()
-            cedula = request.form.get('cedula', '').strip()
-            departamento_base = request.form.get('departamento_base', '').strip()
-            municipio_base = request.form.get('municipio_base', '').strip()
-            numero_licencia = request.form.get('numero_licencia_conduccion', '').strip()
-            vencimiento_licencia = request.form.get('vencimiento_licencia_conduccion') or None
-            eps = request.form.get('eps', '').strip()
-            fondo_pensiones = request.form.get('fondo_pensiones', '').strip()
-            arl = request.form.get('arl', '').strip()
-            ultimo_pago_ss = request.form.get('ultimo_pago_seguridad_social') or None
-            telegram_id = request.form.get('telegram_id', '').strip()
-
-            vencimiento_ss = None
-            if ultimo_pago_ss:
-                try:
-                    fecha_pago = datetime.strptime(ultimo_pago_ss, '%Y-%m-%d')
-                    vencimiento_ss = (fecha_pago + timedelta(days=30)).strftime('%Y-%m-%d')
-                except ValueError:
-                    vencimiento_ss = None
-
-            r_ced = guardar_pdf_manual(request.files.get('file_pdf_cedula'), 'ced', 'conductores')
-            r_lic = guardar_pdf_manual(request.files.get('file_pdf_licencia'), 'lic', 'conductores')
-            r_ss = guardar_pdf_manual(request.files.get('file_pdf_seguridad_social'), 'ss', 'conductores')
-
-            if nombre and cedula:
-                try:
-                    if accion == 'crear_conductor':
-                        cur.execute("SELECT id FROM usuarios WHERE cedula = %s", (cedula,))
-                        if cur.fetchone():
-                            flash(f"La cédula {cedula} ya está registrada como usuario.", "danger")
-                            return redirect(url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='conductores'))
-                        
-                        hashed_pw = bcrypt.generate_password_hash(cedula).decode('utf-8')
-                        cur.execute("""
-                            INSERT INTO usuarios (nombre, cedula, password, tipo_usuario, clase, perfil, empresa, empresa_id, telegram_id) 
-                            VALUES (%s, %s, %s, 'cliente', 'op', 'operador_flotaespecial', %s, %s, %s)
-                        """, (nombre, cedula, hashed_pw, empresa_nombre, empresa_id, telegram_id or None))
-                        
-                        cur.execute("""
-                            INSERT INTO conductores_flotaespecial 
-                            (id_empresa, nombre, cedula, departamento_base, municipio_base, numero_licencia_conduccion, 
-                             vencimiento_licencia_conduccion, eps, fondo_pensiones, arl, ultimo_pago_seguridad_social, 
-                             vencimiento_seguridad_social, ruta_pdf_cedula, ruta_pdf_licencia, ruta_pdf_seguridad_social, estatus) 
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'No Logueado')
-                        """, (empresa_id, nombre, cedula, departamento_base, municipio_base, numero_licencia,
-                              vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
-                              vencimiento_ss, r_ced or '', r_lic or '', r_ss or ''))
-                        
-                        mysql.connection.commit()
-                        flash(f"Conductor {nombre} registrado exitosamente.", "success")
-                        
-                    elif accion == 'editar_conductor' and conductor_id:
-                        cur.execute("""
-                            UPDATE conductores_flotaespecial 
-                            SET nombre=%s, cedula=%s, departamento_base=%s, municipio_base=%s, numero_licencia_conduccion=%s, 
-                                vencimiento_licencia_conduccion=%s, eps=%s, fondo_pensiones=%s, arl=%s, 
-                                ultimo_pago_seguridad_social=%s, vencimiento_seguridad_social=%s
-                            WHERE id=%s AND id_empresa=%s
-                        """, (nombre, cedula, departamento_base, municipio_base, numero_licencia,
-                              vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
-                              vencimiento_ss, conductor_id, empresa_id))
-                        
-                        if r_ced: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_cedula=%s WHERE id=%s", (r_ced, conductor_id))
-                        if r_lic: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_licencia=%s WHERE id=%s", (r_lic, conductor_id))
-                        if r_ss: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_seguridad_social=%s WHERE id=%s", (r_ss, conductor_id))
-                        
-                        cur.execute("UPDATE usuarios SET nombre=%s, telegram_id=%s WHERE cedula=%s AND empresa_id=%s", (nombre, telegram_id or None, cedula, empresa_id))
-                        mysql.connection.commit()
-                        flash(f"Expediente del conductor {nombre} actualizado.", "success")
-
-                except Exception as e:
-                    mysql.connection.rollback()
-                    flash(f"Error en base de datos: {str(e)}", "danger")
-            return redirect(url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='conductores'))
-
-        elif accion == 'eliminar_conductor':
-            conductor_id = request.form.get('conductor_id')
-            cedula_eliminar = request.form.get('cedula')
-            try:
-                cur.execute("DELETE FROM conductores_flotaespecial WHERE id = %s AND id_empresa = %s", (conductor_id, empresa_id))
-                cur.execute("DELETE FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula_eliminar, empresa_id))
-                mysql.connection.commit()
-                flash("Conductor eliminado permanentemente.", "success")
-            except Exception as e:
-                mysql.connection.rollback()
-                flash("Error al eliminar conductor.", "danger")
-            return redirect(url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='conductores'))
-
-        # ----------------------------------------------------
         # GESTIÓN DE EMPRESAS TERCERAS
         # ----------------------------------------------------
-        elif accion == 'crear_tercero':
+        if accion == 'crear_tercero':
             nombre = request.form.get('nombre', '').strip()
             nit = request.form.get('nit', '').strip()
             dep = request.form.get('departamento_sede', '').strip()
@@ -659,25 +528,8 @@ def gestion_vehiculos():
         return redirect(url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='vehiculos'))
 
     # ================= MODO LECTURA / VISTA SEGÚN MÓDULO =================
-    
-    if active_module == 'conductores':
-        cur.execute("""
-            SELECT c.*, u.telegram_id 
-            FROM conductores_flotaespecial c
-            LEFT JOIN usuarios u ON c.cedula COLLATE utf8mb4_unicode_ci = u.cedula COLLATE utf8mb4_unicode_ci AND c.id_empresa = u.empresa_id
-            WHERE c.id_empresa = %s 
-            ORDER BY c.nombre ASC
-        """, (empresa_id,))
-        conductores_db = cur.fetchall()
-        cur.close()
         
-        return render_template(
-            'B_modulo_flotaespecial_vehiculos.html',
-            nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
-            active_module='conductores', conductores=conductores_db
-        )
-        
-    elif active_module == 'preoperacionales':
+    if active_module == 'preoperacionales':
         fecha_inicio = request.args.get('fecha_inicio', (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'))
         fecha_fin = request.args.get('fecha_fin', datetime.now().strftime('%Y-%m-%d'))
         placa_filtro = request.args.get('placa', 'todas')
@@ -752,9 +604,6 @@ def gestion_vehiculos():
         
         conductores_activos = [c for c in conductores_db if c.get('estatus') in ['Logueado', 'Prelogueado']]
         
-        # ----------------------------------------------------
-        # NUEVA CONSULTA DE ACCESOS PARA LISTA DESPLEGABLE
-        # ----------------------------------------------------
         cur.execute("SELECT id, nombre, cedula FROM usuarios WHERE empresa_id = %s AND perfil = 'operador_flotaespecial' ORDER BY nombre ASC", (empresa_id,))
         operadores_flota = cur.fetchall()
         
@@ -771,64 +620,13 @@ def gestion_vehiculos():
             'B_modulo_flotaespecial_vehiculos.html',
             nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
             active_module='vehiculos', vehiculos=vehiculos_db, terceros=terceros_db,
-            kpis=kpis, conductores_activos=conductores_activos, conductores=conductores_db,
+            kpis=kpis, conductores_activos=conductores_activos,
             operadores_flota=operadores_flota
         )
 
 # =========================================================
 # ENDPOINTS AJAX: VISORES INDIVIDUALES Y DESCARGAS
 # =========================================================
-@bp_flotaespecial_vehiculos.route('/visor_individual_conductor', methods=['GET'])
-@login_required_custom
-@controlador_flotaespecial_required
-def visor_conductor_individual():
-    empresa_id = session.get('empresa_id')
-    cedula_busqueda = request.args.get('cedula', '').strip()
-    
-    if not cedula_busqueda:
-        return jsonify({'success': False, 'message': 'Cédula no proporcionada.'})
-
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("""
-        SELECT c.*, u.telegram_id 
-        FROM conductores_flotaespecial c
-        LEFT JOIN usuarios u ON c.cedula COLLATE utf8mb4_unicode_ci = u.cedula COLLATE utf8mb4_unicode_ci AND c.id_empresa = u.empresa_id
-        WHERE c.cedula = %s AND c.id_empresa = %s LIMIT 1
-    """, (cedula_busqueda, empresa_id))
-    conductor = cur.fetchone()
-    cur.close()
-
-    if conductor:
-        return jsonify({'success': True, 'conductor': conductor})
-    else:
-        return jsonify({'success': False, 'message': f'Conductor con cédula {cedula_busqueda} no encontrado.'})
-
-@bp_flotaespecial_vehiculos.route('/visor_viaje_activo', methods=['GET'])
-@login_required_custom
-@controlador_flotaespecial_required
-def visor_viaje_activo():
-    empresa_id = session.get('empresa_id')
-    conductor_nombre = request.args.get('conductor_nombre', '').strip()
-    
-    if not conductor_nombre:
-        return jsonify({'success': False, 'message': 'Conductor no especificado.'})
-
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("""
-        SELECT id_viaje, nombre_usuario, telefono_usuario, direccion_origen, direccion_destino, hora_inicio, vehiculo_asignado
-        FROM control_viajes_flota_especial
-        WHERE id_empresa = %s AND conductor_asignado = %s AND estatus_servicio = 'EN EJECUCION'
-        LIMIT 1
-    """, (empresa_id, conductor_nombre))
-    viaje = cur.fetchone()
-    cur.close()
-
-    if viaje:
-        if 'hora_inicio' in viaje and isinstance(viaje['hora_inicio'], timedelta):
-            viaje['hora_inicio'] = str(viaje['hora_inicio'])
-        return jsonify({'success': True, 'viaje': viaje})
-    else:
-        return jsonify({'success': False, 'message': 'El conductor no tiene un viaje "EN EJECUCIÓN" en este momento.'})
 
 @bp_flotaespecial_vehiculos.route('/visor_tiempos_conduccion', methods=['GET'])
 @login_required_custom

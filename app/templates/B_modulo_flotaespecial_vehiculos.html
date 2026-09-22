@@ -192,7 +192,7 @@
                 <div class="nav-item-content"><span class="nav-icon">🚐</span> Vehículos</div>
             </a>
             
-            <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos', active_module='conductores') }}" class="nav-item {% if active_module == 'conductores' %}active{% endif %}">
+            <a href="{{ url_for('flotaespecial_conductores.gestion_conductores') }}" class="nav-item">
                 <div class="nav-item-content"><span class="nav-icon">👨‍✈️</span> Conductores</div>
             </a>
             
@@ -328,96 +328,6 @@
                             </tr>
                             {% else %}
                             <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay empresas aliadas registradas.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-            {% elif active_module == 'conductores' %}
-                <!-- ================= VISTA CONDUCTORES ================= -->
-                <div class="action-header" style="margin-bottom: 10px;">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Volver al Panel Central">&times;</a>
-                        <h2>Gestión de Conductores (Operadores de Flota)</h2>
-                    </div>
-                    <button class="btn-primary" onclick="abrirCrearConductor()"><span>➕</span> Ingresar Conductor</button>
-                </div>
-
-                <!-- BUSCADOR VISOR CONDUCTOR -->
-                <div class="table-card" style="padding: 15px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
-                    <div class="form-group" style="margin-bottom: 0; flex: 1; max-width: 400px;">
-                        <label style="color: var(--verde);">🔎 Auditar Conductor (Visor por Cédula)</label>
-                        <div style="display: flex; gap: 10px;">
-                            <input type="text" id="input_consulta_cedula" placeholder="Ingrese número de cédula...">
-                            <button class="btn-primary" onclick="buscarYMostrarVisorConductor()" style="height: 38px;">Auditar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Nombre / Cédula</th>
-                                <th>Ubicación Base</th>
-                                <th>Estatus Operativo</th>
-                                <th>Licencia / Seg. Social</th>
-                                <th>Documentos (PDF)</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for c in conductores %}
-                            <tr>
-                                <td><b style="color: var(--verde);">{{ c.nombre }}</b><br><small>{{ c.cedula }}</small></td>
-                                <td>{{ c.municipio_base or 'N/D' }}<br><small>{{ c.departamento_base or '' }}</small></td>
-                                <td>
-                                    {% if c.estatus == 'Logueado' %}
-                                        <span class="badge badge-success">Logueado (Activo)</span>
-                                    {% elif c.estatus == 'Prelogueado' %}
-                                        <span class="badge badge-warning">Prelogueado</span>
-                                    {% else %}
-                                        <span class="badge badge-gray">No Logueado</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    Lic: {{ c.vencimiento_licencia_conduccion or 'N/D' }}<br>
-                                    <b>SS: {{ c.vencimiento_seguridad_social or 'N/D' }}</b>
-                                </td>
-                                <td>
-                                    <div style="display: flex; flex-direction: column; gap: 2px;">
-                                        {% if c.ruta_pdf_cedula %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_cedula }}')" class="btn-pdf-mini">📄 Cédula</a> {% endif %}
-                                        {% if c.ruta_pdf_licencia %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_licencia }}')" class="btn-pdf-mini">📄 Licencia</a> {% endif %}
-                                        {% if c.ruta_pdf_seguridad_social %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_seguridad_social }}')" class="btn-pdf-mini">📄 Seg. Social</a> {% endif %}
-                                        {% if not c.ruta_pdf_cedula and not c.ruta_pdf_licencia and not c.ruta_pdf_seguridad_social %}
-                                            <span style="font-size: 11px; color: #9ca3af;">Sin documentos</span>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                                <td style="white-space: nowrap;">
-                                    {% if c.estatus in ['Logueado', 'Prelogueado'] %}
-                                    <button class="btn-icon map" title="Ver Viaje en Curso" onclick="abrirVisorViajeActivo('{{ c.nombre }}')">🗺️</button>
-                                    {% endif %}
-                                    <button class="btn-icon qr" title="Generar QR Carnet" onclick="abrirQRConductor('{{ c.cedula }}', '{{ c.nombre }}')">📱</button>
-                                    <button class="btn-icon edit" title="Editar" 
-                                            data-id="{{ c.id }}"
-                                            data-nombre="{{ c.nombre }}"
-                                            data-cedula="{{ c.cedula }}"
-                                            data-dep="{{ c.departamento_base }}"
-                                            data-mun="{{ c.municipio_base }}"
-                                            data-lic="{{ c.numero_licencia_conduccion }}"
-                                            data-vlic="{{ c.vencimiento_licencia_conduccion }}"
-                                            data-eps="{{ c.eps }}"
-                                            data-afp="{{ c.fondo_pensiones }}"
-                                            data-arl="{{ c.arl }}"
-                                            data-pago="{{ c.ultimo_pago_seguridad_social }}"
-                                            data-tg="{{ c.telegram_id }}"
-                                            onclick="abrirEditarConductor(this)">✏️</button>
-                                    <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarConductor('{{ c.id }}', '{{ c.cedula }}', '{{ c.nombre }}')">🗑️</button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay conductores registrados en la base de datos.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -605,7 +515,7 @@
         {% endif %}
     </datalist>
 
-   <!-- ================= MODAL AUDITORÍA TIEMPOS DE CONDUCCIÓN (NUEVO) ================= -->
+   <!-- ================= MODAL AUDITORÍA TIEMPOS DE CONDUCCIÓN ================= -->
     <div id="modalAuditoriaTiempos" class="modal-overlay">
         <div class="modal-box" style="max-width: 800px; width: 95%;">
             <div class="modal-header">
@@ -614,7 +524,7 @@
             </div>
             
             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px; text-align: left;">
-                Esta herramienta calcula el tiempo neto de conducción, excluyendo automáticamente los tiempos de espera del paciente (tiempo en diligencias EPS/IPS).
+                Esta herramienta calcula el tiempo neto de conducción, excluyendo automáticamente los tiempos de espera del paciente.
             </p>
 
             <div class="grid-form" style="background: #f9fafb; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; padding: 15px; gap: 10px; align-items: end;">
@@ -663,7 +573,7 @@
         </div>
     </div>
 
-    <!-- ================= MODAL CREAR VEHÍCULO (INGRESO MANUAL) ================= -->
+    <!-- ================= MODAL CREAR VEHÍCULO ================= -->
     <div id="modalVehiculo" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header">
@@ -871,7 +781,7 @@
         </div>
     </div>
 
-    <!-- ================= MODAL VISOR VEHÍCULO (CONSULTA RÁPIDA) ================= -->
+    <!-- ================= MODAL VISOR VEHÍCULO ================= -->
     <div id="modalVisorVehiculo" class="modal-overlay">
         <div class="modal-box" style="max-width: 900px; width: 95%;">
             <div class="modal-header">
@@ -921,158 +831,6 @@
                 <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro de eliminar el vehículo placa <b id="delete_vehiculo_placa"></b>?</p>
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarVehiculo')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
             </form>
-        </div>
-    </div>
-
-    <!-- ================= MODALES CONDUCTORES ================= -->
-    <div id="modalConductor" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3 id="tituloModalConductor">Registrar Nuevo Conductor</h3>
-                <button class="close-btn" onclick="closeModal('modalConductor')">&times;</button>
-            </div>
-
-            <form action="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" method="POST" class="grid-form" enctype="multipart/form-data" id="formConductor">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" id="accionConductor" value="crear_conductor">
-                <input type="hidden" name="conductor_id" id="conductor_id">
-
-                <div class="section-divider"><h4>👤 Identificación y Contacto</h4></div>
-                <div class="form-group"><label>Nombre Completo *</label><input type="text" name="nombre" id="c_nombre" required></div>
-                <div class="form-group">
-                    <label>Número de Cédula *</label>
-                    <input type="text" name="cedula" id="c_cedula" required style="font-weight: bold;">
-                    <small style="color: #6b7280; font-size: 10px;">(Se usará como contraseña de acceso al sistema)</small>
-                </div>
-                
-                <div class="form-group">
-                    <label>Departamento Base</label>
-                    <select name="departamento_base" id="c_dep_base" onchange="cargarMunicipios('c_dep_base', 'c_mun_base')"></select>
-                </div>
-                <div class="form-group">
-                    <label>Municipio Base</label>
-                    <select name="municipio_base" id="c_mun_base"></select>
-                </div>
-
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>ID Telegram (Notificaciones Automáticas)</label>
-                    <input type="text" name="telegram_id" id="c_telegram">
-                    <small style="color: #f59e0b; font-size: 10px;">Requerido para alertas de vencimiento y asignación de viajes.</small>
-                </div>
-
-                <div class="section-divider"><h4>🪪 Licencia de Conducción</h4></div>
-                <div class="form-group"><label>Número de Licencia</label><input type="text" name="numero_licencia_conduccion" id="c_licencia"></div>
-                <div class="form-group"><label>Fecha Vencimiento Licencia</label><input type="date" name="vencimiento_licencia_conduccion" id="c_vlicencia"></div>
-
-                <div class="section-divider"><h4>🏥 Seguridad Social Integral</h4></div>
-                <div class="form-group"><label>EPS</label><input type="text" name="eps" id="c_eps"></div>
-                <div class="form-group"><label>Fondo de Pensiones (AFP)</label><input type="text" name="fondo_pensiones" id="c_afp"></div>
-                <div class="form-group"><label>ARL</label><input type="text" name="arl" id="c_arl"></div>
-                <div class="form-group">
-                    <label>Fecha de Último Pago (Seguridad Social)</label>
-                    <input type="date" name="ultimo_pago_seguridad_social" id="c_pago_ss">
-                    <small style="color: #10b981; font-size: 10px;">El sistema calculará automáticamente el vencimiento a 30 días.</small>
-                </div>
-
-                <div class="section-divider"><h4>📂 Digitalización de Documentos (PDF)</h4></div>
-                <p style="grid-column: 1 / -1; font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Solo archivos .pdf. En edición, dejar en blanco para mantener el archivo actual.</p>
-                <div class="form-group"><label>Cédula Ciudadanía</label><input type="file" name="file_pdf_cedula" accept=".pdf"></div>
-                <div class="form-group"><label>Licencia de Conducción</label><input type="file" name="file_pdf_licencia" accept=".pdf"></div>
-                <div class="form-group"><label>Planilla Seguridad Social</label><input type="file" name="file_pdf_seguridad_social" accept=".pdf"></div>
-
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalConductor')">Cancelar</button><button type="submit" class="btn-primary" id="btnGuardarConductor">Guardar Conductor</button></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL VISOR INDIVIDUAL CONDUCTOR -->
-    <div id="modalVisorConductor" class="modal-overlay">
-        <div class="modal-box" style="max-width: 900px; width: 95%;">
-            <div class="modal-header">
-                <h3>🔍 Auditoría de Conductor: <span id="vis_c_nombre_titulo" style="color: var(--verde);"></span></h3>
-                <button class="close-btn" onclick="closeModal('modalVisorConductor')">&times;</button>
-            </div>
-            
-            <div class="grid-form" style="background: #f9fafb; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
-                <div class="form-group"><label>Nombre y Cédula</label><div id="vis_c_id" class="readonly-box" style="font-weight: bold; color: var(--verde); font-size: 15px;"></div></div>
-                <div class="form-group"><label>Ubicación Base</label><div id="vis_c_ubicacion" class="readonly-box"></div></div>
-                <div class="form-group"><label>Telegram ID</label><div id="vis_c_tg" class="readonly-box"></div></div>
-                <div class="form-group"><label>Estatus Operativo</label><div id="vis_c_estatus" class="readonly-box"></div></div>
-                <div class="form-group"><label>Licencia de Conducción</label><div id="vis_c_lic" class="readonly-box"></div></div>
-                <div class="form-group"><label>Afiliaciones (EPS / AFP / ARL)</label><div id="vis_c_afil" class="readonly-box"></div></div>
-                <div class="form-group" style="grid-column: 1 / -1;"><label>Seguridad Social (Pago / Vence)</label><div id="vis_c_ss" class="readonly-box"></div></div>
-            </div>
-
-            <div class="section-divider"><h4>📄 Documentos Digitalizados</h4></div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
-                <button id="btnVisCed" class="btn-info">Cédula PDF</button>
-                <button id="btnVisLic" class="btn-info">Licencia PDF</button>
-                <button id="btnVisSS" class="btn-info">Seguridad Social PDF</button>
-            </div>
-
-            <div class="modal-footer">
-                <button type="button" class="btn-cancel" onclick="closeModal('modalVisorConductor')">Cerrar Visor</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL ELIMINAR CONDUCTOR -->
-    <div id="modalEliminarConductor" class="modal-overlay">
-        <div class="modal-box" style="max-width: 400px; width: 90%;">
-            <div class="modal-header">
-                <h3 style="color: #ef4444;">⚠️ Eliminar Conductor</h3>
-                <button class="close-btn" onclick="closeModal('modalEliminarConductor')">&times;</button>
-            </div>
-            <form action="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="eliminar_conductor">
-                <input type="hidden" name="conductor_id" id="delete_conductor_id">
-                <input type="hidden" name="cedula" id="delete_conductor_cedula">
-                <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro de eliminar el expediente del conductor <b id="delete_conductor_nombre"></b>? Esto también revocará su acceso al sistema.</p>
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarConductor')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL QR CONDUCTOR (CARNET) -->
-    <div id="modalQRConductor" class="modal-overlay">
-        <div class="modal-box" style="max-width: 450px; width: 90%;">
-            <div class="modal-header">
-                <h3>QR Identificación (Carnet)</h3>
-                <button class="close-btn" onclick="closeModal('modalQRConductor')">&times;</button>
-            </div>
-            <div id="qrPrintAreaConductor" style="text-align: center; padding: 20px; background: white; border: 2px dashed var(--border); border-radius: 10px;">
-                <h2 style="color: var(--verde); font-size: 20px; margin-bottom: 5px; text-transform: uppercase;">{{ empresa }}</h2>
-                <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 20px;">Transporte Especial - Operador Autorizado</p>
-                <img id="qrImageConductor" src="" alt="Código QR Conductor" crossorigin="anonymous" style="width: 200px; height: 200px; margin: 0 auto; display: block;">
-                <h1 id="qrConductorNombre" style="font-size: 20px; margin-top: 15px; color: #111827;"></h1>
-                <p id="qrConductorCedula" style="font-size: 14px; color: var(--text-muted); margin-top: 5px;"></p>
-            </div>
-            <div class="modal-footer" style="justify-content: center; margin-top: 25px; flex-wrap: wrap; gap: 10px; border-top: none;">
-                <button type="button" class="btn-cancel" onclick="closeModal('modalQRConductor')">Cerrar</button>
-                <button type="button" class="btn-primary" style="background: #0ea5e9;" onclick="descargarQRConductor()">⬇️ Descargar</button>
-                <button type="button" class="btn-primary" onclick="window.print()">🖨️ Imprimir</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL VISOR VIAJE ACTIVO -->
-    <div id="modalVisorViajeActivo" class="modal-overlay">
-        <div class="modal-box" style="max-width: 600px; width: 90%;">
-            <div class="modal-header">
-                <h3>🗺️ Viaje en Ejecución: <span id="viaje_activo_conductor" style="color: var(--verde);"></span></h3>
-                <button class="close-btn" onclick="closeModal('modalVisorViajeActivo')">&times;</button>
-            </div>
-            <div class="grid-form" style="background: #f9fafb; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
-                <div class="form-group"><label>Paciente / Contacto</label><div id="viaje_activo_paciente" class="readonly-box" style="font-weight: bold; color: var(--verde);"></div></div>
-                <div class="form-group"><label>Vehículo Asignado</label><div id="viaje_activo_vehiculo" class="readonly-box"></div></div>
-                <div class="form-group"><label>Origen</label><div id="viaje_activo_origen" class="readonly-box"></div></div>
-                <div class="form-group"><label>Destino</label><div id="viaje_activo_destino" class="readonly-box"></div></div>
-                <div class="form-group" style="grid-column: 1 / -1;"><label>Hora de Inicio</label><div id="viaje_activo_hora" class="readonly-box"></div></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-cancel" onclick="closeModal('modalVisorViajeActivo')">Cerrar Visor</button>
-            </div>
         </div>
     </div>
 
@@ -1218,9 +976,6 @@
         function initSelectoresDivipola() {
             let optionsHTML = '<option value="">Seleccione Departamento...</option>';
             Object.keys(divipolaColombia).sort().forEach(dep => { optionsHTML += `<option value="${dep}">${dep}</option>`; });
-            
-            const depSelectCond = document.getElementById('c_dep_base');
-            if (depSelectCond) depSelectCond.innerHTML = optionsHTML;
             
             const depSelectVeh = document.getElementById('v_dep_base');
             if (depSelectVeh) depSelectVeh.innerHTML = optionsHTML;
@@ -1424,133 +1179,6 @@
             document.getElementById('delete_vehiculo_id').value = id;
             document.getElementById('delete_vehiculo_placa').innerText = placa;
             openModal('modalEliminarVehiculo');
-        }
-
-        // ================= JS: CONDUCTORES =================
-        function abrirCrearConductor() {
-            document.getElementById('formConductor').reset();
-            document.getElementById('tituloModalConductor').innerText = 'Registrar Nuevo Conductor';
-            document.getElementById('accionConductor').value = 'crear_conductor';
-            document.getElementById('c_cedula').readOnly = false;
-            document.getElementById('btnGuardarConductor').innerText = 'Guardar Conductor';
-            openModal('modalConductor');
-        }
-
-        function abrirEditarConductor(btn) {
-            const d = btn.dataset;
-            document.getElementById('formConductor').reset();
-            document.getElementById('tituloModalConductor').innerText = 'Editar Expediente Conductor';
-            document.getElementById('accionConductor').value = 'editar_conductor';
-            document.getElementById('btnGuardarConductor').innerText = 'Guardar Cambios';
-            
-            document.getElementById('conductor_id').value = d.id;
-            document.getElementById('c_nombre').value = d.nombre;
-            document.getElementById('c_cedula').value = d.cedula;
-            document.getElementById('c_cedula').readOnly = true; 
-
-            let depSelect = document.getElementById('c_dep_base');
-            if (d.dep && d.dep !== 'None') {
-                depSelect.value = d.dep;
-                cargarMunicipios('c_dep_base', 'c_mun_base');
-                let munSelect = document.getElementById('c_mun_base');
-                if (d.mun && d.mun !== 'None') munSelect.value = d.mun;
-            }
-
-            document.getElementById('c_licencia').value = (d.lic !== 'None') ? d.lic : '';
-            document.getElementById('c_vlicencia').value = (d.vlic !== 'None') ? d.vlic : '';
-            document.getElementById('c_eps').value = (d.eps !== 'None') ? d.eps : '';
-            document.getElementById('c_afp').value = (d.afp !== 'None') ? d.afp : '';
-            document.getElementById('c_arl').value = (d.arl !== 'None') ? d.arl : '';
-            document.getElementById('c_pago_ss').value = (d.pago !== 'None') ? d.pago : '';
-            document.getElementById('c_telegram').value = (d.tg !== 'None') ? d.tg : '';
-            openModal('modalConductor');
-        }
-
-        function confirmarEliminarConductor(id, cedula, nombre) {
-            document.getElementById('delete_conductor_id').value = id;
-            document.getElementById('delete_conductor_cedula').value = cedula;
-            document.getElementById('delete_conductor_nombre').innerText = nombre;
-            openModal('modalEliminarConductor');
-        }
-
-        async function buscarYMostrarVisorConductor() {
-            let cedula = document.getElementById('input_consulta_cedula').value.trim();
-            if (!cedula) { alert("Ingrese un número de cédula válido."); return; }
-
-            try {
-                let res = await fetch(`{{ url_for('flotaespecial_vehiculos.visor_conductor_individual') }}?cedula=${cedula}`);
-                let data = await res.json();
-                
-                if (data.success && data.conductor) {
-                    const c = data.conductor;
-                    document.getElementById('vis_c_nombre_titulo').innerText = c.nombre;
-                    document.getElementById('vis_c_id').innerText = `${c.nombre} (CC: ${c.cedula})`;
-                    document.getElementById('vis_c_ubicacion').innerText = `${c.municipio_base || 'N/D'} - ${c.departamento_base || 'N/D'}`;
-                    document.getElementById('vis_c_tg').innerText = c.telegram_id || 'No registrado';
-                    document.getElementById('vis_c_estatus').innerText = c.estatus || 'No Logueado';
-                    document.getElementById('vis_c_lic').innerText = `N° ${c.numero_licencia_conduccion || 'N/D'} | Vence: ${c.vencimiento_licencia_conduccion || 'N/D'}`;
-                    document.getElementById('vis_c_afil').innerText = `EPS: ${c.eps || 'N/D'} | AFP: ${c.fondo_pensiones || 'N/D'} | ARL: ${c.arl || 'N/D'}`;
-                    document.getElementById('vis_c_ss').innerText = `Pago: ${c.ultimo_pago_seguridad_social || 'N/D'} | Vence: ${c.vencimiento_seguridad_social || 'N/D'}`;
-
-                    configurarBotonVisor('btnVisCed', c.ruta_pdf_cedula);
-                    configurarBotonVisor('btnVisLic', c.ruta_pdf_licencia);
-                    configurarBotonVisor('btnVisSS', c.ruta_pdf_seguridad_social);
-
-                    openModal('modalVisorConductor');
-                } else {
-                    alert(data.message || "Conductor no encontrado.");
-                }
-            } catch (error) {
-                alert("Error de red al consultar el expediente.");
-            }
-        }
-
-        function abrirQRConductor(cedula, nombre) {
-            document.getElementById('qrConductorNombre').innerText = nombre;
-            document.getElementById('qrConductorCedula').innerText = `CC: ${cedula}`;
-            const nitEmpresa = "{{ session.get('empresa_id') }}";
-            const payload = JSON.stringify({ cedula: cedula, nit: nitEmpresa });
-            document.getElementById('qrImageConductor').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(payload)}&margin=0`;
-            openModal('modalQRConductor');
-        }
-
-        async function descargarQRConductor() {
-            const cedulaText = document.getElementById('qrConductorCedula').innerText;
-            const cedula = cedulaText.replace('CC: ', '').trim();
-            const imgSrc = document.getElementById('qrImageConductor').src;
-            if (!imgSrc || !cedula) return;
-            try {
-                const response = await fetch(imgSrc);
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none'; a.href = url; a.download = `QR_Carnet_Conductor_${cedula}.png`;
-                document.body.appendChild(a); a.click();
-                window.URL.revokeObjectURL(url); document.body.removeChild(a);
-            } catch (error) { alert("Hubo un error al descargar la imagen."); }
-        }
-
-        // ================= JS: VIAJE ACTIVO =================
-        async function abrirVisorViajeActivo(conductorNombre) {
-            try {
-                let res = await fetch(`{{ url_for('flotaespecial_vehiculos.visor_viaje_activo') }}?conductor_nombre=${encodeURIComponent(conductorNombre)}`);
-                let data = await res.json();
-                
-                if (data.success && data.viaje) {
-                    const v = data.viaje;
-                    document.getElementById('viaje_activo_conductor').innerText = conductorNombre;
-                    document.getElementById('viaje_activo_paciente').innerText = `${v.nombre_usuario || 'N/A'} (Tel: ${v.telefono_usuario || 'N/A'})`;
-                    document.getElementById('viaje_activo_vehiculo').innerText = v.vehiculo_asignado || 'N/A';
-                    document.getElementById('viaje_activo_origen').innerText = v.direccion_origen || 'N/A';
-                    document.getElementById('viaje_activo_destino').innerText = v.direccion_destino || 'N/A';
-                    document.getElementById('viaje_activo_hora').innerText = v.hora_inicio || 'N/A';
-                    openModal('modalVisorViajeActivo');
-                } else {
-                    alert(data.message || "El conductor no tiene un viaje activo 'EN EJECUCIÓN' en este momento.");
-                }
-            } catch (error) {
-                alert("Error de red al consultar el viaje activo.");
-            }
         }
 
         // ================= JS: TERCEROS =================

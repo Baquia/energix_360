@@ -33,6 +33,8 @@ def asegurar_tablas_conductores(cur):
             id_empresa INT NOT NULL,
             nombre VARCHAR(150) NOT NULL,
             cedula VARCHAR(50) NOT NULL,
+            telefono VARCHAR(50) DEFAULT NULL,
+            email VARCHAR(150) DEFAULT NULL,
             departamento_base VARCHAR(100) DEFAULT NULL,
             municipio_base VARCHAR(100) DEFAULT NULL,
             numero_licencia_conduccion VARCHAR(100) DEFAULT NULL,
@@ -45,11 +47,25 @@ def asegurar_tablas_conductores(cur):
             ruta_pdf_cedula VARCHAR(255) DEFAULT NULL,
             ruta_pdf_licencia VARCHAR(255) DEFAULT NULL,
             ruta_pdf_seguridad_social VARCHAR(255) DEFAULT NULL,
+            estatus VARCHAR(50) DEFAULT 'No Logueado',
+            ultima_latitud VARCHAR(100) DEFAULT NULL,
+            ultima_longitud VARCHAR(100) DEFAULT NULL,
             fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX(id_empresa),
             INDEX(cedula)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     """)
+    
+    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN telefono VARCHAR(50) DEFAULT NULL")
+    except: pass
+    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN email VARCHAR(150) DEFAULT NULL")
+    except: pass
+    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN estatus VARCHAR(50) DEFAULT 'No Logueado'")
+    except: pass
+    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN ultima_latitud VARCHAR(100) DEFAULT NULL")
+    except: pass
+    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN ultima_longitud VARCHAR(100) DEFAULT NULL")
+    except: pass
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS historial_verificaciones_flotaespecial (
@@ -88,6 +104,7 @@ def guardar_pdf_manual(file_obj, prefix):
 def gestion_conductores():
     empresa_id = session.get('empresa_id')
     empresa_nombre = session.get('empresa')
+    nit_empresa = session.get('nit')
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     asegurar_tablas_conductores(cur)
@@ -100,6 +117,9 @@ def gestion_conductores():
             conductor_id = request.form.get('conductor_id')
             nombre = request.form.get('nombre', '').strip()
             cedula = request.form.get('cedula', '').strip()
+            telefono = request.form.get('telefono', '').strip()
+            email = request.form.get('email', '').strip()
+            password = request.form.get('password', '').strip()
             departamento_base = request.form.get('departamento_base', '').strip()
             municipio_base = request.form.get('municipio_base', '').strip()
             numero_licencia = request.form.get('numero_licencia_conduccion', '').strip()
@@ -108,7 +128,6 @@ def gestion_conductores():
             fondo_pensiones = request.form.get('fondo_pensiones', '').strip()
             arl = request.form.get('arl', '').strip()
             ultimo_pago_ss = request.form.get('ultimo_pago_seguridad_social') or None
-            telegram_id = request.form.get('telegram_id', '').strip()
 
             # Cálculo exacto de vencimiento de seguridad social (+30 días)
             vencimiento_ss = None
@@ -128,28 +147,31 @@ def gestion_conductores():
                 try:
                     if accion == 'crear':
                         # 1. Crear en tabla usuarios (Perfil: operador_flotaespecial)
-                        # Corrección SIM-017: Aislamiento Multi-Tenant asegurado en la validación de usuario existente
-                        cur.execute("SELECT id FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula, empresa_id))
+                        cur.execute("SELECT id FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula, nit_empresa))
                         if cur.fetchone():
                             flash(f"La cédula {cedula} ya está registrada como usuario.", "danger")
                             return redirect(url_for('flotaespecial_conductores.gestion_conductores'))
                         
-                        hashed_pw = bcrypt.generate_password_hash(cedula).decode('utf-8')
+                        if not password:
+                            flash("La contraseña es obligatoria para registrar un nuevo conductor.", "warning")
+                            return redirect(url_for('flotaespecial_conductores.gestion_conductores'))
+                        
+                        hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
                         cur.execute("""
-                            INSERT INTO usuarios (nombre, cedula, password, tipo_usuario, clase, perfil, empresa, empresa_id, telegram_id) 
-                            VALUES (%s, %s, %s, 'cliente', 'op', 'operador_flotaespecial', %s, %s, %s)
-                        """, (nombre, cedula, hashed_pw, empresa_nombre, empresa_id, telegram_id or None))
+                            INSERT INTO usuarios (nombre, cedula, password, tipo_usuario, clase, perfil, empresa, empresa_id, telegram_id, telefono, email) 
+                            VALUES (%s, %s, %s, 'cliente', 'op', 'operador_flotaespecial', %s, %s, NULL, %s, %s)
+                        """, (nombre, cedula, hashed_pw, empresa_nombre, nit_empresa, telefono or None, email or None))
                         
                         # 2. Insertar en tabla conductores_flotaespecial
                         cur.execute("""
                             INSERT INTO conductores_flotaespecial 
                             (id_empresa, nombre, cedula, departamento_base, municipio_base, numero_licencia_conduccion, 
                              vencimiento_licencia_conduccion, eps, fondo_pensiones, arl, ultimo_pago_seguridad_social, 
-                             vencimiento_seguridad_social, ruta_pdf_cedula, ruta_pdf_licencia, ruta_pdf_seguridad_social) 
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                             vencimiento_seguridad_social, ruta_pdf_cedula, ruta_pdf_licencia, ruta_pdf_seguridad_social, telefono, email, estatus) 
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'No Logueado')
                         """, (empresa_id, nombre, cedula, departamento_base, municipio_base, numero_licencia,
                               vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
-                              vencimiento_ss, r_ced or '', r_lic or '', r_ss or ''))
+                              vencimiento_ss, r_ced or '', r_lic or '', r_ss or '', telefono or None, email or None))
                         
                         mysql.connection.commit()
                         flash(f"Conductor {nombre} registrado exitosamente.", "success")
@@ -160,19 +182,31 @@ def gestion_conductores():
                             UPDATE conductores_flotaespecial 
                             SET nombre=%s, cedula=%s, departamento_base=%s, municipio_base=%s, numero_licencia_conduccion=%s, 
                                 vencimiento_licencia_conduccion=%s, eps=%s, fondo_pensiones=%s, arl=%s, 
-                                ultimo_pago_seguridad_social=%s, vencimiento_seguridad_social=%s
+                                ultimo_pago_seguridad_social=%s, vencimiento_seguridad_social=%s, telefono=%s, email=%s
                             WHERE id=%s AND id_empresa=%s
                         """, (nombre, cedula, departamento_base, municipio_base, numero_licencia,
                               vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
-                              vencimiento_ss, conductor_id, empresa_id))
+                              vencimiento_ss, telefono or None, email or None, conductor_id, empresa_id))
                         
-                        # Correcciones SIM-018, SIM-019, SIM-020: Aislamiento Multi-Tenant asegurado en la actualización de archivos
+                        # Actualización de archivos
                         if r_ced: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_cedula=%s WHERE id=%s AND id_empresa=%s", (r_ced, conductor_id, empresa_id))
                         if r_lic: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_licencia=%s WHERE id=%s AND id_empresa=%s", (r_lic, conductor_id, empresa_id))
                         if r_ss: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_seguridad_social=%s WHERE id=%s AND id_empresa=%s", (r_ss, conductor_id, empresa_id))
                         
-                        # Actualizar usuario relacionado
-                        cur.execute("UPDATE usuarios SET nombre=%s, telegram_id=%s WHERE cedula=%s AND empresa_id=%s", (nombre, telegram_id or None, cedula, empresa_id))
+                        # Actualizar usuario relacionado (Forzando telegram_id a NULL y gestionando password)
+                        if password:
+                            hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+                            cur.execute("""
+                                UPDATE usuarios 
+                                SET nombre=%s, telefono=%s, email=%s, password=%s, telegram_id=NULL 
+                                WHERE cedula=%s AND empresa_id=%s AND perfil='operador_flotaespecial'
+                            """, (nombre, telefono or None, email or None, hashed_pw, cedula, nit_empresa))
+                        else:
+                            cur.execute("""
+                                UPDATE usuarios 
+                                SET nombre=%s, telefono=%s, email=%s, telegram_id=NULL 
+                                WHERE cedula=%s AND empresa_id=%s AND perfil='operador_flotaespecial'
+                            """, (nombre, telefono or None, email or None, cedula, nit_empresa))
 
                         mysql.connection.commit()
                         flash(f"Expediente del conductor {nombre} actualizado.", "success")
@@ -188,7 +222,7 @@ def gestion_conductores():
             cedula_eliminar = request.form.get('cedula')
             try:
                 cur.execute("DELETE FROM conductores_flotaespecial WHERE id = %s AND id_empresa = %s", (conductor_id, empresa_id))
-                cur.execute("DELETE FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula_eliminar, empresa_id))
+                cur.execute("DELETE FROM usuarios WHERE cedula = %s AND empresa_id = %s AND perfil = 'operador_flotaespecial'", (cedula_eliminar, nit_empresa))
                 mysql.connection.commit()
                 flash("Conductor eliminado permanentemente de la flota y del sistema de usuarios.", "success")
             except Exception as e:
@@ -201,10 +235,10 @@ def gestion_conductores():
     cur.execute("""
         SELECT c.*, u.telegram_id 
         FROM conductores_flotaespecial c
-        LEFT JOIN usuarios u ON c.cedula = u.cedula AND c.id_empresa = u.empresa_id
+        LEFT JOIN usuarios u ON c.cedula COLLATE utf8mb4_unicode_ci = u.cedula COLLATE utf8mb4_unicode_ci AND (c.id_empresa = u.empresa_id OR u.empresa_id = %s)
         WHERE c.id_empresa = %s 
         ORDER BY c.nombre ASC
-    """, (empresa_id,))
+    """, (nit_empresa, empresa_id))
     conductores_db = cur.fetchall()
     cur.close()
 
@@ -223,6 +257,7 @@ def gestion_conductores():
 def visor_conductor_individual():
     empresa_id = session.get('empresa_id')
     cedula_busqueda = request.args.get('cedula', '').strip()
+    nit_empresa = session.get('nit')
     
     if not cedula_busqueda:
         return jsonify({'success': False, 'message': 'Cédula no proporcionada.'})
@@ -231,9 +266,9 @@ def visor_conductor_individual():
     cur.execute("""
         SELECT c.*, u.telegram_id 
         FROM conductores_flotaespecial c
-        LEFT JOIN usuarios u ON c.cedula = u.cedula AND c.id_empresa = u.empresa_id
+        LEFT JOIN usuarios u ON c.cedula COLLATE utf8mb4_unicode_ci = u.cedula COLLATE utf8mb4_unicode_ci AND (c.id_empresa = u.empresa_id OR u.empresa_id = %s)
         WHERE c.cedula = %s AND c.id_empresa = %s LIMIT 1
-    """, (cedula_busqueda, empresa_id))
+    """, (nit_empresa, cedula_busqueda, empresa_id))
     conductor = cur.fetchone()
     cur.close()
 
