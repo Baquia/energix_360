@@ -70,9 +70,10 @@ def _obtener_datos_base():
 def _validar_acceso_submodulo(roles_permitidos):
     """Valida si el perfil en sesión tiene acceso al submódulo o si es Super-Webmaster"""
     perfil = str(session.get('perfil', '')).strip().lower()
+    empresa_id = str(session.get('empresa_id', '')).strip()
     
     # Perfiles super-administradores con acceso universal
-    if perfil in ['webmaster', 'webmaster_admin', 'admin_general'] or session.get('empresa_id') == '901811727':
+    if perfil in ['webmaster', 'webmaster_admin', 'admin_general'] or empresa_id == '901811727':
         return True
         
     return perfil in roles_permitidos
