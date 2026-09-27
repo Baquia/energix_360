@@ -1120,7 +1120,6 @@ def generar_qrs_pdf():
 # ==============================================================================
 # RUTAS DE ADMINISTRACIÓN: OBTENER, ANÁLISIS Y APROBACIÓN (CORREGIDAS)
 # ==============================================================================
-
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/obtener_solicitudes_pendientes', methods=['POST'])
 @login_required_custom
@@ -1129,7 +1128,8 @@ def admin_obtener_solicitudes():
     BANDEJA DE ENTRADA de Aprobaciones para el Webmaster o Supervisores
     """
     try:
-        empresa_id_req = request.get_json().get('empresa_id')
+        data = request.get_json(silent=True) or {}
+        empresa_id_req = data.get('empresa_id')
         session_id = str(session.get('empresa_id', '')).strip()
         empresa_id = empresa_id_req if empresa_id_req else session_id
 
@@ -1139,9 +1139,11 @@ def admin_obtener_solicitudes():
         cur = mysql.connection.cursor()
         
         # VALIDACIÓN MULTI-TENANT INTELIGENTE PARA LECTURA DE LISTA
-        if session_id == '901811727' and not empresa_id_req:
+        es_webmaster = (session_id == '901811727')
+        filtrar_empresa_especifica = bool(empresa_id_req and str(empresa_id_req).strip() != '901811727')
+
+        if es_webmaster and not filtrar_empresa_especifica:
             # Si es el Webmaster y no filtró una empresa en particular, mostrar TODOS los pendientes
-            # CORRECCIÓN: Colaciones explícitas en subconsultas
             sql = """
                 SELECT 
                     p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
@@ -1150,22 +1152,37 @@ def admin_obtener_solicitudes():
                     (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
                 FROM pedidos_gas_glp p 
                 WHERE p.estatus_flujo = 'pendiente_aprobacion' 
-                  AND p.estatus = 'generado'
                 ORDER BY p.fecha_registro DESC
             """
             cur.execute(sql)
         else:
-            # Si envió un NIT o es un supervisor de cliente, filtramos
-            cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1", (empresa_id,))
-            row_emp = cur.fetchone()
-            if not row_emp:
-                cur.close()
-                return jsonify({"success": False, "message": "Empresa no encontrada."})
+            # Si envió un NIT o es un supervisor de cliente, recolectamos variantes de nombre
+            nombres_posibles = set()
+            
+            cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s OR id_empresa = %s", (empresa_id, empresa_id))
+            for row in cur.fetchall():
+                val = row['nombre_comercial'] if isinstance(row, dict) else row[0]
+                if val: nombres_posibles.add(val.strip())
                 
-            empresa_nombre = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
+            cur.execute("SELECT DISTINCT empresa FROM cardex_glp WHERE id_empresa = %s", (empresa_id,))
+            for row in cur.fetchall():
+                val = row['empresa'] if isinstance(row, dict) else row[0]
+                if val: nombres_posibles.add(val.strip())
 
-            # CORRECCIÓN: Colaciones explícitas en subconsultas y en el filtro WHERE
-            sql = """
+            if session.get('empresa'):
+                nombres_posibles.add(session.get('empresa').strip())
+
+            if not nombres_posibles:
+                nombres_posibles.add(str(empresa_id))
+
+            lista_upper = [n.upper() for n in nombres_posibles]
+            lista_clean = [n.upper().replace('.', '').replace(' ', '') for n in nombres_posibles]
+
+            placeholders_1 = ', '.join(['%s'] * len(lista_upper))
+            placeholders_2 = ', '.join(['%s'] * len(lista_clean))
+
+            # Consulta SQL flexible e inmune a diferencias de puntos, espacios o Collation
+            sql = f"""
                 SELECT 
                     p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
                     (SELECT dias_operacion FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
@@ -1173,11 +1190,13 @@ def admin_obtener_solicitudes():
                     (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
                 FROM pedidos_gas_glp p 
                 WHERE p.estatus_flujo = 'pendiente_aprobacion' 
-                  AND p.estatus = 'generado'
-                  AND TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(%s)) COLLATE utf8mb4_general_ci
+                  AND (
+                      TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci IN ({placeholders_1})
+                      OR REPLACE(REPLACE(TRIM(UPPER(p.cliente)), '.', ''), ' ', '') COLLATE utf8mb4_general_ci IN ({placeholders_2})
+                  )
                 ORDER BY p.fecha_registro DESC
             """
-            cur.execute(sql, (empresa_nombre,))
+            cur.execute(sql, tuple(lista_upper + lista_clean))
             
         rows = cur.fetchall()
         items = []
@@ -1189,17 +1208,16 @@ def admin_obtener_solicitudes():
             if rd.get('nivel tk-1') is not None: 
                 tk_info.append({"numero": "Ref", "nivel": rd.get('nivel tk-1'), "foto": rd.get('testigo nivel tk-1')})
             
-            # CORRECCIÓN: Exportamos la variable nivel_solicitado y solicitado para soportar ambas vistas
             items.append({
                 "id": rd.get('id'), 
                 "fecha": str(rd.get('fecha_registro')), 
                 "cliente": rd.get('cliente'), 
                 "ubicacion": rd.get('ubicacion'), 
                 "lote": rd.get('lote'), 
-                "dias_operacion": rd.get('dias_operacion'), 
+                "dias_operacion": rd.get('dias_operacion') if rd.get('dias_operacion') is not None else 0, 
                 "nivel_solicitado": float(rd.get('nivel_solicitado') or 0), 
                 "solicitado": float(rd.get('nivel_solicitado') or 0),
-                "dias_extra": rd.get('dias_extra'), 
+                "dias_extra": rd.get('dias_extra') if rd.get('dias_extra') is not None else 0, 
                 "tanques": tk_info
             })
         cur.close()
@@ -1207,7 +1225,6 @@ def admin_obtener_solicitudes():
     except Exception as e: 
         print("❌ Error de lectura solicitudes pendientes:\n", traceback.format_exc())
         return jsonify({"success": False, "message": str(e)})
-
 
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/analizar_proyeccion', methods=['POST'])
