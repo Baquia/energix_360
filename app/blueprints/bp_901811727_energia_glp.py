@@ -901,7 +901,9 @@ def obtener_alertas_ruptura_validacion():
             FROM pedidos_gas_glp p
             WHERE p.estatus = 'validado'
               AND p.fecha_validacion >= '2026-04-30'
-              AND p.cliente = (SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1)
+              AND TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = (
+                  SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+              )
               AND p.codigo_pedido COLLATE utf8mb4_general_ci NOT IN (
                   SELECT codigo_pedido COLLATE utf8mb4_general_ci 
                   FROM cardex_glp 
@@ -1116,203 +1118,7 @@ def generar_qrs_pdf():
         return jsonify({'success': False, 'message': f'Error interno: {str(e)}'}), 500
 
 # ==============================================================================
-# UTILIDADES Y OPERACIONES
-# ==============================================================================
-
-@csrf.exempt
-@bp_energia_glp.route('/glp/admin/rechazar_solicitud', methods=['POST'])
-@login_required_custom
-def rechazar_solicitud():
-    try:
-        data = request.get_json()
-        id_solicitud = data.get('id')
-        
-        if not id_solicitud:
-            return jsonify({"success": False, "message": "ID de solicitud requerido."}), 400
-
-        cur = mysql.connection.cursor()
-        
-        query = """
-            UPDATE pedidos_gas_glp 
-            SET estatus_flujo = 'rechazado' 
-            WHERE id = %s
-        """
-        cur.execute(query, (id_solicitud,))
-        mysql.connection.commit()
-        cur.close()
-
-        return jsonify({"success": True, "message": "Solicitud anulada correctamente."})
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "message": str(e)}), 500
-
-@csrf.exempt
-@bp_energia_glp.route('/ejecutar_limpieza_automatica')
-@login_required_custom
-def ejecutar_limpieza_automatica():
-    dias_limite = 60
-    total_borrados = 0
-    base_dir = current_app.static_folder
-    
-    cur = mysql.connection.cursor()
-    try:
-        cur.execute(f"""
-            SELECT * FROM cardex_glp 
-            WHERE fecha < DATE_SUB(NOW(), INTERVAL {dias_limite} DAY)
-        """)
-        filas_glp = cur.fetchall()
-        cols_glp = [desc[0] for desc in cur.description] if filas_glp else []
-
-        for fila in filas_glp:
-            row = dict(zip(cols_glp, fila)) if not isinstance(fila, dict) else fila
-            rutas_glp = []
-            cols_update_glp = []
-
-            for col, val in row.items():
-                if val and isinstance(val, str) and 'testigo' in col.lower():
-                    rutas_glp.append(val.strip())
-                    cols_update_glp.append(col)
-            
-            if rutas_glp:
-                count = _borrar_evidencias_tanqueo(rutas_glp) 
-                total_borrados += (count or 0) # En esta migración, _borrar_evidencias no retorna count, así que lo ignoramos
-            
-            if cols_update_glp:
-                set_clause = ", ".join([f"`{c}` = NULL" for c in cols_update_glp])
-                cur.execute(f"UPDATE cardex_glp SET {set_clause} WHERE id = %s", (row['id'],))
-
-        mysql.connection.commit()
-        mensaje = f"Mantenimiento de GLP completado. Se limpiaron evidencias antiguas."
-        return jsonify({'success': True, 'message': mensaje})
-
-    except Exception as e:
-        print(f"⚠️ Error en limpieza automática: {e}")
-        return jsonify({'success': False, 'message': str(e)})
-    finally:
-        cur.close()
-
-@bp_energia_glp.route('/util/recalcular_historico')
-@login_required_custom
-def recalcular_historico_glp():
-    try:
-        cur = mysql.connection.cursor()
-        
-        cur.execute("SELECT DISTINCT lote FROM cardex_glp WHERE lote IS NOT NULL")
-        lotes_raw = cur.fetchall()
-        lotes = [row['lote'] if isinstance(row, dict) else row[0] for row in lotes_raw]
-        
-        registros_actualizados = 0
-        
-        for lote in lotes:
-            cur.execute("""
-                SELECT pollitos FROM cardex_glp 
-                WHERE lote=%s AND operacion='inicio_calefaccion' LIMIT 1
-            """, (lote,))
-            row_p = cur.fetchone()
-            
-            pollitos = 0
-            if row_p:
-                pollitos = row_p.get('pollitos') if isinstance(row_p, dict) else row_p[0]
-            
-            if not pollitos or float(pollitos) <= 0:
-                continue
-                
-            cur.execute("""
-                SELECT id, COALESCE(neto_gastado, 0) as neto 
-                FROM cardex_glp 
-                WHERE lote=%s 
-                ORDER BY id ASC
-            """, (lote,))
-            registros = cur.fetchall()
-            
-            consumo_acumulado = 0.0
-            
-            for reg in registros:
-                r_id = reg['id'] if isinstance(reg, dict) else reg[0]
-                r_neto = float(reg['neto'] if isinstance(reg, dict) else reg[1])
-                
-                consumo_acumulado += r_neto
-                nuevo_kg_pollito = consumo_acumulado / float(pollitos)
-                
-                cur.execute("UPDATE cardex_glp SET kg_pollito=%s WHERE id=%s", (nuevo_kg_pollito, r_id))
-                registros_actualizados += 1
-                
-        mysql.connection.commit()
-        cur.close()
-        
-        return jsonify({
-            "success": True, 
-            "message": f"¡Éxito! Se han recalculado y corregido {registros_actualizados} registros históricos."
-        })
-
-    except Exception as e:
-        mysql.connection.rollback()
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "error": str(e)})
-
-@csrf.exempt
-@bp_energia_glp.route('/obtener_pendientes_tanqueo_reporte', methods=['POST'])
-@login_required_custom
-def obtener_pendientes_tanqueo_reporte():
-    empresa_id = request.get_json().get('empresa_id')
-    if not empresa_id:
-        return jsonify({"success": False, "message": "ID Empresa requerido"})
-
-    try:
-        cur = mysql.connection.cursor()
-        
-        cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
-        row_emp = cur.fetchone()
-        if not row_emp:
-            return jsonify({"success": False, "message": "Empresa no encontrada"})
-            
-        nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
-
-        sql = """
-            SELECT 
-                p.id,
-                p.fecha_registro,
-                p.ubicacion,
-                p.proveedor,
-                p.nivel_solicitado,
-                p.codigo_pedido,
-                DATEDIFF(NOW(), p.fecha_registro) as dias_retraso
-            FROM pedidos_gas_glp p
-            WHERE TRIM(UPPER(p.cliente)) = TRIM(UPPER(%s))
-              AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
-              AND p.fecha_registro >= '2026-04-30'
-            ORDER BY dias_retraso DESC
-        """
-        cur.execute(sql, (nombre_empresa,))
-        rows = cur.fetchall()
-        
-        pendientes = []
-        col_names = [d[0] for d in cur.description] if cur.description else []
-        
-        for r in rows:
-            rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
-            pendientes.append({
-                "id": rd.get('id'),
-                "fecha": str(rd.get('fecha_registro')),
-                "ubicacion": rd.get('ubicacion'),
-                "proveedor": rd.get('proveedor'),
-                "solicitado": float(rd.get('nivel_solicitado') or 0),
-                "codigo": rd.get('codigo_pedido'),
-                "dias": int(rd.get('dias_retraso') or 0)
-            })
-
-        cur.close()
-        return jsonify({"success": True, "items": pendientes})
-
-    except Exception as e:
-        print("Error reporte pendientes:", str(e))
-        return jsonify({"success": False, "message": str(e)})
-    
-# ==============================================================================
-# RUTAS RESTAURADAS Y BLINDADAS: PROYECCIÓN Y APROBACIÓN GLP
+# NUEVAS RUTAS DE ADMINISTRACIÓN: ANÁLISIS, APROBACIÓN Y RECHAZO
 # ==============================================================================
 
 @csrf.exempt
@@ -1327,7 +1133,7 @@ def admin_analizar_proyeccion():
     try:
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT ESTRICTA (Con TRIM y UPPER para evitar fallos por espacios)
+        # VALIDACIÓN MULTI-TENANT ESTRICTA (Con TRIM, UPPER y COLLATE)
         cur.execute("""
             SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
             FROM pedidos_gas_glp 
@@ -1437,7 +1243,7 @@ def admin_aprobar_solicitud():
     try:
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT (Con TRIM y UPPER)
+        # VALIDACIÓN MULTI-TENANT
         cur.execute("""
             SELECT id FROM pedidos_gas_glp 
             WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
@@ -1486,7 +1292,7 @@ def rechazar_solicitud():
 
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT (Con TRIM y UPPER)
+        # VALIDACIÓN MULTI-TENANT ESTRICTA CON ÚNICA FUNCIÓN
         cur.execute("""
             SELECT id FROM pedidos_gas_glp 
             WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
@@ -1517,7 +1323,6 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
     try:
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT ESTRICTA (Con TRIM y UPPER)
         cur.execute("""
             SELECT cliente, ubicacion, lote, codigo_pedido, proveedor 
             FROM pedidos_gas_glp 
@@ -1634,3 +1439,169 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
     except Exception as e:
         print(f"⛔ Error enviando correo GLP: {e}")
         return False
+
+# ==============================================================================
+# UTILIDADES Y OPERACIONES
+# ==============================================================================
+
+@csrf.exempt
+@bp_energia_glp.route('/ejecutar_limpieza_automatica')
+@login_required_custom
+def ejecutar_limpieza_automatica():
+    dias_limite = 60
+    total_borrados = 0
+    base_dir = current_app.static_folder
+    
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute(f"""
+            SELECT * FROM cardex_glp 
+            WHERE fecha < DATE_SUB(NOW(), INTERVAL {dias_limite} DAY)
+        """)
+        filas_glp = cur.fetchall()
+        cols_glp = [desc[0] for desc in cur.description] if filas_glp else []
+
+        for fila in filas_glp:
+            row = dict(zip(cols_glp, fila)) if not isinstance(fila, dict) else fila
+            rutas_glp = []
+            cols_update_glp = []
+
+            for col, val in row.items():
+                if val and isinstance(val, str) and 'testigo' in col.lower():
+                    rutas_glp.append(val.strip())
+                    cols_update_glp.append(col)
+            
+            if rutas_glp:
+                _borrar_evidencias_tanqueo(rutas_glp) 
+            
+            if cols_update_glp:
+                set_clause = ", ".join([f"`{c}` = NULL" for c in cols_update_glp])
+                cur.execute(f"UPDATE cardex_glp SET {set_clause} WHERE id = %s", (row['id'],))
+
+        mysql.connection.commit()
+        mensaje = f"Mantenimiento de GLP completado. Se limpiaron evidencias antiguas."
+        return jsonify({'success': True, 'message': mensaje})
+
+    except Exception as e:
+        print(f"⚠️ Error en limpieza automática: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+
+@bp_energia_glp.route('/util/recalcular_historico')
+@login_required_custom
+def recalcular_historico_glp():
+    try:
+        cur = mysql.connection.cursor()
+        
+        cur.execute("SELECT DISTINCT lote FROM cardex_glp WHERE lote IS NOT NULL")
+        lotes_raw = cur.fetchall()
+        lotes = [row['lote'] if isinstance(row, dict) else row[0] for row in lotes_raw]
+        
+        registros_actualizados = 0
+        
+        for lote in lotes:
+            cur.execute("""
+                SELECT pollitos FROM cardex_glp 
+                WHERE lote=%s AND operacion='inicio_calefaccion' LIMIT 1
+            """, (lote,))
+            row_p = cur.fetchone()
+            
+            pollitos = 0
+            if row_p:
+                pollitos = row_p.get('pollitos') if isinstance(row_p, dict) else row_p[0]
+            
+            if not pollitos or float(pollitos) <= 0:
+                continue
+                
+            cur.execute("""
+                SELECT id, COALESCE(neto_gastado, 0) as neto 
+                FROM cardex_glp 
+                WHERE lote=%s 
+                ORDER BY id ASC
+            """, (lote,))
+            registros = cur.fetchall()
+            
+            consumo_acumulado = 0.0
+            
+            for reg in registros:
+                r_id = reg['id'] if isinstance(reg, dict) else reg[0]
+                r_neto = float(reg['neto'] if isinstance(reg, dict) else reg[1])
+                
+                consumo_acumulado += r_neto
+                nuevo_kg_pollito = consumo_acumulado / float(pollitos)
+                
+                cur.execute("UPDATE cardex_glp SET kg_pollito=%s WHERE id=%s", (nuevo_kg_pollito, r_id))
+                registros_actualizados += 1
+                
+        mysql.connection.commit()
+        cur.close()
+        
+        return jsonify({
+            "success": True, 
+            "message": f"¡Éxito! Se han recalculado y corregido {registros_actualizados} registros históricos."
+        })
+
+    except Exception as e:
+        mysql.connection.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)})
+
+@csrf.exempt
+@bp_energia_glp.route('/obtener_pendientes_tanqueo_reporte', methods=['POST'])
+@login_required_custom
+def obtener_pendientes_tanqueo_reporte():
+    empresa_id = request.get_json().get('empresa_id')
+    if not empresa_id:
+        return jsonify({"success": False, "message": "ID Empresa requerido"})
+
+    try:
+        cur = mysql.connection.cursor()
+        
+        cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
+        row_emp = cur.fetchone()
+        if not row_emp:
+            return jsonify({"success": False, "message": "Empresa no encontrada"})
+            
+        nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
+
+        sql = """
+            SELECT 
+                p.id,
+                p.fecha_registro,
+                p.ubicacion,
+                p.proveedor,
+                p.nivel_solicitado,
+                p.codigo_pedido,
+                DATEDIFF(NOW(), p.fecha_registro) as dias_retraso
+            FROM pedidos_gas_glp p
+            WHERE TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(%s)) COLLATE utf8mb4_general_ci
+              AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
+              AND p.fecha_registro >= '2026-04-30'
+            ORDER BY dias_retraso DESC
+        """
+        cur.execute(sql, (nombre_empresa,))
+        rows = cur.fetchall()
+        
+        pendientes = []
+        col_names = [d[0] for d in cur.description] if cur.description else []
+        
+        for r in rows:
+            rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
+            pendientes.append({
+                "id": rd.get('id'),
+                "fecha": str(rd.get('fecha_registro')),
+                "ubicacion": rd.get('ubicacion'),
+                "proveedor": rd.get('proveedor'),
+                "solicitado": float(rd.get('nivel_solicitado') or 0),
+                "codigo": rd.get('codigo_pedido'),
+                "dias": int(rd.get('dias_retraso') or 0)
+            })
+
+        cur.close()
+        return jsonify({"success": True, "items": pendientes})
+
+    except Exception as e:
+        print("Error reporte pendientes:", str(e))
+        return jsonify({"success": False, "message": str(e)})
