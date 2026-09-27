@@ -1311,7 +1311,9 @@ def obtener_pendientes_tanqueo_reporte():
         print("Error reporte pendientes:", str(e))
         return jsonify({"success": False, "message": str(e)})
     
+# ==============================================================================
 # RUTAS RESTAURADAS Y BLINDADAS: PROYECCIÓN Y APROBACIÓN GLP
+# ==============================================================================
 
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/analizar_proyeccion', methods=['POST'])
@@ -1324,7 +1326,7 @@ def admin_analizar_proyeccion():
     try:
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT ESTRICTA: Aseguramos que el pedido pertenezca a la empresa del usuario
+        # VALIDACIÓN MULTI-TENANT ESTRICTA: Aseguramos que el pedido pertenezca a la empresa
         cur.execute("""
             SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
             FROM pedidos_gas_glp 
@@ -1515,7 +1517,7 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
         nivel_objetivo = nivel_actual_promedio + delta_aprobado
         if nivel_objetivo > 80.0: nivel_objetivo = 80.0
         
-        cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor=%s AND id_empresa=%s", (prov, empresa_id))
+        cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor=%s", (prov,))
         pdat = cur.fetchone()
         cur.close()
         
