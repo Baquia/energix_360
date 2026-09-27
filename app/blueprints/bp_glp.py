@@ -2947,16 +2947,14 @@ def solicitar_pedido_manual():
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"}), 500
       
 @csrf.exempt
-@bp_glp.route('/admin/obtener_solicitudes_pendientes', methods=['GET', 'POST']) # 1. Habilitar POST
+@bp_glp.route('/admin/obtener_solicitudes_pendientes', methods=['GET', 'POST'])
 @login_required_custom
 def admin_obtener_solicitudes():
     try:
-        # =========================================================
-        # 2. CAPTURAR EL ID DE LA EMPRESA (El Cerebro Multi/Single-Tenant)
-        # =========================================================
         empresa_id = None
+        session_id = str(session.get('empresa_id', '')).strip()
         
-        # Prioridad A: Lo que manda el Frontend (Webmaster)
+        # Prioridad A: Lo que manda el Frontend (Webmaster o Supervisor)
         if request.is_json:
             data = request.get_json(silent=True)
             if data:
@@ -2971,32 +2969,45 @@ def admin_obtener_solicitudes():
 
         cur = mysql.connection.cursor()
 
-        # =========================================================
-        # 3. TRADUCIR NIT A NOMBRE COMERCIAL (La tabla pedidos usa nombre)
-        # =========================================================
-        cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
-        row_emp = cur.fetchone()
-        if not row_emp:
-            cur.close()
-            return jsonify({"success": False, "message": "Empresa no encontrada."})
-            
-        empresa_nombre = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
+        # Validación multi-tenant especial para Webmaster (NIT 901811727) cuando no filtra una empresa en particular
+        if session_id == '901811727' and not (request.is_json and request.get_json(silent=True) and request.get_json(silent=True).get('empresa_id')):
+            sql = """
+                SELECT 
+                    p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
+                    (SELECT dias_operacion FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
+                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
+                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
+                FROM pedidos_gas_glp p 
+                WHERE p.estatus_flujo = 'pendiente_aprobacion' 
+                  AND p.estatus = 'generado'
+                ORDER BY p.fecha_registro DESC
+            """
+            cur.execute(sql)
+        else:
+            # Traducir el NIT enviado o de sesión a Nombre Comercial de la empresa
+            cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1", (empresa_id,))
+            row_emp = cur.fetchone()
+            if not row_emp:
+                cur.close()
+                return jsonify({"success": False, "message": "Empresa no encontrada."})
+                
+            empresa_nombre = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
 
-        # =========================================================
-        # 4. CONSULTA SQL BLINDADA (Filtro por cliente)
-        # =========================================================
-        sql = """
-            SELECT 
-                p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
-                (SELECT dias_operacion FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
-                (SELECT `nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
-                (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
-            FROM pedidos_gas_glp p 
-            WHERE p.estatus_flujo = 'pendiente_aprobacion' 
-              AND TRIM(UPPER(p.cliente)) = TRIM(UPPER(%s)) -- <-- EL FILTRO CLAVE
-            ORDER BY p.fecha_registro DESC
-        """
-        cur.execute(sql, (empresa_nombre,))
+            # Consulta blindada con unificación explícita de Collation (utf8mb4_general_ci)
+            sql = """
+                SELECT 
+                    p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
+                    (SELECT dias_operacion FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
+                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
+                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
+                FROM pedidos_gas_glp p 
+                WHERE p.estatus_flujo = 'pendiente_aprobacion' 
+                  AND p.estatus = 'generado'
+                  AND TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(%s)) COLLATE utf8mb4_general_ci
+                ORDER BY p.fecha_registro DESC
+            """
+            cur.execute(sql, (empresa_nombre,))
+
         rows = cur.fetchall()
         items = []
         col_names = [d[0] for d in cur.description] if cur.description else []
@@ -3015,6 +3026,7 @@ def admin_obtener_solicitudes():
                 "lote": rd.get('lote'), 
                 "dias_operacion": rd.get('dias_operacion'), 
                 "nivel_solicitado": float(rd.get('nivel_solicitado') or 0), 
+                "solicitado": float(rd.get('nivel_solicitado') or 0),
                 "dias_extra": rd.get('dias_extra'), 
                 "tanques": tk_info
             })
@@ -3023,7 +3035,7 @@ def admin_obtener_solicitudes():
     except Exception as e: 
         print("❌ Error de lectura solicitudes:", e)
         return jsonify({"success": False, "message": str(e)})
-
+    
 # ==========================================
 # RUTAS DE ADMIN Y APROBACIÓN (CORREGIDAS)
 # ==========================================

@@ -1150,6 +1150,7 @@ def admin_obtener_solicitudes():
                     (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
                 FROM pedidos_gas_glp p 
                 WHERE p.estatus_flujo = 'pendiente_aprobacion' 
+                  AND p.estatus = 'generado'
                 ORDER BY p.fecha_registro DESC
             """
             cur.execute(sql)
@@ -1172,6 +1173,7 @@ def admin_obtener_solicitudes():
                     (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
                 FROM pedidos_gas_glp p 
                 WHERE p.estatus_flujo = 'pendiente_aprobacion' 
+                  AND p.estatus = 'generado'
                   AND TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(%s)) COLLATE utf8mb4_general_ci
                 ORDER BY p.fecha_registro DESC
             """
@@ -1203,7 +1205,7 @@ def admin_obtener_solicitudes():
         cur.close()
         return jsonify({"success": True, "items": items})
     except Exception as e: 
-        print("❌ Error de lectura solicitudes pendientes:", e)
+        print("❌ Error de lectura solicitudes pendientes:\n", traceback.format_exc())
         return jsonify({"success": False, "message": str(e)})
 
 
