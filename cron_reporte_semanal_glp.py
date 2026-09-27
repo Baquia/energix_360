@@ -13,31 +13,26 @@ project_home = '/home/baquiasoft/energix_360'
 if project_home not in sys.path:
     sys.path.insert(0, project_home)
 
-# 2. Cargar variables de entorno inyectadas en el WSGI (Arquitectura Limpia)
-# Esto garantiza que el Cron lea las mismas credenciales de correo que la App Web.
+# 2. Cargar variables de entorno del WSGI de forma segura (sin ejecutar la app)
 wsgi_path = '/var/www/baquiasoft_pythonanywhere_com_wsgi.py'
 if os.path.exists(wsgi_path):
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("wsgi", wsgi_path)
-    wsgi_module = importlib.util.module_from_spec(spec)
     try:
-        spec.loader.exec_module(wsgi_module)
+        with open(wsgi_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip().startswith('os.environ'):
+                    exec(line.strip())
     except Exception as e:
-        print(f"⚠️ Aviso: No se pudo cargar wsgi.py directamente ({e})")
+        print(f"⚠️ Aviso al leer wsgi.py: {e}")
 
 # 3. Importar la factoría de la aplicación y la instancia global de MySQL
 from app import create_app, mysql
 
 def generar_reporte_semanal():
-    # Instanciar la aplicación. Esto ejecuta la lógica de __init__.py y 
-    # autoconfigura la conexión a BD según el entorno (EN_PYTHONANYWHERE).
     app = create_app()
     
-    # Ejecutar toda la lógica dentro del Contexto de la Aplicación
     with app.app_context():
         print(f"🚀 INICIANDO REPORTE SEMANAL GLP: {datetime.now()}")
         
-        # Heredar credenciales del entorno
         EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
         EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
         EMAIL_USER = os.environ.get('EMAIL_USER')
@@ -49,13 +44,11 @@ def generar_reporte_semanal():
             print("❌ Error: No se encontraron credenciales SMTP en el entorno.")
             return
 
-        # Ventana de Tiempo (Día 1 del mes hasta ayer)
         hoy = datetime.now()
         fecha_fin = (hoy - timedelta(days=1)).date()
         fecha_inicio = hoy.replace(day=1).date()
         
         try:
-            # Reutilizamos la conexión segura inyectada por Flask-MySQLdb
             cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
             
             cur.execute("SELECT DISTINCT id_empresa, empresa FROM cardex_glp WHERE estatus_lote = 'ACTIVO'")
