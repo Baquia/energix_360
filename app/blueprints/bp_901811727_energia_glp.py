@@ -843,17 +843,19 @@ def obtener_lotes_vencidos():
 
     try:
         cur = mysql.connection.cursor()
+        
+        # Calcula los días reales usando el MAX de dias_operacion y COALESCE para la fecha de inicio
         sql = """
             SELECT 
                 ubicacion, 
                 lote, 
-                MIN(fecha) as fecha_inicio,
-                DATEDIFF(NOW(), MIN(fecha)) as dias_abierto,
+                MIN(COALESCE(fecha_llegada_pollitos, fecha)) as fecha_inicio,
+                MAX(dias_operacion) as dias_abierto,
                 MAX(fecha) as ultima_actividad
             FROM cardex_glp
             WHERE id_empresa = %s AND estatus_lote = 'ACTIVO'
             GROUP BY ubicacion, lote
-            HAVING DATEDIFF(NOW(), MIN(fecha)) > 15
+            HAVING MAX(dias_operacion) > 15
             ORDER BY dias_abierto DESC
         """
         cur.execute(sql, (empresa_id,))
