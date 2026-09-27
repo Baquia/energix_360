@@ -1314,8 +1314,9 @@ def obtener_pendientes_tanqueo_reporte():
 # ==============================================================================
 # RUTAS RESTAURADAS Y BLINDADAS: PROYECCIÓN Y APROBACIÓN GLP
 # ==============================================================================
-# bp_901811727_energia_glp.py
-# (Rutas corregidas con COLLATE explícito para resolver el Error 1267)
+# ==============================================================================
+# RUTAS RESTAURADAS Y BLINDADAS: PROYECCIÓN Y APROBACIÓN GLP
+# ==============================================================================
 
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/analizar_proyeccion', methods=['POST'])
@@ -1323,12 +1324,14 @@ def obtener_pendientes_tanqueo_reporte():
 def admin_analizar_proyeccion():
     data = request.get_json(force=True) or {}
     ped_id = data.get('id')
-    empresa_id = session.get('empresa_id')
+    # Capturamos el empresa_id del cliente enviado por el Webmaster
+    empresa_id_req = data.get('empresa_id')
+    empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
     
     try:
         cur = mysql.connection.cursor()
         
-        # SOLUCIÓN ERROR 1267: COLLATE explícito para evitar mezcla ilegal en subconsulta
+        # VALIDACIÓN MULTI-TENANT ESTRICTA (Con COLLATE corregido)
         cur.execute("""
             SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
             FROM pedidos_gas_glp 
@@ -1353,10 +1356,7 @@ def admin_analizar_proyeccion():
             solicitado = float(head[3] or 0)
             dias_extra = int(head[4] or 0)
         
-        cur.execute("""
-            SELECT fecha, `nivel tk-1` FROM cardex_glp 
-            WHERE lote=%s ORDER BY fecha DESC LIMIT 5
-        """, (lote,))
+        cur.execute("SELECT fecha, `nivel tk-1` FROM cardex_glp WHERE lote=%s ORDER BY fecha DESC LIMIT 5", (lote,))
         rows_hist = cur.fetchall()
         
         tasa = 8.0 
@@ -1435,18 +1435,17 @@ def admin_aprobar_solicitud():
     data = request.get_json(force=True) or {}
     ped_id = data.get('id')
     nivel = data.get('nivel_aprobado')
-    empresa_id = session.get('empresa_id')
+    empresa_id_req = data.get('empresa_id')
+    empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
     
     try:
         cur = mysql.connection.cursor()
         
-        # SOLUCIÓN ERROR 1267: COLLATE explícito
+        # VALIDACIÓN MULTI-TENANT
         cur.execute("""
             SELECT id FROM pedidos_gas_glp 
             WHERE id=%s AND cliente COLLATE utf8mb4_general_ci = (
-                SELECT nombre_comercial COLLATE utf8mb4_general_ci 
-                FROM empresas 
-                WHERE nit = %s LIMIT 1
+                SELECT nombre_comercial COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
             )
         """, (ped_id, empresa_id))
         if not cur.fetchone():
@@ -1476,23 +1475,55 @@ def admin_aprobar_solicitud():
         return jsonify({"success": False, "message": str(e)})
 
 
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/rechazar_solicitud', methods=['POST'])
+@login_required_custom
+def rechazar_solicitud():
+    try:
+        data = request.get_json()
+        id_solicitud = data.get('id')
+        empresa_id_req = data.get('empresa_id')
+        empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
+        
+        if not id_solicitud:
+            return jsonify({"success": False, "message": "ID de solicitud requerido."}), 400
+
+        cur = mysql.connection.cursor()
+        
+        # VALIDACIÓN MULTI-TENANT
+        cur.execute("""
+            SELECT id FROM pedidos_gas_glp 
+            WHERE id=%s AND cliente COLLATE utf8mb4_general_ci = (
+                SELECT nombre_comercial COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+            )
+        """, (id_solicitud, empresa_id))
+        if not cur.fetchone():
+            cur.close()
+            return jsonify({"success": False, "message": "Acceso denegado a este registro."})
+        
+        query = "UPDATE pedidos_gas_glp SET estatus_flujo = 'rechazado' WHERE id = %s"
+        cur.execute(query, (id_solicitud,))
+        mysql.connection.commit()
+        cur.close()
+
+        return jsonify({"success": True, "message": "Solicitud anulada correctamente."})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
     if not EMAIL_USER or not EMAIL_PASS:
         return False
 
     try:
         cur = mysql.connection.cursor()
-        
-        # SOLUCIÓN ERROR 1267: COLLATE explícito
         cur.execute("""
             SELECT cliente, ubicacion, lote, codigo_pedido, proveedor 
-            FROM pedidos_gas_glp 
-            WHERE id=%s AND cliente COLLATE utf8mb4_general_ci = (
-                SELECT nombre_comercial COLLATE utf8mb4_general_ci 
-                FROM empresas 
-                WHERE nit = %s LIMIT 1
-            )
-        """, (pedido_id, empresa_id))
+            FROM pedidos_gas_glp WHERE id=%s
+        """, (pedido_id,))
         res = cur.fetchone()
         
         if not res:
@@ -1504,11 +1535,7 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
         else:
             emp, ubi, lot, cod, prov = res[0], res[1], res[2], res[3], res[4]
 
-        cur.execute("""
-            SELECT `nivel tk-1`, `nivel tk-2`, `nivel tk-3`, `nivel tk-4`, `nivel tk-5`, `nivel tk-6` 
-            FROM cardex_glp 
-            WHERE lote = %s ORDER BY id DESC LIMIT 1
-        """, (lot,))
+        cur.execute("SELECT `nivel tk-1`, `nivel tk-2`, `nivel tk-3`, `nivel tk-4`, `nivel tk-5`, `nivel tk-6` FROM cardex_glp WHERE lote = %s ORDER BY id DESC LIMIT 1", (lot,))
         row_niveles = cur.fetchone()
         
         nivel_actual_promedio = 0.0
@@ -1531,7 +1558,7 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
         nivel_objetivo = nivel_actual_promedio + delta_aprobado
         if nivel_objetivo > 80.0: nivel_objetivo = 80.0
         
-        cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor=%s AND id_empresa=%s", (prov, empresa_id))
+        cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor=%s", (prov,))
         pdat = cur.fetchone()
         cur.close()
         
