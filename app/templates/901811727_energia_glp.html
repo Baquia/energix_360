@@ -587,69 +587,6 @@
         }
     }
 
-    // --- MÉTODOS DE APROBACIONES GLP ---
-    function mostrarSeccionAprobacionesGLP(empresaId) {
-        document.querySelectorAll('#glpDashboardContainer .form-section').forEach(el => el.style.display = 'none');
-        document.getElementById('seccionAprobacionesGLP').style.display = 'block';
-        cargarAprobacionesGLP(empresaId);
-    }
-
-    function cargarAprobacionesGLP(empresaId) {
-        const tbody = document.getElementById('tablaAprobacionesGLP');
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border text-primary"></div></td></tr>';
-
-        // La ruta original del monolito usa /glp/admin/obtener_solicitudes_pendientes. 
-        // Asumiendo que ahora debe apuntar a la ruta que configuramos en bp_901811727_energia_glp.py.
-        // Si no existe, se usa la que devuelve los pendientes (obtener_pendientes_tanqueo_reporte).
-        fetch('/obtener_pendientes_tanqueo_reporte', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: empresaId }) })
-        .then(r => r.json()).then(data => {
-            tbody.innerHTML = '';
-            if (!data.success || data.items.length === 0) { document.getElementById('msgSinAprobaciones').style.display = 'block'; return; }
-            document.getElementById('msgSinAprobaciones').style.display = 'none';
-
-            data.items.forEach(item => {
-                let maxNivel = 0; let htmlTanques = '<div class="d-flex gap-2">';
-                // Para efectos de renderizado, si item.tanques no existe en esta API nueva, mostramos info genérica.
-                if(item.tanques) {
-                    item.tanques.forEach(t => {
-                        if (t.nivel > maxNivel) maxNivel = t.nivel; 
-                        let color = t.nivel <= 25 ? 'text-danger fw-bold' : '';
-                        htmlTanques += `<div class="border p-1 rounded text-center" style="min-width:60px;"><div class="small fw-bold">${t.numero}</div><div class="${color}">${t.nivel}%</div></div>`;
-                    });
-                } else { htmlTanques += `<div class="small text-muted">Evaluar Proyección</div>`; }
-                htmlTanques += '</div>';
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${item.fecha.substring(0, 16)}</td>
-                    <td><div class="fw-bold">${item.cliente || item.proveedor}</div><div class="small text-muted">${item.ubicacion}</div></td>
-                    <td><div>${item.codigo || '-'}</div></td>
-                    <td>${htmlTanques}</td>
-                    <td class="text-center"><div class="fs-5 fw-bold text-success">${item.solicitado || item.nivel_solicitado}%</div><div class="small text-muted">Llenar hasta</div></td>
-                    <td class="text-center">
-                        <div class="d-flex justify-content-center gap-2">
-                            <button class="btn btn-danger btn-sm fw-bold" title="Anular" onclick="rechazarSolicitudGLP(${item.id}, this)">❌ Rechazar</button>
-                            <button class="btn btn-primary btn-sm fw-bold" onclick="abrirSimuladorProyeccion(${item.id})">📈 Analizar Simulación</button>
-                        </div>
-                    </td>`;
-                tbody.appendChild(tr);
-            });
-        });
-    }
-
-    function rechazarSolicitudGLP(id, btn) {
-        if (!confirm("¿Está seguro de anular esta solicitud?")) return;
-        btn.disabled = true; btn.textContent = "⏳";
-        fetch('/glp/admin/rechazar_solicitud', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
-        .then(r => r.json()).then(data => {
-            if (data.success) {
-                alert("Solicitud anulada.");
-                const fila = btn.closest('tr'); if (fila) fila.remove();
-                if (document.getElementById('tablaAprobacionesGLP').children.length === 0) document.getElementById('msgSinAprobaciones').style.display = 'block';
-            } else { alert("Error: " + data.message); btn.disabled = false; btn.textContent = "❌"; }
-        }).catch(e => { alert("Error de red."); btn.disabled = false; btn.textContent = "❌"; });
-    }
-
     // --- MÉTODOS DE AUDITORÍA Y HERRAMIENTAS EXTRAS ---
     function generarInformeSaldos(empresaId) {
         document.querySelectorAll('#glpDashboardContainer .form-section').forEach(el => el.style.display = 'none');
@@ -769,14 +706,18 @@
         const tbody = document.getElementById('tablaAprobacionesGLP');
         tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border text-primary"></div></td></tr>';
 
-        fetch('/obtener_pendientes_tanqueo_reporte', { 
+        // CORRECCIÓN CRÍTICA: Apuntamos al endpoint de administración real de pendientes de aprobación
+        fetch('/glp/admin/obtener_solicitudes_pendientes', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify({ empresa_id: empresaId }) 
         })
         .then(r => r.json()).then(data => {
             tbody.innerHTML = '';
-            if (!data.success || data.items.length === 0) { document.getElementById('msgSinAprobaciones').style.display = 'block'; return; }
+            if (!data.success || data.items.length === 0) { 
+                document.getElementById('msgSinAprobaciones').style.display = 'block'; 
+                return; 
+            }
             document.getElementById('msgSinAprobaciones').style.display = 'none';
 
             data.items.forEach(item => {
@@ -794,7 +735,7 @@
                 tr.innerHTML = `
                     <td>${item.fecha.substring(0, 16)}</td>
                     <td><div class="fw-bold">${item.cliente || item.proveedor}</div><div class="small text-muted">${item.ubicacion}</div></td>
-                    <td><div>${item.codigo || '-'}</div></td>
+                    <td><div>${item.lote || '-'} <br><small class="text-muted">${item.dias_operacion || 0} Días</small></div></td>
                     <td>${htmlTanques}</td>
                     <td class="text-center"><div class="fs-5 fw-bold text-success">${item.solicitado || item.nivel_solicitado}%</div><div class="small text-muted">Llenar hasta</div></td>
                     <td class="text-center">
@@ -806,6 +747,9 @@
                     </td>`;
                 tbody.appendChild(tr);
             });
+        }).catch(err => {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-danger text-center">Error cargando solicitudes.</td></tr>';
+            console.error(err);
         });
     }
 
@@ -867,7 +811,68 @@
         });
     }
 
-    // (La función actualizarGraficaSimulacion() se mantiene igual a la que te entregué antes, sin cambios estructurales).
+    function actualizarGraficaSimulacion() {
+        if (!datosSimulacion) return;
+        
+        let solicitado = parseFloat(document.getElementById('sim_input_solicita').value) || 0;
+        let nivelActual = datosSimulacion.nivel_actual;
+        let tasa = datosSimulacion.tasa_descenso_diaria;
+        
+        let nivelSim = nivelActual + solicitado;
+        if (nivelSim > 100) nivelSim = 100;
+
+        let labels = [];
+        let dataProy = [];
+        let dataMin = [];
+        
+        datosSimulacion.proyeccion_inteligente.forEach(pt => {
+            labels.push(pt.fecha_str);
+            
+            // Recalcular proyección restando la tasa diaria y validando festivos
+            nivelSim -= (pt.es_festivo ? (tasa * 0.2) : tasa);
+            if (nivelSim < 0) nivelSim = 0;
+            
+            dataProy.push(nivelSim.toFixed(1));
+            dataMin.push(30); // Umbral de seguridad (30%)
+        });
+
+        const ctx = document.getElementById('chartProyeccion').getContext('2d');
+        if (chartSimulador) chartSimulador.destroy();
+        
+        chartSimulador = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Proyección Nivel (%)',
+                        data: dataProy,
+                        borderColor: '#015249',
+                        backgroundColor: 'rgba(1, 82, 73, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Límite Crítico (30%)',
+                        data: dataMin,
+                        borderColor: '#dc3545',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, max: 100 }
+                }
+            }
+        });
+    }
 
     function confirmarAprobacionSimulada() {
         let nivelFinal = parseFloat(document.getElementById('sim_input_solicita').value);
@@ -907,5 +912,4 @@
             }
         }).catch(err => alert("Error de red intentando aprobar."));
     }
-    
 </script>

@@ -1118,8 +1118,90 @@ def generar_qrs_pdf():
         return jsonify({'success': False, 'message': f'Error interno: {str(e)}'}), 500
 
 # ==============================================================================
-# NUEVAS RUTAS DE ADMINISTRACIÓN: ANÁLISIS, APROBACIÓN Y RECHAZO
+# NUEVAS RUTAS DE ADMINISTRACIÓN: OBTENER, ANÁLISIS Y APROBACIÓN
 # ==============================================================================
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/obtener_solicitudes_pendientes', methods=['POST'])
+@login_required_custom
+def admin_obtener_solicitudes():
+    """ 
+    BANDEJA DE ENTRADA de Aprobaciones para el Webmaster o Supervisores
+    """
+    try:
+        empresa_id_req = request.get_json().get('empresa_id')
+        session_id = str(session.get('empresa_id', '')).strip()
+        empresa_id = empresa_id_req if empresa_id_req else session_id
+
+        if not empresa_id:
+            return jsonify({"success": False, "message": "ID Empresa no identificado"})
+
+        cur = mysql.connection.cursor()
+        
+        # VALIDACIÓN MULTI-TENANT INTELIGENTE PARA LECTURA DE LISTA
+        if session_id == '901811727' and not empresa_id_req:
+            # Si es el Webmaster y no filtró una empresa en particular, mostrar TODOS los pendientes
+            sql = """
+                SELECT 
+                    p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
+                    (SELECT dias_operacion FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
+                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
+                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
+                FROM pedidos_gas_glp p 
+                WHERE p.estatus_flujo = 'pendiente_aprobacion' 
+                ORDER BY p.fecha_registro DESC
+            """
+            cur.execute(sql)
+        else:
+            # Si envió un NIT o es un supervisor de cliente, filtramos
+            cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1", (empresa_id,))
+            row_emp = cur.fetchone()
+            if not row_emp:
+                cur.close()
+                return jsonify({"success": False, "message": "Empresa no encontrada."})
+                
+            empresa_nombre = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
+
+            sql = """
+                SELECT 
+                    p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
+                    (SELECT dias_operacion FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
+                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
+                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
+                FROM pedidos_gas_glp p 
+                WHERE p.estatus_flujo = 'pendiente_aprobacion' 
+                  AND TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(%s)) COLLATE utf8mb4_general_ci
+                ORDER BY p.fecha_registro DESC
+            """
+            cur.execute(sql, (empresa_nombre,))
+            
+        rows = cur.fetchall()
+        items = []
+        col_names = [d[0] for d in cur.description] if cur.description else []
+        
+        for r in rows:
+            rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
+            tk_info = []
+            if rd.get('nivel tk-1') is not None: 
+                tk_info.append({"numero": "Ref", "nivel": rd.get('nivel tk-1'), "foto": rd.get('testigo nivel tk-1')})
+            
+            items.append({
+                "id": rd.get('id'), 
+                "fecha": str(rd.get('fecha_registro')), 
+                "cliente": rd.get('cliente'), 
+                "ubicacion": rd.get('ubicacion'), 
+                "lote": rd.get('lote'), 
+                "dias_operacion": rd.get('dias_operacion'), 
+                "solicitado": float(rd.get('nivel_solicitado') or 0), 
+                "dias_extra": rd.get('dias_extra'), 
+                "tanques": tk_info
+            })
+        cur.close()
+        return jsonify({"success": True, "items": items})
+    except Exception as e: 
+        print("❌ Error de lectura solicitudes pendientes:", e)
+        return jsonify({"success": False, "message": str(e)})
+
 
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/analizar_proyeccion', methods=['POST'])
@@ -1128,21 +1210,31 @@ def admin_analizar_proyeccion():
     data = request.get_json(force=True) or {}
     ped_id = data.get('id')
     empresa_id_req = data.get('empresa_id')
-    empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
     
+    empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
+    session_id = str(session.get('empresa_id', '')).strip()
+
     try:
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT ESTRICTA (Con TRIM, UPPER y COLLATE)
-        cur.execute("""
-            SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
-            FROM pedidos_gas_glp 
-            WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
-                SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci 
-                FROM empresas 
-                WHERE nit = %s LIMIT 1
-            )
-        """, (ped_id, empresa_id))
+        # VALIDACIÓN MULTI-TENANT INTELIGENTE: Permite acceso a Webmaster ('901811727')
+        if session_id == '901811727':
+            cur.execute("""
+                SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
+                FROM pedidos_gas_glp 
+                WHERE id=%s
+            """, (ped_id,))
+        else:
+            cur.execute("""
+                SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
+                FROM pedidos_gas_glp 
+                WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                    SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci 
+                    FROM empresas 
+                    WHERE nit = %s LIMIT 1
+                )
+            """, (ped_id, empresa_id))
+            
         head = cur.fetchone()
         
         if not head: 
@@ -1238,18 +1330,24 @@ def admin_aprobar_solicitud():
     ped_id = data.get('id')
     nivel = data.get('nivel_aprobado')
     empresa_id_req = data.get('empresa_id')
-    empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
     
+    empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
+    session_id = str(session.get('empresa_id', '')).strip()
+
     try:
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT
-        cur.execute("""
-            SELECT id FROM pedidos_gas_glp 
-            WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
-                SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
-            )
-        """, (ped_id, empresa_id))
+        # VALIDACIÓN MULTI-TENANT INTELIGENTE
+        if session_id == '901811727':
+             cur.execute("SELECT id FROM pedidos_gas_glp WHERE id=%s", (ped_id,))
+        else:
+            cur.execute("""
+                SELECT id FROM pedidos_gas_glp 
+                WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                    SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+                )
+            """, (ped_id, empresa_id))
+            
         if not cur.fetchone():
             cur.close()
             return jsonify({"success": False, "message": "Acceso denegado a este registro."})
@@ -1285,20 +1383,26 @@ def rechazar_solicitud():
         data = request.get_json()
         id_solicitud = data.get('id')
         empresa_id_req = data.get('empresa_id')
-        empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
         
+        empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
+        session_id = str(session.get('empresa_id', '')).strip()
+
         if not id_solicitud:
             return jsonify({"success": False, "message": "ID de solicitud requerido."}), 400
 
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT ESTRICTA CON ÚNICA FUNCIÓN
-        cur.execute("""
-            SELECT id FROM pedidos_gas_glp 
-            WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
-                SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
-            )
-        """, (id_solicitud, empresa_id))
+        # VALIDACIÓN MULTI-TENANT INTELIGENTE
+        if session_id == '901811727':
+            cur.execute("SELECT id FROM pedidos_gas_glp WHERE id=%s", (id_solicitud,))
+        else:
+            cur.execute("""
+                SELECT id FROM pedidos_gas_glp 
+                WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                    SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+                )
+            """, (id_solicitud, empresa_id))
+            
         if not cur.fetchone():
             cur.close()
             return jsonify({"success": False, "message": "Acceso denegado a este registro."})
@@ -1323,13 +1427,23 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
     try:
         cur = mysql.connection.cursor()
         
-        cur.execute("""
-            SELECT cliente, ubicacion, lote, codigo_pedido, proveedor 
-            FROM pedidos_gas_glp 
-            WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
-                SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
-            )
-        """, (pedido_id, empresa_id))
+        session_id = str(session.get('empresa_id', '')).strip()
+        
+        if session_id == '901811727':
+            cur.execute("""
+                SELECT cliente, ubicacion, lote, codigo_pedido, proveedor 
+                FROM pedidos_gas_glp 
+                WHERE id=%s
+            """, (pedido_id,))
+        else:
+            cur.execute("""
+                SELECT cliente, ubicacion, lote, codigo_pedido, proveedor 
+                FROM pedidos_gas_glp 
+                WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                    SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+                )
+            """, (pedido_id, empresa_id))
+            
         res = cur.fetchone()
         
         if not res:
@@ -1547,61 +1661,3 @@ def recalcular_historico_glp():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)})
-
-@csrf.exempt
-@bp_energia_glp.route('/obtener_pendientes_tanqueo_reporte', methods=['POST'])
-@login_required_custom
-def obtener_pendientes_tanqueo_reporte():
-    empresa_id = request.get_json().get('empresa_id')
-    if not empresa_id:
-        return jsonify({"success": False, "message": "ID Empresa requerido"})
-
-    try:
-        cur = mysql.connection.cursor()
-        
-        cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
-        row_emp = cur.fetchone()
-        if not row_emp:
-            return jsonify({"success": False, "message": "Empresa no encontrada"})
-            
-        nombre_empresa = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
-
-        sql = """
-            SELECT 
-                p.id,
-                p.fecha_registro,
-                p.ubicacion,
-                p.proveedor,
-                p.nivel_solicitado,
-                p.codigo_pedido,
-                DATEDIFF(NOW(), p.fecha_registro) as dias_retraso
-            FROM pedidos_gas_glp p
-            WHERE TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(%s)) COLLATE utf8mb4_general_ci
-              AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
-              AND p.fecha_registro >= '2026-04-30'
-            ORDER BY dias_retraso DESC
-        """
-        cur.execute(sql, (nombre_empresa,))
-        rows = cur.fetchall()
-        
-        pendientes = []
-        col_names = [d[0] for d in cur.description] if cur.description else []
-        
-        for r in rows:
-            rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
-            pendientes.append({
-                "id": rd.get('id'),
-                "fecha": str(rd.get('fecha_registro')),
-                "ubicacion": rd.get('ubicacion'),
-                "proveedor": rd.get('proveedor'),
-                "solicitado": float(rd.get('nivel_solicitado') or 0),
-                "codigo": rd.get('codigo_pedido'),
-                "dias": int(rd.get('dias_retraso') or 0)
-            })
-
-        cur.close()
-        return jsonify({"success": True, "items": pendientes})
-
-    except Exception as e:
-        print("Error reporte pendientes:", str(e))
-        return jsonify({"success": False, "message": str(e)})
