@@ -1146,17 +1146,23 @@ def admin_obtener_solicitudes():
         nombres_clean = set()
         
         if not es_webmaster or filtrar_empresa:
-            # Buscar en tabla empresas
-            cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s OR id_empresa = %s", (empresa_id, empresa_id))
-            for row in cur.fetchall():
-                val = row['nombre_comercial'] if isinstance(row, dict) else row[0]
-                if val: nombres_clean.add(str(val).upper().replace('.', '').replace(' ', ''))
+            # Buscar en tabla empresas (Corregido: Solo usamos 'nit' para evitar error de columna inexistente)
+            try:
+                cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
+                for row in cur.fetchall():
+                    val = row['nombre_comercial'] if isinstance(row, dict) else row[0]
+                    if val: nombres_clean.add(str(val).upper().replace('.', '').replace(' ', ''))
+            except Exception:
+                pass
                 
             # Buscar en el historial real de Kárdex
-            cur.execute("SELECT DISTINCT empresa FROM cardex_glp WHERE id_empresa = %s", (empresa_id,))
-            for row in cur.fetchall():
-                val = row['empresa'] if isinstance(row, dict) else row[0]
-                if val: nombres_clean.add(str(val).upper().replace('.', '').replace(' ', ''))
+            try:
+                cur.execute("SELECT DISTINCT empresa FROM cardex_glp WHERE id_empresa = %s", (empresa_id,))
+                for row in cur.fetchall():
+                    val = row['empresa'] if isinstance(row, dict) else row[0]
+                    if val: nombres_clean.add(str(val).upper().replace('.', '').replace(' ', ''))
+            except Exception:
+                pass
                 
             # Buscar en la sesión activa
             if session.get('empresa'):
@@ -1164,7 +1170,7 @@ def admin_obtener_solicitudes():
                 
             nombres_clean.add(str(empresa_id).upper().replace('.', '').replace(' ', ''))
 
-        # 3. Traer todos los pedidos pendientes (Al ser una tabla pequeña, es muy eficiente)
+        # 3. Traer todos los pedidos pendientes (Aísla la consulta para evitar bloqueos por Collation en MySQL)
         cur.execute("""
             SELECT id, fecha_registro, cliente, ubicacion, lote, nivel_solicitado, dias_extra 
             FROM pedidos_gas_glp 
@@ -1180,31 +1186,44 @@ def admin_obtener_solicitudes():
         for p_row in pedidos_pendientes:
             p = dict(zip(col_pedidos, p_row)) if not isinstance(p_row, dict) else p_row
             
-            # 4. Filtrar por cliente directamente en Python (Inmune a problemas de Collation MySQL)
+            # 4. Filtrar por cliente directamente en Python (Inmune a problemas de puntuación o codificación)
             if not es_webmaster or filtrar_empresa:
                 cliente_str = str(p['cliente'] or '').upper().replace('.', '').replace(' ', '')
                 if cliente_str not in nombres_clean:
                     continue # No pertenece a esta empresa, lo saltamos
 
-            # 5. Obtener los detalles del nivel del tanque desde Cardex
+            # 5. Obtener los detalles del nivel del tanque desde Cardex (Manejo de Lote NULL)
             dias_op = 0
             nivel_tk1 = None
             foto_tk1 = None
             
-            if p['lote']:
-                cur.execute("""
-                    SELECT dias_operacion, `nivel tk-1`, `testigo nivel tk-1` 
-                    FROM cardex_glp 
-                    WHERE lote = %s AND operacion IN ('consumo','inicio_calefaccion') 
-                    ORDER BY id DESC LIMIT 1
-                """, (p['lote'],))
+            try:
+                if p.get('lote'):
+                    cur.execute("""
+                        SELECT dias_operacion, `nivel tk-1`, `testigo nivel tk-1` 
+                        FROM cardex_glp 
+                        WHERE lote = %s AND operacion IN ('consumo','inicio_calefaccion') 
+                        ORDER BY id DESC LIMIT 1
+                    """, (p['lote'],))
+                elif p.get('ubicacion'):
+                    cur.execute("""
+                        SELECT dias_operacion, `nivel tk-1`, `testigo nivel tk-1` 
+                        FROM cardex_glp 
+                        WHERE TRIM(ubicacion) = TRIM(%s) AND operacion IN ('consumo','inicio_calefaccion') 
+                        ORDER BY id DESC LIMIT 1
+                    """, (p['ubicacion'],))
+                else:
+                    # Failsafe si no hay ubicacion ni lote
+                    cur.execute("SELECT 0, NULL, NULL")
+
                 c_row = cur.fetchone()
-                
                 if c_row:
                     c = dict(zip([d[0] for d in cur.description], c_row)) if not isinstance(c_row, dict) else c_row
                     dias_op = c.get('dias_operacion') or 0
                     nivel_tk1 = c.get('nivel tk-1')
                     foto_tk1 = c.get('testigo nivel tk-1')
+            except Exception:
+                pass
 
             tk_info = []
             if nivel_tk1 is not None:
@@ -1215,7 +1234,7 @@ def admin_obtener_solicitudes():
                 "fecha": str(p.get('fecha_registro')), 
                 "cliente": p.get('cliente'), 
                 "ubicacion": p.get('ubicacion'), 
-                "lote": p.get('lote'), 
+                "lote": p.get('lote') or 'Sin Lote', 
                 "dias_operacion": dias_op, 
                 "nivel_solicitado": float(p.get('nivel_solicitado') or 0), 
                 "solicitado": float(p.get('nivel_solicitado') or 0),
@@ -1230,7 +1249,6 @@ def admin_obtener_solicitudes():
         import traceback
         print("❌ Error de lectura solicitudes pendientes:\n", traceback.format_exc())
         return jsonify({"success": False, "message": str(e)})
-    
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/analizar_proyeccion', methods=['POST'])
 @login_required_custom

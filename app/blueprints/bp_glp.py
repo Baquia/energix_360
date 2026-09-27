@@ -2947,118 +2947,135 @@ def solicitar_pedido_manual():
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"}), 500
       
 @csrf.exempt
-@bp_glp.route('/admin/obtener_solicitudes_pendientes', methods=['GET', 'POST'])
+@bp_glp.route('/glp/admin/obtener_solicitudes_pendientes', methods=['POST'])
 @login_required_custom
 def admin_obtener_solicitudes():
+    """ 
+    BANDEJA DE ENTRADA de Aprobaciones para el Webmaster o Supervisores
+    """
     try:
-        empresa_id = None
+        data = request.get_json(silent=True) or {}
+        empresa_id_req = data.get('empresa_id')
         session_id = str(session.get('empresa_id', '')).strip()
-        
-        # 1. Obtener empresa_id desde el cuerpo JSON si fue enviado por el frontend
-        if request.is_json:
-            data = request.get_json(silent=True) or {}
-            empresa_id = data.get('empresa_id')
-                
-        # 2. Si no viene en el JSON, tomar el de la sesión
-        if not empresa_id:
-            empresa_id = session.get('empresa_id')
+        empresa_id = empresa_id_req if empresa_id_req else session_id
 
         if not empresa_id:
             return jsonify({"success": False, "message": "ID Empresa no identificado"})
 
         cur = mysql.connection.cursor()
-
-        # Evaluar si es el Webmaster consultando la bandeja global sin filtro específico
-        es_webmaster = (session_id == '901811727')
-        filtrar_empresa_especifica = bool(empresa_id and str(empresa_id).strip() != '901811727')
-
-        if es_webmaster and not filtrar_empresa_especifica:
-            sql = """
-                SELECT 
-                    p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
-                    (SELECT dias_operacion FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
-                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
-                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
-                FROM pedidos_gas_glp p 
-                WHERE p.estatus_flujo = 'pendiente_aprobacion' 
-                ORDER BY p.fecha_registro DESC
-            """
-            cur.execute(sql)
-        else:
-            # 3. Recolectar todas las variantes posibles del nombre de la empresa
-            nombres_posibles = set()
-            
-            # Búsqueda A: En la tabla empresas por NIT/ID
-            cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s OR id_empresa = %s", (empresa_id, empresa_id))
-            for row in cur.fetchall():
-                val = row['nombre_comercial'] if isinstance(row, dict) else row[0]
-                if val: nombres_posibles.add(val.strip())
-                
-            # Búsqueda B: En cardex_glp por id_empresa (Rescata la cadena exacta usada en operaciones)
-            cur.execute("SELECT DISTINCT empresa FROM cardex_glp WHERE id_empresa = %s", (empresa_id,))
-            for row in cur.fetchall():
-                val = row['empresa'] if isinstance(row, dict) else row[0]
-                if val: nombres_posibles.add(val.strip())
-
-            # Búsqueda C: Nombre en sesión Flask
-            if session.get('empresa'):
-                nombres_posibles.add(session.get('empresa').strip())
-
-            if not nombres_posibles:
-                nombres_posibles.add(str(empresa_id))
-
-            # Preparar listas comparativas (Mayúsculas con y sin puntos/espacios)
-            lista_upper = [n.upper() for n in nombres_posibles]
-            lista_clean = [n.upper().replace('.', '').replace(' ', '') for n in nombres_posibles]
-
-            placeholders_1 = ', '.join(['%s'] * len(lista_upper))
-            placeholders_2 = ', '.join(['%s'] * len(lista_clean))
-
-            # Consulta SQL flexible que ignora diferencias de puntos, espacios o colación
-            sql = f"""
-                SELECT 
-                    p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
-                    (SELECT dias_operacion FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
-                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
-                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
-                FROM pedidos_gas_glp p 
-                WHERE p.estatus_flujo = 'pendiente_aprobacion' 
-                  AND (
-                      TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci IN ({placeholders_1})
-                      OR REPLACE(REPLACE(TRIM(UPPER(p.cliente)), '.', ''), ' ', '') COLLATE utf8mb4_general_ci IN ({placeholders_2})
-                  )
-                ORDER BY p.fecha_registro DESC
-            """
-            cur.execute(sql, tuple(lista_upper + lista_clean))
-
-        rows = cur.fetchall()
-        items = []
-        col_names = [d[0] for d in cur.description] if cur.description else []
         
-        for r in rows:
-            rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
-            tk_info = []
-            if rd.get('nivel tk-1') is not None: 
-                tk_info.append({"numero": "Ref", "nivel": rd.get('nivel tk-1'), "foto": rd.get('testigo nivel tk-1')})
+        # 1. Definir permisos de visualización
+        es_webmaster = (session_id == '901811727')
+        filtrar_empresa = bool(empresa_id_req and str(empresa_id_req).strip() != '901811727')
+        
+        # 2. Recolectar variantes del nombre de la empresa para el filtro en Python
+        nombres_clean = set()
+        
+        if not es_webmaster or filtrar_empresa:
+            # Buscar en tabla empresas (Corregido: Solo usamos 'nit' para evitar error de columna inexistente)
+            try:
+                cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
+                for row in cur.fetchall():
+                    val = row['nombre_comercial'] if isinstance(row, dict) else row[0]
+                    if val: nombres_clean.add(str(val).upper().replace('.', '').replace(' ', ''))
+            except Exception:
+                pass
+                
+            # Buscar en el historial real de Kárdex
+            try:
+                cur.execute("SELECT DISTINCT empresa FROM cardex_glp WHERE id_empresa = %s", (empresa_id,))
+                for row in cur.fetchall():
+                    val = row['empresa'] if isinstance(row, dict) else row[0]
+                    if val: nombres_clean.add(str(val).upper().replace('.', '').replace(' ', ''))
+            except Exception:
+                pass
+                
+            # Buscar en la sesión activa
+            if session.get('empresa'):
+                nombres_clean.add(str(session.get('empresa')).upper().replace('.', '').replace(' ', ''))
+                
+            nombres_clean.add(str(empresa_id).upper().replace('.', '').replace(' ', ''))
+
+        # 3. Traer todos los pedidos pendientes (Aísla la consulta para evitar bloqueos por Collation en MySQL)
+        cur.execute("""
+            SELECT id, fecha_registro, cliente, ubicacion, lote, nivel_solicitado, dias_extra 
+            FROM pedidos_gas_glp 
+            WHERE estatus_flujo = 'pendiente_aprobacion' 
+              AND estatus = 'generado'
+            ORDER BY fecha_registro DESC
+        """)
+        pedidos_pendientes = cur.fetchall()
+        
+        items = []
+        col_pedidos = [d[0] for d in cur.description] if cur.description else []
+        
+        for p_row in pedidos_pendientes:
+            p = dict(zip(col_pedidos, p_row)) if not isinstance(p_row, dict) else p_row
             
+            # 4. Filtrar por cliente directamente en Python (Inmune a problemas de puntuación o codificación)
+            if not es_webmaster or filtrar_empresa:
+                cliente_str = str(p['cliente'] or '').upper().replace('.', '').replace(' ', '')
+                if cliente_str not in nombres_clean:
+                    continue # No pertenece a esta empresa, lo saltamos
+
+            # 5. Obtener los detalles del nivel del tanque desde Cardex (Manejo de Lote NULL)
+            dias_op = 0
+            nivel_tk1 = None
+            foto_tk1 = None
+            
+            try:
+                if p.get('lote'):
+                    cur.execute("""
+                        SELECT dias_operacion, `nivel tk-1`, `testigo nivel tk-1` 
+                        FROM cardex_glp 
+                        WHERE lote = %s AND operacion IN ('consumo','inicio_calefaccion') 
+                        ORDER BY id DESC LIMIT 1
+                    """, (p['lote'],))
+                elif p.get('ubicacion'):
+                    cur.execute("""
+                        SELECT dias_operacion, `nivel tk-1`, `testigo nivel tk-1` 
+                        FROM cardex_glp 
+                        WHERE TRIM(ubicacion) = TRIM(%s) AND operacion IN ('consumo','inicio_calefaccion') 
+                        ORDER BY id DESC LIMIT 1
+                    """, (p['ubicacion'],))
+                else:
+                    # Failsafe si no hay ubicacion ni lote
+                    cur.execute("SELECT 0, NULL, NULL")
+
+                c_row = cur.fetchone()
+                if c_row:
+                    c = dict(zip([d[0] for d in cur.description], c_row)) if not isinstance(c_row, dict) else c_row
+                    dias_op = c.get('dias_operacion') or 0
+                    nivel_tk1 = c.get('nivel tk-1')
+                    foto_tk1 = c.get('testigo nivel tk-1')
+            except Exception:
+                pass
+
+            tk_info = []
+            if nivel_tk1 is not None:
+                tk_info.append({"numero": "Ref", "nivel": nivel_tk1, "foto": foto_tk1})
+
             items.append({
-                "id": rd.get('id'), 
-                "fecha": str(rd.get('fecha_registro')), 
-                "cliente": rd.get('cliente'), 
-                "ubicacion": rd.get('ubicacion'), 
-                "lote": rd.get('lote'), 
-                "dias_operacion": rd.get('dias_operacion') if rd.get('dias_operacion') is not None else 0, 
-                "nivel_solicitado": float(rd.get('nivel_solicitado') or 0), 
-                "solicitado": float(rd.get('nivel_solicitado') or 0),
-                "dias_extra": rd.get('dias_extra') if rd.get('dias_extra') is not None else 0, 
+                "id": p.get('id'), 
+                "fecha": str(p.get('fecha_registro')), 
+                "cliente": p.get('cliente'), 
+                "ubicacion": p.get('ubicacion'), 
+                "lote": p.get('lote') or 'Sin Lote', 
+                "dias_operacion": dias_op, 
+                "nivel_solicitado": float(p.get('nivel_solicitado') or 0), 
+                "solicitado": float(p.get('nivel_solicitado') or 0),
+                "dias_extra": p.get('dias_extra') or 0, 
                 "tanques": tk_info
             })
+            
         cur.close()
         return jsonify({"success": True, "items": items})
-    except Exception as e: 
-        print("❌ Error de lectura solicitudes:", e)
+        
+    except Exception as e:
+        import traceback
+        print("❌ Error de lectura solicitudes pendientes:\n", traceback.format_exc())
         return jsonify({"success": False, "message": str(e)})
-    
+        
 # ==========================================
 # RUTAS DE ADMIN Y APROBACIÓN (CORREGIDAS)
 # ==========================================
