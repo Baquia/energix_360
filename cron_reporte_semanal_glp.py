@@ -8,12 +8,7 @@ from email.utils import make_msgid, formatdate
 from datetime import datetime, timedelta
 import MySQLdb
 
-# 1. Integrar la ruta del proyecto al path del sistema
-project_home = '/home/baquiasoft/energix_360'
-if project_home not in sys.path:
-    sys.path.insert(0, project_home)
-
-# 2. Cargar variables de entorno del WSGI de forma segura (sin ejecutar la app)
+# 1. Extraer dinámicamente las variables de correo desde wsgi.py (Arquitectura Limpia)
 wsgi_path = '/var/www/baquiasoft_pythonanywhere_com_wsgi.py'
 if os.path.exists(wsgi_path):
     try:
@@ -24,107 +19,113 @@ if os.path.exists(wsgi_path):
     except Exception as e:
         print(f"⚠️ Aviso al leer wsgi.py: {e}")
 
-# 3. Importar la factoría de la aplicación y la instancia global de MySQL
-from app import create_app, mysql
+# 2. Credenciales de Producción (Conexión Nativa sin Flask)
+DB_HOST = "baquiasoft.mysql.pythonanywhere-services.com"
+DB_USER = "baquiasoft"
+DB_PASS = "Ataraxia123*/"
+DB_NAME = "baquiasoft$energix_v2"
 
 def generar_reporte_semanal():
-    app = create_app()
+    print(f"🚀 INICIANDO REPORTE SEMANAL GLP: {datetime.now()}")
     
-    with app.app_context():
-        print(f"🚀 INICIANDO REPORTE SEMANAL GLP: {datetime.now()}")
-        
-        EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-        EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
-        EMAIL_USER = os.environ.get('EMAIL_USER')
-        EMAIL_PASS = os.environ.get('EMAIL_PASS')
-        EMAIL_FROM = os.environ.get('EMAIL_FROM', f"BQA-ONE - Gestión Energética <{EMAIL_USER}>")
-        EMAIL_ADMIN = EMAIL_USER
-        
-        if not EMAIL_USER or not EMAIL_PASS:
-            print("❌ Error: No se encontraron credenciales SMTP en el entorno.")
-            return
+    # Heredar credenciales del entorno procesado
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+    EMAIL_USER = os.environ.get('EMAIL_USER')
+    EMAIL_PASS = os.environ.get('EMAIL_PASS')
+    EMAIL_FROM = os.environ.get('EMAIL_FROM', f"BQA-ONE - Gestión Energética <{EMAIL_USER}>")
+    EMAIL_ADMIN = EMAIL_USER
+    
+    if not EMAIL_USER or not EMAIL_PASS:
+        print("❌ Error: No se encontraron credenciales SMTP en el entorno.")
+        return
 
-        hoy = datetime.now()
-        fecha_fin = (hoy - timedelta(days=1)).date()
-        fecha_inicio = hoy.replace(day=1).date()
+    # Ventana de Tiempo (Día 1 del mes hasta ayer)
+    hoy = datetime.now()
+    fecha_fin = (hoy - timedelta(days=1)).date()
+    fecha_inicio = hoy.replace(day=1).date()
+    
+    try:
+        # Conexión nativa a prueba de fallos de entorno
+        conn = MySQLdb.connect(host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_NAME)
+        conn.commit() # Saneamiento de caché
+        cur = conn.cursor(MySQLdb.cursors.DictCursor)
         
-        try:
-            cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("SELECT DISTINCT id_empresa, empresa FROM cardex_glp WHERE estatus_lote = 'ACTIVO'")
+        empresas = cur.fetchall()
+        
+        for emp in empresas:
+            emp_id = emp['id_empresa']
+            emp_nombre = emp['empresa']
             
-            cur.execute("SELECT DISTINCT id_empresa, empresa FROM cardex_glp WHERE estatus_lote = 'ACTIVO'")
-            empresas = cur.fetchall()
+            cur.execute("""
+                SELECT email 
+                FROM usuarios 
+                WHERE empresa_id = %s 
+                  AND perfil = 'supervisor_gas' 
+                  AND email IS NOT NULL 
+                  AND email != ''
+            """, (emp_id,))
+            destinatarios = [row['email'] for row in cur.fetchall()]
             
-            for emp in empresas:
-                emp_id = emp['id_empresa']
-                emp_nombre = emp['empresa']
-                
-                cur.execute("""
-                    SELECT email 
-                    FROM usuarios 
-                    WHERE empresa_id = %s 
-                      AND perfil = 'supervisor_gas' 
-                      AND email IS NOT NULL 
-                      AND email != ''
-                """, (emp_id,))
-                destinatarios = [row['email'] for row in cur.fetchall()]
-                
-                # A) Ranking de consumo
-                cur.execute("""
-                    SELECT ubicacion, MAX(kg_pollito) as max_kg_pollito
+            # A) Ranking de consumo
+            cur.execute("""
+                SELECT ubicacion, MAX(kg_pollito) as max_kg_pollito
+                FROM cardex_glp
+                WHERE id_empresa = %s AND estatus_lote = 'ACTIVO' AND fecha BETWEEN %s AND %s
+                GROUP BY ubicacion
+                ORDER BY max_kg_pollito DESC
+            """, (emp_id, fecha_inicio, fecha_fin))
+            ranking = cur.fetchall()
+            
+            # B) Costos Acumulados
+            cur.execute("""
+                SELECT ubicacion, SUM(COALESCE(precio_total, 0)) as costo_total
+                FROM cardex_glp
+                WHERE id_empresa = %s AND estatus_lote = 'ACTIVO' AND fecha BETWEEN %s AND %s
+                GROUP BY ubicacion
+                ORDER BY costo_total DESC
+            """, (emp_id, fecha_inicio, fecha_fin))
+            costos = cur.fetchall()
+            total_costo_empresa = sum([(c['costo_total'] or 0) for c in costos])
+            
+            # C) Auditoría Multi-Tenant (Estricto WHERE id_empresa)
+            cur.execute("""
+                SELECT c.fecha, c.ubicacion, c.estatus_lote, c.codigo_pedido, c.operacion
+                FROM cardex_glp c
+                INNER JOIN (
+                    SELECT ubicacion, MAX(id) AS ultimo_id
                     FROM cardex_glp
-                    WHERE id_empresa = %s AND estatus_lote = 'ACTIVO' AND fecha BETWEEN %s AND %s
+                    WHERE id_empresa = %s AND estatus_lote = 'ACTIVO' 
+                      AND operacion IN ('inicio_calefaccion', 'consumo')
+                      AND codigo_pedido IS NOT NULL AND TRIM(codigo_pedido) <> ''
+                      AND fecha BETWEEN %s AND %s
                     GROUP BY ubicacion
-                    ORDER BY max_kg_pollito DESC
-                """, (emp_id, fecha_inicio, fecha_fin))
-                ranking = cur.fetchall()
-                
-                # B) Costos Acumulados
-                cur.execute("""
-                    SELECT ubicacion, SUM(COALESCE(precio_total, 0)) as costo_total
-                    FROM cardex_glp
-                    WHERE id_empresa = %s AND estatus_lote = 'ACTIVO' AND fecha BETWEEN %s AND %s
-                    GROUP BY ubicacion
-                    ORDER BY costo_total DESC
-                """, (emp_id, fecha_inicio, fecha_fin))
-                costos = cur.fetchall()
-                total_costo_empresa = sum([(c['costo_total'] or 0) for c in costos])
-                
-                # C) Auditoría Multi-Tenant (Estricto WHERE id_empresa)
-                cur.execute("""
-                    SELECT c.fecha, c.ubicacion, c.estatus_lote, c.codigo_pedido, c.operacion
-                    FROM cardex_glp c
-                    INNER JOIN (
-                        SELECT ubicacion, MAX(id) AS ultimo_id
-                        FROM cardex_glp
-                        WHERE id_empresa = %s AND estatus_lote = 'ACTIVO' 
-                          AND operacion IN ('inicio_calefaccion', 'consumo')
-                          AND codigo_pedido IS NOT NULL AND TRIM(codigo_pedido) <> ''
-                          AND fecha BETWEEN %s AND %s
-                        GROUP BY ubicacion
-                    ) ult ON c.id = ult.ultimo_id
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM cardex_glp t
-                        WHERE t.codigo_pedido = c.codigo_pedido 
-                          AND t.ubicacion = c.ubicacion 
-                          AND t.operacion = 'tanqueo'
-                          AND t.id_empresa = %s
-                    )
-                    ORDER BY c.ubicacion;
-                """, (emp_id, fecha_inicio, fecha_fin, emp_id))
-                auditoria = cur.fetchall()
-                
-                if destinatarios or ranking or costos or auditoria:
-                    _enviar_correo(
-                        emp_nombre, fecha_inicio, fecha_fin, ranking, costos, 
-                        total_costo_empresa, auditoria, destinatarios,
-                        EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FROM, EMAIL_ADMIN
-                    )
+                ) ult ON c.id = ult.ultimo_id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM cardex_glp t
+                    WHERE t.codigo_pedido = c.codigo_pedido 
+                      AND t.ubicacion = c.ubicacion 
+                      AND t.operacion = 'tanqueo'
+                      AND t.id_empresa = %s
+                )
+                ORDER BY c.ubicacion;
+            """, (emp_id, fecha_inicio, fecha_fin, emp_id))
+            auditoria = cur.fetchall()
+            
+            if destinatarios or ranking or costos or auditoria:
+                _enviar_correo(
+                    emp_nombre, fecha_inicio, fecha_fin, ranking, costos, 
+                    total_costo_empresa, auditoria, destinatarios,
+                    EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FROM, EMAIL_ADMIN
+                )
 
-            cur.close()
-            print("✅ Ejecución de reportes semanales finalizada.")
+        cur.close()
+        conn.close()
+        print("✅ Ejecución de reportes semanales finalizada.")
 
-        except Exception as e:
-            print(f"❌ Error crítico en el reporte semanal: {e}")
+    except Exception as e:
+        print(f"❌ Error crítico en el reporte semanal: {e}")
 
 def _enviar_correo(empresa, f_ini, f_fin, ranking, costos, total_costo, auditoria, destinatarios, e_host, e_port, e_user, e_pass, e_from, e_admin):
     html_ranking = ""
