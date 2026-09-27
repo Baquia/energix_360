@@ -1138,94 +1138,99 @@ def admin_obtener_solicitudes():
 
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT INTELIGENTE PARA LECTURA DE LISTA
+        # 1. Definir permisos de visualización
         es_webmaster = (session_id == '901811727')
-        filtrar_empresa_especifica = bool(empresa_id_req and str(empresa_id_req).strip() != '901811727')
-
-        if es_webmaster and not filtrar_empresa_especifica:
-            # Si es el Webmaster y no filtró una empresa en particular, mostrar TODOS los pendientes
-            sql = """
-                SELECT 
-                    p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
-                    (SELECT dias_operacion FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
-                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
-                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
-                FROM pedidos_gas_glp p 
-                WHERE p.estatus_flujo = 'pendiente_aprobacion' 
-                ORDER BY p.fecha_registro DESC
-            """
-            cur.execute(sql)
-        else:
-            # Si envió un NIT o es un supervisor de cliente, recolectamos variantes de nombre
-            nombres_posibles = set()
-            
+        filtrar_empresa = bool(empresa_id_req and str(empresa_id_req).strip() != '901811727')
+        
+        # 2. Recolectar variantes del nombre de la empresa para el filtro en Python
+        nombres_clean = set()
+        
+        if not es_webmaster or filtrar_empresa:
+            # Buscar en tabla empresas
             cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s OR id_empresa = %s", (empresa_id, empresa_id))
             for row in cur.fetchall():
                 val = row['nombre_comercial'] if isinstance(row, dict) else row[0]
-                if val: nombres_posibles.add(val.strip())
+                if val: nombres_clean.add(str(val).upper().replace('.', '').replace(' ', ''))
                 
+            # Buscar en el historial real de Kárdex
             cur.execute("SELECT DISTINCT empresa FROM cardex_glp WHERE id_empresa = %s", (empresa_id,))
             for row in cur.fetchall():
                 val = row['empresa'] if isinstance(row, dict) else row[0]
-                if val: nombres_posibles.add(val.strip())
-
+                if val: nombres_clean.add(str(val).upper().replace('.', '').replace(' ', ''))
+                
+            # Buscar en la sesión activa
             if session.get('empresa'):
-                nombres_posibles.add(session.get('empresa').strip())
+                nombres_clean.add(str(session.get('empresa')).upper().replace('.', '').replace(' ', ''))
+                
+            nombres_clean.add(str(empresa_id).upper().replace('.', '').replace(' ', ''))
 
-            if not nombres_posibles:
-                nombres_posibles.add(str(empresa_id))
-
-            lista_upper = [n.upper() for n in nombres_posibles]
-            lista_clean = [n.upper().replace('.', '').replace(' ', '') for n in nombres_posibles]
-
-            placeholders_1 = ', '.join(['%s'] * len(lista_upper))
-            placeholders_2 = ', '.join(['%s'] * len(lista_clean))
-
-            # Consulta SQL flexible e inmune a diferencias de puntos, espacios o Collation
-            sql = f"""
-                SELECT 
-                    p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
-                    (SELECT dias_operacion FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
-                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
-                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
-                FROM pedidos_gas_glp p 
-                WHERE p.estatus_flujo = 'pendiente_aprobacion' 
-                  AND (
-                      TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci IN ({placeholders_1})
-                      OR REPLACE(REPLACE(TRIM(UPPER(p.cliente)), '.', ''), ' ', '') COLLATE utf8mb4_general_ci IN ({placeholders_2})
-                  )
-                ORDER BY p.fecha_registro DESC
-            """
-            cur.execute(sql, tuple(lista_upper + lista_clean))
-            
-        rows = cur.fetchall()
-        items = []
-        col_names = [d[0] for d in cur.description] if cur.description else []
+        # 3. Traer todos los pedidos pendientes (Al ser una tabla pequeña, es muy eficiente)
+        cur.execute("""
+            SELECT id, fecha_registro, cliente, ubicacion, lote, nivel_solicitado, dias_extra 
+            FROM pedidos_gas_glp 
+            WHERE estatus_flujo = 'pendiente_aprobacion' 
+              AND estatus = 'generado'
+            ORDER BY fecha_registro DESC
+        """)
+        pedidos_pendientes = cur.fetchall()
         
-        for r in rows:
-            rd = dict(zip(col_names, r)) if not isinstance(r, dict) else r
-            tk_info = []
-            if rd.get('nivel tk-1') is not None: 
-                tk_info.append({"numero": "Ref", "nivel": rd.get('nivel tk-1'), "foto": rd.get('testigo nivel tk-1')})
+        items = []
+        col_pedidos = [d[0] for d in cur.description] if cur.description else []
+        
+        for p_row in pedidos_pendientes:
+            p = dict(zip(col_pedidos, p_row)) if not isinstance(p_row, dict) else p_row
             
+            # 4. Filtrar por cliente directamente en Python (Inmune a problemas de Collation MySQL)
+            if not es_webmaster or filtrar_empresa:
+                cliente_str = str(p['cliente'] or '').upper().replace('.', '').replace(' ', '')
+                if cliente_str not in nombres_clean:
+                    continue # No pertenece a esta empresa, lo saltamos
+
+            # 5. Obtener los detalles del nivel del tanque desde Cardex
+            dias_op = 0
+            nivel_tk1 = None
+            foto_tk1 = None
+            
+            if p['lote']:
+                cur.execute("""
+                    SELECT dias_operacion, `nivel tk-1`, `testigo nivel tk-1` 
+                    FROM cardex_glp 
+                    WHERE lote = %s AND operacion IN ('consumo','inicio_calefaccion') 
+                    ORDER BY id DESC LIMIT 1
+                """, (p['lote'],))
+                c_row = cur.fetchone()
+                
+                if c_row:
+                    c = dict(zip([d[0] for d in cur.description], c_row)) if not isinstance(c_row, dict) else c_row
+                    dias_op = c.get('dias_operacion') or 0
+                    nivel_tk1 = c.get('nivel tk-1')
+                    foto_tk1 = c.get('testigo nivel tk-1')
+
+            tk_info = []
+            if nivel_tk1 is not None:
+                tk_info.append({"numero": "Ref", "nivel": nivel_tk1, "foto": foto_tk1})
+
             items.append({
-                "id": rd.get('id'), 
-                "fecha": str(rd.get('fecha_registro')), 
-                "cliente": rd.get('cliente'), 
-                "ubicacion": rd.get('ubicacion'), 
-                "lote": rd.get('lote'), 
-                "dias_operacion": rd.get('dias_operacion') if rd.get('dias_operacion') is not None else 0, 
-                "nivel_solicitado": float(rd.get('nivel_solicitado') or 0), 
-                "solicitado": float(rd.get('nivel_solicitado') or 0),
-                "dias_extra": rd.get('dias_extra') if rd.get('dias_extra') is not None else 0, 
+                "id": p.get('id'), 
+                "fecha": str(p.get('fecha_registro')), 
+                "cliente": p.get('cliente'), 
+                "ubicacion": p.get('ubicacion'), 
+                "lote": p.get('lote'), 
+                "dias_operacion": dias_op, 
+                "nivel_solicitado": float(p.get('nivel_solicitado') or 0), 
+                "solicitado": float(p.get('nivel_solicitado') or 0),
+                "dias_extra": p.get('dias_extra') or 0, 
                 "tanques": tk_info
             })
+            
         cur.close()
         return jsonify({"success": True, "items": items})
-    except Exception as e: 
+        
+    except Exception as e:
+        import traceback
         print("❌ Error de lectura solicitudes pendientes:\n", traceback.format_exc())
         return jsonify({"success": False, "message": str(e)})
-
+    
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/analizar_proyeccion', methods=['POST'])
 @login_required_custom
