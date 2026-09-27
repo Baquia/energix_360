@@ -1314,9 +1314,6 @@ def obtener_pendientes_tanqueo_reporte():
 # ==============================================================================
 # RUTAS RESTAURADAS Y BLINDADAS: PROYECCIÓN Y APROBACIÓN GLP
 # ==============================================================================
-# ==============================================================================
-# RUTAS RESTAURADAS Y BLINDADAS: PROYECCIÓN Y APROBACIÓN GLP
-# ==============================================================================
 
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/analizar_proyeccion', methods=['POST'])
@@ -1324,19 +1321,18 @@ def obtener_pendientes_tanqueo_reporte():
 def admin_analizar_proyeccion():
     data = request.get_json(force=True) or {}
     ped_id = data.get('id')
-    # Capturamos el empresa_id del cliente enviado por el Webmaster
     empresa_id_req = data.get('empresa_id')
     empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
     
     try:
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT ESTRICTA (Con COLLATE corregido)
+        # VALIDACIÓN MULTI-TENANT ESTRICTA (Con TRIM y UPPER para evitar fallos por espacios)
         cur.execute("""
             SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
             FROM pedidos_gas_glp 
-            WHERE id=%s AND cliente COLLATE utf8mb4_general_ci = (
-                SELECT nombre_comercial COLLATE utf8mb4_general_ci 
+            WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci 
                 FROM empresas 
                 WHERE nit = %s LIMIT 1
             )
@@ -1441,11 +1437,11 @@ def admin_aprobar_solicitud():
     try:
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT
+        # VALIDACIÓN MULTI-TENANT (Con TRIM y UPPER)
         cur.execute("""
             SELECT id FROM pedidos_gas_glp 
-            WHERE id=%s AND cliente COLLATE utf8mb4_general_ci = (
-                SELECT nombre_comercial COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+            WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
             )
         """, (ped_id, empresa_id))
         if not cur.fetchone():
@@ -1490,11 +1486,11 @@ def rechazar_solicitud():
 
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT
+        # VALIDACIÓN MULTI-TENANT (Con TRIM y UPPER)
         cur.execute("""
             SELECT id FROM pedidos_gas_glp 
-            WHERE id=%s AND cliente COLLATE utf8mb4_general_ci = (
-                SELECT nombre_comercial COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+            WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
             )
         """, (id_solicitud, empresa_id))
         if not cur.fetchone():
@@ -1520,10 +1516,15 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
 
     try:
         cur = mysql.connection.cursor()
+        
+        # VALIDACIÓN MULTI-TENANT ESTRICTA (Con TRIM y UPPER)
         cur.execute("""
             SELECT cliente, ubicacion, lote, codigo_pedido, proveedor 
-            FROM pedidos_gas_glp WHERE id=%s
-        """, (pedido_id,))
+            FROM pedidos_gas_glp 
+            WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+            )
+        """, (pedido_id, empresa_id))
         res = cur.fetchone()
         
         if not res:
