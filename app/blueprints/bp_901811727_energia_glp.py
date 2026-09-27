@@ -934,7 +934,7 @@ def obtener_alertas_ruptura_validacion():
         return jsonify({"success": False, "message": str(e)})
 
 # ==============================================================================
-# EDICIÓN DE TANQUES Y GENERACIÓN DE QR
+# EDICIÓN DE TANQUE Y GENERACIÓN DE QR
 # ==============================================================================
 
 @csrf.exempt
@@ -1118,7 +1118,7 @@ def generar_qrs_pdf():
         return jsonify({'success': False, 'message': f'Error interno: {str(e)}'}), 500
 
 # ==============================================================================
-# NUEVAS RUTAS DE ADMINISTRACIÓN: OBTENER, ANÁLISIS Y APROBACIÓN
+# RUTAS DE ADMINISTRACIÓN: OBTENER, ANÁLISIS Y APROBACIÓN (CORREGIDAS)
 # ==============================================================================
 
 @csrf.exempt
@@ -1141,12 +1141,13 @@ def admin_obtener_solicitudes():
         # VALIDACIÓN MULTI-TENANT INTELIGENTE PARA LECTURA DE LISTA
         if session_id == '901811727' and not empresa_id_req:
             # Si es el Webmaster y no filtró una empresa en particular, mostrar TODOS los pendientes
+            # CORRECCIÓN: Colaciones explícitas en subconsultas
             sql = """
                 SELECT 
                     p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
-                    (SELECT dias_operacion FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
-                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
-                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
+                    (SELECT dias_operacion FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
+                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
+                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
                 FROM pedidos_gas_glp p 
                 WHERE p.estatus_flujo = 'pendiente_aprobacion' 
                 ORDER BY p.fecha_registro DESC
@@ -1162,12 +1163,13 @@ def admin_obtener_solicitudes():
                 
             empresa_nombre = row_emp['nombre_comercial'] if isinstance(row_emp, dict) else row_emp[0]
 
+            # CORRECCIÓN: Colaciones explícitas en subconsultas y en el filtro WHERE
             sql = """
                 SELECT 
                     p.id, p.fecha_registro, p.cliente, p.ubicacion, p.lote, p.nivel_solicitado, p.dias_extra,
-                    (SELECT dias_operacion FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
-                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
-                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
+                    (SELECT dias_operacion FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as dias_operacion,
+                    (SELECT `nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `nivel tk-1`,
+                    (SELECT `testigo nivel tk-1` FROM cardex_glp WHERE lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND operacion IN ('consumo','inicio_calefaccion') ORDER BY id DESC LIMIT 1) as `testigo nivel tk-1`
                 FROM pedidos_gas_glp p 
                 WHERE p.estatus_flujo = 'pendiente_aprobacion' 
                   AND TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(%s)) COLLATE utf8mb4_general_ci
@@ -1185,6 +1187,7 @@ def admin_obtener_solicitudes():
             if rd.get('nivel tk-1') is not None: 
                 tk_info.append({"numero": "Ref", "nivel": rd.get('nivel tk-1'), "foto": rd.get('testigo nivel tk-1')})
             
+            # CORRECCIÓN: Exportamos la variable nivel_solicitado y solicitado para soportar ambas vistas
             items.append({
                 "id": rd.get('id'), 
                 "fecha": str(rd.get('fecha_registro')), 
@@ -1192,7 +1195,8 @@ def admin_obtener_solicitudes():
                 "ubicacion": rd.get('ubicacion'), 
                 "lote": rd.get('lote'), 
                 "dias_operacion": rd.get('dias_operacion'), 
-                "solicitado": float(rd.get('nivel_solicitado') or 0), 
+                "nivel_solicitado": float(rd.get('nivel_solicitado') or 0), 
+                "solicitado": float(rd.get('nivel_solicitado') or 0),
                 "dias_extra": rd.get('dias_extra'), 
                 "tanques": tk_info
             })
@@ -1225,6 +1229,7 @@ def admin_analizar_proyeccion():
                 WHERE id=%s
             """, (ped_id,))
         else:
+            # CORRECCIÓN: Colación explícita
             cur.execute("""
                 SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
                 FROM pedidos_gas_glp 
@@ -1341,6 +1346,7 @@ def admin_aprobar_solicitud():
         if session_id == '901811727':
              cur.execute("SELECT id FROM pedidos_gas_glp WHERE id=%s", (ped_id,))
         else:
+            # CORRECCIÓN: Colación explícita
             cur.execute("""
                 SELECT id FROM pedidos_gas_glp 
                 WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
@@ -1396,6 +1402,7 @@ def rechazar_solicitud():
         if session_id == '901811727':
             cur.execute("SELECT id FROM pedidos_gas_glp WHERE id=%s", (id_solicitud,))
         else:
+            # CORRECCIÓN: Colación explícita
             cur.execute("""
                 SELECT id FROM pedidos_gas_glp 
                 WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
@@ -1436,6 +1443,7 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
                 WHERE id=%s
             """, (pedido_id,))
         else:
+            # CORRECCIÓN: Colación explícita
             cur.execute("""
                 SELECT cliente, ubicacion, lote, codigo_pedido, proveedor 
                 FROM pedidos_gas_glp 
@@ -1553,111 +1561,3 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
     except Exception as e:
         print(f"⛔ Error enviando correo GLP: {e}")
         return False
-
-# ==============================================================================
-# UTILIDADES Y OPERACIONES
-# ==============================================================================
-
-@csrf.exempt
-@bp_energia_glp.route('/ejecutar_limpieza_automatica')
-@login_required_custom
-def ejecutar_limpieza_automatica():
-    dias_limite = 60
-    total_borrados = 0
-    base_dir = current_app.static_folder
-    
-    cur = mysql.connection.cursor()
-    try:
-        cur.execute(f"""
-            SELECT * FROM cardex_glp 
-            WHERE fecha < DATE_SUB(NOW(), INTERVAL {dias_limite} DAY)
-        """)
-        filas_glp = cur.fetchall()
-        cols_glp = [desc[0] for desc in cur.description] if filas_glp else []
-
-        for fila in filas_glp:
-            row = dict(zip(cols_glp, fila)) if not isinstance(fila, dict) else fila
-            rutas_glp = []
-            cols_update_glp = []
-
-            for col, val in row.items():
-                if val and isinstance(val, str) and 'testigo' in col.lower():
-                    rutas_glp.append(val.strip())
-                    cols_update_glp.append(col)
-            
-            if rutas_glp:
-                _borrar_evidencias_tanqueo(rutas_glp) 
-            
-            if cols_update_glp:
-                set_clause = ", ".join([f"`{c}` = NULL" for c in cols_update_glp])
-                cur.execute(f"UPDATE cardex_glp SET {set_clause} WHERE id = %s", (row['id'],))
-
-        mysql.connection.commit()
-        mensaje = f"Mantenimiento de GLP completado. Se limpiaron evidencias antiguas."
-        return jsonify({'success': True, 'message': mensaje})
-
-    except Exception as e:
-        print(f"⚠️ Error en limpieza automática: {e}")
-        return jsonify({'success': False, 'message': str(e)})
-    finally:
-        cur.close()
-
-@bp_energia_glp.route('/util/recalcular_historico')
-@login_required_custom
-def recalcular_historico_glp():
-    try:
-        cur = mysql.connection.cursor()
-        
-        cur.execute("SELECT DISTINCT lote FROM cardex_glp WHERE lote IS NOT NULL")
-        lotes_raw = cur.fetchall()
-        lotes = [row['lote'] if isinstance(row, dict) else row[0] for row in lotes_raw]
-        
-        registros_actualizados = 0
-        
-        for lote in lotes:
-            cur.execute("""
-                SELECT pollitos FROM cardex_glp 
-                WHERE lote=%s AND operacion='inicio_calefaccion' LIMIT 1
-            """, (lote,))
-            row_p = cur.fetchone()
-            
-            pollitos = 0
-            if row_p:
-                pollitos = row_p.get('pollitos') if isinstance(row_p, dict) else row_p[0]
-            
-            if not pollitos or float(pollitos) <= 0:
-                continue
-                
-            cur.execute("""
-                SELECT id, COALESCE(neto_gastado, 0) as neto 
-                FROM cardex_glp 
-                WHERE lote=%s 
-                ORDER BY id ASC
-            """, (lote,))
-            registros = cur.fetchall()
-            
-            consumo_acumulado = 0.0
-            
-            for reg in registros:
-                r_id = reg['id'] if isinstance(reg, dict) else reg[0]
-                r_neto = float(reg['neto'] if isinstance(reg, dict) else reg[1])
-                
-                consumo_acumulado += r_neto
-                nuevo_kg_pollito = consumo_acumulado / float(pollitos)
-                
-                cur.execute("UPDATE cardex_glp SET kg_pollito=%s WHERE id=%s", (nuevo_kg_pollito, r_id))
-                registros_actualizados += 1
-                
-        mysql.connection.commit()
-        cur.close()
-        
-        return jsonify({
-            "success": True, 
-            "message": f"¡Éxito! Se han recalculado y corregido {registros_actualizados} registros históricos."
-        })
-
-    except Exception as e:
-        mysql.connection.rollback()
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "error": str(e)})

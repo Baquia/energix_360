@@ -698,15 +698,21 @@
         ov.innerHTML = `<div class="pregunta-card text-center bg-white p-4 rounded" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><h5 class="fw-bold mb-3">Evidencia Fotográfica</h5>${galeria}<button class="btn btn-secondary w-100 mt-2 fw-bold" onclick="this.closest('.pregunta-overlay').remove()">Cerrar Visor</button></div>`;
         document.body.appendChild(ov);
     }
+    
     // =========================================================================
     // FUNCIONES RESTAURADAS: RENDER DE TABLA, SIMULACIÓN Y APROBACIÓN GLP
     // =========================================================================
+
+    function mostrarSeccionAprobacionesGLP(empresaId) {
+        document.querySelectorAll('#glpDashboardContainer .form-section').forEach(el => el.style.display = 'none');
+        document.getElementById('seccionAprobacionesGLP').style.display = 'block';
+        cargarAprobacionesGLP(empresaId);
+    }
 
     function cargarAprobacionesGLP(empresaId) {
         const tbody = document.getElementById('tablaAprobacionesGLP');
         tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border text-primary"></div></td></tr>';
 
-        // CORRECCIÓN CRÍTICA: Apuntamos al endpoint de administración real de pendientes de aprobación
         fetch('/glp/admin/obtener_solicitudes_pendientes', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
@@ -721,26 +727,31 @@
             document.getElementById('msgSinAprobaciones').style.display = 'none';
 
             data.items.forEach(item => {
-                let maxNivel = 0; let htmlTanques = '<div class="d-flex gap-2">';
-                if(item.tanques) {
+                let maxNivel = 0; 
+                let htmlTanques = '<div class="d-flex gap-2">';
+                if(item.tanques && item.tanques.length > 0) {
                     item.tanques.forEach(t => {
                         if (t.nivel > maxNivel) maxNivel = t.nivel; 
                         let color = t.nivel <= 25 ? 'text-danger fw-bold' : '';
                         htmlTanques += `<div class="border p-1 rounded text-center" style="min-width:60px;"><div class="small fw-bold">${t.numero}</div><div class="${color}">${t.nivel}%</div></div>`;
                     });
-                } else { htmlTanques += `<div class="small text-muted">Evaluar Proyección</div>`; }
+                } else { 
+                    htmlTanques += `<div class="small text-muted">Evaluar Proyección</div>`; 
+                }
                 htmlTanques += '</div>';
+
+                // Usamos la nueva variable del backend o el fallback
+                let nivelSol = item.nivel_solicitado !== undefined ? item.nivel_solicitado : item.solicitado;
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${item.fecha.substring(0, 16)}</td>
-                    <td><div class="fw-bold">${item.cliente || item.proveedor}</div><div class="small text-muted">${item.ubicacion}</div></td>
+                    <td><div class="fw-bold">${item.cliente || item.proveedor || ''}</div><div class="small text-muted">${item.ubicacion}</div></td>
                     <td><div>${item.lote || '-'} <br><small class="text-muted">${item.dias_operacion || 0} Días</small></div></td>
                     <td>${htmlTanques}</td>
-                    <td class="text-center"><div class="fs-5 fw-bold text-success">${item.solicitado || item.nivel_solicitado}%</div><div class="small text-muted">Llenar hasta</div></td>
+                    <td class="text-center"><div class="fs-5 fw-bold text-success">${nivelSol}%</div><div class="small text-muted">Llenar hasta</div></td>
                     <td class="text-center">
                         <div class="d-flex justify-content-center gap-2">
-                            <!-- SE PASA empresaId DIRECTAMENTE AL EVENTO CLICK -->
                             <button class="btn btn-danger btn-sm fw-bold" title="Anular" onclick="rechazarSolicitudGLP(${item.id}, this, '${empresaId}')">❌ Rechazar</button>
                             <button class="btn btn-primary btn-sm fw-bold" onclick="abrirSimuladorProyeccion(${item.id}, '${empresaId}')">📈 Analizar Simulación</button>
                         </div>
@@ -773,8 +784,6 @@
 
     function abrirSimuladorProyeccion(id, empresaId) {
         idPedidoEnAnalisis = id;
-        
-        // Guardamos el ID del cliente de forma persistente para la aprobación posterior
         window.empresaIdEnAnalisis = empresaId; 
         
         const btn = event.currentTarget; 
@@ -827,13 +836,11 @@
         
         datosSimulacion.proyeccion_inteligente.forEach(pt => {
             labels.push(pt.fecha_str);
-            
-            // Recalcular proyección restando la tasa diaria y validando festivos
             nivelSim -= (pt.es_festivo ? (tasa * 0.2) : tasa);
             if (nivelSim < 0) nivelSim = 0;
             
             dataProy.push(nivelSim.toFixed(1));
-            dataMin.push(30); // Umbral de seguridad (30%)
+            dataMin.push(30); 
         });
 
         const ctx = document.getElementById('chartProyeccion').getContext('2d');
@@ -867,9 +874,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, max: 100 }
-                }
+                scales: { y: { beginAtZero: true, max: 100 } }
             }
         });
     }
@@ -889,7 +894,7 @@
             body: JSON.stringify({
                 id: idPedidoEnAnalisis,
                 nivel_aprobado: nivelFinal,
-                empresa_id: window.empresaIdEnAnalisis // <-- Se inyecta el ID guardado
+                empresa_id: window.empresaIdEnAnalisis
             })
         })
         .then(r => r.json())
@@ -898,7 +903,7 @@
                 alert("Aprobación ejecutada exitosamente.");
                 bootstrap.Modal.getInstance(document.getElementById('modalProyeccion')).hide();
                 
-                let btnRechazar = document.querySelector(`button[onclick="rechazarSolicitudGLP(${idPedidoEnAnalisis}, this, '${window.empresaIdEnAnalisis}')"]`);
+                let btnRechazar = document.querySelector(`button[onclick*="rechazarSolicitudGLP(${idPedidoEnAnalisis}"]`);
                 if(btnRechazar){
                     let tr = btnRechazar.closest('tr');
                     if(tr) tr.remove();
