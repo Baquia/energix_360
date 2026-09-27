@@ -1310,3 +1310,283 @@ def obtener_pendientes_tanqueo_reporte():
     except Exception as e:
         print("Error reporte pendientes:", str(e))
         return jsonify({"success": False, "message": str(e)})
+    
+# RUTAS RESTAURADAS Y BLINDADAS: PROYECCIÓN Y APROBACIÓN GLP
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/analizar_proyeccion', methods=['POST'])
+@login_required_custom
+def admin_analizar_proyeccion():
+    data = request.get_json(force=True) or {}
+    ped_id = data.get('id')
+    empresa_id = session.get('empresa_id')
+    
+    try:
+        cur = mysql.connection.cursor()
+        
+        # VALIDACIÓN MULTI-TENANT ESTRICTA: Aseguramos que el pedido pertenezca a la empresa del usuario
+        cur.execute("""
+            SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
+            FROM pedidos_gas_glp 
+            WHERE id=%s AND cliente = (SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1)
+        """, (ped_id, empresa_id))
+        head = cur.fetchone()
+        
+        if not head: 
+            cur.close()
+            return jsonify({"success": False, "message": "Pedido no encontrado o sin permisos de acceso."})
+            
+        if isinstance(head, dict):
+            lote = head['lote']
+            solicitado = float(head.get('nivel_solicitado') or 0)
+            dias_extra = int(head.get('dias_extra') or 0)
+        else:
+            lote = head[0]
+            solicitado = float(head[3] or 0)
+            dias_extra = int(head[4] or 0)
+        
+        # Cálculo técnico de tasa de descenso
+        cur.execute("""
+            SELECT fecha, `nivel tk-1` FROM cardex_glp 
+            WHERE lote=%s ORDER BY fecha DESC LIMIT 5
+        """, (lote,))
+        rows_hist = cur.fetchall()
+        
+        tasa = 8.0 # Tasa por defecto
+        if rows_hist and len(rows_hist) > 1:
+            deltas = []
+            for i in range(len(rows_hist)-1):
+                f1 = rows_hist[i]['fecha'] if isinstance(rows_hist[i], dict) else rows_hist[i][0]
+                n1 = float((rows_hist[i]['nivel tk-1'] if isinstance(rows_hist[i], dict) else rows_hist[i][1]) or 0)
+                
+                f2 = rows_hist[i+1]['fecha'] if isinstance(rows_hist[i+1], dict) else rows_hist[i+1][0]
+                n2 = float((rows_hist[i+1]['nivel tk-1'] if isinstance(rows_hist[i+1], dict) else rows_hist[i+1][1]) or 0)
+                
+                diff_days = (f1 - f2).days
+                if diff_days > 0:
+                    diff_niv = n2 - n1
+                    if diff_niv > 0: deltas.append(diff_niv / diff_days)
+            if deltas: tasa = sum(deltas)/len(deltas)
+
+        # Datos Actuales para la simulación
+        cur.execute("SELECT `nivel tk-1`, dias_operacion, fecha FROM cardex_glp WHERE lote=%s ORDER BY id DESC LIMIT 1", (lote,))
+        curr = cur.fetchone()
+        cur.close()
+        
+        niv_act = float(curr[0] or 0) if curr else 0
+        dia_act = int(curr[1] or 0) if curr else 0
+        fecha_ultima = curr[2] if curr else datetime.now().date()
+        if isinstance(fecha_ultima, datetime): fecha_ultima = fecha_ultima.date()
+        
+        # Proyección Dinámica
+        from datetime import timedelta
+        import holidays
+        co_holidays = holidays.CO() 
+        
+        puntos_grafica = []
+        fecha_sim = fecha_ultima
+        nivel_sim = niv_act + solicitado
+        if nivel_sim > 100: nivel_sim = 100
+        
+        ciclo_total = 15 + dias_extra
+        dias_a_proyectar = (ciclo_total - dia_act) + 4 
+
+        for d in range(1, dias_a_proyectar + 1):
+            fecha_sim += timedelta(days=1)
+            
+            es_festivo = (fecha_sim in co_holidays) or (fecha_sim.weekday() >= 5) 
+            factor_consumo = 0.2 if es_festivo else 1.0 
+            consumo_dia = tasa * factor_consumo
+            
+            nivel_sim -= consumo_dia
+            if nivel_sim < 0: nivel_sim = 0
+            
+            puntos_grafica.append({
+                "dia_ciclo": dia_act + d,
+                "fecha_str": fecha_sim.strftime("%d/%m"),
+                "nivel": round(nivel_sim, 1),
+                "es_festivo": es_festivo
+            })
+
+        return jsonify({
+            "success": True, 
+            "nivel_actual": niv_act, 
+            "tasa_descenso_diaria": round(tasa, 2), 
+            "dia_actual": dia_act, 
+            "dias_extra_aprobados": dias_extra,
+            "solicitado_original": solicitado,
+            "proyeccion_inteligente": puntos_grafica, 
+            "ciclo_meta": ciclo_total
+        })
+        
+    except Exception as e: 
+        return jsonify({"success": False, "message": str(e)})
+
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/aprobar_solicitud', methods=['POST'])
+@login_required_custom
+def admin_aprobar_solicitud():
+    data = request.get_json(force=True) or {}
+    ped_id = data.get('id')
+    nivel = data.get('nivel_aprobado')
+    empresa_id = session.get('empresa_id')
+    
+    try:
+        cur = mysql.connection.cursor()
+        
+        # VALIDACIÓN MULTI-TENANT ESTRICTA: Comprobar propiedad antes de mutar
+        cur.execute("SELECT id FROM pedidos_gas_glp WHERE id=%s AND cliente = (SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1)", (ped_id, empresa_id))
+        if not cur.fetchone():
+            cur.close()
+            return jsonify({"success": False, "message": "Acceso denegado a este registro."})
+        
+        if nivel: 
+            cur.execute("UPDATE pedidos_gas_glp SET nivel_solicitado=%s WHERE id=%s", (nivel, ped_id))
+        else:
+            cur.execute("SELECT nivel_solicitado FROM pedidos_gas_glp WHERE id=%s", (ped_id,))
+            res = cur.fetchone()
+            if res:
+                nivel = res[0] if not isinstance(res, dict) else res.get('nivel_solicitado')
+            
+        cur.execute("UPDATE pedidos_gas_glp SET estatus_flujo='aprobado_webmaster' WHERE id=%s", (ped_id,))
+        mysql.connection.commit()
+        cur.close()
+        
+        env = _enviar_correo_aprobado_proveedor(ped_id, nivel, empresa_id)
+        
+        return jsonify({
+            "success": True, 
+            "message": "Solicitud aprobada correctamente." + (" Proveedor notificado." if env else " Error enviando correo al proveedor.")
+        })
+        
+    except Exception as e: 
+        return jsonify({"success": False, "message": str(e)})
+
+
+def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
+    if not EMAIL_USER or not EMAIL_PASS:
+        return False
+
+    try:
+        cur = mysql.connection.cursor()
+        
+        # VALIDACIÓN MULTI-TENANT ESTRICTA
+        cur.execute("""
+            SELECT cliente, ubicacion, lote, codigo_pedido, proveedor 
+            FROM pedidos_gas_glp 
+            WHERE id=%s AND cliente = (SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1)
+        """, (pedido_id, empresa_id))
+        res = cur.fetchone()
+        
+        if not res:
+            cur.close()
+            return False
+            
+        if isinstance(res, dict):
+            emp, ubi, lot, cod, prov = res['cliente'], res['ubicacion'], res['lote'], res['codigo_pedido'], res['proveedor']
+        else:
+            emp, ubi, lot, cod, prov = res[0], res[1], res[2], res[3], res[4]
+
+        cur.execute("""
+            SELECT `nivel tk-1`, `nivel tk-2`, `nivel tk-3`, `nivel tk-4`, `nivel tk-5`, `nivel tk-6` 
+            FROM cardex_glp 
+            WHERE lote = %s ORDER BY id DESC LIMIT 1
+        """, (lot,))
+        row_niveles = cur.fetchone()
+        
+        nivel_actual_promedio = 0.0
+        if row_niveles:
+            valores_validos = []
+            if isinstance(row_niveles, dict):
+                for i in range(1, 7):
+                    val = row_niveles.get(f'nivel tk-{i}')
+                    if val is not None: valores_validos.append(float(val))
+            else:
+                for val in row_niveles:
+                    if val is not None: valores_validos.append(float(val))
+            
+            if valores_validos:
+                nivel_actual_promedio = sum(valores_validos) / len(valores_validos)
+                
+        try: delta_aprobado = float(nivel_aprobado)
+        except: delta_aprobado = 0.0
+            
+        nivel_objetivo = nivel_actual_promedio + delta_aprobado
+        if nivel_objetivo > 80.0: nivel_objetivo = 80.0
+        
+        cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor=%s AND id_empresa=%s", (prov, empresa_id))
+        pdat = cur.fetchone()
+        cur.close()
+        
+        emails = []
+        if pdat:
+            if isinstance(pdat, dict):
+                if pdat.get('email1'): emails.append(pdat.get('email1'))
+                if pdat.get('email2'): emails.append(pdat.get('email2'))
+            else:
+                if pdat[0]: emails.append(pdat[0])
+                if pdat[1]: emails.append(pdat[1])
+        
+        if not emails:
+            emails = [EMAIL_USER]
+
+        cuerpo = f"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <body style="background-color: #f4f4f4; padding: 20px; font-family: Arial, sans-serif;">
+            <div style="background-color: #ffffff; max-width: 500px; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow: hidden;">
+                <div style="background-color: #015249; color: white; padding: 20px; text-align: center;">
+                    <h2 style="margin: 0; font-size: 22px;">Orden de Suministro GLP</h2>
+                    <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Solicitud Aprobada</p>
+                </div>
+                <div style="padding: 25px;">
+                    <div style="background-color: #e8f5e9; border: 2px dashed #015249; padding: 15px; text-align: center; margin-bottom: 25px; border-radius: 6px;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: #555; letter-spacing: 1px; margin-bottom: 5px;">Código de Pedido</div>
+                        <div style="font-size: 26px; font-weight: 800; color: #015249;">{cod}</div>
+                    </div>
+                    <p style="color: #333; margin-bottom: 15px;">Se autoriza el despacho de gas para:</p>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 10px 0; color: #666;">🏢 Cliente:</td>
+                            <td style="padding: 10px 0; font-weight: bold; text-align: right; color: #333;">{emp}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 10px 0; color: #666;">📍 Sede:</td>
+                            <td style="padding: 10px 0; font-weight: bold; text-align: right; color: #333;">{ubi}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px 0; color: #666;">📊 Nivel Objetivo (Manómetro):</td>
+                            <td style="padding: 10px 0; font-weight: bold; text-align: right; color: #015249; font-size: 18px;">{round(nivel_objetivo, 2)}%</td>
+                        </tr>
+                    </table>
+                    <div style="margin-top: 25px; padding: 10px; background-color: #fff8e1; border-left: 4px solid #ffc107; font-size: 13px; color: #795548;">
+                        <strong>Instrucción:</strong> Favor suministrar gas hasta alcanzar el Nivel Objetivo detallado. Incluir el código de pedido en la factura.
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg = MIMEMultipart()
+        msg["Subject"] = f"✅ Orden de Suministro Aprobada: {cod} - {ubi}"
+        msg["From"] = EMAIL_FROM
+        msg["To"] = ", ".join(emails)
+        
+        from email.utils import make_msgid, formatdate
+        msg["Message-ID"] = make_msgid()
+        msg["Date"] = formatdate(localtime=True)
+        msg["Reply-To"] = EMAIL_FROM
+
+        msg.attach(MIMEText(cuerpo, "html", "utf-8"))
+
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as s:
+            s.starttls()
+            s.login(EMAIL_USER, EMAIL_PASS)
+            s.sendmail(EMAIL_USER, emails, msg.as_string())
+        
+        return True
+    except Exception as e:
+        print(f"⛔ Error enviando correo GLP: {e}")
+        return False

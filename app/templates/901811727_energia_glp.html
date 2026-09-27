@@ -761,4 +761,146 @@
         ov.innerHTML = `<div class="pregunta-card text-center bg-white p-4 rounded" style="max-width: 600px; max-height: 90vh; overflow-y: auto;"><h5 class="fw-bold mb-3">Evidencia Fotográfica</h5>${galeria}<button class="btn btn-secondary w-100 mt-2 fw-bold" onclick="this.closest('.pregunta-overlay').remove()">Cerrar Visor</button></div>`;
         document.body.appendChild(ov);
     }
+    // --- FUNCIONES RESTAURADAS: SIMULACIÓN Y APROBACIÓN ---
+
+    function abrirSimuladorProyeccion(id) {
+        idPedidoEnAnalisis = id;
+        
+        // Efecto de carga en el botón cliqueado
+        const btn = event.currentTarget; 
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analizando...';
+        btn.disabled = true;
+
+        fetch('/glp/admin/analizar_proyeccion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            
+            if (data.success) {
+                datosSimulacion = data;
+                document.getElementById('sim_nivel_actual').textContent = data.nivel_actual.toFixed(1) + '%';
+                document.getElementById('sim_tasa').textContent = data.tasa_descenso_diaria.toFixed(2) + ' %/día';
+                document.getElementById('sim_input_solicita').value = data.solicitado_original;
+                
+                actualizarGraficaSimulacion();
+                new bootstrap.Modal(document.getElementById('modalProyeccion')).show();
+            } else {
+                alert("Error al analizar: " + data.message);
+            }
+        })
+        .catch(e => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            alert("Error de conexión con el simulador.");
+        });
+    }
+
+    function actualizarGraficaSimulacion() {
+        if (!datosSimulacion) return;
+        
+        let solicitado = parseFloat(document.getElementById('sim_input_solicita').value) || 0;
+        let nivelActual = datosSimulacion.nivel_actual;
+        let tasa = datosSimulacion.tasa_descenso_diaria;
+        
+        let nivelSim = nivelActual + solicitado;
+        if (nivelSim > 100) nivelSim = 100;
+
+        let labels = [];
+        let dataProy = [];
+        let dataMin = [];
+        
+        datosSimulacion.proyeccion_inteligente.forEach(pt => {
+            labels.push(pt.fecha_str);
+            
+            // Recalcular proyección restando la tasa diaria
+            nivelSim -= (pt.es_festivo ? (tasa * 0.2) : tasa);
+            if (nivelSim < 0) nivelSim = 0;
+            
+            dataProy.push(nivelSim.toFixed(1));
+            dataMin.push(30); // Línea roja de seguridad (Umbral Crítico)
+        });
+
+        const ctx = document.getElementById('chartProyeccion').getContext('2d');
+        if (chartSimulador) chartSimulador.destroy();
+        
+        chartSimulador = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Proyección Nivel (%)',
+                        data: dataProy,
+                        borderColor: '#015249',
+                        backgroundColor: 'rgba(1, 82, 73, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Límite Crítico (30%)',
+                        data: dataMin,
+                        borderColor: '#dc3545',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, max: 100 }
+                }
+            }
+        });
+    }
+
+    function confirmarAprobacionSimulada() {
+        let nivelFinal = parseFloat(document.getElementById('sim_input_solicita').value);
+        if (isNaN(nivelFinal) || nivelFinal <= 0) {
+            alert("Ingrese un nivel de aprobación válido.");
+            return;
+        }
+
+        if (!confirm("¿Desea aprobar la solicitud final por " + nivelFinal + "% y enviar la orden de servicio al proveedor?")) return;
+
+        fetch('/glp/admin/aprobar_solicitud', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: idPedidoEnAnalisis,
+                nivel_aprobado: nivelFinal
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert("Aprobación ejecutada exitosamente.");
+                bootstrap.Modal.getInstance(document.getElementById('modalProyeccion')).hide();
+                
+                // Retirar la fila de la vista local (optimización UI)
+                let btnRechazar = document.querySelector(`button[onclick="rechazarSolicitudGLP(${idPedidoEnAnalisis}, this)"]`);
+                if(btnRechazar){
+                    let tr = btnRechazar.closest('tr');
+                    if(tr) tr.remove();
+                }
+                
+                // Mostrar alerta de bandeja vacía si corresponde
+                if (document.getElementById('tablaAprobacionesGLP').children.length === 0) {
+                    document.getElementById('msgSinAprobaciones').style.display = 'block';
+                }
+            } else {
+                alert("Error de procesamiento: " + data.message);
+            }
+        }).catch(err => alert("Error de red intentando aprobar."));
+    }
 </script>
