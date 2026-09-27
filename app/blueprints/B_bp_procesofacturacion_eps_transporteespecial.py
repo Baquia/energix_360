@@ -4,14 +4,18 @@ import json
 import zipfile
 import io
 import csv
+import hashlib
 from datetime import datetime
-from flask import Blueprint, render_template, session, redirect, url_for, request, flash, send_file, Response
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash, send_file, Response, current_app, jsonify
 from app import mysql
 from app.utils import login_required_custom
 from functools import wraps
 import MySQLdb.cursors
+import pytz
 
 bp_procesofacturacion_eps = Blueprint('procesofacturacion_eps', __name__, url_prefix='/gestor_flotaespecial/facturacion_eps')
+
+BOGOTA_TZ = pytz.timezone('America/Bogota')
 
 def controlador_flotaespecial_required(f):
     @wraps(f)
@@ -67,7 +71,7 @@ def asegurar_tablas_facturacion(cur):
         pass
 
 # =========================================================
-# VISTA PRINCIPAL DEL MÓDULO
+# VISTA PRINCIPAL DEL MÓDULO (Lotes de Facturación)
 # =========================================================
 @bp_procesofacturacion_eps.route('/', methods=['GET'])
 @login_required_custom
@@ -98,6 +102,7 @@ def index_facturacion():
         nit=session.get('nit'), 
         empresa=session.get('empresa'), 
         nombre=session.get('nombre'),
+        active_module='index_facturacion',
         prefacturas=prefacturas,
         pendientes=pendientes
     )
@@ -170,76 +175,140 @@ def consolidar_lote():
     return redirect(url_for('procesofacturacion_eps.index_facturacion'))
 
 # =========================================================
-# 2. GENERACIÓN RIPS JSON (Res. 2275 de 2023)
+# 2. GENERACIÓN RIPS JSON (Res. 0948 de 2026 - Anexo 1)
 # =========================================================
-@bp_procesofacturacion_eps.route('/descargar_rips/<int:lote_id>', methods=['GET'])
+@bp_procesofacturacion_eps.route('/descargar_rips/<int:lote_id>', methods=['POST'])
 @login_required_custom
 @controlador_flotaespecial_required
 def descargar_rips(lote_id):
     empresa_id = session.get('empresa_id')
+    num_factura = request.form.get('numero_factura', f"FEV-{lote_id}")
+    
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    
-    cur.execute("SELECT * FROM control_viajes_flota_especial WHERE id_empresa = %s AND id_prefactura = %s", (empresa_id, lote_id))
-    viajes = cur.fetchall()
-    cur.close()
+    try:
+        # 1. Obtener la prefactura
+        cur.execute("SELECT * FROM prefacturas_eps_tespecial WHERE id = %s AND id_empresa = %s", (lote_id, empresa_id))
+        lote = cur.fetchone()
+        if not lote:
+            flash('Lote de facturación no encontrado.', 'danger')
+            return redirect(url_for('procesofacturacion_eps.index_facturacion'))
 
-    if not viajes:
-        flash('No hay viajes asociados a este lote.', 'danger')
+        # 2. Obtener los viajes consolidados cruzando con tarifario
+        cur.execute("""
+            SELECT c.*, t.valor_unidad
+            FROM control_viajes_flota_especial c
+            LEFT JOIN tarifario_eps_contratos t ON c.tipo_servicio = t.codigo_servicio AND c.id_empresa = t.id_empresa AND t.numero_contrato = %s
+            WHERE c.id_prefactura = %s AND c.id_empresa = %s
+        """, (lote['numero_contrato'], lote_id, empresa_id))
+        viajes = cur.fetchall()
+
+        if not viajes:
+            flash('No hay viajes asociados a este lote.', 'danger')
+            return redirect(url_for('procesofacturacion_eps.index_facturacion'))
+
+        # 3. Agrupar por usuarios y armar la estructura RIPS JSON según Anexo 1 para Transporte
+        usuarios_dict = {}
+        consecutivo_servicio = 1
+
+        for v in viajes:
+            id_usr = v['id_usuario']
+            if id_usr not in usuarios_dict:
+                # Capturar datos demográficos inyectados desde el formulario del frontend
+                cod_mun = request.form.get(f'mun_{id_usr}', '00000')
+                cod_zona = request.form.get(f'zona_{id_usr}', '01')
+                
+                usuarios_dict[id_usr] = {
+                    "tipoDocumentoIdentificacion": v.get('tipo_documento', 'CC'),
+                    "numDocumentoIdentificacion": id_usr,
+                    "tipoUsuario": "01",
+                    "fechaNacimiento": "1990-01-01", # Placeholder demográfico requerido
+                    "codSexo": "M",
+                    "codPaisResidencia": "170",
+                    "codMunicipioResidencia": cod_mun,
+                    "codZonaTerritorialResidencia": cod_zona,
+                    "incapacidad": "02",
+                    "consecutivo": len(usuarios_dict) + 1,
+                    "codPaisOrigen": "170",
+                    "registroSIRAS": None,
+                    "servicios": {
+                        "otrosServicios": []
+                    }
+                }
+
+            # Construir el nodo "otrosServicios" (Transporte - Código 03) según Anexo 1
+            servicio_obj = {
+                "codPrestador": session.get('nit')[:10],
+                "numAutorizacion": v.get('numero_autorizacion') if v.get('numero_autorizacion') else None,
+                "idMIPRES": v.get('numero_prescripcion') if v.get('numero_prescripcion') else None,
+                "fechaSuministroTecnologia": v['fecha_servicio'].strftime('%Y-%m-%d %H:%M') if v.get('fecha_servicio') else None,
+                "tipoOS": "03", # 03 corresponde a Transporte Especial
+                "codTecnologiaSalud": v.get('tipo_servicio', '0000'), 
+                "nomTecnologiaSalud": None, # Exención norma: null para transporte
+                "cantidadOS": 1,
+                "tipoDocumentoIdentificacion": None, # Exención norma: null para transporte
+                "numDocumentoIdentificacion": None, # Exención norma: null para transporte
+                "vrUnitOS": float(v.get('valor_unidad') or 0.0),
+                "vrDispensacion": 0, # Exención norma: Siempre 0 para transporte
+                "vrServicio": float(v.get('valor_unidad') or 0.0),
+                "conceptoRecaudo": "05", # No aplica pago moderador por defecto
+                "valorPagoModerador": 0,
+                "numFEVPagoModerador": None,
+                "codigoVIDA": None,
+                "consecutivo": consecutivo_servicio
+            }
+            usuarios_dict[id_usr]["servicios"]["otrosServicios"].append(servicio_obj)
+            consecutivo_servicio += 1
+
+        rips_payload = {
+            "numDocumentoIdObligado": session.get('nit'),
+            "numFactura": num_factura,
+            "tipoNota": None,
+            "numNota": None,
+            "usuarios": list(usuarios_dict.values())
+        }
+
+        # 4. Generar Archivo ZIP en Memoria
+        json_str = json.dumps(rips_payload, ensure_ascii=False, indent=4)
+        memory_file = io.BytesIO()
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f"RIPS_{num_factura}.json", json_str)
+        memory_file.seek(0)
+
+        # 5. Actualizar estado de la prefactura
+        cur.execute("UPDATE prefacturas_eps_tespecial SET estado_rips = 'JSON_GENERADO' WHERE id = %s", (lote_id,))
+        mysql.connection.commit()
+
+        return send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'RIPS_{num_factura}.zip'
+        )
+
+    except Exception as e:
+        mysql.connection.rollback()
+        flash(f'Error al generar JSON: {str(e)}', 'danger')
         return redirect(url_for('procesofacturacion_eps.index_facturacion'))
+    finally:
+        cur.close()
 
-    # Estructura base RIPS JSON (Aislado completamente del SHA-256 interno)
-    # Solo datos normativos de MinSalud
-    usuarios_us = []
-    servicios_os = []
-    
-    visitados = set()
-    for v in viajes:
-        # Agrupar por paciente único para el array 'usuarios' (US)
-        if v['id_usuario'] not in visitados:
-            usuarios_us.append({
-                "tipoDocumentoIdentificacion": v.get('tipo_documento', 'CC'),
-                "numDocumentoIdentificacion": v['id_usuario'],
-                "tipoUsuario": "01", # Ajustar según tabla real
-                "fechaNacimiento": "1990-01-01", # Ejemplo: se debe cruzar con maestra
-                "codSexo": "M",
-                "codPaisResidencia": "170",
-                "codMunicipioResidencia": "001",
-                "codZonaTerritorialResidencia": "01"
-            })
-            visitados.add(v['id_usuario'])
-            
-        # Generar cobro único por servicio integral (Agrupando IDA/VUELTA)
-        # Aquí se asume que si el trayecto es IDA, registra el servicio para no duplicarlo con la VUELTA
-        if v['trayecto'] == 'IDA':
-            servicios_os.append({
-                "numAutorizacion": v.get('numero_autorizacion', ''),
-                "numPrescripcion": v.get('numero_prescripcion', ''),
-                "tipoDocumentoIdentificacion": v.get('tipo_documento', 'CC'),
-                "numDocumentoIdentificacion": v['id_usuario'],
-                "codPrestador": "000000000001", # Reemplazar con código de habilitación real
-                "fechaRegistro": v['fecha_servicio'].strftime('%Y-%m-%d %H:%M') if v['fecha_servicio'] else "",
-                "codProcedimiento": v.get('tipo_servicio', ''),
-                "valorProcedimiento": 0.00 # Traer del tarifario
-            })
-
-    rips_payload = {
-        "usuarios": usuarios_us,
-        "servicios": servicios_os
-    }
-
-    json_str = json.dumps(rips_payload, indent=4)
-    
-    memory_file = io.BytesIO()
-    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"RIPS_LOTE_{lote_id}.json", json_str)
-    memory_file.seek(0)
-
-    return send_file(
-        memory_file,
-        mimetype='application/zip',
-        as_attachment=True,
-        download_name=f'RIPS_LOTE_{lote_id}.zip'
-    )
+@bp_procesofacturacion_eps.route('/api/obtener_pacientes_lote/<int:lote_id>', methods=['GET'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_obtener_pacientes_lote(lote_id):
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("""
+            SELECT DISTINCT id_usuario, nombre_usuario 
+            FROM control_viajes_flota_especial 
+            WHERE id_prefactura = %s AND id_empresa = %s
+        """, (lote_id, session.get('empresa_id')))
+        pacientes = cur.fetchall()
+        return jsonify({"status": "success", "pacientes": pacientes}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
 
 # =========================================================
 # 3. REGISTRAR CUV (Código Único de Validación)
@@ -298,7 +367,6 @@ def exportar_csv(lote_id):
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
     
-    # Encabezados compatibles con ERPs estándar (Ej. Siigo, Alegra)
     writer.writerow(['NIT_CLIENTE', 'NUMERO_CONTRATO', 'CUV_MINSALUD', 'PRESCRIPCION', 'AUTORIZACION', 'ID_PACIENTE', 'NOMBRE_PACIENTE', 'CODIGO_SERVICIO', 'FECHA_SERVICIO', 'VALOR_TOTAL_LOTE'])
     
     for v in viajes:
@@ -323,18 +391,144 @@ def exportar_csv(lote_id):
     )
 
 # =========================================================
-# 5. STUBS PARA FUTURAS INTEGRACIONES API (FASE 2)
+# MIGRACIÓN FASE 1: AUDITORÍA DE VIAJES Y GENERACIÓN SHA-256
 # =========================================================
+@bp_procesofacturacion_eps.route('/auditoria', methods=['GET', 'POST'])
+@login_required_custom
+@controlador_flotaespecial_required
+def gestion_traslados_auditoria():
+    empresa_id = session.get('empresa_id')
+    
+    if request.method == 'POST':
+        accion = request.form.get('accion')
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        try:
+            if accion == 'aprobar_paquete':
+                raiz_viaje = request.form.get('id_viaje_padre')
+                
+                cur.execute("""
+                    SELECT id, estatus_servicio, numero_autorizacion, numero_prescripcion, 
+                           id_viaje, ruta_documento, hash_seguridad
+                    FROM control_viajes_flota_especial
+                    WHERE SUBSTRING_INDEX(id_viaje, '_', 1) = %s AND id_empresa = %s AND estatus_servicio = 'TERMINADO-PDTE AUDITAR'
+                """, (raiz_viaje, empresa_id))
+                tramos = cur.fetchall()
+                
+                auditados_count = 0
+                for viaje in tramos:
+                    hash_seg = viaje.get('hash_seguridad')
+
+                    if hash_seg:
+                        auditor = session.get('nombre')
+                        fecha_auditoria = datetime.now(BOGOTA_TZ)
+                        
+                        cadena_auditoria = f"{hash_seg}|{viaje['id_viaje']}|{auditor}|{fecha_auditoria.strftime('%Y-%m-%d %H:%M:%S')}"
+                        hash_auditoria = hashlib.sha256(cadena_auditoria.encode('utf-8')).hexdigest()
+                        
+                        cur.execute("""
+                            UPDATE control_viajes_flota_especial 
+                            SET estatus_servicio = 'AUDITADO',
+                                auditor_nombre = %s,
+                                fecha_auditoria = %s,
+                                hash_auditoria = %s,
+                                ruta_pdf_unificado = %s
+                            WHERE id = %s AND id_empresa = %s
+                        """, (auditor, fecha_auditoria, hash_auditoria, viaje['ruta_documento'], viaje['id'], empresa_id))
+                        
+                        cur.execute("""
+                            UPDATE maestra_traslados_eps_tespecial 
+                            SET numero_traslados_ejecutados = numero_traslados_ejecutados + 1
+                            WHERE id_empresa = %s AND (numero_autorizacion = %s OR numero_prescripcion = %s)
+                        """, (empresa_id, viaje['numero_autorizacion'], viaje['numero_prescripcion']))
+                        auditados_count += 1
+                        
+                if auditados_count > 0:
+                    flash(f'Sello SHA-256 verificado y estatus actualizado. Paquete aprobado ({auditados_count} tramos validados).', 'success')
+                else:
+                    flash('Error: No se pudieron validar los hashes de seguridad en este paquete.', 'danger')
+                    
+            elif accion == 'rechazar_tramo':
+                viaje_id = request.form.get('viaje_id')
+                cur.execute("UPDATE control_viajes_flota_especial SET estatus_servicio = 'ASIGNADO' WHERE id = %s AND id_empresa = %s", (viaje_id, empresa_id))
+                flash('Tramo rechazado y devuelto al conductor (Estado ASIGNADO). El paquete completo queda pausado.', 'danger')
+
+            mysql.connection.commit()
+        except Exception as e:
+            mysql.connection.rollback()
+            flash(f'Error en auditoría: {str(e)}', 'danger')
+        finally:
+            cur.close()
+        return redirect(url_for('procesofacturacion_eps.gestion_traslados_auditoria'))
+        
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    
+    cur.execute("""
+        SELECT SUBSTRING_INDEX(id_viaje, '_', 1) as raiz_viaje
+        FROM control_viajes_flota_especial
+        WHERE id_empresa = %s AND estatus_servicio IN ('TERMINADO-PDTE AUDITAR', 'AUDITADO') AND id_prefactura IS NULL
+        GROUP BY raiz_viaje
+        HAVING COUNT(id) = 2
+           AND SUM(CASE WHEN estatus_servicio = 'TERMINADO-PDTE AUDITAR' THEN 1 ELSE 0 END) > 0
+    """, (empresa_id,))
+    raices_validas = [r['raiz_viaje'] for r in cur.fetchall()]
+    
+    viajes_agrupados = {}
+    
+    if raices_validas:
+        format_strings = ','.join(['%s'] * len(raices_validas))
+        cur.execute(f"""
+            SELECT c.id, c.id_viaje_padre, c.id_viaje, c.numero_prescripcion, c.nombre_usuario, c.trayecto, 
+                   c.conductor_asignado, c.vehiculo_asignado, c.fecha_fin_real, c.ruta_documento, c.estatus_servicio,
+                   c.direccion_origen, c.municipio, c.departamento, c.lat_origen, c.lng_origen, c.lat_origen_esperado, c.lng_origen_esperado,
+                   c.direccion_destino, c.municipio_destino, c.departamento_destino, c.lat_destino, c.lng_destino, c.lat_destino_esperado, c.lng_destino_esperado, c.firma,
+                   c.hora_origen, c.hora_destino, c.tiempo_efectivo_minutos,
+                   COALESCE(c.distancia_estimada_km, 0.00) as distancia_estimada_km,
+                   COALESCE(c.distancia_real_km, 0.00) as distancia_real_km,
+                   COALESCE(c.desviacion_origen_m, 0) as desviacion_origen_m,
+                   COALESCE(c.desviacion_destino_m, 0) as desviacion_destino_m,
+                   SUBSTRING_INDEX(c.id_viaje, '_', 1) as raiz_viaje,
+                   (SELECT SUM(COALESCE(sub.distancia_estimada_km, 0.00)) FROM control_viajes_flota_especial sub WHERE sub.id_viaje_padre = c.id_viaje_padre AND sub.id_empresa = c.id_empresa) as consolidado_estimado_paquete,
+                   (SELECT SUM(COALESCE(sub.distancia_real_km, 0.00)) FROM control_viajes_flota_especial sub WHERE sub.id_viaje_padre = c.id_viaje_padre AND sub.id_empresa = c.id_empresa) as consolidado_real_paquete
+            FROM control_viajes_flota_especial c
+            WHERE c.id_empresa = %s AND SUBSTRING_INDEX(c.id_viaje, '_', 1) IN ({format_strings})
+            ORDER BY raiz_viaje, c.trayecto
+        """, [empresa_id] + raices_validas)
+        tramos = cur.fetchall()
+        
+        for t in tramos:
+            p = t['raiz_viaje']
+            if p not in viajes_agrupados:
+                viajes_agrupados[p] = []
+            viajes_agrupados[p].append(t)
+            
+    cur.close()
+    
+    return render_template('B_modulo_procesofacturacion_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_auditoria', viajes_agrupados=viajes_agrupados)
+
+# =========================================================
+# MIGRACIÓN FASE 1: HISTORIAL DE AUDITADOS
+# =========================================================
+@bp_procesofacturacion_eps.route('/auditados', methods=['GET'])
+@login_required_custom
+@controlador_flotaespecial_required
+def gestion_traslados_auditados():
+    empresa_id = session.get('empresa_id')
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("""
+        SELECT id_viaje, numero_autorizacion, nombre_usuario, id_eps_cliente AS eps_cliente, operador_ejecucion, 
+               vehiculo_asignado, fecha_fin_real, auditor_nombre, fecha_auditoria, hash_auditoria,
+               COALESCE(ruta_pdf_unificado, ruta_documento) as ruta_documento
+        FROM control_viajes_flota_especial 
+        WHERE id_empresa = %s AND estatus_servicio = 'AUDITADO' 
+        ORDER BY id DESC LIMIT 100
+    """, (empresa_id,))
+    viajes = cur.fetchall()
+    cur.close()
+    
+    return render_template('B_modulo_procesofacturacion_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_auditados', viajes=viajes)
+
 def transmitir_rips_json_api(lote_id):
-    """
-    STUB: Función preparada para consumir directamente el Web Service 
-    de SISPRO / MinSalud mediante HTTP POST y capturar el CUV automáticamente.
-    """
     pass
 
 def emitir_factura_dian_api(lote_id, cuv_codigo):
-    """
-    STUB: Función preparada para generar el XML UBL 2.1 (Anexo Salud)
-    y transmitirlo vía API a un Proveedor Tecnológico para obtener el CUFE.
-    """
     pass

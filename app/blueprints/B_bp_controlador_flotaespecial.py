@@ -57,7 +57,7 @@ def dashboard_operativo():
     try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN vuelta_activada BOOLEAN DEFAULT FALSE")
     except: pass
     
-    # KPIs generales activos o del día (Se elimina filtro de fechas y se hace 100% dinámico)
+    # KPIs generales activos o del día
     cur.execute("""
         SELECT 
             COUNT(*) as total,
@@ -99,8 +99,15 @@ def dashboard_operativo():
     """, (empresa_id,))
     viajes = cur.fetchall()
 
-    # Cargar flota, conductores y contratos vigentes
-    cur.execute("SELECT placa, clase AS tipo FROM vehiculos_especial WHERE id_empresa = %s OR id_empresa = %s", (empresa_id, empresa_nit))
+    # Cargar flota con cruce dinámico de conductores asignados
+    cur.execute("""
+        SELECT placa, clase AS tipo, regional, departamento_base, municipio_base,
+               (SELECT GROUP_CONCAT(nombre SEPARATOR ', ') FROM conductores_flotaespecial c 
+                WHERE c.vehiculo_asignado = vehiculos_especial.placa 
+                  AND (c.id_empresa = %s OR c.id_empresa = %s)) AS conductor_asignado
+        FROM vehiculos_especial 
+        WHERE id_empresa = %s OR id_empresa = %s
+    """, (empresa_id, empresa_nit, empresa_id, empresa_nit))
     vehiculos = cur.fetchall()
 
     cur.execute("SELECT id, nombre, cedula, telegram_id FROM usuarios WHERE (empresa_id = %s OR empresa_id = %s) AND perfil IN ('operador_flotaespecial', 'auxiliar_transporte_especial')", (empresa_id, empresa_nit))
@@ -121,11 +128,14 @@ def dashboard_operativo():
     cur.close()
 
     now_col = datetime.now(BOGOTA_TZ).replace(tzinfo=None)
+    viajes_retrasados = []
+    
     for v in viajes:
         h_init = v.get('hora_inicio')
         f_serv = v.get('fecha_servicio')
         v['is_urgencia'] = False
         v['is_36h'] = False
+        diff_minutes = -1
         
         if h_init is not None and f_serv is not None:
             try:
@@ -137,6 +147,7 @@ def dashboard_operativo():
                     h_str = h_init.strftime('%H:%M:%S')
                     
                 diff_hours = (dt_val - now_col).total_seconds() / 3600.0
+                diff_minutes = (now_col - dt_val).total_seconds() / 60.0
                 
                 if diff_hours <= 36.0:
                     v['is_36h'] = True
@@ -155,7 +166,11 @@ def dashboard_operativo():
         v['trayecto'] = (v.get('trayecto') or 'IDA').upper()
         v['estatus_servicio'] = (v.get('estatus_servicio') or '').upper()
 
-    # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN (Con corrección de visibilidad para novedades)
+        # Detección de retrasos en servicios de IDA asignados sin fecha límite de hoy
+        if v['trayecto'] == 'IDA' and v['estatus_servicio'] == 'ASIGNADO' and diff_minutes > 15.0:
+            viajes_retrasados.append(v)
+
+    # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN
     parte1_ida_programados = [v for v in viajes if v['trayecto'] == 'IDA' and ((v['estatus_servicio'] == 'PROGRAMADO' and v['is_36h']) or v['estatus_servicio'] == 'NOVEDAD_PRE_VIAJE')]
     parte2_col1 = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] in ('EN EJECUCION', 'NOVEDAD_RECORRIDO')]
     parte2_col2 = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] in ('TERMINADO-PDTE AUDITAR', 'AUDITADO')]
@@ -171,6 +186,7 @@ def dashboard_operativo():
         active_module='dashboard',
         kpis=kpis,
         filtros={},
+        viajes_retrasados=viajes_retrasados,
         parte1_ida_programados=parte1_ida_programados,
         parte2_col1=parte2_col1,
         parte2_col2=parte2_col2,
@@ -216,6 +232,7 @@ def api_operativa_vivo():
 
         datos = {
             "novedades_activas": [],
+            "viajes_retrasados": [],
             "parte1_ida_programados": [],
             "parte2_col1": [],
             "parte2_col2": [],
@@ -231,6 +248,7 @@ def api_operativa_vivo():
             f_serv = v.get('fecha_servicio')
             v['is_urgencia'] = False
             v['is_36h'] = False
+            diff_minutes = -1
             
             if h_init is not None and f_serv is not None:
                 try:
@@ -242,6 +260,7 @@ def api_operativa_vivo():
                         h_str = h_init.strftime('%H:%M:%S')
                         
                     diff_hours = (dt_val - now_col).total_seconds() / 3600.0
+                    diff_minutes = (now_col - dt_val).total_seconds() / 60.0
                     
                     if diff_hours <= 36.0:
                         v['is_36h'] = True
@@ -263,10 +282,14 @@ def api_operativa_vivo():
             v['trayecto'] = trayecto
             v['estatus_servicio'] = estatus
 
+            # Detección dinámica de viajes retrasados (> 15 min acumulados)
+            if trayecto == 'IDA' and estatus == 'ASIGNADO' and diff_minutes > 15.0:
+                datos["viajes_retrasados"].append(v)
+
             if estatus in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO']:
                 datos["novedades_activas"].append(v)
             
-            # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN (Con corrección de visibilidad para novedades)
+            # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN
             if trayecto == 'IDA':
                 if (estatus == 'PROGRAMADO' and v['is_36h']) or estatus == 'NOVEDAD_PRE_VIAJE':
                     datos["parte1_ida_programados"].append(v)
@@ -314,14 +337,12 @@ def api_ocultar_kanban():
         viaje_actual = cur.fetchone()
         
         if viaje_actual:
-            # 1. Ocultar el viaje en el que se hizo clic
             cur.execute("""
                 UPDATE control_viajes_flota_especial 
                 SET oculto_kanban = TRUE
                 WHERE id = %s AND id_empresa = %s
             """, (viaje_id, empresa_id))
             
-            # 2. Activar la vuelta si el que se ocultó fue IDA
             trayecto = (viaje_actual.get('trayecto') or 'IDA').upper()
             id_padre = viaje_actual.get('id_viaje_padre')
             viaje_vuelta = None
@@ -333,7 +354,6 @@ def api_ocultar_kanban():
                     WHERE id_viaje_padre = %s AND trayecto = 'VUELTA' AND id_empresa = %s
                 """, (id_padre, empresa_id))
                 
-                # Obtener datos de la vuelta para auto-lanzar los modales
                 cur.execute("""
                     SELECT id, id_viaje_padre, id_viaje, numero_prescripcion, nombre_usuario, 
                            telefono_usuario, direccion_origen, direccion_destino, 
@@ -431,6 +451,97 @@ def api_notificar_viaje():
         return jsonify({"status": "success", "message": "Notificación enviada al operador."}), 200
 
     except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+# =========================================================
+# 2.4 GESTIÓN DE CONTINGENCIAS (BUSCAR, REPROGRAMAR, ANULAR)
+# =========================================================
+@bp_controlador_flotaespecial.route('/api/operativa/contingencias/buscar', methods=['POST'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_contingencias_buscar():
+    empresa_id = session.get('empresa_id')
+    datos = request.get_json(silent=True) or {}
+    cedula = datos.get('cedula', '').strip()
+
+    if not cedula:
+        return jsonify({"status": "error", "message": "Documento (Cédula) no proporcionado."}), 400
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("""
+            SELECT id, id_viaje, numero_prescripcion, nombre_usuario, telefono_usuario, 
+                   fecha_servicio, hora_inicio, direccion_origen, direccion_destino, estatus_servicio
+            FROM control_viajes_flota_especial
+            WHERE id_empresa = %s AND id_usuario = %s AND trayecto = 'IDA' 
+              AND estatus_servicio IN ('CAPTURADO', 'VERIFICADO', 'PROGRAMADO', 'PDTE. ASIGNAR VUELTA')
+            ORDER BY fecha_servicio ASC, hora_inicio ASC
+        """, (empresa_id, cedula))
+        viajes = cur.fetchall()
+
+        for v in viajes:
+            v['fecha_servicio'] = str(v['fecha_servicio']) if v['fecha_servicio'] else 'Sin Fecha'
+            v['hora_inicio'] = str(v['hora_inicio']) if v['hora_inicio'] else 'Sin Hora'
+
+        return jsonify({"status": "success", "data": viajes}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+@bp_controlador_flotaespecial.route('/api/operativa/contingencias/reprogramar', methods=['POST'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_contingencias_reprogramar():
+    empresa_id = session.get('empresa_id')
+    datos = request.get_json(silent=True) or {}
+    viaje_id = datos.get('viaje_id')
+    nueva_fecha = datos.get('fecha_servicio')
+    nueva_hora = datos.get('hora_inicio')
+
+    if not viaje_id or not nueva_fecha or not nueva_hora:
+        return jsonify({"status": "error", "message": "Faltan datos obligatorios para reprogramar el viaje."}), 400
+
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("""
+            UPDATE control_viajes_flota_especial
+            SET fecha_servicio = %s, hora_inicio = %s
+            WHERE id = %s AND id_empresa = %s AND trayecto = 'IDA'
+        """, (nueva_fecha, nueva_hora, viaje_id, empresa_id))
+        mysql.connection.commit()
+        return jsonify({"status": "success", "message": "Viaje reprogramado exitosamente."}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+@bp_controlador_flotaespecial.route('/api/operativa/contingencias/anular', methods=['POST'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_contingencias_anular():
+    empresa_id = session.get('empresa_id')
+    datos = request.get_json(silent=True) or {}
+    viaje_id = datos.get('viaje_id')
+    motivo = datos.get('motivo', '').strip()
+
+    if not viaje_id or not motivo:
+        return jsonify({"status": "error", "message": "Datos incompletos para anular el viaje. El motivo es obligatorio."}), 400
+
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("""
+            UPDATE control_viajes_flota_especial
+            SET estatus_servicio = 'ANULADO', descripcion_novedad = %s
+            WHERE id = %s AND id_empresa = %s
+        """, (motivo, viaje_id, empresa_id))
+        mysql.connection.commit()
+        return jsonify({"status": "success", "message": "Viaje anulado exitosamente."}), 200
+    except Exception as e:
+        mysql.connection.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         cur.close()

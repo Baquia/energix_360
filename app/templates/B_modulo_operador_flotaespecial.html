@@ -464,7 +464,7 @@
         }
 
         // ============================================
-        // INICIO MANUAL DE VIAJES (TOKEN)
+        // INICIO MANUAL DE VIAJES (TOKEN CON GPS ESTRICTO)
         // ============================================
         function iniciarViajeManual() {
             const manualId = document.getElementById('manual_id_viaje').value.trim().toUpperCase();
@@ -479,7 +479,7 @@
         function prepararInicioViaje(idViaje, trayecto) {
             idViajeSeleccionadoTemp = idViaje;
             trayectoSeleccionadoTemp = trayecto;
-            confirmarAccion(`¿Está seguro que desea INICIAR el viaje ${idViaje} ahora?`, iniciarViaje);
+            confirmarAccion(`¿Está seguro que desea INICIAR el viaje ${idViaje} ahora? Se registrará su ubicación GPS.`, iniciarViaje);
         }
 
         function iniciarViaje() {
@@ -490,11 +490,34 @@
                 return;
             }
 
+            if (!navigator.geolocation) {
+                alert("Su navegador no soporta geolocalización. Actívelo para iniciar el viaje de manera segura.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    _ejecutarInicioViaje(lat, lng);
+                },
+                function(err) {
+                    alert("No se pudo obtener la ubicación GPS inicial. Asegúrese de tener el GPS activado y con permisos para iniciar.");
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        function _ejecutarInicioViaje(lat, lng) {
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             fetch("{{ url_for('operador_flotaespecial.iniciar_viaje_especial') }}", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ id_traslado_eps: idViajeSeleccionadoTemp })
+                body: JSON.stringify({ 
+                    id_traslado_eps: idViajeSeleccionadoTemp,
+                    lat: lat,
+                    lng: lng
+                })
             }).then(res => res.json())
               .then(data => {
                   if(data.status === 'success') {

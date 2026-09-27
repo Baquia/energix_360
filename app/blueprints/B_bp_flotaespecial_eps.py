@@ -32,6 +32,23 @@ bp_flotaespecial_eps = Blueprint('flotaespecial_eps', __name__, url_prefix='/ges
 BOGOTA_TZ = pytz.timezone('America/Bogota')
 
 # =========================================================
+# HELPER: CÁLCULO DE DISTANCIA GOOGLE MAPS API
+# =========================================================
+def _calcular_distancia_google(origen, destino):
+    if not origen or not destino:
+        return 0.0
+    api_key = "AIzaSyBloN0EeBxRj9CWnHZ9Wgjz721846DT4KY"
+    url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origen}&destinations={destino}&mode=driving&key={api_key}"
+    try:
+        resp = requests.get(url, timeout=10).json()
+        if resp.get('status') == 'OK' and resp['rows'][0]['elements'][0].get('status') == 'OK':
+            meters = resp['rows'][0]['elements'][0]['distance']['value']
+            return round(meters / 1000.0, 2)
+    except Exception as e:
+        print("Error API Google Maps:", e)
+    return 0.0
+
+# =========================================================
 # HELPER: CONVERSIÓN DE FECHA HTML (YYYY-MM-DD)
 # =========================================================
 def _convertir_fecha_html(cadena_fecha):
@@ -63,7 +80,6 @@ def _obtener_codigo_dane(departamento, municipio):
 # HELPER: CÁLCULO DE TURNOS Y FRECUENCIAS (CON FESTIVOS CO)
 # =========================================================
 def _get_next_date_turno(current_date, turno):
-    """Calcula la siguiente fecha válida según el turno de diálisis saltando festivos"""
     co_holidays = holidays.CO(years=[current_date.year, current_date.year + 1])
     next_d = current_date + timedelta(days=1)
     valid_days = [0, 2, 4] if turno == '1' else [1, 3, 5]
@@ -72,7 +88,6 @@ def _get_next_date_turno(current_date, turno):
     return next_d
 
 def _get_next_date_frecuencia(current_date, frecuencia):
-    """Calcula la siguiente fecha válida según la frecuencia seleccionada saltando domingos y festivos"""
     if frecuencia == 'diaria': next_d = current_date + timedelta(days=1)
     elif frecuencia == 'cada_2_dias': next_d = current_date + timedelta(days=2)
     elif frecuencia == 'cada_3_dias': next_d = current_date + timedelta(days=3)
@@ -101,7 +116,7 @@ def _enviar_mensajes_telegram_hilo(chat_ids, mensaje):
             data = {
                 "chat_id": chat_id,
                 "text": mensaje,
-                "parse_mode": "Markdown"
+                "parse_mode": "HTML"
             }
             for intento in range(3):
                 try:
@@ -141,52 +156,53 @@ def _enviar_documento_telegram_hilo(chat_ids, mensaje, filepath):
     hilo.start()
 
 def notificar_programacion_viaje(empresa_id, empresa_nombre, viaje_data, tipo_evento='ASIGNACION'):
-    f_serv = viaje_data.get('fecha_servicio') or 'Pendiente'
-    h_ini = viaje_data.get('hora_inicio') or 'Pendiente'
+    import html
+    f_serv = html.escape(str(viaje_data.get('fecha_servicio') or 'Pendiente'))
+    h_ini = html.escape(str(viaje_data.get('hora_inicio') or 'Pendiente'))
     
-    telefono_paciente = viaje_data.get('telefono_usuario') or 'N/D'
+    telefono_paciente = html.escape(str(viaje_data.get('telefono_usuario') or 'N/D'))
     info_acompanante = ""
     if viaje_data.get('lleva_acompanante'):
-        info_acompanante = f"👥 *Acompañante:* {viaje_data.get('nombre_acompanante', 'Sí')}\n"
+        info_acompanante = f"👥 <b>Acompañante:</b> {html.escape(str(viaje_data.get('nombre_acompanante', 'Sí')))}\n"
 
     if tipo_evento == 'ASIGNACION':
-        titulo_tg = "🟢 *NUEVA ASIGNACIÓN DE VIAJE*"
+        titulo_tg = "🟢 <b>NUEVA ASIGNACIÓN DE VIAJE</b>"
         cuerpo_info_tg = (
-            f"📦 *Cantidad de Viajes Asignados:* 1\n\n"
-            f"📋 *PROGRAMACIÓN ESTIMADA:*\n"
-            f"🆔 *ID Viaje:* `{viaje_data['id_viaje']}`\n"
-            f"👤 *Paciente:* {viaje_data['nombre_usuario']}\n"
-            f"📞 *Teléfono:* {telefono_paciente}\n"
+            f"📦 <b>Cantidad de Viajes Asignados:</b> 1\n\n"
+            f"📋 <b>PROGRAMACIÓN ESTIMADA:</b>\n"
+            f"🆔 <b>ID Viaje:</b> <code>{html.escape(str(viaje_data.get('id_viaje', 'N/D')))}</code>\n"
+            f"👤 <b>Paciente:</b> {html.escape(str(viaje_data.get('nombre_usuario', 'N/D')))}\n"
+            f"📞 <b>Teléfono:</b> {telefono_paciente}\n"
             f"{info_acompanante}"
-            f"📅 *Fecha Estimada:* {f_serv} | ⏰ *Hora Inicio:* {h_ini}\n"
-            f"📍 *Origen Estimado:* {viaje_data['direccion_origen']}\n\n"
-            f"ℹ️ _Nota: Los datos detallados de cada servicio (incluyendo el destino exacto) serán notificados X horas antes del inicio del viaje._"
+            f"📅 <b>Fecha Estimada:</b> {f_serv} | ⏰ <b>Hora Inicio:</b> {h_ini}\n"
+            f"📍 <b>Origen Estimado:</b> {html.escape(str(viaje_data.get('direccion_origen', 'N/D')))}\n\n"
+            f"ℹ️ <i>Nota: Los datos detallados de cada servicio (incluyendo el destino exacto) serán notificados X horas antes del inicio del viaje.</i>"
         )
     else:
         if tipo_evento == 'REPROGRAMACION':
-            titulo_tg = "🟡 *VIAJE REPROGRAMADO/ACTUALIZADO*"
+            titulo_tg = "🟡 <b>VIAJE REPROGRAMADO/ACTUALIZADO</b>"
         elif tipo_evento == 'CANCELACION':
-            titulo_tg = "🔴 *VIAJE CANCELADO*"
+            titulo_tg = "🔴 <b>VIAJE CANCELADO</b>"
         elif tipo_evento == 'RECORDATORIO':
-            titulo_tg = "⏰ *RECORDATORIO DE VIAJE PRÓXIMO*"
+            titulo_tg = "⏰ <b>RECORDATORIO DE VIAJE PRÓXIMO</b>"
         else:
-            titulo_tg = "🚐 *NOTIFICACIÓN DE SERVICIO*"
+            titulo_tg = "🚐 <b>NOTIFICACIÓN DE SERVICIO</b>"
             
         cuerpo_info_tg = (
-            f"🆔 *ID Viaje:* `{viaje_data['id_viaje']}`\n"
-            f"👤 *Paciente:* {viaje_data['nombre_usuario']}\n"
-            f"📞 *Teléfono:* {telefono_paciente}\n"
+            f"🆔 <b>ID Viaje:</b> <code>{html.escape(str(viaje_data.get('id_viaje', 'N/D')))}</code>\n"
+            f"👤 <b>Paciente:</b> {html.escape(str(viaje_data.get('nombre_usuario', 'N/D')))}\n"
+            f"📞 <b>Teléfono:</b> {telefono_paciente}\n"
             f"{info_acompanante}"
-            f"📅 *Fecha:* {f_serv} | ⏰ *Hora:* {h_ini}\n"
-            f"📍 *Origen:* {viaje_data['direccion_origen']}\n"
-            f"🏁 *Destino:* {viaje_data['direccion_destino']}"
+            f"📅 <b>Fecha:</b> {f_serv} | ⏰ <b>Hora:</b> {h_ini}\n"
+            f"📍 <b>Origen:</b> {html.escape(str(viaje_data.get('direccion_origen', 'N/D')))}\n"
+            f"🏁 <b>Destino:</b> {html.escape(str(viaje_data.get('direccion_destino', 'N/D')))}"
         )
 
     mensaje_tg = (
         f"{titulo_tg}\n\n"
-        f"🏢 *Empresa:* {empresa_nombre}\n"
-        f"🚙 *Vehículo:* {viaje_data['vehiculo_asignado']} | 👨‍✈️ *Conductor:* {viaje_data['conductor_asignado']}\n"
-        f"📄 *Auth:* {viaje_data['numero_autorizacion']}\n\n"
+        f"🏢 <b>Empresa:</b> {html.escape(str(empresa_nombre))}\n"
+        f"🚙 <b>Vehículo:</b> {html.escape(str(viaje_data.get('vehiculo_asignado', 'N/A')))} | 👨‍✈️ <b>Conductor:</b> {html.escape(str(viaje_data.get('conductor_asignado', 'N/A')))}\n"
+        f"📄 <b>Auth:</b> {html.escape(str(viaje_data.get('numero_autorizacion', 'N/A')))}\n\n"
         f"{cuerpo_info_tg}"
     )
     
@@ -206,9 +222,10 @@ def generar_id_viaje_unico(cur, empresa_id=None):
     for _ in range(10):
         codigo = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         if empresa_id:
-            cur.execute("SELECT id FROM control_viajes_flota_especial WHERE id_viaje = %s AND id_empresa = %s", (codigo, empresa_id))
+            # Se añade FOR UPDATE para evitar colisiones en alta concurrencia
+            cur.execute("SELECT id FROM control_viajes_flota_especial WHERE id_viaje = %s AND id_empresa = %s FOR UPDATE", (codigo, empresa_id))
         else:
-            cur.execute("SELECT id FROM control_viajes_flota_especial WHERE id_viaje = %s", (codigo,))
+            cur.execute("SELECT id FROM control_viajes_flota_especial WHERE id_viaje = %s FOR UPDATE", (codigo,))
         if not cur.fetchone():
             return codigo
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -340,6 +357,9 @@ def asegurar_tablas_transporte_especial(cur):
     try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN consecutivo_viaje VARCHAR(50) NULL, ADD COLUMN foto_origen VARCHAR(255) NULL, ADD COLUMN foto_destino VARCHAR(255) NULL, ADD COLUMN foto_paciente VARCHAR(255) NULL, ADD COLUMN firma VARCHAR(255) NULL, ADD COLUMN hash_seguridad VARCHAR(255) NULL, ADD COLUMN lat_origen DECIMAL(10,8) NULL, ADD COLUMN lng_origen DECIMAL(11,8) NULL, ADD COLUMN hora_origen DATETIME NULL, ADD COLUMN lat_destino DECIMAL(10,8) NULL, ADD COLUMN lng_destino DECIMAL(11,8) NULL, ADD COLUMN hora_destino DATETIME NULL, ADD COLUMN tiempo_efectivo_minutos INT DEFAULT 0;")
     except: pass
 
+    try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN distancia_estimada_km DECIMAL(10,2) NULL, ADD COLUMN tiempo_estimado_minutos INT NULL, ADD COLUMN distancia_real_km DECIMAL(10,2) NULL, ADD COLUMN desviacion_origen_m INT DEFAULT 0, ADD COLUMN desviacion_destino_m INT DEFAULT 0;")
+    except: pass
+
     try: cur.execute("ALTER TABLE control_viajes_flota_especial ADD COLUMN lat_origen_esperado DECIMAL(10,8) NULL, ADD COLUMN lng_origen_esperado DECIMAL(11,8) NULL, ADD COLUMN lat_destino_esperado DECIMAL(10,8) NULL, ADD COLUMN lng_destino_esperado DECIMAL(11,8) NULL;")
     except: pass
     
@@ -354,6 +374,8 @@ def asegurar_tablas_transporte_especial(cur):
     except: pass
     
     try: cur.execute("ALTER TABLE vehiculos_especial ADD COLUMN capacidad_pasajeros INT DEFAULT 4;")
+    except: pass
+    try: cur.execute("ALTER TABLE vehiculos_especial ADD COLUMN capacidad_residual INT DEFAULT 0 AFTER capacidad_pasajeros;")
     except: pass
 
 def controlador_flotaespecial_required(f):
@@ -616,13 +638,38 @@ def gestion_traslados_captura():
                     departamento, municipio, direccion_origen, 
                     departamento_destino, municipio_destino, direccion_destino, 
                     numero_traslados_aporbados, numero_traslados_ejecutados, diferencia, observaciones, ruta_documento)
-                    VALUES (%s, %s, %s, NOW(), %s, %s, %s, %s, %s, 'CAPTURADO', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s, %s, %s)
-                """, (empresa_id, eps_cliente, id_eps_cliente, fecha_entrega_servicio, numero_autorizacion, numero_prescripcion,
-                      tipo_servicio, codigo_servicio, nombre_usuario, tipo_documento, id_usuario, fecha_nacimiento, edad, sexo,
-                      numero_carne, tipo_usuario, nivel_sisben, telefono_usuario, email_usuario, 
-                      departamento, municipio, direccion_origen, 
-                      departamento_destino, municipio_destino, direccion_destino, 
-                      cantidad, cantidad, observaciones, ruta_documento))
+                    VALUES (%(id_empresa)s, %(eps_cliente)s, %(id_eps_cliente)s, NOW(), %(fecha_entrega_servicio)s, %(numero_autorizacion)s, %(numero_prescripcion)s, %(tipo_servicio)s, %(codigo_servicio)s, 'CAPTURADO', %(nombre_usuario)s, %(tipo_documento)s, %(id_usuario)s, %(fecha_nacimiento)s, %(edad)s, %(sexo)s, %(numero_carne)s, %(tipo_usuario)s, %(nivel_sisben)s, %(telefono_usuario)s, %(email_usuario)s, %(departamento)s, %(municipio)s, %(direccion_origen)s, %(departamento_destino)s, %(municipio_destino)s, %(direccion_destino)s, %(numero_traslados_aporbados)s, 0, %(diferencia)s, %(observaciones)s, %(ruta_documento)s)
+                """, {
+                    'id_empresa': empresa_id,
+                    'eps_cliente': eps_cliente,
+                    'id_eps_cliente': id_eps_cliente,
+                    'fecha_entrega_servicio': fecha_entrega_servicio,
+                    'numero_autorizacion': numero_autorizacion,
+                    'numero_prescripcion': numero_prescripcion,
+                    'tipo_servicio': tipo_servicio,
+                    'codigo_servicio': codigo_servicio,
+                    'nombre_usuario': nombre_usuario,
+                    'tipo_documento': tipo_documento,
+                    'id_usuario': id_usuario,
+                    'fecha_nacimiento': fecha_nacimiento,
+                    'edad': edad,
+                    'sexo': sexo,
+                    'numero_carne': numero_carne,
+                    'tipo_usuario': tipo_usuario,
+                    'nivel_sisben': nivel_sisben,
+                    'telefono_usuario': telefono_usuario,
+                    'email_usuario': email_usuario,
+                    'departamento': departamento,
+                    'municipio': municipio,
+                    'direccion_origen': direccion_origen,
+                    'departamento_destino': departamento_destino,
+                    'municipio_destino': municipio_destino,
+                    'direccion_destino': direccion_destino,
+                    'numero_traslados_aporbados': cantidad,
+                    'diferencia': cantidad,
+                    'observaciones': observaciones,
+                    'ruta_documento': ruta_documento
+                })
                 mysql.connection.commit()
                 flash('Orden Maestra guardada exitosamente.', 'success')
                 return redirect(url_for('flotaespecial_eps.gestion_traslados_captura'))
@@ -767,6 +814,17 @@ def gestion_traslados_verificacion():
                     viaje_ref = cur.fetchone()
                     if viaje_ref and viaje_ref['numero_prescripcion']:
                         num_prescripcion = viaje_ref['numero_prescripcion']
+
+                        dist_est_ida = 0.0
+                        dist_est_vuelta = 0.0
+                        if lat_origen_esperado and lng_origen_esperado and lat_destino_esperado and lng_destino_esperado:
+                            dist_est_ida = _calcular_distancia_google(f"{lat_origen_esperado},{lng_origen_esperado}", f"{lat_destino_esperado},{lng_destino_esperado}")
+                            dist_est_vuelta = _calcular_distancia_google(f"{lat_destino_esperado},{lng_destino_esperado}", f"{lat_origen_esperado},{lng_origen_esperado}")
+                        elif direccion_origen and direccion_destino:
+                            ori_s = f"{direccion_origen}, {municipio_origen}, {departamento_origen}, Colombia"
+                            des_s = f"{direccion_destino}, {municipio_destino}, {departamento_destino}, Colombia"
+                            dist_est_ida = _calcular_distancia_google(ori_s, des_s)
+                            dist_est_vuelta = _calcular_distancia_google(des_s, ori_s)
                         
                         cur.execute("""
                             UPDATE control_viajes_flota_especial 
@@ -777,6 +835,7 @@ def gestion_traslados_verificacion():
                                 lat_origen_esperado=%s, lng_origen_esperado=%s,
                                 lat_destino_esperado=%s, lng_destino_esperado=%s,
                                 coordenadas_inicio=%s, coordenadas_fin=%s,
+                                distancia_estimada_km=%s,
                                 estatus_servicio = 'VERIFICADO'
                             WHERE numero_prescripcion=%s AND id_empresa=%s AND trayecto = 'IDA' AND estatus_servicio = 'CAPTURADO'
                         """, (nombre_usuario, id_usuario, telefono_usuario, 
@@ -786,6 +845,7 @@ def gestion_traslados_verificacion():
                               lat_origen_esperado, lng_origen_esperado,
                               lat_destino_esperado, lng_destino_esperado,
                               coordenadas_inicio, coordenadas_fin,
+                              dist_est_ida,
                               num_prescripcion, empresa_id))
                         
                         cur.execute("""
@@ -797,6 +857,7 @@ def gestion_traslados_verificacion():
                                 lat_origen_esperado=%s, lng_origen_esperado=%s,
                                 lat_destino_esperado=%s, lng_destino_esperado=%s,
                                 coordenadas_inicio=%s, coordenadas_fin=%s,
+                                distancia_estimada_km=%s,
                                 estatus_servicio = 'VERIFICADO'
                             WHERE numero_prescripcion=%s AND id_empresa=%s AND trayecto = 'VUELTA' AND estatus_servicio = 'CAPTURADO'
                         """, (nombre_usuario, id_usuario, telefono_usuario, 
@@ -806,6 +867,7 @@ def gestion_traslados_verificacion():
                               lat_destino_esperado, lng_destino_esperado,
                               lat_origen_esperado, lng_origen_esperado,
                               coordenadas_fin, coordenadas_inicio,
+                              dist_est_vuelta,
                               num_prescripcion, empresa_id))
                         
                         mysql.connection.commit()
@@ -821,6 +883,14 @@ def gestion_traslados_verificacion():
                             return jsonify({"status": "error", "message": "Prescripción no encontrada."}), 404
                         
                 elif accion == 'editar_excepcion_individual':
+                    dist_est_ind = 0.0
+                    if lat_origen_esperado and lng_origen_esperado and lat_destino_esperado and lng_destino_esperado:
+                        dist_est_ind = _calcular_distancia_google(f"{lat_origen_esperado},{lng_origen_esperado}", f"{lat_destino_esperado},{lng_destino_esperado}")
+                    elif direccion_origen and direccion_destino:
+                        ori_s = f"{direccion_origen}, {municipio_origen}, {departamento_origen}, Colombia"
+                        des_s = f"{direccion_destino}, {municipio_destino}, {departamento_destino}, Colombia"
+                        dist_est_ind = _calcular_distancia_google(ori_s, des_s)
+
                     cur.execute("""
                         UPDATE control_viajes_flota_especial 
                         SET nombre_usuario=%s, id_usuario=%s, telefono_usuario=%s, 
@@ -829,7 +899,8 @@ def gestion_traslados_verificacion():
                             lleva_acompanante=%s, nombre_acompanante=%s, cedula_acompanante=%s,
                             lat_origen_esperado=%s, lng_origen_esperado=%s,
                             lat_destino_esperado=%s, lng_destino_esperado=%s,
-                            coordenadas_inicio=%s, coordenadas_fin=%s
+                            coordenadas_inicio=%s, coordenadas_fin=%s,
+                            distancia_estimada_km=%s
                         WHERE id=%s AND id_empresa=%s
                     """, (nombre_usuario, id_usuario, telefono_usuario, 
                           departamento_origen, municipio_origen, direccion_origen,
@@ -838,6 +909,7 @@ def gestion_traslados_verificacion():
                           lat_origen_esperado, lng_origen_esperado,
                           lat_destino_esperado, lng_destino_esperado,
                           coordenadas_inicio, coordenadas_fin,
+                          dist_est_ind,
                           viaje_id, empresa_id))
                     
                     mysql.connection.commit()
@@ -957,13 +1029,16 @@ def gestion_traslados_programacion():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cur.execute("""
-        SELECT c.*, 
+        SELECT MIN(c.id) as id, c.numero_prescripcion, MAX(c.nombre_usuario) as nombre_usuario, 
+               MAX(c.telefono_usuario) as telefono_usuario, MAX(c.tipo_servicio) as tipo_servicio, 
+               MIN(c.id_viaje) as id_viaje, MAX(c.tipo_documento) as tipo_documento, MAX(c.id_usuario) as id_usuario, 
                (SELECT COUNT(*) FROM control_viajes_flota_especial 
                 WHERE numero_prescripcion = c.numero_prescripcion 
                 AND trayecto = 'IDA' AND id_empresa = %s) as total_idas
         FROM control_viajes_flota_especial c
         WHERE c.id_empresa = %s AND c.estatus_servicio = 'VERIFICADO' AND c.trayecto = 'IDA' 
-        ORDER BY c.id ASC
+        GROUP BY c.numero_prescripcion
+        ORDER BY MIN(c.id) ASC
     """, (empresa_id, empresa_id))
     viajes_verificados = cur.fetchall()
     cur.close()
@@ -1018,6 +1093,152 @@ def gestion_contratos():
     return render_template('B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='gestion_contratos', contratos=contratos)
 
 # =========================================================
+# API: VIAJES AGRUPABLES
+# =========================================================
+@bp_flotaespecial_eps.route('/api/viajes_agrupables', methods=['POST'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_viajes_agrupables():
+    empresa_id = session.get('empresa_id')
+    datos = request.get_json(silent=True) or {}
+    viaje_id = datos.get('viaje_id')
+    
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("SELECT id, fecha_servicio, hora_inicio, direccion_origen, municipio, departamento, trayecto, lleva_acompanante FROM control_viajes_flota_especial WHERE id = %s AND id_empresa = %s", (viaje_id, empresa_id))
+        base = cur.fetchone()
+        if not base:
+            return jsonify({"status": "error", "message": "Viaje no encontrado"}), 404
+            
+        cur.execute("""
+            SELECT id, id_viaje, nombre_usuario, hora_inicio, lleva_acompanante, direccion_origen, direccion_destino
+            FROM control_viajes_flota_especial
+            WHERE id_empresa = %s 
+              AND id != %s
+              AND estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA')
+              AND fecha_servicio = %s
+              AND trayecto = %s
+              AND municipio = %s
+        """, (empresa_id, base['id'], base['fecha_servicio'], base['trayecto'], base['municipio']))
+        candidatos = cur.fetchall()
+        
+        agrupables = []
+        fmt = '%H:%M:%S'
+        base_time = base['hora_inicio']
+        if base_time is None:
+             return jsonify({"status": "success", "agrupables": [], "cupos_base": 2 if base['lleva_acompanante'] else 1}), 200
+             
+        if isinstance(base_time, timedelta):
+            base_dt = datetime.min + base_time
+        else:
+            base_dt = datetime.strptime(str(base_time), fmt) if isinstance(base_time, str) else datetime.combine(datetime.min, base_time)
+
+        for c in candidatos:
+            c_time = c['hora_inicio']
+            if c_time:
+                if isinstance(c_time, timedelta):
+                    c_dt = datetime.min + c_time
+                else:
+                    c_dt = datetime.strptime(str(c_time), fmt) if isinstance(c_time, str) else datetime.combine(datetime.min, c_time)
+                
+                diff_mins = abs((c_dt - base_dt).total_seconds()) / 60.0
+                if diff_mins <= 30.0:
+                    c['hora_inicio_str'] = c_dt.strftime('%H:%M')
+                    c['cupos'] = 2 if c['lleva_acompanante'] else 1
+                    agrupables.append(c)
+                    
+        return jsonify({"status": "success", "agrupables": agrupables, "cupos_base": 2 if base['lleva_acompanante'] else 1}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+# =========================================================
+# API: VALIDACIÓN ESTRICTA DE DISPONIBILIDAD DIRECTA EN COLUMNA
+# =========================================================
+@bp_flotaespecial_eps.route('/api/viajes/validar_disponibilidad_vehiculo', methods=['POST'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_validar_disponibilidad_vehiculo():
+    empresa_id = session.get('empresa_id')
+    empresa_nit = session.get('nit')
+    datos = request.get_json(silent=True) or {}
+    
+    vehiculo_placa = datos.get('vehiculo')
+    viaje_base_id = datos.get('viaje_id')
+    viajes_agrupados = datos.get('viajes_agrupados', [])
+    
+    if not vehiculo_placa or not viaje_base_id:
+        return jsonify({"status": "error", "message": "Faltan datos para validar."}), 400
+        
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        # Bloqueo pesimista FOR UPDATE para garantizar que la capacidad residual leída no mute
+        cur.execute("""
+            SELECT COALESCE(capacidad_residual, (COALESCE(capacidad_pasajeros, 4) - 1)) as capacidad_residual
+            FROM vehiculos_especial 
+            WHERE placa = %s AND (id_empresa = %s OR id_empresa = %s)
+            FOR UPDATE
+        """, (vehiculo_placa, empresa_id, empresa_nit))
+        vehiculo = cur.fetchone()
+        
+        if not vehiculo:
+            return jsonify({"status": "error", "message": "Vehículo no encontrado."}), 404
+            
+        capacidad_residual_actual = vehiculo['capacidad_residual']
+        
+        viajes_a_asignar_ids = [viaje_base_id] + viajes_agrupados
+        format_strings = ','.join(['%s'] * len(viajes_a_asignar_ids))
+        cur.execute(f"""
+            SELECT id, departamento_destino, municipio_destino, lleva_acompanante
+            FROM control_viajes_flota_especial
+            WHERE id IN ({format_strings}) AND id_empresa = %s
+        """, tuple(viajes_a_asignar_ids + [empresa_id]))
+        viajes_a_asignar = cur.fetchall()
+        
+        if not viajes_a_asignar:
+            return jsonify({"status": "error", "message": "Viajes a asignar no encontrados."}), 404
+            
+        cupos_requeridos = sum([2 if v['lleva_acompanante'] else 1 for v in viajes_a_asignar])
+        
+        if cupos_requeridos > capacidad_residual_actual:
+            return jsonify({
+                "status": "bloqueo", 
+                "tipo": "capacidad",
+                "message": f"🚨 Capacidad Excedida. El vehículo solo tiene {capacidad_residual_actual} cupo(s) disponible(s) actualmente."
+            }), 200
+
+        cur.execute("""
+            SELECT id, departamento_destino, municipio_destino
+            FROM control_viajes_flota_especial
+            WHERE vehiculo_asignado = %s AND id_empresa = %s
+              AND estatus_servicio IN ('ASIGNADO', 'EN EJECUCION')
+            LIMIT 1
+        """, (vehiculo_placa, empresa_id))
+        viaje_en_ruta = cur.fetchone()
+        
+        if viaje_en_ruta:
+            for v_nuevo in viajes_a_asignar:
+                if (v_nuevo['departamento_destino'] or '').upper() != (viaje_en_ruta['departamento_destino'] or '').upper() or (v_nuevo['municipio_destino'] or '').upper() != (viaje_en_ruta['municipio_destino'] or '').upper():
+                    return jsonify({
+                        "status": "bloqueo", 
+                        "tipo": "ruta",
+                        "message": f"🚨 ALERTA: Conflicto de Ruta. El vehículo está ejecutando un viaje hacia {viaje_en_ruta['municipio_destino']} ({viaje_en_ruta['departamento_destino']}). No cumple la regla de misma ciudad de destino."
+                    }), 200
+
+        cupos_finales = capacidad_residual_actual - cupos_requeridos
+        return jsonify({
+            "status": "ok",
+            "message": f"✅ Vehículo Apto. Capacidad Residual tras asignación será de: {cupos_finales} cupo(s).",
+            "cupos_residuales": cupos_finales
+        }), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+
+# =========================================================
 # ETAPA 5: ASIGNACIÓN DE FLOTA Y GENERACIÓN DEL FUEC OFICIAL
 # =========================================================
 @bp_flotaespecial_eps.route('/asignacion_flota', methods=['GET', 'POST'])
@@ -1034,7 +1255,13 @@ def gestion_traslados_asignacion_flota():
         
         try:
             if accion in ['asignar_flota', 'resolver_novedad']:
-                viaje_id = request.form.get('viaje_id')
+                viaje_id_base = request.form.get('viaje_id')
+                viajes_agrupados = request.form.getlist('viajes_agrupados[]')
+                viajes_ids = [viaje_id_base]
+                if accion == 'asignar_flota' and viajes_agrupados:
+                    viajes_ids.extend(viajes_agrupados)
+                viajes_ids = list(dict.fromkeys(viajes_ids))
+
                 vehiculo_placa = request.form.get('vehiculo')
                 conductor = request.form.get('conductor')
                 contrato_id = request.form.get('contrato_id')
@@ -1046,13 +1273,37 @@ def gestion_traslados_asignacion_flota():
                     return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
                 
                 cur.execute("""
+                    SELECT id FROM conductores_flotaespecial 
+                    WHERE vehiculo_asignado = %s AND nombre = %s AND (id_empresa = %s OR id_empresa = %s)
+                """, (vehiculo_placa, conductor, empresa_id, empresa_nit))
+                if not cur.fetchone():
+                    flash(f"Error de Integridad: El conductor {conductor} no está vinculado legalmente al vehículo {vehiculo_placa}.", "danger")
+                    return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
+
+                # Adición de FOR UPDATE para prevenir lecturas sucias en alta concurrencia
+                cur.execute("""
                     SELECT v.*, e.nombre_comercial, e.nit, 
                            e.codigo_direccion_territorial, e.numero_resolucion_habilitacion, e.anio_habilitacion, e.firma_representante_legal
                     FROM vehiculos_especial v 
                     LEFT JOIN empresas e ON (v.id_empresa = e.id OR v.id_empresa = e.nit) 
                     WHERE v.placa = %s AND (v.id_empresa = %s OR v.id_empresa = %s)
+                    FOR UPDATE
                 """, (vehiculo_placa, empresa_id, empresa_nit))
                 veh_docs = cur.fetchone()
+
+                if accion == 'resolver_novedad':
+                    cur.execute("""
+                        SELECT COALESCE(v.capacidad_pasajeros, 4) as cap 
+                        FROM control_viajes_flota_especial c
+                        JOIN vehiculos_especial v ON c.vehiculo_asignado = v.placa AND v.id_empresa = c.id_empresa
+                        WHERE c.id = %s AND c.id_empresa = %s
+                    """, (viaje_id_base, empresa_id))
+                    old_veh = cur.fetchone()
+                    old_cap = old_veh['cap'] if old_veh else 4
+                    new_cap = veh_docs.get('capacidad_pasajeros', 4) if veh_docs else 4
+                    if new_cap < old_cap:
+                        flash(f'El vehículo de reemplazo ({new_cap} cupos) debe tener una capacidad igual o mayor al original ({old_cap} cupos).', 'danger')
+                        return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
 
                 cur.execute("SELECT id, nombre, cedula, telegram_id FROM usuarios WHERE (empresa_id = %s OR empresa_id = %s) AND perfil IN ('operador_flotaespecial', 'auxiliar_transporte_especial')", (empresa_id, empresa_nit))
                 cond_usrs = list(cur.fetchall())
@@ -1106,195 +1357,213 @@ def gestion_traslados_asignacion_flota():
                     flash(f"⛔ Prevención Activa (Decreto 1079): Bloqueo por {', '.join(errores_docs)}.", "danger")
                     return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
                 
-                cur.execute("SELECT * FROM control_viajes_flota_especial WHERE id = %s AND id_empresa = %s", (viaje_id, empresa_id))
-                viaje_data = cur.fetchone()
-
-                if accion == 'resolver_novedad':
-                    try:
-                        cur.execute("UPDATE fuec SET categoria_contrato = CONCAT(categoria_contrato, '-ANULADO') WHERE id_traslado_eps = %s AND id_empresa = %s", (viaje_data['id_viaje'], empresa_id))
-                    except:
-                        pass
-                    es_trasbordo = 1 if tipo_novedad == 'NOVEDAD_RECORRIDO' else 0
-                    cur.execute("""
-                        UPDATE control_viajes_flota_especial 
-                        SET estado_novedad = 'RESUELTA', 
-                            monto_liquidacion_manual = %s, 
-                            es_trasbordo = %s 
-                        WHERE id = %s AND id_empresa = %s
-                    """, (monto_liquidacion_manual if monto_liquidacion_manual else None, es_trasbordo, viaje_id, empresa_id))
-
                 anio_actual = str(datetime.now(BOGOTA_TZ).year)
-                cur.execute("SELECT COUNT(*) as c FROM fuec WHERE id_empresa = %s AND YEAR(fecha_inicio_vigencia) = %s", (empresa_id, anio_actual))
-                cons_extracto = cur.fetchone()['c'] + 1
-                
-                consecutivo_oficial = generar_consecutivo_fuec(
-                    veh_docs.get('codigo_direccion_territorial', '000') or '000',
-                    veh_docs.get('numero_resolucion_habilitacion', '0000') or '0000',
-                    veh_docs.get('anio_habilitacion', '00') or '00',
-                    anio_actual,
-                    contrato['numero_contrato'],
-                    cons_extracto
-                )
-                
-                pdf_filename = f"FUEC_{consecutivo_oficial}.pdf"
-                ruta_relativa = f"uploads/flotaespecial/fuec/{pdf_filename}"
-                ruta_pdf_abs = os.path.join(current_app.static_folder, ruta_relativa)
-                os.makedirs(os.path.dirname(ruta_pdf_abs), exist_ok=True)
-                
-                doc = SimpleDocTemplate(ruta_pdf_abs, pagesize=letter, rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
-                story = []
-                styles = getSampleStyleSheet()
-                
-                style_header = ParagraphStyle('Header', parent=styles['Normal'], alignment=1, fontSize=11, fontName='Helvetica-Bold')
-                style_cell = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=8)
-                style_cell_bold = ParagraphStyle('CellBold', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold')
-                
-                logo_min = os.path.join(current_app.static_folder, 'logo_mintransporte.png')
-                logo_empresa = os.path.join(current_app.static_folder, f"logo_{veh_docs.get('nit')}.PNG")
-                
-                img_min = RLImage(logo_min, width=2*inch, height=0.6*inch, kind='proportional') if os.path.exists(logo_min) else ""
-                img_emp = RLImage(logo_empresa, width=2*inch, height=0.6*inch, kind='proportional') if os.path.exists(logo_empresa) else ""
-                
-                t_logos = Table([[img_min, img_emp]], colWidths=[3.5*inch, 3.5*inch])
-                t_logos.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
-                story.append(t_logos)
-                story.append(Spacer(1, 10))
-                
-                story.append(Paragraph(f"FORMATO ÚNICO DE EXTRACTO DEL CONTRATO DEL SERVICIO PÚBLICO DE TRANSPORTE TERRESTRE AUTOMOTOR ESPECIAL No. {consecutivo_oficial}", style_header))
-                story.append(Spacer(1, 10))
-                
-                origen_destino_str = f"{viaje_data.get('direccion_origen', '')} - {viaje_data.get('direccion_destino', '')}"
-                
-                data_cto = [
-                    [Paragraph("RAZÓN SOCIAL DE LA EMPRESA:", style_cell_bold), Paragraph(str(veh_docs.get('nombre_comercial') or 'N/A'), style_cell), Paragraph("NIT:", style_cell_bold), Paragraph(str(veh_docs.get('nit') or 'N/A'), style_cell)],
-                    [Paragraph("CONTRATO No:", style_cell_bold), Paragraph(str(contrato.get('numero_contrato') or 'N/A'), style_cell), "", ""],
-                    [Paragraph("CONTRATANTE:", style_cell_bold), Paragraph(str(contrato.get('contratante_nombre') or 'N/A'), style_cell), Paragraph("NIT/CC:", style_cell_bold), Paragraph(str(contrato.get('contratante_nit_cedula') or 'N/A'), style_cell)],
-                    [Paragraph("OBJETO CONTRATO:", style_cell_bold), Paragraph(str(contrato.get('objeto_contrato') or 'N/A'), style_cell), "", ""],
-                    [Paragraph("ORIGEN-DESTINO:", style_cell_bold), Paragraph(str(origen_destino_str), style_cell), "", ""],
-                    [Paragraph("CONVENIO COLABORACIÓN:", style_cell_bold), Paragraph(str(contrato.get('convenio_colaboracion') or 'N/A'), style_cell), "", ""]
-                ]
-                t_cto = Table(data_cto, colWidths=[1.5*inch, 2.5*inch, 0.8*inch, 2.2*inch])
-                t_cto.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('SPAN', (1,1), (3,1)), ('SPAN', (1,3), (3,3)), ('SPAN', (1,4), (3,4)), ('SPAN', (1,5), (3,5))]))
-                story.append(t_cto)
-                story.append(Spacer(1, 5))
-                
-                f_ini = contrato['fecha_inicio']
-                f_fin = contrato['fecha_fin']
-                data_vig = [
-                    [Paragraph("VIGENCIA DEL CONTRATO", style_cell_bold), "DIA", "MES", "AÑO"],
-                    [Paragraph("FECHA INICIAL", style_cell), f_ini.strftime('%d'), f_ini.strftime('%m'), f_ini.strftime('%Y')],
-                    [Paragraph("FECHA VENCIMIENTO", style_cell), f_fin.strftime('%d'), f_fin.strftime('%m'), f_fin.strftime('%Y')]
-                ]
-                t_vig = Table(data_vig, colWidths=[4*inch, 1*inch, 1*inch, 1*inch])
-                t_vig.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('ALIGN', (1,0), (-1,-1), 'CENTER')]))
-                story.append(t_vig)
-                story.append(Spacer(1, 5))
-                
-                data_veh = [
-                    [Paragraph("CARACTERÍSTICAS DEL VEHÍCULO", style_header), "", "", ""],
-                    ["PLACA", "MODELO", "MARCA", "CLASE"],
-                    [str(veh_docs.get('placa') or 'N/A'), str(veh_docs.get('modelo') or 'N/A'), str(veh_docs.get('marca') or 'N/A'), str(veh_docs.get('clase') or 'N/A')],
-                    ["NÚMERO INTERNO", "NÚMERO TARJETA DE OPERACIÓN", "", ""],
-                    [str(veh_docs.get('numero_interno') or 'N/A'), str(veh_docs.get('numero_tarjeta_operacion') or 'N/A'), "", ""]
-                ]
-                t_veh = Table(data_veh, colWidths=[1.75*inch, 1.75*inch, 1.75*inch, 1.75*inch])
-                t_veh.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('SPAN', (0,0), (3,0)), ('SPAN', (1,3), (3,3)), ('SPAN', (1,4), (3,4)), ('ALIGN', (0,0), (-1,-1), 'CENTER')]))
-                story.append(t_veh)
-                story.append(Spacer(1, 5))
-                
-                data_cond = [
-                    ["DATOS DE CONDUCTORES", "NOMBRES Y APELLIDOS", "NÚMERO CÉDULA", "NÚMERO LICENCIA", "VIGENCIA"],
-                    ["CONDUCTOR 1", str(cond_docs.get('nombre') or 'N/A'), str(cond_docs.get('cedula') or 'N/A'), str(cond_docs.get('cedula') or 'N/A'), str(cond_docs.get('vencimiento_licencia_conduccion') or 'N/A')],
-                    ["CONDUCTOR 2", "N/A", "N/A", "N/A", "N/A"],
-                    ["CONDUCTOR 3", "N/A", "N/A", "N/A", "N/A"]
-                ]
-                t_cond = Table(data_cond, colWidths=[1.2*inch, 2.3*inch, 1*inch, 1.2*inch, 1.3*inch])
-                t_cond.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('FONTSIZE', (0,0), (-1,-1), 7)]))
-                story.append(t_cond)
-                story.append(Spacer(1, 5))
-                
-                data_resp = [
-                    [Paragraph("RESPONSABLE DEL CONTRATANTE", style_cell_bold), Paragraph("NOMBRES Y APELLIDOS", style_cell_bold), Paragraph("NÚMERO CÉDULA", style_cell_bold), Paragraph("TELÉFONO", style_cell_bold), Paragraph("DIRECCIÓN", style_cell_bold)],
-                    ["", Paragraph(str(contrato.get('responsable_nombre') or 'N/A'), style_cell), Paragraph(str(contrato.get('responsable_cedula') or 'N/A'), style_cell), Paragraph(str(contrato.get('responsable_telefono') or 'N/A'), style_cell), Paragraph(str(contrato.get('responsable_direccion') or 'N/A'), style_cell)]
-                ]
-                t_resp = Table(data_resp, colWidths=[1.5*inch, 1.5*inch, 1*inch, 1*inch, 2*inch])
-                t_resp.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('ALIGN', (0,0), (-1,-1), 'CENTER')]))
-                story.append(t_resp)
-                story.append(Spacer(1, 10))
-                
-                url_verificacion = request.host_url + 'gestor_flotaespecial/eps_bp/verificar_fuec/' + consecutivo_oficial
-                qr_code = qr.QrCodeWidget(url_verificacion)
-                d = Drawing(100, 100)
-                d.add(qr_code)
-                
-                firma_empresa = RLImage(os.path.join(current_app.static_folder, veh_docs.get('firma_representante_legal', '')), width=1.5*inch, height=0.5*inch) if veh_docs.get('firma_representante_legal') else Spacer(1, 0.5*inch)
-                
-                data_footer = [
-                    [Paragraph(f"<b>{str(veh_docs.get('nombre_comercial') or 'Empresa de Transporte')}</b><br/>NIT: {str(veh_docs.get('nit') or 'N/A')}", style_cell), 
-                     d, 
-                     [firma_empresa, Paragraph("FIRMA REPRESENTANTE LEGAL", style_cell_bold)]]
-                ]
-                t_footer = Table(data_footer, colWidths=[2.5*inch, 2*inch, 2.5*inch])
-                t_footer.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
-                story.append(t_footer)
-                
-                story.append(PageBreak())
-                story.append(Paragraph("INSTRUCTIVO PARA LA DETERMINACIÓN DEL NÚMERO CONSECUTIVO DEL FUEC", style_header))
-                story.append(Spacer(1, 10))
-                story.append(Paragraph("El formato único de Extracto de Contrato FUEC estará constituido por los siguientes números según Resolución 0006652 de 2019:", style_cell))
-                story.append(Spacer(1, 5))
-                story.append(Paragraph("a) Los tres primeros dígitos corresponden al código de la Dirección Territorial que otorgó la habilitación. b) Los cuatro dígitos siguientes señalarán el número de resolución. c) Los dos siguientes dígitos, el año de habilitación. d) Los cuatro dígitos, el año de expedición. e) Cuatro dígitos del contrato. f) Cuatro dígitos del extracto.", style_cell))
-                
-                doc.build(story)
-                
-                cur.execute("""
-                    INSERT INTO fuec (id_empresa, id_fuec_unico, consecutivo_oficial, consecutivo_extracto, placa, cedula_conductor, id_traslado_eps, id_contrato, categoria_contrato, numero_contrato, contratante_nombre, contratante_nit_cedula, origen, destino, fecha_inicio_vigencia, fecha_fin_vigencia, ruta_pdf_fuec, codigo_qr_url)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (empresa_id, consecutivo_oficial, consecutivo_oficial, cons_extracto, vehiculo_placa, cond_docs['cedula'], viaje_data['id_viaje'], contrato_id, contrato['categoria_contrato'], contrato['numero_contrato'], contrato['contratante_nombre'], contrato['contratante_nit_cedula'], viaje_data.get('direccion_origen'), viaje_data.get('direccion_destino'), f_ini, f_fin, ruta_relativa, url_verificacion))
+                mensajes_exito = 0
+                cupos_a_descontar = 0
 
-                # Actualizar el viaje con el nuevo vehículo y conductor
-                cur.execute("UPDATE control_viajes_flota_especial SET vehiculo_asignado = %s, conductor_asignado = %s, estatus_servicio = 'ASIGNADO' WHERE id = %s AND id_empresa = %s", (vehiculo_placa, conductor, viaje_id, empresa_id))
-                
-                # REVISIÓN CRÍTICA DE NOTIFICACIÓN TELEGRAM (Fallback y Escapado de HTML)
-                cur.execute("SELECT telegram_id FROM usuarios WHERE nombre = %s AND (empresa_id = %s OR empresa_id = %s) LIMIT 1", (conductor, empresa_id, empresa_nit))
-                usr_op = cur.fetchone()
-                
-                if usr_op and usr_op.get('telegram_id'):
-                    import html
-                    f_serv = html.escape(str(viaje_data.get('fecha_servicio') or 'Pendiente'))
-                    h_ini = html.escape(str(viaje_data.get('hora_inicio') or 'Pendiente'))
-                    telefono_pac = html.escape(str(viaje_data.get('telefono_usuario') or 'N/D'))
-                    nombre_pac = html.escape(str(viaje_data.get('nombre_usuario') or 'N/D'))
-                    dir_ori = html.escape(str(viaje_data.get('direccion_origen') or 'N/D'))
-                    dir_des = html.escape(str(viaje_data.get('direccion_destino') or 'N/D'))
-                    id_v = html.escape(str(viaje_data.get('id_viaje') or 'N/D'))
-                    trayecto = html.escape(str(viaje_data.get('trayecto') or 'IDA'))
-                    prescripcion = html.escape(str(viaje_data.get('numero_prescripcion') or 'N/A'))
+                for v_id in viajes_ids:
+                    cur.execute("SELECT * FROM control_viajes_flota_especial WHERE id = %s AND id_empresa = %s FOR UPDATE", (v_id, empresa_id))
+                    viaje_data = cur.fetchone()
+                    if not viaje_data: continue
                     
-                    info_acompanante = ""
-                    if viaje_data.get('lleva_acompanante'):
-                        info_acompanante = f"👥 <b>Acompañante:</b> {html.escape(str(viaje_data.get('nombre_acompanante', 'Sí')))}\n"
+                    cupos_a_descontar += 2 if viaje_data['lleva_acompanante'] else 1
 
-                    mensaje_tg = (
-                        f"🟢 <b>NUEVA ASIGNACIÓN DE VIAJE (FUEC)</b>\n\n"
-                        f"🏢 <b>Empresa:</b> {html.escape(str(empresa_nombre))}\n"
-                        f"🆔 <b>Prescripción:</b> {prescripcion}\n"
-                        f"🚙 <b>Vehículo:</b> {html.escape(str(vehiculo_placa))}\n\n"
-                        f"📋 <b>PROGRAMACIÓN:</b>\n"
-                        f"ID Viaje: <code>{id_v}</code>\n"
-                        f"Trayecto: {trayecto}\n"
-                        f"Paciente: {nombre_pac}\n"
-                        f"📞 <b>Teléfono:</b> {telefono_pac}\n"
-                        f"{info_acompanante}"
-                        f"Fecha: {f_serv} | Hora: {h_ini}\n"
-                        f"Origen: {dir_ori}\n"
-                        f"Destino: {dir_des}"
+                    if accion == 'resolver_novedad' and str(v_id) == str(viaje_id_base):
+                        try:
+                            cur.execute("UPDATE fuec SET categoria_contrato = CONCAT(categoria_contrato, '-ANULADO') WHERE id_traslado_eps = %s AND id_empresa = %s", (viaje_data['id_viaje'], empresa_id))
+                        except:
+                            pass
+                        es_trasbordo = 1 if tipo_novedad == 'NOVEDAD_RECORRIDO' else 0
+                        cur.execute("""
+                            UPDATE control_viajes_flota_especial 
+                            SET estado_novedad = 'RESUELTA', 
+                                monto_liquidacion_manual = %s, 
+                                es_trasbordo = %s 
+                            WHERE id = %s AND id_empresa = %s
+                        """, (monto_liquidacion_manual if monto_liquidacion_manual else None, es_trasbordo, v_id, empresa_id))
+
+                    # Bloqueo en generador de consecutivos para evitar Duplicated Entry en alta concurrencia
+                    cur.execute("SELECT COUNT(*) as c FROM fuec WHERE id_empresa = %s AND YEAR(fecha_inicio_vigencia) = %s FOR UPDATE", (empresa_id, anio_actual))
+                    cons_extracto = cur.fetchone()['c'] + 1
+                    
+                    consecutivo_oficial = generar_consecutivo_fuec(
+                        veh_docs.get('codigo_direccion_territorial', '000') or '000',
+                        veh_docs.get('numero_resolucion_habilitacion', '0000') or '0000',
+                        veh_docs.get('anio_habilitacion', '00') or '00',
+                        anio_actual,
+                        contrato['numero_contrato'],
+                        cons_extracto
                     )
                     
-                    if os.path.exists(ruta_pdf_abs):
-                        _enviar_documento_telegram_hilo([usr_op['telegram_id']], mensaje_tg, ruta_pdf_abs)
-                    else:
-                        _enviar_mensajes_telegram_hilo([usr_op['telegram_id']], mensaje_tg.replace("<b>", "*").replace("</b>", "*").replace("<code>", "`").replace("</code>", "`"))
+                    pdf_filename = f"FUEC_{consecutivo_oficial}.pdf"
+                    ruta_relativa = f"uploads/flotaespecial/fuec/{pdf_filename}"
+                    ruta_pdf_abs = os.path.join(current_app.static_folder, ruta_relativa)
+                    os.makedirs(os.path.dirname(ruta_pdf_abs), exist_ok=True)
+                    
+                    doc = SimpleDocTemplate(ruta_pdf_abs, pagesize=letter, rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
+                    story = []
+                    styles = getSampleStyleSheet()
+                    
+                    style_header = ParagraphStyle('Header', parent=styles['Normal'], alignment=1, fontSize=11, fontName='Helvetica-Bold')
+                    style_cell = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=8)
+                    style_cell_bold = ParagraphStyle('CellBold', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold')
+                    
+                    logo_min = os.path.join(current_app.static_folder, 'logo_mintransporte.png')
+                    logo_empresa = os.path.join(current_app.static_folder, f"logo_{veh_docs.get('nit')}.PNG")
+                    
+                    img_min = RLImage(logo_min, width=2*inch, height=0.6*inch, kind='proportional') if os.path.exists(logo_min) else ""
+                    img_emp = RLImage(logo_empresa, width=2*inch, height=0.6*inch, kind='proportional') if os.path.exists(logo_empresa) else ""
+                    
+                    t_logos = Table([[img_min, img_emp]], colWidths=[3.5*inch, 3.5*inch])
+                    t_logos.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
+                    story.append(t_logos)
+                    story.append(Spacer(1, 10))
+                    
+                    story.append(Paragraph(f"FORMATO ÚNICO DE EXTRACTO DEL CONTRATO DEL SERVICIO PÚBLICO DE TRANSPORTE TERRESTRE AUTOMOTOR ESPECIAL No. {consecutivo_oficial}", style_header))
+                    story.append(Spacer(1, 10))
+                    
+                    origen_destino_str = f"{viaje_data.get('direccion_origen', '')} - {viaje_data.get('direccion_destino', '')}"
+                    
+                    data_cto = [
+                        [Paragraph("RAZÓN SOCIAL DE LA EMPRESA:", style_cell_bold), Paragraph(str(veh_docs.get('nombre_comercial') or 'N/A'), style_cell), Paragraph("NIT:", style_cell_bold), Paragraph(str(veh_docs.get('nit') or 'N/A'), style_cell)],
+                        [Paragraph("CONTRATO No:", style_cell_bold), Paragraph(str(contrato.get('numero_contrato') or 'N/A'), style_cell), "", ""],
+                        [Paragraph("CONTRATANTE:", style_cell_bold), Paragraph(str(contrato.get('contratante_nombre') or 'N/A'), style_cell), Paragraph("NIT/CC:", style_cell_bold), Paragraph(str(contrato.get('contratante_nit_cedula') or 'N/A'), style_cell)],
+                        [Paragraph("OBJETO CONTRATO:", style_cell_bold), Paragraph(str(contrato.get('objeto_contrato') or 'N/A'), style_cell), "", ""],
+                        [Paragraph("ORIGEN-DESTINO:", style_cell_bold), Paragraph(str(origen_destino_str), style_cell), "", ""],
+                        [Paragraph("CONVENIO COLABORACIÓN:", style_cell_bold), Paragraph(str(contrato.get('convenio_colaboracion') or 'N/A'), style_cell), "", ""]
+                    ]
+                    t_cto = Table(data_cto, colWidths=[1.5*inch, 2.5*inch, 0.8*inch, 2.2*inch])
+                    t_cto.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('SPAN', (1,1), (3,1)), ('SPAN', (1,3), (3,3)), ('SPAN', (1,4), (3,4)), ('SPAN', (1,5), (3,5))]))
+                    story.append(t_cto)
+                    story.append(Spacer(1, 5))
+                    
+                    f_ini = contrato['fecha_inicio']
+                    f_fin = contrato['fecha_fin']
+                    data_vig = [
+                        [Paragraph("VIGENCIA DEL CONTRATO", style_cell_bold), "DIA", "MES", "AÑO"],
+                        [Paragraph("FECHA INICIAL", style_cell), f_ini.strftime('%d'), f_ini.strftime('%m'), f_ini.strftime('%Y')],
+                        [Paragraph("FECHA VENCIMIENTO", style_cell), f_fin.strftime('%d'), f_fin.strftime('%m'), f_fin.strftime('%Y')]
+                    ]
+                    t_vig = Table(data_vig, colWidths=[4*inch, 1*inch, 1*inch, 1*inch])
+                    t_vig.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('ALIGN', (1,0), (-1,-1), 'CENTER')]))
+                    story.append(t_vig)
+                    story.append(Spacer(1, 5))
+                    
+                    data_veh = [
+                        [Paragraph("CARACTERÍSTICAS DEL VEHÍCULO", style_header), "", "", ""],
+                        ["PLACA", "MODELO", "MARCA", "CLASE"],
+                        [str(veh_docs.get('placa') or 'N/A'), str(veh_docs.get('modelo') or 'N/A'), str(veh_docs.get('marca') or 'N/A'), str(veh_docs.get('clase') or 'N/A')],
+                        ["NÚMERO INTERNO", "NÚMERO TARJETA DE OPERACIÓN", "", ""],
+                        [str(veh_docs.get('numero_interno') or 'N/A'), str(veh_docs.get('numero_tarjeta_operacion') or 'N/A'), "", ""]
+                    ]
+                    t_veh = Table(data_veh, colWidths=[1.75*inch, 1.75*inch, 1.75*inch, 1.75*inch])
+                    t_veh.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('SPAN', (0,0), (3,0)), ('SPAN', (1,3), (3,3)), ('SPAN', (1,4), (3,4)), ('ALIGN', (0,0), (-1,-1), 'CENTER')]))
+                    story.append(t_veh)
+                    story.append(Spacer(1, 5))
+                    
+                    data_cond = [
+                        ["DATOS DE CONDUCTORES", "NOMBRES Y APELLIDOS", "NÚMERO CÉDULA", "NÚMERO LICENCIA", "VIGENCIA"],
+                        ["CONDUCTOR 1", str(cond_docs.get('nombre') or 'N/A'), str(cond_docs.get('cedula') or 'N/A'), str(cond_docs.get('cedula') or 'N/A'), str(cond_docs.get('vencimiento_licencia_conduccion') or 'N/A')],
+                        ["CONDUCTOR 2", "N/A", "N/A", "N/A", "N/A"],
+                        ["CONDUCTOR 3", "N/A", "N/A", "N/A", "N/A"]
+                    ]
+                    t_cond = Table(data_cond, colWidths=[1.2*inch, 2.3*inch, 1*inch, 1.2*inch, 1.3*inch])
+                    t_cond.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('FONTSIZE', (0,0), (-1,-1), 7)]))
+                    story.append(t_cond)
+                    story.append(Spacer(1, 5))
+                    
+                    data_resp = [
+                        [Paragraph("RESPONSABLE DEL CONTRATANTE", style_cell_bold), Paragraph("NOMBRES Y APELLIDOS", style_cell_bold), Paragraph("NÚMERO CÉDULA", style_cell_bold), Paragraph("TELÉFONO", style_cell_bold), Paragraph("DIRECCIÓN", style_cell_bold)],
+                        ["", Paragraph(str(contrato.get('responsable_nombre') or 'N/A'), style_cell), Paragraph(str(contrato.get('responsable_cedula') or 'N/A'), style_cell), Paragraph(str(contrato.get('responsable_telefono') or 'N/A'), style_cell), Paragraph(str(contrato.get('responsable_direccion') or 'N/A'), style_cell)]
+                    ]
+                    t_resp = Table(data_resp, colWidths=[1.5*inch, 1.5*inch, 1*inch, 1*inch, 2*inch])
+                    t_resp.setStyle(TableStyle([('BOX', (0,0), (-1,-1), 1, colors.black), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.black), ('ALIGN', (0,0), (-1,-1), 'CENTER')]))
+                    story.append(t_resp)
+                    story.append(Spacer(1, 10))
+                    
+                    url_verificacion = request.host_url + 'gestor_flotaespecial/eps_bp/verificar_fuec/' + consecutivo_oficial
+                    qr_code = qr.QrCodeWidget(url_verificacion)
+                    d = Drawing(100, 100)
+                    d.add(qr_code)
+                    
+                    firma_empresa = RLImage(os.path.join(current_app.static_folder, veh_docs.get('firma_representante_legal', '')), width=1.5*inch, height=0.5*inch) if veh_docs.get('firma_representante_legal') else Spacer(1, 0.5*inch)
+                    
+                    data_footer = [
+                        [Paragraph(f"<b>{str(veh_docs.get('nombre_comercial') or 'Empresa de Transporte')}</b><br/>NIT: {str(veh_docs.get('nit') or 'N/A')}", style_cell), 
+                         d, 
+                         [firma_empresa, Paragraph("FIRMA REPRESENTANTE LEGAL", style_cell_bold)]]
+                    ]
+                    t_footer = Table(data_footer, colWidths=[2.5*inch, 2*inch, 2.5*inch])
+                    t_footer.setStyle(TableStyle([('ALIGN', (0,0), (-1,-1), 'CENTER'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
+                    story.append(t_footer)
+                    
+                    story.append(PageBreak())
+                    story.append(Paragraph("INSTRUCTIVO PARA LA DETERMINACIÓN DEL NÚMERO CONSECUTIVO DEL FUEC", style_header))
+                    story.append(Spacer(1, 10))
+                    story.append(Paragraph("El formato único de Extracto de Contrato FUEC estará constituido por los siguientes números según Resolución 0006652 de 2019:", style_cell))
+                    story.append(Spacer(1, 5))
+                    story.append(Paragraph("a) Los tres primeros dígitos corresponden al código de la Dirección Territorial que otorgó la habilitación. b) Los cuatro dígitos siguientes señalarán el número de resolución. c) Los dos siguientes dígitos, el año de habilitación. d) Los cuatro dígitos, el año de expedición. e) Cuatro dígitos del contrato. f) Cuatro dígitos del extracto.", style_cell))
+                    
+                    doc.build(story)
+                    
+                    cur.execute("""
+                        INSERT INTO fuec (id_empresa, id_fuec_unico, consecutivo_oficial, consecutivo_extracto, placa, cedula_conductor, id_traslado_eps, id_contrato, categoria_contrato, numero_contrato, contratante_nombre, contratante_nit_cedula, origen, destino, fecha_inicio_vigencia, fecha_fin_vigencia, ruta_pdf_fuec, codigo_qr_url)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (empresa_id, consecutivo_oficial, consecutivo_oficial, cons_extracto, vehiculo_placa, cond_docs['cedula'], viaje_data['id_viaje'], contrato_id, contrato['categoria_contrato'], contrato['numero_contrato'], contrato['contratante_nombre'], contrato['contratante_nit_cedula'], viaje_data.get('direccion_origen'), viaje_data.get('direccion_destino'), f_ini, f_fin, ruta_relativa, url_verificacion))
+
+                    nuevo_estatus = 'ASIGNADO'
+                    if accion == 'resolver_novedad' and str(v_id) == str(viaje_id_base):
+                        nuevo_estatus = 'EN EJECUCION' if tipo_novedad == 'NOVEDAD_RECORRIDO' else 'ASIGNADO'
+                        
+                    cur.execute("UPDATE control_viajes_flota_especial SET vehiculo_asignado = %s, conductor_asignado = %s, estatus_servicio = %s WHERE id = %s AND id_empresa = %s", (vehiculo_placa, conductor, nuevo_estatus, v_id, empresa_id))
+                    
+                    cur.execute("SELECT telegram_id FROM usuarios WHERE nombre = %s AND (empresa_id = %s OR empresa_id = %s) LIMIT 1", (conductor, empresa_id, empresa_nit))
+                    usr_op = cur.fetchone()
+                    
+                    if usr_op and usr_op.get('telegram_id'):
+                        import html
+                        f_serv = html.escape(str(viaje_data.get('fecha_servicio') or 'Pendiente'))
+                        h_ini = html.escape(str(viaje_data.get('hora_inicio') or 'Pendiente'))
+                        telefono_pac = html.escape(str(viaje_data.get('telefono_usuario') or 'N/D'))
+                        nombre_pac = html.escape(str(viaje_data.get('nombre_usuario') or 'N/D'))
+                        dir_ori = html.escape(str(viaje_data.get('direccion_origen') or 'N/D'))
+                        dir_des = html.escape(str(viaje_data.get('direccion_destino') or 'N/D'))
+                        id_v = html.escape(str(viaje_data.get('id_viaje') or 'N/D'))
+                        trayecto = html.escape(str(viaje_data.get('trayecto') or 'IDA'))
+                        prescripcion = html.escape(str(viaje_data.get('numero_prescripcion') or 'N/A'))
+                        
+                        info_acompanante = ""
+                        if viaje_data.get('lleva_acompanante'):
+                            info_acompanante = f"👥 <b>Acompañante:</b> {html.escape(str(viaje_data.get('nombre_acompanante', 'Sí')))}\n"
+
+                        mensaje_tg = (
+                            f"🟢 <b>NUEVA ASIGNACIÓN DE VIAJE (FUEC)</b>\n\n"
+                            f"🏢 <b>Empresa:</b> {html.escape(str(empresa_nombre))}\n"
+                            f"🆔 <b>Prescripción:</b> {prescripcion}\n"
+                            f"🚙 <b>Vehículo:</b> {html.escape(str(vehiculo_placa))}\n\n"
+                            f"📋 <b>PROGRAMACIÓN:</b>\n"
+                            f"ID Viaje: <code>{id_v}</code>\n"
+                            f"Trayecto: {trayecto}\n"
+                            f"Paciente: {nombre_pac}\n"
+                            f"📞 <b>Teléfono:</b> {telefono_pac}\n"
+                            f"{info_acompanante}"
+                            f"Fecha: {f_serv} | Hora: {h_ini}\n"
+                            f"Origen: {dir_ori}\n"
+                            f"Destino: {dir_des}"
+                        )
+                        
+                        if os.path.exists(ruta_pdf_abs):
+                            _enviar_documento_telegram_hilo([usr_op['telegram_id']], mensaje_tg, ruta_pdf_abs)
+                        else:
+                            _enviar_mensajes_telegram_hilo([usr_op['telegram_id']], mensaje_tg)
+                    
+                    mensajes_exito += 1
+                
+                cur.execute("""
+                    UPDATE vehiculos_especial 
+                    SET capacidad_residual = capacidad_residual - %s 
+                    WHERE placa = %s AND (id_empresa = %s OR id_empresa = %s)
+                """, (cupos_a_descontar, vehiculo_placa, empresa_id, empresa_nit))
                 
                 mysql.connection.commit()
                 if accion == 'resolver_novedad':
@@ -1304,7 +1573,7 @@ def gestion_traslados_asignacion_flota():
                         return jsonify({"status": "success"})
                 else:
                     if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        flash('Flota asignada y FUEC oficial generado exitosamente.', 'success')
+                        flash(f'Flota asignada y {mensajes_exito} FUECs oficiales generados exitosamente.', 'success')
                     else:
                         return jsonify({"status": "success"})
 
@@ -1319,50 +1588,8 @@ def gestion_traslados_asignacion_flota():
             
         if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
-        
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("""
-        SELECT * FROM control_viajes_flota_especial 
-        WHERE id_empresa = %s 
-          AND (estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA') OR estado_novedad = 'ACTIVA')
-        ORDER BY fecha_servicio ASC
-    """, (empresa_id,))
-    viajes_programados = cur.fetchall()
-    
-    cur.execute("""
-        SELECT v.placa, v.clase AS tipo, COALESCE(v.capacidad_pasajeros, 4) as capacidad_pasajeros,
-               (SELECT COUNT(*) FROM control_viajes_flota_especial c 
-                WHERE c.vehiculo_asignado = v.placa AND c.estatus_servicio IN ('ASIGNADO', 'EN EJECUCION') 
-                AND c.fecha_servicio = CURDATE() AND c.id_empresa = %s) as ocupacion_actual
-        FROM vehiculos_especial v 
-        WHERE v.id_empresa = %s OR v.id_empresa = %s
-    """, (empresa_id, empresa_id, empresa_nit))
-    vehiculos = cur.fetchall()
-    
-    cur.execute("SELECT id, nombre, cedula, telegram_id FROM usuarios WHERE (empresa_id = %s OR empresa_id = %s) AND perfil IN ('operador_flotaespecial', 'auxiliar_transporte_especial')", (empresa_id, empresa_nit))
-    cond_usrs = list(cur.fetchall())
-    
-    cur.execute("SELECT id, nombre, cedula, vencimiento_licencia_conduccion FROM conductores_flotaespecial WHERE id_empresa = %s OR id_empresa = %s", (empresa_id, empresa_nit))
-    cond_flota = list(cur.fetchall())
-    
-    cond_dict = {c['cedula']: c for c in cond_usrs}
-    for c in cond_flota:
-        if c['cedula'] not in cond_dict:
-            cond_dict[c['cedula']] = c
-    conductores = list(cond_dict.values())
-
-    cur.execute("SELECT id, contratante_nombre, numero_contrato, categoria_contrato FROM contratos_transporte_especial WHERE (id_empresa = %s OR id_empresa = %s) AND estado = 'ACTIVO'", (empresa_id, empresa_nit))
-    contratos = cur.fetchall()
-
-    cur.close()
-    
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_asignacion_flota', viajes=viajes_programados, vehiculos=vehiculos, conductores=conductores, contratos=contratos)
-    
-    return render_template('B_modulo_flotaespecial_eps.html', nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'), active_module='traslados_asignacion_flota', viajes=viajes_programados, vehiculos=vehiculos, conductores=conductores, contratos=contratos)
-
 # =========================================================
-# ETAPAS 6 Y 7: AUDITORÍA Y RESULTADOS
+# ETAPAS 6 Y 7: AUDITORÍA Y RESULTADOS (SOPORTE COALESCE FALLBACK TOTAL_EPS)
 # =========================================================
 @bp_flotaespecial_eps.route('/auditoria', methods=['GET', 'POST'])
 @login_required_custom
@@ -1457,15 +1684,25 @@ def gestion_traslados_auditoria():
     if raices_validas:
         format_strings = ','.join(['%s'] * len(raices_validas))
         cur.execute(f"""
-            SELECT id, id_viaje_padre, id_viaje, numero_prescripcion, nombre_usuario, trayecto, 
-                   conductor_asignado, vehiculo_asignado, fecha_fin_real, ruta_documento, estatus_servicio,
-                   direccion_origen, municipio, departamento, lat_origen, lng_origen, lat_origen_esperado, lng_origen_esperado,
-                   direccion_destino, municipio_destino, departamento_destino, lat_destino, lng_destino, lat_destino_esperado, lng_destino_esperado, firma,
-                   hora_origen, hora_destino, tiempo_efectivo_minutos,
-                   SUBSTRING_INDEX(id_viaje, '_', 1) as raiz_viaje
-            FROM control_viajes_flota_especial 
-            WHERE id_empresa = %s AND SUBSTRING_INDEX(id_viaje, '_', 1) IN ({format_strings})
-            ORDER BY raiz_viaje, trayecto
+            SELECT c.id, c.id_viaje_padre, c.id_viaje, c.numero_prescripcion, c.nombre_usuario, c.trayecto, 
+                   c.conductor_asignado, c.vehiculo_asignado, c.fecha_fin_real, c.ruta_documento, c.estatus_servicio,
+                   c.direccion_origen, c.municipio, c.departamento, c.lat_origen, c.lng_origen, c.lat_origen_esperado, c.lng_origen_esperado,
+                   c.direccion_destino, c.municipio_destino, c.departamento_destino, c.lat_destino, c.lng_destino, c.lat_destino_esperado, c.lng_destino_esperado, c.firma,
+                   c.hora_origen, c.hora_destino, c.tiempo_efectivo_minutos,
+                   COALESCE(
+                       NULLIF(c.distancia_estimada_km, 0.00),
+                       (SELECT t.distancia_km FROM viajes_tramos_liquidaciones_especial t WHERE t.id_viaje COLLATE utf8mb4_unicode_ci = c.id_viaje AND t.id_empresa = c.id_empresa AND t.tipo_tramo = 'TOTAL_EPS' LIMIT 1),
+                       0.00
+                   ) as distancia_estimada_km,
+                   COALESCE(c.distancia_real_km, 0.00) as distancia_real_km,
+                   COALESCE(c.desviacion_origen_m, 0) as desviacion_origen_m,
+                   COALESCE(c.desviacion_destino_m, 0) as desviacion_destino_m,
+                   SUBSTRING_INDEX(c.id_viaje, '_', 1) as raiz_viaje,
+                   (SELECT SUM(COALESCE(NULLIF(sub.distancia_estimada_km, 0.00), (SELECT t2.distancia_km FROM viajes_tramos_liquidaciones_especial t2 WHERE t2.id_viaje COLLATE utf8mb4_unicode_ci = sub.id_viaje AND t2.id_empresa = sub.id_empresa AND t2.tipo_tramo = 'TOTAL_EPS' LIMIT 1), 0.00)) FROM control_viajes_flota_especial sub WHERE sub.id_viaje_padre = c.id_viaje_padre AND sub.id_empresa = c.id_empresa) as consolidado_estimado_paquete,
+                   (SELECT SUM(COALESCE(sub.distancia_real_km, 0.00)) FROM control_viajes_flota_especial sub WHERE sub.id_viaje_padre = c.id_viaje_padre AND sub.id_empresa = c.id_empresa) as consolidado_real_paquete
+            FROM control_viajes_flota_especial c
+            WHERE c.id_empresa = %s AND SUBSTRING_INDEX(c.id_viaje, '_', 1) IN ({format_strings})
+            ORDER BY raiz_viaje, c.trayecto
         """, [empresa_id] + raices_validas)
         tramos = cur.fetchall()
         

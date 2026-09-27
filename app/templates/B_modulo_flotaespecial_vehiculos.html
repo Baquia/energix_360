@@ -485,6 +485,7 @@
                                             data-rrtm="{{ v.ruta_pdf_tecnomecanica }}"
                                             data-rtm_exento="{{ 'true' if v.rtm_exento else 'false' }}"
                                             data-cond="{{ v.conductor_asignado }}"
+                                            data-cond_cedulas="{{ v.cedulas_conductores }}"
                                             data-dep="{{ v.departamento_base }}"
                                             data-mun="{{ v.municipio_base }}"
                                             onclick="abrirEditarVehiculo(this)">✏️</button>
@@ -598,8 +599,16 @@
                 <div class="form-group"><label>Organismo de Tránsito</label><input type="text" name="organismo_transito"></div>
                 
                 <div class="form-group">
-                    <label>Conductor Asignado</label>
-                    <input type="text" name="conductor_asignado" list="lista_operadores" placeholder="Escriba para buscar conductor..." autocomplete="off">
+                    <label>Conductores Asignados (Máx. 3)</label>
+                    <select name="conductores_asignados" id="c_conductores" multiple size="4" onchange="limitarSeleccionMultiple(this, 3)" style="height: auto;">
+                        {% if conductores_flota is defined %}
+                            {% for c in conductores_flota %}
+                                <option value="{{ c.cedula }}">{{ c.nombre }} ({{ c.cedula }})</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    <small style="color: var(--text-muted); font-size: 10px; display: block; margin-top: 4px;">Presione Ctrl (Windows) o Cmd (Mac) para seleccionar varios.</small>
+                    <small id="warn_c_conductores" style="color: #ef4444; font-size: 11px; font-weight: bold; display: none; margin-top: 4px;"></small>
                 </div>
                 <div class="form-group">
                     <label>Departamento Base</label>
@@ -699,8 +708,16 @@
                 <div class="form-group"><label>Organismo Tránsito</label><input type="text" name="organismo_transito" id="edit_org"></div>
                 
                 <div class="form-group">
-                    <label>Conductor Asignado</label>
-                    <input type="text" name="conductor_asignado" id="edit_cond" list="lista_operadores" placeholder="Escriba para buscar conductor..." autocomplete="off">
+                    <label>Conductores Asignados (Máx. 3)</label>
+                    <select name="conductores_asignados" id="edit_cond_multiple" multiple size="4" onchange="limitarSeleccionMultiple(this, 3)" style="height: auto;">
+                        {% if conductores_flota is defined %}
+                            {% for c in conductores_flota %}
+                                <option value="{{ c.cedula }}">{{ c.nombre }} ({{ c.cedula }})</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    <small style="color: var(--text-muted); font-size: 10px; display: block; margin-top: 4px;">Presione Ctrl (Windows) o Cmd (Mac) para seleccionar varios.</small>
+                    <small id="warn_edit_cond_multiple" style="color: #ef4444; font-size: 11px; font-weight: bold; display: none; margin-top: 4px;"></small>
                 </div>
                 <div class="form-group">
                     <label>Departamento Base</label>
@@ -1055,6 +1072,24 @@
         }
 
         // ================= JS: VEHÍCULOS =================
+        function limitarSeleccionMultiple(selectObj, maxAllowed) {
+            let count = 0;
+            for (let i = 0; i < selectObj.options.length; i++) {
+                if (selectObj.options[i].selected) {
+                    count++;
+                    if (count > maxAllowed) {
+                        selectObj.options[i].selected = false;
+                        let warnEl = document.getElementById('warn_' + selectObj.id);
+                        if (warnEl) {
+                            warnEl.innerText = "Solo puede seleccionar un máximo de " + maxAllowed + " conductores.";
+                            warnEl.style.display = 'block';
+                            setTimeout(() => { warnEl.style.display = 'none'; }, 4000);
+                        }
+                    }
+                }
+            }
+        }
+
         function buscarYMostrarVisor() {
             let placaBusqueda = document.getElementById('input_consulta_placa').value.trim().toUpperCase();
             if (!placaBusqueda) { alert("Ingrese una placa válida para consultar."); return; }
@@ -1162,7 +1197,20 @@
             document.getElementById('edit_nrtm').value = (d.nrtm !== 'None' && d.nrtm) ? d.nrtm : '';
             document.getElementById('edit_fvenrtm').value = (d.fvenrtm !== 'None' && d.fvenrtm) ? d.fvenrtm : '';
             
-            document.getElementById('edit_cond').value = (d.cond !== 'None' && d.cond) ? d.cond : '';
+            let selectEditCond = document.getElementById('edit_cond_multiple');
+            if(selectEditCond) {
+                for(let i=0; i < selectEditCond.options.length; i++) {
+                    selectEditCond.options[i].selected = false;
+                }
+                if(d.cond_cedulas && d.cond_cedulas !== 'None') {
+                    let cedulas_asignadas = d.cond_cedulas.split(',');
+                    for(let i=0; i < selectEditCond.options.length; i++) {
+                        if(cedulas_asignadas.includes(selectEditCond.options[i].value)) {
+                            selectEditCond.options[i].selected = true;
+                        }
+                    }
+                }
+            }
             
             let depSelectEdit = document.getElementById('edit_dep_base');
             if (d.dep && d.dep !== 'None') {

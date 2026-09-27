@@ -137,7 +137,6 @@
                 <div class="nav-item-content"><span class="nav-icon">🚐</span> Vehículos</div>
             </a>
             
-            <!-- ENLACE ESTRICTO AL MÓDULO EXCLUSIVO DE CONDUCTORES -->
             <a href="{{ url_for('flotaespecial_conductores.gestion_conductores') }}" class="nav-item active">
                 <div class="nav-item-content"><span class="nav-icon">👨‍✈️</span> Conductores</div>
             </a>
@@ -206,7 +205,7 @@
                             <th>Nombre / Cédula</th>
                             <th>Contacto (Tel/Email)</th>
                             <th>Ubicación Base</th>
-                            <th>Estatus Operativo</th>
+                            <th>Estatus / Vehículo</th>
                             <th>Licencia (Vence)</th>
                             <th>Seg. Social (Vence)</th>
                             <th>Documentos (PDF)</th>
@@ -227,6 +226,7 @@
                                 {% else %}
                                     <span class="badge badge-gray">No Logueado</span>
                                 {% endif %}
+                                <br><small style="color: var(--text-muted); margin-top: 4px; display: inline-block;"><b>🚐 Vehículo:</b> <span style="color: var(--verde);">{{ c.vehiculo_asignado or 'Sin asignar' }}</span></small>
                             </td>
                             <td>{{ c.numero_licencia_conduccion or 'N/D' }}<br><small>{{ c.vencimiento_licencia_conduccion or 'N/D' }}</small></td>
                             <td><b>{{ c.vencimiento_seguridad_social or 'N/D' }}</b></td>
@@ -255,6 +255,7 @@
                                         data-afp="{{ c.fondo_pensiones }}"
                                         data-arl="{{ c.arl }}"
                                         data-pago="{{ c.ultimo_pago_seguridad_social }}"
+                                        data-vehiculo="{{ c.vehiculo_asignado }}"
                                         onclick="abrirEditarConductor(this)">✏️</button>
                                 <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarConductor('{{ c.id }}', '{{ c.cedula }}', '{{ c.nombre }}')">🗑️</button>
                             </td>
@@ -315,6 +316,13 @@
                     <label>Municipio Base</label>
                     <select name="municipio_base" id="c_mun_base"></select>
                 </div>
+                
+                <!-- NUEVO CAMPO: VEHÍCULO ASIGNADO CON DATALIST -->
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Vehículo Asignado (Placa)</label>
+                    <input type="text" name="vehiculo_asignado" id="c_vehiculo" list="lista_vehiculos" placeholder="Buscar vehículo por placa o marca..." autocomplete="off">
+                    <small style="color: #10b981; font-size: 10px;">Escriba para buscar o seleccione de la lista de vehículos de la flota.</small>
+                </div>
 
                 <!-- CAMPO TELEGRAM ID BLOQUEADO (REGLA DE SEGURIDAD) -->
                 <div class="form-group" style="grid-column: 1 / -1;">
@@ -360,6 +368,7 @@
                 <div class="form-group"><label>Nombre y Cédula</label><div id="vis_id" class="readonly-box" style="font-weight: bold; color: var(--verde); font-size: 15px;"></div></div>
                 <div class="form-group"><label>Contacto (Tel / Email)</label><div id="vis_contacto" class="readonly-box"></div></div>
                 <div class="form-group"><label>Ubicación Base</label><div id="vis_ubicacion" class="readonly-box"></div></div>
+                <div class="form-group"><label>Vehículo Asignado</label><div id="vis_vehiculo" class="readonly-box" style="font-weight: bold; color: var(--verde);"></div></div>
                 <div class="form-group"><label>Estatus / Telegram ID</label><div id="vis_tg" class="readonly-box"></div></div>
                 <div class="form-group"><label>Licencia de Conducción</label><div id="vis_lic" class="readonly-box"></div></div>
                 <div class="form-group"><label>Afiliaciones (EPS / AFP / ARL)</label><div id="vis_afil" class="readonly-box"></div></div>
@@ -396,6 +405,15 @@
             </form>
         </div>
     </div>
+
+    <!-- DATALIST PARA VEHÍCULOS DE LA FLOTA -->
+    <datalist id="lista_vehiculos">
+        {% if vehiculos_flota is defined %}
+            {% for v in vehiculos_flota %}
+                <option value="{{ v.placa }}">{{ v.placa }} - {{ v.marca }} ({{ v.modelo }})</option>
+            {% endfor %}
+        {% endif %}
+    </datalist>
 
     <script>
         const menuToggle = document.getElementById('menuToggle');
@@ -479,6 +497,7 @@
             document.getElementById('accionConductor').value = 'crear';
             document.getElementById('c_cedula').readOnly = false;
             document.getElementById('c_password').required = true;
+            document.getElementById('c_vehiculo').value = '';
             document.getElementById('btnGuardarConductor').innerText = 'Guardar Conductor';
             openModal('modalConductor');
         }
@@ -498,6 +517,7 @@
             document.getElementById('c_telefono').value = (d.telefono !== 'None' && d.telefono) ? d.telefono : '';
             document.getElementById('c_email').value = (d.email !== 'None' && d.email) ? d.email : '';
             document.getElementById('c_password').value = ''; 
+            document.getElementById('c_vehiculo').value = (d.vehiculo !== 'None' && d.vehiculo) ? d.vehiculo : '';
 
             let depSelect = document.getElementById('c_dep_base');
             if (d.dep && d.dep !== 'None') {
@@ -538,6 +558,7 @@
                     document.getElementById('vis_id').innerText = `${c.nombre} (CC: ${c.cedula})`;
                     document.getElementById('vis_contacto').innerText = `${c.telefono || 'N/D'} / ${c.email || 'N/D'}`;
                     document.getElementById('vis_ubicacion').innerText = `${c.municipio_base || 'N/D'} - ${c.departamento_base || 'N/D'}`;
+                    document.getElementById('vis_vehiculo').innerText = c.vehiculo_asignado || 'Sin asignar';
                     document.getElementById('vis_tg').innerText = `${c.estatus || 'No Logueado'} / ${c.telegram_id || 'No registrado'}`;
                     document.getElementById('vis_lic').innerText = `N° ${c.numero_licencia_conduccion || 'N/D'} | Vence: ${c.vencimiento_licencia_conduccion || 'N/D'}`;
                     document.getElementById('vis_afil').innerText = `EPS: ${c.eps || 'N/D'} | AFP: ${c.fondo_pensiones || 'N/D'} | ARL: ${c.arl || 'N/D'}`;

@@ -383,7 +383,15 @@ def gestion_vehiculos():
             restriccion_movilidad = request.form.get('restriccion_movilidad', '').strip()
             blindaje = request.form.get('blindaje', '').strip()
             
-            conductor_asignado = request.form.get('conductor_asignado', '').strip()
+            conductores_asignados = request.form.getlist('conductores_asignados')
+            nombres_conductores = []
+            if conductores_asignados:
+                format_strings = ','.join(['%s'] * len(conductores_asignados))
+                cur.execute(f"SELECT nombre FROM conductores_flotaespecial WHERE id_empresa = %s AND cedula IN ({format_strings})", tuple([empresa_id] + conductores_asignados))
+                nombres_conductores = [row['nombre'] for row in cur.fetchall()]
+                
+            conductor_asignado_nombres = ", ".join(nombres_conductores) if nombres_conductores else None
+
             departamento_base = request.form.get('departamento_base', '').strip()
             municipio_base = request.form.get('municipio_base', '').strip()
             
@@ -464,8 +472,15 @@ def gestion_vehiculos():
                             numero_poliza_soat, aseguradora_soat, vencimiento_soat,
                             numero_certificado_rtm, vencimiento_rtm,
                             r_prop or '', r_ope or '', r_rcc or '', r_soat or '', r_rtm or '',
-                            conductor_asignado, departamento_base, municipio_base
+                            conductor_asignado_nombres, departamento_base, municipio_base
                         ))
+                        
+                        cur.execute("UPDATE conductores_flotaespecial SET vehiculo_asignado = NULL WHERE id_empresa = %s AND vehiculo_asignado = %s", (empresa_id, placa))
+                        
+                        if conductores_asignados:
+                            format_strings = ','.join(['%s'] * len(conductores_asignados))
+                            cur.execute(f"UPDATE conductores_flotaespecial SET vehiculo_asignado = %s WHERE id_empresa = %s AND cedula IN ({format_strings})", tuple([placa, empresa_id] + conductores_asignados))
+
                         mysql.connection.commit()
                         flash(f"Vehículo especial {placa} registrado manualmente con éxito.", "success")
                         
@@ -498,15 +513,22 @@ def gestion_vehiculos():
                             numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
                             numero_poliza_soat, aseguradora_soat, vencimiento_soat,
                             numero_certificado_rtm, vencimiento_rtm,
-                            conductor_asignado, departamento_base, municipio_base,
+                            conductor_asignado_nombres, departamento_base, municipio_base,
                             v_id, empresa_id
                         ))
+                        
                         if r_prop: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_tarjeta_propiedad=%s WHERE id=%s", (r_prop, v_id))
                         if r_ope: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_tarjeta_operacion=%s WHERE id=%s", (r_ope, v_id))
                         if r_rcc: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_rcc_rce=%s WHERE id=%s", (r_rcc, v_id))
                         if r_soat: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_soat=%s WHERE id=%s", (r_soat, v_id))
                         if r_rtm: cur.execute("UPDATE vehiculos_especial SET ruta_pdf_tecnomecanica=%s WHERE id=%s", (r_rtm, v_id))
                         
+                        cur.execute("UPDATE conductores_flotaespecial SET vehiculo_asignado = NULL WHERE id_empresa = %s AND vehiculo_asignado = %s", (empresa_id, placa))
+                        
+                        if conductores_asignados:
+                            format_strings = ','.join(['%s'] * len(conductores_asignados))
+                            cur.execute(f"UPDATE conductores_flotaespecial SET vehiculo_asignado = %s WHERE id_empresa = %s AND cedula IN ({format_strings})", tuple([placa, empresa_id] + conductores_asignados))
+
                         mysql.connection.commit()
                         flash(f"Expediente del vehículo {placa} actualizado correctamente.", "success")
                         
@@ -519,6 +541,11 @@ def gestion_vehiculos():
         elif accion == 'eliminar':
             vehiculo_id = request.form.get('vehiculo_id')
             try:
+                cur.execute("SELECT placa FROM vehiculos_especial WHERE id = %s AND id_empresa = %s", (vehiculo_id, empresa_id))
+                vehiculo = cur.fetchone()
+                if vehiculo:
+                    cur.execute("UPDATE conductores_flotaespecial SET vehiculo_asignado = NULL WHERE vehiculo_asignado = %s AND id_empresa = %s", (vehiculo['placa'], empresa_id))
+                
                 cur.execute("DELETE FROM vehiculos_especial WHERE id = %s AND id_empresa = %s", (vehiculo_id, empresa_id))
                 mysql.connection.commit()
                 flash("Vehículo especial eliminado de la base de datos.", "success")
@@ -576,7 +603,14 @@ def gestion_vehiculos():
         
     else:
         # VISTA POR DEFECTO: VEHÍCULOS + TABLERO KPIs
-        cur.execute("SELECT * FROM vehiculos_especial WHERE id_empresa = %s ORDER BY id DESC", (empresa_id,))
+        cur.execute("""
+            SELECT v.*, GROUP_CONCAT(c.cedula) as cedulas_conductores
+            FROM vehiculos_especial v
+            LEFT JOIN conductores_flotaespecial c ON v.placa = c.vehiculo_asignado AND v.id_empresa = c.id_empresa
+            WHERE v.id_empresa = %s 
+            GROUP BY v.id
+            ORDER BY v.id DESC
+        """, (empresa_id,))
         vehiculos_db = cur.fetchall()
         
         hoy = datetime.now().date()
@@ -621,7 +655,7 @@ def gestion_vehiculos():
             nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
             active_module='vehiculos', vehiculos=vehiculos_db, terceros=terceros_db,
             kpis=kpis, conductores_activos=conductores_activos,
-            operadores_flota=operadores_flota
+            operadores_flota=conductores_db, conductores_flota=conductores_db
         )
 
 # =========================================================

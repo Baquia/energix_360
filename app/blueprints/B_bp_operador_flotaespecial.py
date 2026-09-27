@@ -5,6 +5,7 @@ import base64
 import uuid
 import hashlib
 import pytz
+import requests
 from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash, current_app
 from app import mysql
 from app.utils import login_required_custom
@@ -15,6 +16,23 @@ bp_operador_flotaespecial = Blueprint('operador_flotaespecial', __name__)
 
 # Zona horaria oficial de Colombia
 BOGOTA_TZ = pytz.timezone('America/Bogota')
+
+# ==============================================================================
+# HELPER: CÁLCULO DE DISTANCIA GOOGLE MAPS API (ANTI-FRAUDE)
+# ==============================================================================
+def _calcular_distancia_google(origen, destino):
+    if not origen or not destino:
+        return 0.0
+    api_key = "AIzaSyBloN0EeBxRj9CWnHZ9Wgjz721846DT4KY"
+    url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origen}&destinations={destino}&mode=driving&key={api_key}"
+    try:
+        resp = requests.get(url, timeout=10).json()
+        if resp.get('status') == 'OK' and resp['rows'][0]['elements'][0].get('status') == 'OK':
+            meters = resp['rows'][0]['elements'][0]['distance']['value']
+            return round(meters / 1000.0, 2)
+    except Exception as e:
+        print("Error API Google Maps:", e)
+    return 0.0
 
 # ==============================================================================
 # HELPER: GUARDADO DE EVIDENCIAS EN BASE64 CON DETECCIÓN MIME
@@ -130,7 +148,7 @@ def autoasignar_vuelta_especial():
             return jsonify({"status": "error", "message": "Referencia de viaje padre no encontrada."}), 404
             
         cur.execute("""
-            SELECT id, id_viaje FROM control_viajes_flota_especial 
+            SELECT id, id_viaje, lleva_acompanante FROM control_viajes_flota_especial 
             WHERE id_empresa = %s AND id_viaje_padre = %s AND trayecto = 'VUELTA' AND estatus_servicio = 'PDTE. ASIGNAR VUELTA'
             LIMIT 1
         """, (empresa_id, ida['id_viaje_padre']))
@@ -144,6 +162,15 @@ def autoasignar_vuelta_especial():
             SET vehiculo_asignado = %s, conductor_asignado = %s, estatus_servicio = 'ASIGNADO'
             WHERE id = %s AND id_empresa = %s
         """, (placa, usuario_nombre, vuelta['id'], empresa_id))
+        
+        # Descontar capacidad residual del vehículo
+        cupos_a_descontar = 2 if vuelta['lleva_acompanante'] else 1
+        cur.execute("""
+            UPDATE vehiculos_especial 
+            SET capacidad_residual = capacidad_residual - %s 
+            WHERE placa = %s AND id_empresa = %s
+        """, (cupos_a_descontar, placa, empresa_id))
+
         mysql.connection.commit()
         
         return jsonify({"status": "success", "id_viaje_vuelta": vuelta['id_viaje']}), 200
@@ -180,6 +207,10 @@ def prelogin_flotaespecial():
     try:
         try:
             cur.execute("ALTER TABLE vehiculos_especial ADD COLUMN estatus VARCHAR(50) DEFAULT 'No logueado', ADD COLUMN ultima_latitud DECIMAL(10, 8) NULL, ADD COLUMN ultima_longitud DECIMAL(11, 8) NULL;")
+        except:
+            pass
+        try:
+            cur.execute("ALTER TABLE vehiculos_especial ADD COLUMN capacidad_residual INT DEFAULT 0 AFTER capacidad_pasajeros;")
         except:
             pass
 
@@ -257,19 +288,27 @@ def iniciar_viaje_especial():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        cur.execute("SELECT id, estatus_servicio, id_viaje FROM control_viajes_flota_especial WHERE id_viaje = %s AND id_empresa = %s", (id_viaje_alfanumerico, empresa_id))
+        cur.execute("SELECT id, estatus_servicio, id_viaje, estado_novedad FROM control_viajes_flota_especial WHERE id_viaje = %s AND id_empresa = %s", (id_viaje_alfanumerico, empresa_id))
         viaje_data = cur.fetchone()
         
         if not viaje_data:
              return jsonify({"status": "error", "message": "El Código de Acceso no existe o no pertenece a su empresa."}), 404
 
-        if viaje_data['estatus_servicio'] != 'ASIGNADO':
-             return jsonify({"status": "error", "message": f"El servicio no está disponible. Estado actual: {viaje_data['estatus_servicio']}."}), 400
+        puede_iniciar = False
+        if viaje_data['estatus_servicio'] == 'ASIGNADO':
+            puede_iniciar = True
+        elif viaje_data['estatus_servicio'] == 'EN EJECUCION' and viaje_data.get('estado_novedad') == 'RESUELTA':
+            puede_iniciar = True
 
+        if not puede_iniciar:
+             return jsonify({"status": "error", "message": f"El servicio no está disponible para iniciar o la novedad no ha sido resuelta por el controlador. Estado actual: {viaje_data['estatus_servicio']}."}), 400
+
+        # Implementación de FOR UPDATE para prevenir lecturas fantasmas en el contador
         cur.execute("""
             SELECT COUNT(*) as total 
             FROM control_viajes_flota_especial 
             WHERE id_empresa = %s AND vehiculo_asignado = %s AND YEAR(fecha_servicio) = YEAR(NOW()) AND consecutivo_viaje IS NOT NULL
+            FOR UPDATE
         """, (empresa_id, placa))
         resultado = cur.fetchone()
         contador = (resultado['total'] if resultado else 0) + 1
@@ -283,7 +322,9 @@ def iniciar_viaje_especial():
             SET estatus_servicio = 'EN EJECUCION', 
                 operador_ejecucion = %s, 
                 fecha_ejecucion_real = %s,
-                consecutivo_viaje = %s 
+                consecutivo_viaje = %s,
+                estado_novedad = NULL,
+                descripcion_novedad = NULL
             WHERE id_viaje = %s AND id_empresa = %s
         """, (usuario_nombre, datetime.now(BOGOTA_TZ), consecutivo, id_viaje_alfanumerico, empresa_id))
 
@@ -323,7 +364,6 @@ def reportar_novedad_especial():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        # Se elimina el ALTER TABLE para evitar bloqueos por el Metadata Lock
         cur.execute("SELECT id, estatus_servicio FROM control_viajes_flota_especial WHERE id_viaje = %s AND id_empresa = %s", (id_viaje_alfanumerico, empresa_id))
         viaje_info = cur.fetchone()
         
@@ -352,7 +392,8 @@ def reportar_novedad_especial():
             WHERE id_viaje = %s AND id_empresa = %s
         """
         
-        args = [tipo_novedad, descripcion, datetime.now(BOGOTA_TZ)] + coords_args + [id_viaje_alfanumerico, empresa_id]
+        # Corrección: Se elimina la zona horaria del objeto datetime para evitar el Error 500
+        args = [tipo_novedad, descripcion, datetime.now(BOGOTA_TZ).replace(tzinfo=None)] + coords_args + [id_viaje_alfanumerico, empresa_id]
         
         cur.execute(query, tuple(args))
         mysql.connection.commit()
@@ -382,6 +423,7 @@ def finalizar_viaje_especial():
     id_viaje_fisico = datos.get('id_viaje_fisico') or session.get('id_viaje_especial')
     id_viaje_alfanumerico = datos.get('id_viaje_alfanumerico') or session.get('codigo_viaje_alfanumerico')
     empresa_id = session.get('empresa_id')
+    placa = session.get('placa_prelogueada_especial')
 
     if not id_viaje_fisico or not id_viaje_alfanumerico:
         return jsonify({"status": "error", "message": "No hay un viaje activo para finalizar."}), 400
@@ -413,17 +455,45 @@ def finalizar_viaje_especial():
         ruta_paciente = _guardar_testigo_base64(foto_paciente, 'viajes', f"paciente_{id_viaje_fisico}")
         ruta_firma = _guardar_testigo_base64(firma, 'viajes', f"firma_{id_viaje_fisico}")
 
+        # Cálculo de distancias y desviaciones geoespaciales reales
+        lat_ori_real = telemetria.get('lat_origen')
+        lng_ori_real = telemetria.get('lng_origen')
+        lat_des_real = telemetria.get('lat_destino')
+        lng_des_real = telemetria.get('lng_destino')
+
+        dist_real_calc = 0.0
+        desv_ori_m = 0
+        desv_des_m = 0
+
+        cur.execute("SELECT lat_origen_esperado, lng_origen_esperado, lat_destino_esperado, lng_destino_esperado, lleva_acompanante FROM control_viajes_flota_especial WHERE id = %s AND id_empresa = %s", (id_viaje_fisico, empresa_id))
+        esp_coords = cur.fetchone()
+
+        if lat_ori_real and lng_ori_real and lat_des_real and lng_des_real:
+            dist_real_calc = _calcular_distancia_google(f"{lat_ori_real},{lng_ori_real}", f"{lat_des_real},{lng_des_real}")
+
+        if esp_coords:
+            if lat_ori_real and lng_ori_real and esp_coords.get('lat_origen_esperado') and esp_coords.get('lng_origen_esperado'):
+                desv_ori_m = int(calcular_distancia(lat_ori_real, lng_ori_real, esp_coords['lat_origen_esperado'], esp_coords['lng_origen_esperado']))
+            if lat_des_real and lng_des_real and esp_coords.get('lat_destino_esperado') and esp_coords.get('lng_destino_esperado'):
+                desv_des_m = int(calcular_distancia(lat_des_real, lng_des_real, esp_coords['lat_destino_esperado'], esp_coords['lng_destino_esperado']))
+
         cur.execute("""
             UPDATE control_viajes_flota_especial 
             SET foto_origen = %s, foto_destino = %s, foto_paciente = %s, firma = %s,
                 lat_origen = %s, lng_origen = %s, hora_origen = %s,
                 lat_destino = %s, lng_destino = %s, hora_destino = %s,
-                tiempo_efectivo_minutos = %s
+                tiempo_efectivo_minutos = %s,
+                distancia_real_km = %s,
+                desviacion_origen_m = %s,
+                desviacion_destino_m = %s
             WHERE id = %s AND id_empresa = %s
         """, (ruta_origen, ruta_destino, ruta_paciente, ruta_firma, 
-              telemetria.get('lat_origen'), telemetria.get('lng_origen'), telemetria.get('hora_origen'),
-              telemetria.get('lat_destino'), telemetria.get('lng_destino'), telemetria.get('hora_destino'),
+              lat_ori_real, lng_ori_real, telemetria.get('hora_origen'),
+              lat_des_real, lng_des_real, telemetria.get('hora_destino'),
               tiempo_efectivo_minutos,
+              dist_real_calc,
+              desv_ori_m,
+              desv_des_m,
               id_viaje_fisico, empresa_id))
         
         cur.execute("""
@@ -567,6 +637,14 @@ def finalizar_viaje_especial():
                     WHERE id_viaje_padre = %s AND trayecto = 'VUELTA' AND id_empresa = %s 
                     AND estatus_servicio IN ('CAPTURADO', 'VERIFICADO', 'PROGRAMADO')
                 """, (viaje_data.get('id_viaje_padre'), empresa_id))
+            
+            # Restaurar capacidad residual del vehículo
+            cupos_a_restaurar = 2 if esp_coords and esp_coords.get('lleva_acompanante') else 1
+            cur.execute("""
+                UPDATE vehiculos_especial 
+                SET capacidad_residual = capacidad_residual + %s 
+                WHERE placa = %s AND id_empresa = %s
+            """, (cupos_a_restaurar, placa, empresa_id))
 
         mysql.connection.commit()
 
@@ -637,19 +715,26 @@ def heartbeat_flotaespecial():
     if 'usuario_id' not in session:
         return jsonify({"status": "error", "message": "No autenticado"}), 401
         
-    try:
-        cur = mysql.connection.cursor()
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, %s)
-            ON DUPLICATE KEY UPDATE ultima_actividad = %s
-        """, (session.get('usuario_id'), datetime.now(BOGOTA_TZ), datetime.now(BOGOTA_TZ)))
-        mysql.connection.commit()
-        cur.close()
-        return jsonify({"status": "success"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            cur = mysql.connection.cursor()
+            cur.execute("""
+                INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE ultima_actividad = %s
+            """, (session.get('usuario_id'), datetime.now(BOGOTA_TZ), datetime.now(BOGOTA_TZ)))
+            mysql.connection.commit()
+            cur.close()
+            return jsonify({"status": "success"})
+        except Exception as e:
+            if "Deadlock found" in str(e) and attempt < max_retries - 1:
+                # Sistema de reintento automático silencioso (Backoff)
+                time.sleep(0.1)
+                continue
+            return jsonify({"status": "error", "message": str(e)}), 500
+        
 @bp_operador_flotaespecial.route('/api/flotaespecial/logout_manual', methods=['POST'])
 @login_required_custom 
 def logout_manual_flotaespecial():
