@@ -1588,6 +1588,67 @@ def gestion_traslados_asignacion_flota():
             
         if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
+
+    # --- INICIO DE BLOQUE GET AÑADIDO ---
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    
+    # 1. Consultar Viajes pendientes de flota
+    cur.execute("""
+        SELECT id, id_viaje, numero_prescripcion, nombre_usuario, telefono_usuario, 
+               fecha_servicio, hora_inicio, direccion_origen, direccion_destino, 
+               estatus_servicio, trayecto, vehiculo_asignado, conductor_asignado, 
+               estado_novedad, descripcion_novedad, lleva_acompanante, nombre_acompanante,
+               tipo_documento, id_usuario, departamento, municipio, departamento_destino, municipio_destino,
+               ruta_documento
+        FROM control_viajes_flota_especial
+        WHERE id_empresa = %s 
+          AND estatus_servicio IN ('PROGRAMADO', 'PDTE. ASIGNAR VUELTA', 'NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO')
+        ORDER BY fecha_servicio ASC, hora_inicio ASC
+    """, (empresa_id,))
+    viajes = cur.fetchall()
+
+    # 2. Consultar Vehículos
+    cur.execute("""
+        SELECT placa, clase AS tipo, regional, departamento_base, municipio_base, capacidad_pasajeros, capacidad_residual,
+               (SELECT GROUP_CONCAT(nombre SEPARATOR ', ') FROM conductores_flotaespecial c 
+                WHERE c.vehiculo_asignado = vehiculos_especial.placa 
+                  AND (c.id_empresa = %s OR c.id_empresa = %s)) AS conductor_asignado
+        FROM vehiculos_especial 
+        WHERE id_empresa = %s OR id_empresa = %s
+    """, (empresa_id, empresa_nit, empresa_id, empresa_nit))
+    vehiculos = cur.fetchall()
+
+    # 3. Consultar Conductores (Consolidado)
+    cur.execute("SELECT id, nombre, cedula FROM usuarios WHERE (empresa_id = %s OR empresa_id = %s) AND perfil IN ('operador_flotaespecial', 'auxiliar_transporte_especial')", (empresa_id, empresa_nit))
+    cond_usrs = list(cur.fetchall())
+    
+    cur.execute("SELECT id, nombre, cedula FROM conductores_flotaespecial WHERE id_empresa = %s OR id_empresa = %s", (empresa_id, empresa_nit))
+    cond_flota = list(cur.fetchall())
+    
+    cond_dict = {c['cedula']: c for c in cond_usrs}
+    for c in cond_flota:
+        if c['cedula'] not in cond_dict:
+            cond_dict[c['cedula']] = c
+    conductores = list(cond_dict.values())
+
+    # 4. Consultar Contratos Activos
+    cur.execute("SELECT id, contratante_nombre, numero_contrato, categoria_contrato FROM contratos_transporte_especial WHERE (id_empresa = %s OR id_empresa = %s) AND estado = 'ACTIVO'", (empresa_id, empresa_nit))
+    contratos = cur.fetchall()
+    
+    cur.close()
+
+    return render_template(
+        'B_modulo_flotaespecial_eps.html', 
+        nit=session.get('nit'), 
+        empresa=session.get('empresa'), 
+        nombre=session.get('nombre'), 
+        active_module='traslados_asignacion_flota',
+        viajes=viajes,
+        vehiculos=vehiculos,
+        conductores=conductores,
+        contratos=contratos
+    )
+    # --- FIN DE BLOQUE GET ---
 # =========================================================
 # ETAPAS 6 Y 7: AUDITORÍA Y RESULTADOS (SOPORTE COALESCE FALLBACK TOTAL_EPS)
 # =========================================================
