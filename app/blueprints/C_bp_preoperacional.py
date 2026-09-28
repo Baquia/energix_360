@@ -187,6 +187,9 @@ def guardar_inspeccion():
         foto_conductor_base64 = request.form.get('foto_conductor_base64')
         firma_grafica_base64 = request.form.get('firma_grafica_base64')
         
+        # Captura de la nueva clasificación RUNT
+        clasificacion_runt = request.form.get('clasificacion_runt_vehiculo', '')
+        
         # Geolocalización capturada en el formulario
         latitud_raw = request.form.get('latitud', '')
         longitud_raw = request.form.get('longitud', '')
@@ -287,7 +290,7 @@ def guardar_inspeccion():
         query = """
             INSERT INTO inspeccion_preoperacional (
                 id_usuario_conductor, id_empresa, consecutivo_anual, fecha_inspeccion, hora_inspeccion, 
-                nombre_conductor, placa_vehiculo, tipo_vehiculo, kilometraje_inicial, ruta_destino, 
+                nombre_conductor, placa_vehiculo, tipo_vehiculo, clasificacion_runt_vehiculo, kilometraje_inicial, ruta_destino, 
                 doc_licencia_conduccion, fecha_vence_licencia, doc_soat_vigente, fecha_vence_soat,
                 doc_tecnomecanica_vigente, fecha_vence_tecnomecanica, doc_tarjeta_operacion, fecha_vence_tarjeta_operacion,
                 doc_cedula, doc_licencia_transito, 
@@ -303,7 +306,7 @@ def guardar_inspeccion():
                 alerta_email_enviada, alerta_destinatario, alerta_resumen_novedades, firma_digital_conductor,
                 foto_conductor_base64, firma_grafica_base64
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s
@@ -311,7 +314,7 @@ def guardar_inspeccion():
         """
         params = (
             usuario_id, empresa_id, consecutivo, fecha_inspeccion, hora_inspeccion,
-            session.get('nombre'), placa, request.form.get('tipo_vehiculo', 'NPR / Turbo'), kilometraje, ruta,
+            session.get('nombre'), placa, request.form.get('tipo_vehiculo', 'NPR / Turbo'), clasificacion_runt, kilometraje, ruta,
             doc_values['doc_licencia_conduccion'], None, doc_values['doc_soat_vigente'], None, doc_values['doc_tecnomecanica_vigente'], None, doc_values['doc_tarjeta_operacion'], None, val_cedula, val_licencia_transito,
             get_int('mec_aceite_motor'), get_int('mec_liquido_frenos'), get_int('mec_liquido_embrague'), get_int('mec_refrigerante'), get_int('mec_correas'), get_int('mec_fugas'), get_int('luc_altas'), get_int('luc_frenos'), get_int('luc_direccionales'), get_int('luc_parqueo_estacionarias'), get_int('luc_reversa'), get_int('luc_cocuyos'),
             get_int('llan_tuercas'), get_int('llan_repuesto'), get_int('llan_muelles'), get_int('fren_pedal'), get_int('fren_mano'), get_int('fren_manometro'), get_int('fren_juego_direccion'), get_int('fre_pito_corneta'), get_int('fren_plumillas'),

@@ -165,7 +165,7 @@
         <input type="hidden" name="longitud" id="input_longitud" value="">
 
         {% macro render_3_state(name, label) %}
-        <div class="form-group">
+        <div class="form-group componente-preoperacional">
             <label>{{ label }} <span style="color:#ef4444;">*</span></label>
             <div class="radio-group">
                 <label class="radio-option"><input type="radio" name="{{ name }}" value="1" required><span class="text-op">Operativo</span></label>
@@ -183,6 +183,25 @@
                         <div class="col-6 mb-2"><span style="color: var(--text-muted);">Placa:</span> <br><strong style="font-size: 18px; color: var(--verde);">{{ vehiculo.placa }}</strong></div>
                         <div class="col-6 mb-2"><span style="color: var(--text-muted);">Ref/Tipo:</span> <br><strong><span id="tipo_vehiculo_label">{{ vehiculo.tipo|title }}</span></strong></div>
                     </div>
+                    
+                    <div class="form-group mb-3">
+                        <label>Clasificación RUNT del Vehículo <span style="color:#ef4444;">*</span></label>
+                        <select name="clasificacion_runt_vehiculo" id="clasificacion_runt_vehiculo" class="form-control" required onchange="aplicarFiltroVehiculo()">
+                            <option value="" disabled selected>Seleccione la clasificación...</option>
+                            <option value="Automóvil">Automóvil: Vehículo diseñado para el transporte de pasajeros con capacidad reducida.</option>
+                            <option value="Camioneta y Campero">Camioneta y Campero: Vehículos de uso mixto o todoterreno para pasajeros y carga liviana.</option>
+                            <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Automotores destinados al transporte colectivo de pasajeros.</option>
+                            <option value="Camión C2">Camión C2 ( 2 ejes sencillo )</option>
+                            <option value="Camión C3">Camión C3 ( 3 ejes doble troque)</option>
+                            <option value="Camión C4">Camión C4 ( 4 ejes-2 ejes direccionales)</option>
+                            <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote de 3 ejes con un semirremolque de 2 ejes)</option>
+                            <option value="Tractocamión C3-S3">Tractocamión C3-S3: E (6 ejes en total: cabezote doble troque con un tráiler de tres ejes)</option>
+                            <option value="Motocicleta, Motocarro y Mototriciclo">Motocicleta, Motocarro y Mototriciclo: Vehículos de dos o tres ruedas con motor.</option>
+                            <option value="Cuatrimoto">Cuatrimoto: Vehículo de cuatro ruedas para recreación o trabajo en terrenos difíciles.</option>
+                            <option value="Volqueta">Volqueta: Vehículo destinado al transporte de materiales de construcción.</option>
+                        </select>
+                    </div>
+
                     <div class="form-group">
                         <label>Kilometraje Inicial <span style="color:#ef4444;">*</span></label>
                         <input type="number" name="kilometraje" class="form-control" required>
@@ -232,7 +251,7 @@
                 <div class="card-header">Capítulo 4: Llantas (Esquema Posicional)</div>
                 <div class="card-body">
                     <p style="font-size: 13px; color: var(--text-muted); text-align: center; margin-bottom: 15px;">Toque cada llanta del esquema para calificar. <strong style="color:var(--verde);">Obligatorio.</strong></p>
-                    <div class="chasis-wrapper"><div class="chasis-container" id="chasis_render"></div></div>
+                    <div class="chasis-wrapper"><div class="chasis-container" id="chasis_render"><p class="text-muted text-center" style="margin:20px 0; font-size: 12px;">Seleccione la clasificación RUNT en el Capítulo 1 para habilitar el esquema de llantas.</p></div></div>
                     {{ render_3_state('lla_tuercas_pernos', 'Tuercas y Espárragos') }}
                     {{ render_3_state('lla_repuesto_operativa', 'Llanta de Repuesto') }}
                     {{ render_3_state('lla_suspension_muelles', 'Suspensión y Muelles') }}
@@ -412,7 +431,7 @@
 
     function nextStep(currentStep) {
         const currentSection = document.getElementById('step-' + currentStep);
-        const inputs = currentSection.querySelectorAll('input, select, textarea');
+        const inputs = currentSection.querySelectorAll('input:not([disabled]), select:not([disabled]), textarea:not([disabled])');
         let isValid = true;
 
         for (let input of inputs) {
@@ -613,6 +632,13 @@
             window.addEventListener('popstate', function () { history.pushState(null, null, location.href); });
             window.addEventListener('beforeunload', function (e) { if (!isSubmitting) { e.preventDefault(); e.returnValue = ''; }});
 
+            // Inicializar Select de Clasificación y Restaurar
+            const selectClasificacion = document.getElementById('clasificacion_runt_vehiculo');
+            if(localStorage.getItem('preop_clasificacion_runt_vehiculo')) {
+                selectClasificacion.value = localStorage.getItem('preop_clasificacion_runt_vehiculo');
+                aplicarFiltroVehiculo();
+            }
+
             const formInputs = document.querySelectorAll('input:not([type="hidden"]), select, textarea');
             formInputs.forEach(input => {
                 if(input.name && localStorage.getItem('preop_' + input.name)) {
@@ -634,39 +660,105 @@
                     }
                 });
             });
-
-            {% if not scanner_mode %} renderizarChasis('{{ vehiculo.tipo|default("")|lower }}', '{{ vehiculo.referencia|default("")|lower }}'); {% endif %}
         }
     });
 
-    function renderizarChasis(tipo, referencia) {
-        const container = document.getElementById('chasis_render'); let html = '';
-        const searchStr = (tipo + " " + referencia).toLowerCase();
-        
-        html += `<div class="eje"><div class="llanta-btn" id="ll_dir_izq" onclick="abrirModalLlanta('ll_dir_izq', 'Dir. Izquierda')">DIR<br>IZQ</div><div class="eje-barra"></div><div class="llanta-btn" id="ll_dir_der" onclick="abrirModalLlanta('ll_dir_der', 'Dir. Derecha')">DIR<br>DER</div></div>`;
-        arrayLlantasRequeridas.push('ll_dir_izq', 'll_dir_der');
+    function aplicarFiltroVehiculo() {
+        const select = document.getElementById('clasificacion_runt_vehiculo');
+        const tipo = select.value;
+        if(tipo) {
+            localStorage.setItem('preop_clasificacion_runt_vehiculo', tipo);
+            renderizarChasis(tipo);
+            // Nota: Aquí se implementaría el condicional para inyectar/mostrar los ítems específicos de mecánica.
+            // Según instrucciones, mantenemos los ítems generales actuales intactos y listos para procesar.
+        } else {
+            document.getElementById('chasis_render').innerHTML = '<p class="text-muted text-center" style="margin:20px 0; font-size: 12px;">Seleccione la clasificación RUNT en el Capítulo 1 para habilitar el esquema de llantas.</p>';
+            arrayLlantasRequeridas = [];
+        }
+    }
 
-        if (searchStr.includes('tractomula')) {
-            html += `<div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_izq_ext" onclick="abrirModalLlanta('ll_t1_izq_ext', 'Tracción 1 Izq Ext')">T1 E<br>IZQ</div><div class="llanta-btn" id="ll_t1_izq_int" onclick="abrirModalLlanta('ll_t1_izq_int', 'Tracción 1 Izq Int')">T1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_der_int" onclick="abrirModalLlanta('ll_t1_der_int', 'Tracción 1 Der Int')">T1 I<br>DER</div><div class="llanta-btn" id="ll_t1_der_ext" onclick="abrirModalLlanta('ll_t1_der_ext', 'Tracción 1 Der Ext')">T1 E<br>DER</div></div></div>
-            <div class="eje" style="margin-bottom: 40px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_izq_ext" onclick="abrirModalLlanta('ll_t2_izq_ext', 'Tracción 2 Izq Ext')">T2 E<br>IZQ</div><div class="llanta-btn" id="ll_t2_izq_int" onclick="abrirModalLlanta('ll_t2_izq_int', 'Tracción 2 Izq Int')">T2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_der_int" onclick="abrirModalLlanta('ll_t2_der_int', 'Tracción 2 Der Int')">T2 I<br>DER</div><div class="llanta-btn" id="ll_t2_der_ext" onclick="abrirModalLlanta('ll_t2_der_ext', 'Tracción 2 Der Ext')">T2 E<br>DER</div></div></div>
-            <div style="width: 20px; height: 30px; background: #94a3b8; margin: 0 auto; border-radius: 4px;"></div>
-            <div class="eje" style="margin-top: 10px; margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_r1_izq_ext" onclick="abrirModalLlanta('ll_r1_izq_ext', 'Remolque 1 Izq Ext')">R1 E<br>IZQ</div><div class="llanta-btn" id="ll_r1_izq_int" onclick="abrirModalLlanta('ll_r1_izq_int', 'Remolque 1 Izq Int')">R1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_r1_der_int" onclick="abrirModalLlanta('ll_r1_der_int', 'Remolque 1 Der Int')">R1 I<br>DER</div><div class="llanta-btn" id="ll_r1_der_ext" onclick="abrirModalLlanta('ll_r1_der_ext', 'Remolque 1 Der Ext')">R1 E<br>DER</div></div></div>
-            <div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_r2_izq_ext" onclick="abrirModalLlanta('ll_r2_izq_ext', 'Remolque 2 Izq Ext')">R2 E<br>IZQ</div><div class="llanta-btn" id="ll_r2_izq_int" onclick="abrirModalLlanta('ll_r2_izq_int', 'Remolque 2 Izq Int')">R2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_r2_der_int" onclick="abrirModalLlanta('ll_r2_der_int', 'Remolque 2 Der Int')">R2 I<br>DER</div><div class="llanta-btn" id="ll_r2_der_ext" onclick="abrirModalLlanta('ll_r2_der_ext', 'Remolque 2 Der Ext')">R2 E<br>DER</div></div></div>
-            <div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_r3_izq_ext" onclick="abrirModalLlanta('ll_r3_izq_ext', 'Remolque 3 Izq Ext')">R3 E<br>IZQ</div><div class="llanta-btn" id="ll_r3_izq_int" onclick="abrirModalLlanta('ll_r3_izq_int', 'Remolque 3 Izq Int')">R3 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_r3_der_int" onclick="abrirModalLlanta('ll_r3_der_int', 'Remolque 3 Der Int')">R3 I<br>DER</div><div class="llanta-btn" id="ll_r3_der_ext" onclick="abrirModalLlanta('ll_r3_der_ext', 'Remolque 3 Der Ext')">R3 E<br>DER</div></div></div>`;
-            arrayLlantasRequeridas.push('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext', 'll_r1_izq_ext', 'll_r1_izq_int', 'll_r1_der_int', 'll_r1_der_ext', 'll_r2_izq_ext', 'll_r2_izq_int', 'll_r2_der_int', 'll_r2_der_ext', 'll_r3_izq_ext', 'll_r3_izq_int', 'll_r3_der_int', 'll_r3_der_ext');
-        } else if (searchStr.includes('dobletroque')) {
-            html += `<div class="eje" style="margin-bottom: 25px;"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_izq_ext" onclick="abrirModalLlanta('ll_t1_izq_ext', 'Troque 1 Izq Ext')">T1 E<br>IZQ</div><div class="llanta-btn" id="ll_t1_izq_int" onclick="abrirModalLlanta('ll_t1_izq_int', 'Troque 1 Izq Int')">T1 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t1_der_int" onclick="abrirModalLlanta('ll_t1_der_int', 'Troque 1 Der Int')">T1 I<br>DER</div><div class="llanta-btn" id="ll_t1_der_ext" onclick="abrirModalLlanta('ll_t1_der_ext', 'Troque 1 Der Ext')">T1 E<br>DER</div></div></div><div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_izq_ext" onclick="abrirModalLlanta('ll_t2_izq_ext', 'Troque 2 Izq Ext')">T2 E<br>IZQ</div><div class="llanta-btn" id="ll_t2_izq_int" onclick="abrirModalLlanta('ll_t2_izq_int', 'Troque 2 Izq Int')">T2 I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_t2_der_int" onclick="abrirModalLlanta('ll_t2_der_int', 'Troque 2 Der Int')">T2 I<br>DER</div><div class="llanta-btn" id="ll_t2_der_ext" onclick="abrirModalLlanta('ll_t2_der_ext', 'Troque 2 Der Ext')">T2 E<br>DER</div></div></div>`;
-            arrayLlantasRequeridas.push('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext');
-        } else if (searchStr.includes('sencillo') || searchStr.includes('npr')) {
-            html += `<div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="ll_trac_izq_ext" onclick="abrirModalLlanta('ll_trac_izq_ext', 'Trac. Izq Ext')">EXT<br>IZQ</div><div class="llanta-btn" id="ll_trac_izq_int" onclick="abrirModalLlanta('ll_trac_izq_int', 'Trac. Izq Int')">INT<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="ll_trac_der_int" onclick="abrirModalLlanta('ll_trac_der_int', 'Trac. Der Int')">INT<br>DER</div><div class="llanta-btn" id="ll_trac_der_ext" onclick="abrirModalLlanta('ll_trac_der_ext', 'Trac. Der Ext')">EXT<br>DER</div></div></div>`;
-            arrayLlantasRequeridas.push('ll_trac_izq_ext', 'll_trac_izq_int', 'll_trac_der_int', 'll_trac_der_ext');
-        } else if (searchStr.includes('ligero') || searchStr.includes('nhr') || searchStr.includes('turbo')) {
-            html += `<div class="eje"><div class="llanta-btn" id="ll_trac_izq" onclick="abrirModalLlanta('ll_trac_izq', 'Trac. Izquierda')">TRAC<br>IZQ</div><div class="eje-barra"></div><div class="llanta-btn" id="ll_trac_der" onclick="abrirModalLlanta('ll_trac_der', 'Trac. Derecha')">TRAC<br>DER</div></div>`;
-            arrayLlantasRequeridas.push('ll_trac_izq', 'll_trac_der');
+    function renderizarChasis(tipo) {
+        const container = document.getElementById('chasis_render'); 
+        let html = '';
+        arrayLlantasRequeridas = [];
+
+        const addEjeSencillo = (idIzq, idDer, lblIzq, lblDer, title) => {
+            html += `<div class="eje"><div class="llanta-btn" id="${idIzq}" onclick="abrirModalLlanta('${idIzq}', '${lblIzq}')">${title}<br>IZQ</div><div class="eje-barra"></div><div class="llanta-btn" id="${idDer}" onclick="abrirModalLlanta('${idDer}', '${lblDer}')">${title}<br>DER</div></div>`;
+            arrayLlantasRequeridas.push(idIzq, idDer);
+        };
+
+        const addEjePacha = (idIzqExt, idIzqInt, idDerInt, idDerExt, lblIzqExt, lblIzqInt, lblDerInt, lblDerExt, title) => {
+            html += `<div class="eje"><div class="llanta-pacha"><div class="llanta-btn" id="${idIzqExt}" onclick="abrirModalLlanta('${idIzqExt}', '${lblIzqExt}')">${title} E<br>IZQ</div><div class="llanta-btn" id="${idIzqInt}" onclick="abrirModalLlanta('${idIzqInt}', '${lblIzqInt}')">${title} I<br>IZQ</div></div><div class="eje-barra"></div><div class="llanta-pacha"><div class="llanta-btn" id="${idDerInt}" onclick="abrirModalLlanta('${idDerInt}', '${lblDerInt}')">${title} I<br>DER</div><div class="llanta-btn" id="${idDerExt}" onclick="abrirModalLlanta('${idDerExt}', '${lblDerExt}')">${title} E<br>DER</div></div></div>`;
+            arrayLlantasRequeridas.push(idIzqExt, idIzqInt, idDerInt, idDerExt);
+        };
+
+        const addEjeMoto = (id, lbl, title) => {
+            html += `<div class="eje" style="justify-content: center;"><div class="llanta-btn" id="${id}" onclick="abrirModalLlanta('${id}', '${lbl}')">${title}</div></div>`;
+            arrayLlantasRequeridas.push(id);
+        }
+
+        if (tipo.includes('C3-S3')) {
+            addEjeSencillo('ll_dir_izq', 'll_dir_der', 'Dir. Izquierda', 'Dir. Derecha', 'DIR');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'Tracción 1 Izq Ext', 'Tracción 1 Izq Int', 'Tracción 1 Der Int', 'Tracción 1 Der Ext', 'T1');
+            html += `<div style="margin-bottom: 40px;"></div>`;
+            addEjePacha('ll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext', 'Tracción 2 Izq Ext', 'Tracción 2 Izq Int', 'Tracción 2 Der Int', 'Tracción 2 Der Ext', 'T2');
+            html += `<div style="width: 20px; height: 30px; background: #94a3b8; margin: 0 auto; border-radius: 4px;"></div><div style="margin-top: 10px; margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_r1_izq_ext', 'll_r1_izq_int', 'll_r1_der_int', 'll_r1_der_ext', 'Remolque 1 Izq Ext', 'Remolque 1 Izq Int', 'Remolque 1 Der Int', 'Remolque 1 Der Ext', 'R1');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_r2_izq_ext', 'll_r2_izq_int', 'll_r2_der_int', 'll_r2_der_ext', 'Remolque 2 Izq Ext', 'Remolque 2 Izq Int', 'Remolque 2 Der Int', 'Remolque 2 Der Ext', 'R2');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_r3_izq_ext', 'll_r3_izq_int', 'll_r3_der_int', 'll_r3_der_ext', 'Remolque 3 Izq Ext', 'Remolque 3 Izq Int', 'Remolque 3 Der Int', 'Remolque 3 Der Ext', 'R3');
+        
+        } else if (tipo.includes('C3-S2')) {
+            addEjeSencillo('ll_dir_izq', 'll_dir_der', 'Dir. Izquierda', 'Dir. Derecha', 'DIR');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'Tracción 1 Izq Ext', 'Tracción 1 Izq Int', 'Tracción 1 Der Int', 'Tracción 1 Der Ext', 'T1');
+            html += `<div style="margin-bottom: 40px;"></div>`;
+            addEjePacha('ll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext', 'Tracción 2 Izq Ext', 'Tracción 2 Izq Int', 'Tracción 2 Der Int', 'Tracción 2 Der Ext', 'T2');
+            html += `<div style="width: 20px; height: 30px; background: #94a3b8; margin: 0 auto; border-radius: 4px;"></div><div style="margin-top: 10px; margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_r1_izq_ext', 'll_r1_izq_int', 'll_r1_der_int', 'll_r1_der_ext', 'Remolque 1 Izq Ext', 'Remolque 1 Izq Int', 'Remolque 1 Der Int', 'Remolque 1 Der Ext', 'R1');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_r2_izq_ext', 'll_r2_izq_int', 'll_r2_der_int', 'll_r2_der_ext', 'Remolque 2 Izq Ext', 'Remolque 2 Izq Int', 'Remolque 2 Der Int', 'Remolque 2 Der Ext', 'R2');
+        
+        } else if (tipo.includes('C4')) {
+            addEjeSencillo('ll_dir1_izq', 'll_dir1_der', 'Dir. 1 Izquierda', 'Dir. 1 Derecha', 'DIR1');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjeSencillo('ll_dir2_izq', 'll_dir2_der', 'Dir. 2 Izquierda', 'Dir. 2 Derecha', 'DIR2');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'Tracción 1 Izq Ext', 'Tracción 1 Izq Int', 'Tracción 1 Der Int', 'Tracción 1 Der Ext', 'T1');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext', 'Tracción 2 Izq Ext', 'Tracción 2 Izq Int', 'Tracción 2 Der Int', 'Tracción 2 Der Ext', 'T2');
+        
+        } else if (tipo.includes('C3') || tipo.includes('Volqueta')) {
+            addEjeSencillo('ll_dir_izq', 'll_dir_der', 'Dir. Izquierda', 'Dir. Derecha', 'DIR');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_t1_izq_ext', 'll_t1_izq_int', 'll_t1_der_int', 'll_t1_der_ext', 'Tracción 1 Izq Ext', 'Tracción 1 Izq Int', 'Tracción 1 Der Int', 'Tracción 1 Der Ext', 'T1');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_t2_izq_ext', 'll_t2_izq_int', 'll_t2_der_int', 'll_t2_der_ext', 'Tracción 2 Izq Ext', 'Tracción 2 Izq Int', 'Tracción 2 Der Int', 'Tracción 2 Der Ext', 'T2');
+        
+        } else if (tipo.includes('C2') || tipo.includes('Bus')) {
+            addEjeSencillo('ll_dir_izq', 'll_dir_der', 'Dir. Izquierda', 'Dir. Derecha', 'DIR');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjePacha('ll_trac_izq_ext', 'll_trac_izq_int', 'll_trac_der_int', 'll_trac_der_ext', 'Tracción Izq Ext', 'Tracción Izq Int', 'Tracción Der Int', 'Tracción Der Ext', 'TRAC');
+        
+        } else if (tipo.includes('Automóvil') || tipo.includes('Camioneta') || tipo.includes('Cuatrimoto')) {
+            addEjeSencillo('ll_del_izq', 'll_del_der', 'Delantera Izquierda', 'Delantera Derecha', 'DEL');
+            html += `<div style="margin-bottom: 25px;"></div>`;
+            addEjeSencillo('ll_tras_izq', 'll_tras_der', 'Trasera Izquierda', 'Trasera Derecha', 'TRAS');
+        
+        } else if (tipo.includes('Motocicleta')) {
+            addEjeMoto('ll_del', 'Delantera', 'DEL');
+            html += `<div class="eje-barra" style="width: 4px; left: 50%; top: 30px; bottom: 30px; height: auto; transform: translateX(-50%);"></div>`;
+            html += `<div style="margin-bottom: 40px;"></div>`;
+            addEjeMoto('ll_tras', 'Trasera', 'TRAS');
         }
         
         container.innerHTML = html;
-        for (let llantaId in objetoLlantas) { let btn = document.getElementById(llantaId); if(btn) btn.className = "llanta-btn " + objetoLlantas[llantaId].labrado; }
+        for (let llantaId in objetoLlantas) { 
+            let btn = document.getElementById(llantaId); 
+            if(btn) btn.className = "llanta-btn " + objetoLlantas[llantaId].labrado; 
+        }
     }
 
     let llantaEditandoID = ""; let llantaEditandoNombre = "";

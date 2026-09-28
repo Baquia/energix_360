@@ -1036,3 +1036,33 @@ def descargar_qr_vehiculo_pdf(placa):
     doc.build(story)
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name=f"QR_Vehiculo_{placa}.pdf", mimetype='application/pdf')
+
+# =========================================================
+# ENDPOINT AJAX: CONDUCTORES POR UBICACIÓN (DEPARTAMENTO Y MUNICIPIO)
+# =========================================================
+@bp_flotaespecial_vehiculos.route('/api/conductores_por_ubicacion', methods=['GET'])
+@login_required_custom
+@controlador_flotaespecial_required
+def api_conductores_por_ubicacion():
+    empresa_id = session.get('empresa_id')
+    departamento = request.args.get('departamento', '').strip()
+    municipio = request.args.get('municipio', '').strip()
+
+    if not departamento or not municipio:
+        return jsonify({'success': False, 'message': 'Faltan parámetros de ubicación (departamento y municipio).'})
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        cur.execute("""
+            SELECT cedula, nombre 
+            FROM conductores_flotaespecial 
+            WHERE id_empresa = %s AND departamento_base = %s AND municipio_base = %s
+            ORDER BY nombre ASC
+        """, (empresa_id, departamento, municipio))
+        conductores = cur.fetchall()
+        
+        return jsonify({'success': True, 'conductores': conductores})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()

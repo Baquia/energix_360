@@ -163,16 +163,24 @@
                         <div class="btn-card">Gestionar &rarr;</div>
                     </a>
                 {% else %}
-                    <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE (Oculta el resto) -->
+                    <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE (BLOQUEO TEMPORAL) -->
                     <div style="width: 100%; text-align: center; grid-column: 1 / -1; padding: 30px 10px;">
                         <h3 style="color: var(--verde); margin-bottom: 15px;">Vehículo enlazado: {{ session.get('placa_prelogueada') }}</h3>
+                        
+                        <!-- MENSAJE DE RESTRICCIÓN TEMPORAL -->
+                        <div style="background: #fef2f2; border: 1px solid #f87171; border-radius: 12px; padding: 20px; color: #991b1b; max-width: 500px; margin: 0 auto;">
+                            <h4 style="margin-bottom: 10px; font-size: 18px;">⚠️ Módulo en Mantenimiento</h4>
+                            <p style="font-size: 14px;">El inicio de viaje y las funcionalidades en ruta están temporalmente deshabilitados por ajustes en el sistema. Gracias por diligenciar su inspección preoperacional.</p>
+                        </div>
+
+                        <!-- CÓDIGO ORIGINAL COMENTADO PARA FACILITAR SU RESTAURACIÓN FUTURA
                         <p style="color: var(--text-muted); margin-bottom: 25px;">Habilite su consola de operación e inicie el rastreo satelital marcando el inicio de su viaje.</p>
                         <button onclick="iniciarViaje()" class="btn-card" style="background: var(--verde); color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(1, 82, 73, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto;">
                             <span style="font-size: 24px;">▶</span> INICIAR VIAJE
                         </button>
+                        -->
                     </div>
                 {% endif %}
-                
             {% else %}
                 <!-- MÓDULOS DE PRE-LOGUEO: (Vehículo NO logueado, redirige al scanner QR) -->
                 <a href="{{ url_for('preoperacional.preoperacional_tc', nit=nit) }}" class="module-card">
