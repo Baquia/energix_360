@@ -75,7 +75,7 @@ def dashboard_operativo():
     if not kpis or kpis['total'] is None:
         kpis = {'total': 0, 'capturados': 0, 'programados': 0, 'verificados': 0, 'asignados': 0, 'ejecucion': 0, 'ejecutados': 0}
 
-    # Consulta maestra de viajes operativos en vivo
+    # Consulta maestra de viajes operativos en vivo (Orden cronológico base)
     cur.execute("""
         SELECT c.id, c.id_viaje, c.fecha_servicio, c.hora_inicio, c.vehiculo_asignado, c.conductor_asignado, 
                c.nombre_usuario, c.telefono_usuario, c.direccion_origen, c.direccion_destino, c.estatus_servicio,
@@ -129,12 +129,18 @@ def dashboard_operativo():
 
     now_col = datetime.now(BOGOTA_TZ).replace(tzinfo=None)
     viajes_retrasados = []
+    novedades_pre_viaje = []
+    programados_normales = []
+    parte2_col1 = []
+    parte2_col2 = []
+    parte2_col3 = []
+    parte2_col4 = []
+    parte2_col5 = []
     
     for v in viajes:
         h_init = v.get('hora_inicio')
         f_serv = v.get('fecha_servicio')
         v['is_urgencia'] = False
-        v['is_36h'] = False
         diff_minutes = -1
         
         if h_init is not None and f_serv is not None:
@@ -149,34 +155,47 @@ def dashboard_operativo():
                 diff_hours = (dt_val - now_col).total_seconds() / 3600.0
                 diff_minutes = (now_col - dt_val).total_seconds() / 60.0
                 
-                if diff_hours <= 36.0:
-                    v['is_36h'] = True
                 if diff_hours <= 12.0:
                     v['is_urgencia'] = True
                     
                 v['hora_inicio_str'] = f"{f_serv} | {h_str}"
             except:
                 v['hora_inicio_str'] = f"{f_serv} | {h_init}"
-                v['is_36h'] = True
         else:
             v['hora_inicio_str'] = f"{f_serv} | Pendiente" if f_serv else "Pendiente"
-            v['is_36h'] = True
             
         v['hora_inicio'] = v['hora_inicio_str']
-        v['trayecto'] = (v.get('trayecto') or 'IDA').upper()
-        v['estatus_servicio'] = (v.get('estatus_servicio') or '').upper()
+        trayecto = (v.get('trayecto') or 'IDA').upper()
+        estatus = (v.get('estatus_servicio') or '').upper()
 
-        # Detección de retrasos en servicios de IDA asignados sin fecha límite de hoy
-        if v['trayecto'] == 'IDA' and v['estatus_servicio'] == 'ASIGNADO' and diff_minutes > 15.0:
+        v['trayecto'] = trayecto
+        v['estatus_servicio'] = estatus
+
+        # Detección de retrasos críticos (> 15 min y estatus estrictamente ASIGNADO)
+        if estatus == 'ASIGNADO' and diff_minutes > 15.0:
             viajes_retrasados.append(v)
 
-    # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN
-    parte1_ida_programados = [v for v in viajes if v['trayecto'] == 'IDA' and ((v['estatus_servicio'] == 'PROGRAMADO' and v['is_36h']) or v['estatus_servicio'] == 'NOVEDAD_PRE_VIAJE')]
-    parte2_col1 = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] in ('EN EJECUCION', 'NOVEDAD_RECORRIDO')]
-    parte2_col2 = [v for v in viajes if v['trayecto'] == 'IDA' and v['estatus_servicio'] in ('TERMINADO-PDTE AUDITAR', 'AUDITADO')]
-    parte2_col3 = [v for v in viajes if v['trayecto'] == 'VUELTA' and v.get('vuelta_activada') and v['estatus_servicio'] not in ('EN EJECUCION', 'NOVEDAD_RECORRIDO', 'TERMINADO-PDTE AUDITAR', 'AUDITADO')]
-    parte2_col4 = [v for v in viajes if v['trayecto'] == 'VUELTA' and v['estatus_servicio'] in ('EN EJECUCION', 'NOVEDAD_RECORRIDO')]
-    parte2_col5 = [v for v in viajes if v['trayecto'] == 'VUELTA' and v['estatus_servicio'] in ('TERMINADO-PDTE AUDITAR', 'AUDITADO')]
+        # Clasificación en bolsas y columnas (Mutuamente excluyentes)
+        if trayecto == 'IDA':
+            if estatus == 'NOVEDAD_PRE_VIAJE':
+                novedades_pre_viaje.append(v)
+            elif estatus == 'PROGRAMADO':
+                programados_normales.append(v)
+            elif estatus in ('EN EJECUCION', 'NOVEDAD_RECORRIDO'):
+                parte2_col1.append(v)
+            elif estatus in ('TERMINADO-PDTE AUDITAR', 'AUDITADO'):
+                parte2_col2.append(v)
+                
+        elif trayecto == 'VUELTA':
+            if v.get('vuelta_activada') and estatus not in ('EN EJECUCION', 'NOVEDAD_RECORRIDO', 'TERMINADO-PDTE AUDITAR', 'AUDITADO'):
+                parte2_col3.append(v)
+            elif estatus in ('EN EJECUCION', 'NOVEDAD_RECORRIDO'):
+                parte2_col4.append(v)
+            elif estatus in ('TERMINADO-PDTE AUDITAR', 'AUDITADO'):
+                parte2_col5.append(v)
+
+    # Unificación de PARTE 1 (Prioridad Novedades, luego resto Cronológico)
+    parte1_ida_programados = novedades_pre_viaje + programados_normales
 
     return render_template(
         'B_dashboard_operativo_eps.html',
@@ -197,7 +216,6 @@ def dashboard_operativo():
         conductores=conductores,
         contratos=contratos
     )
-
 # =========================================================
 # 2.1 MOTOR DE DATOS EN VIVO (SHORT-POLLING DEL TABLERO)
 # =========================================================
@@ -208,11 +226,30 @@ def api_operativa_vivo():
     empresa_id = session.get('empresa_id')
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
+        # Obtener KPIs en vivo para inyectar en el tablero
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN estatus_servicio = 'CAPTURADO' THEN 1 ELSE 0 END) as capturados,
+                SUM(CASE WHEN estatus_servicio = 'PROGRAMADO' THEN 1 ELSE 0 END) as programados,
+                SUM(CASE WHEN estatus_servicio = 'VERIFICADO' THEN 1 ELSE 0 END) as verificados,
+                SUM(CASE WHEN estatus_servicio IN ('ASIGNADO', 'PDTE. ASIGNAR VUELTA') THEN 1 ELSE 0 END) as asignados,
+                SUM(CASE WHEN estatus_servicio IN ('EN EJECUCION', 'NOVEDAD_RECORRIDO') THEN 1 ELSE 0 END) as ejecucion,
+                SUM(CASE WHEN estatus_servicio IN ('TERMINADO-PDTE AUDITAR', 'AUDITADO') THEN 1 ELSE 0 END) as ejecutados
+            FROM control_viajes_flota_especial 
+            WHERE id_empresa = %s AND (fecha_servicio = CURDATE() OR estatus_servicio NOT IN ('AUDITADO'))
+        """, (empresa_id,))
+        kpis_db = cur.fetchone()
+        if not kpis_db or kpis_db['total'] is None:
+            kpis_db = {'total': 0, 'capturados': 0, 'programados': 0, 'verificados': 0, 'asignados': 0, 'ejecucion': 0, 'ejecutados': 0}
+
+        # Obtener viajes ordenados cronológicamente por la BD
         cur.execute("""
             SELECT c.id, c.id_viaje, c.numero_autorizacion, c.numero_prescripcion, c.nombre_usuario, c.id_usuario, 
                    c.direccion_origen, c.direccion_destino, c.departamento, c.municipio, c.departamento_destino, c.municipio_destino,
                    c.telefono_usuario, c.hora_inicio, c.fecha_servicio, c.trayecto, c.estatus_servicio, c.vehiculo_asignado, 
                    c.conductor_asignado, c.id_viaje_padre, c.estado_novedad, c.descripcion_novedad, c.tipo_documento, c.vuelta_activada,
+                   c.lleva_acompanante, c.nombre_acompanante, c.cedula_acompanante,
                    COALESCE(c.ruta_documento, m.ruta_documento) as ruta_documento
             FROM control_viajes_flota_especial c
             LEFT JOIN (
@@ -231,6 +268,7 @@ def api_operativa_vivo():
         viajes = cur.fetchall()
 
         datos = {
+            "kpis": kpis_db,
             "novedades_activas": [],
             "viajes_retrasados": [],
             "parte1_ida_programados": [],
@@ -242,12 +280,17 @@ def api_operativa_vivo():
         }
 
         now_col = datetime.now(BOGOTA_TZ).replace(tzinfo=None)
+        novedades_pre_viaje = []
+        programados_normales = []
 
         for v in viajes:
             h_init = v.get('hora_inicio')
             f_serv = v.get('fecha_servicio')
+            
+            # Casteo estricto a string para evitar errores del JSON Encoder en Flask
+            v['fecha_servicio'] = str(f_serv) if f_serv else ''
+            
             v['is_urgencia'] = False
-            v['is_36h'] = False
             diff_minutes = -1
             
             if h_init is not None and f_serv is not None:
@@ -262,56 +305,56 @@ def api_operativa_vivo():
                     diff_hours = (dt_val - now_col).total_seconds() / 3600.0
                     diff_minutes = (now_col - dt_val).total_seconds() / 60.0
                     
-                    if diff_hours <= 36.0:
-                        v['is_36h'] = True
                     if diff_hours <= 12.0:
                         v['is_urgencia'] = True
                         
-                    v['hora_inicio_str'] = f"{f_serv} | {h_str}"
+                    v['hora_inicio_str'] = f"{v['fecha_servicio']} | {h_str}"
                 except:
-                    v['hora_inicio_str'] = f"{f_serv} | {h_init}"
-                    v['is_36h'] = True
+                    v['hora_inicio_str'] = f"{v['fecha_servicio']} | {h_init}"
             else:
-                v['hora_inicio_str'] = f"{f_serv} | Pendiente" if f_serv else "Pendiente"
-                v['is_36h'] = True
+                v['hora_inicio_str'] = f"{v['fecha_servicio']} | Pendiente" if v['fecha_servicio'] else "Pendiente"
                 
             v['hora_inicio'] = v['hora_inicio_str']
-            trayecto = (v.get('trayecto') or 'IDA').upper()
-            estatus = (v.get('estatus_servicio') or '').upper()
+            trayecto = str(v.get('trayecto') or 'IDA').upper().strip()
+            estatus = str(v.get('estatus_servicio') or '').upper().strip()
             
             v['trayecto'] = trayecto
             v['estatus_servicio'] = estatus
 
-            # Detección dinámica de viajes retrasados (> 15 min acumulados)
-            if trayecto == 'IDA' and estatus == 'ASIGNADO' and diff_minutes > 15.0:
+            # Detección dinámica de viajes retrasados (> 15 min acumulados y estrictamente ASIGNADOS)
+            if estatus == 'ASIGNADO' and diff_minutes > 15.0:
                 datos["viajes_retrasados"].append(v)
 
             if estatus in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO']:
                 datos["novedades_activas"].append(v)
             
-            # CLASIFICACIÓN ESTRICTA DE COLUMNAS KANBAN
+            # Clasificación estricta (Mutuamente excluyente)
             if trayecto == 'IDA':
-                if (estatus == 'PROGRAMADO' and v['is_36h']) or estatus == 'NOVEDAD_PRE_VIAJE':
-                    datos["parte1_ida_programados"].append(v)
-                elif estatus in ['EN EJECUCION', 'NOVEDAD_RECORRIDO']:
+                if estatus == 'NOVEDAD_PRE_VIAJE':
+                    novedades_pre_viaje.append(v)
+                elif estatus == 'PROGRAMADO':
+                    programados_normales.append(v)
+                elif estatus in ('EN EJECUCION', 'NOVEDAD_RECORRIDO'):
                     datos["parte2_col1"].append(v)
-                elif estatus in ['TERMINADO-PDTE AUDITAR', 'AUDITADO']:
+                elif estatus in ('TERMINADO-PDTE AUDITAR', 'AUDITADO'):
                     datos["parte2_col2"].append(v)
                     
             elif trayecto == 'VUELTA':
-                if v.get('vuelta_activada') and estatus not in ['EN EJECUCION', 'NOVEDAD_RECORRIDO', 'TERMINADO-PDTE AUDITAR', 'AUDITADO']:
+                if v.get('vuelta_activada') and estatus not in ('EN EJECUCION', 'NOVEDAD_RECORRIDO', 'TERMINADO-PDTE AUDITAR', 'AUDITADO'):
                     datos["parte2_col3"].append(v)
-                elif estatus in ['EN EJECUCION', 'NOVEDAD_RECORRIDO']:
+                elif estatus in ('EN EJECUCION', 'NOVEDAD_RECORRIDO'):
                     datos["parte2_col4"].append(v)
-                elif estatus in ['TERMINADO-PDTE AUDITAR', 'AUDITADO']:
+                elif estatus in ('TERMINADO-PDTE AUDITAR', 'AUDITADO'):
                     datos["parte2_col5"].append(v)
+
+        # Unificación final de Parte 1: Novedades en la cima, luego cronológicos
+        datos["parte1_ida_programados"] = novedades_pre_viaje + programados_normales
 
         return jsonify({"status": "success", "data": datos}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         cur.close()
-
 # =========================================================
 # 2.2 OCULTAR VIAJES Y DESENCADENAR VUELTA
 # =========================================================

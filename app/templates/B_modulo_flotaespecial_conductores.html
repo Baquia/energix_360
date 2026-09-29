@@ -104,7 +104,7 @@
         .modal-header h3 { color: var(--verde); font-size: 18px; }
         .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
         
-        .form-group { margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; text-align: left; }
         .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;}
         .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; font-family: inherit;}
         
@@ -215,7 +215,13 @@
                     <tbody>
                         {% for c in conductores %}
                         <tr>
-                            <td><b style="color: var(--verde);">{{ c.nombre }}</b><br><small>{{ c.cedula }}</small></td>
+                            <td>
+                                <b style="color: var(--verde);">{{ c.nombre }}</b><br>
+                                <small>{{ c.cedula }}</small><br>
+                                {% if c.es_relevo %}
+                                    <span class="badge badge-warning" style="margin-top: 4px; display: inline-block;">[UNIVERSAL / RELEVO]</span>
+                                {% endif %}
+                            </td>
                             <td>{{ c.telefono or 'N/D' }}<br><small>{{ c.email or 'N/D' }}</small></td>
                             <td>{{ c.municipio_base or 'N/D' }}<br><small>{{ c.departamento_base or '' }}</small></td>
                             <td>
@@ -255,7 +261,7 @@
                                         data-afp="{{ c.fondo_pensiones }}"
                                         data-arl="{{ c.arl }}"
                                         data-pago="{{ c.ultimo_pago_seguridad_social }}"
-                                        data-vehiculo="{{ c.vehiculo_asignado }}"
+                                        data-relevo="{{ c.es_relevo }}"
                                         onclick="abrirEditarConductor(this)">✏️</button>
                                 <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarConductor('{{ c.id }}', '{{ c.cedula }}', '{{ c.nombre }}')">🗑️</button>
                             </td>
@@ -317,11 +323,11 @@
                     <select name="municipio_base" id="c_mun_base"></select>
                 </div>
                 
-                <!-- NUEVO CAMPO: VEHÍCULO ASIGNADO CON DATALIST -->
                 <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Vehículo Asignado (Placa)</label>
-                    <input type="text" name="vehiculo_asignado" id="c_vehiculo" list="lista_vehiculos" placeholder="Buscar vehículo por placa o marca..." autocomplete="off">
-                    <small style="color: #10b981; font-size: 10px;">Escriba para buscar o seleccione de la lista de vehículos de la flota.</small>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #111827; font-weight: bold; background: #fffbeb; padding: 10px; border-radius: 8px; border: 1px solid #f59e0b;">
+                        <input type="checkbox" name="es_relevo" id="c_es_relevo" style="width: auto; transform: scale(1.2);">
+                        ¿Es conductor de relevo / comodín? (Le permite operar cualquier vehículo sin restricción de asignación)
+                    </label>
                 </div>
 
                 <!-- CAMPO TELEGRAM ID BLOQUEADO (REGLA DE SEGURIDAD) -->
@@ -406,15 +412,6 @@
         </div>
     </div>
 
-    <!-- DATALIST PARA VEHÍCULOS DE LA FLOTA -->
-    <datalist id="lista_vehiculos">
-        {% if vehiculos_flota is defined %}
-            {% for v in vehiculos_flota %}
-                <option value="{{ v.placa }}">{{ v.placa }} - {{ v.marca }} ({{ v.modelo }})</option>
-            {% endfor %}
-        {% endif %}
-    </datalist>
-
     <script>
         const menuToggle = document.getElementById('menuToggle');
         const sidebar = document.getElementById('sidebar');
@@ -497,7 +494,7 @@
             document.getElementById('accionConductor').value = 'crear';
             document.getElementById('c_cedula').readOnly = false;
             document.getElementById('c_password').required = true;
-            document.getElementById('c_vehiculo').value = '';
+            document.getElementById('c_es_relevo').checked = false;
             document.getElementById('btnGuardarConductor').innerText = 'Guardar Conductor';
             openModal('modalConductor');
         }
@@ -517,7 +514,7 @@
             document.getElementById('c_telefono').value = (d.telefono !== 'None' && d.telefono) ? d.telefono : '';
             document.getElementById('c_email').value = (d.email !== 'None' && d.email) ? d.email : '';
             document.getElementById('c_password').value = ''; 
-            document.getElementById('c_vehiculo').value = (d.vehiculo !== 'None' && d.vehiculo) ? d.vehiculo : '';
+            document.getElementById('c_es_relevo').checked = (d.relevo === '1' || d.relevo === 'True');
 
             let depSelect = document.getElementById('c_dep_base');
             if (d.dep && d.dep !== 'None') {

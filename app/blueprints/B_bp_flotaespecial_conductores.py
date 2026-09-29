@@ -1,4 +1,4 @@
-# app/blueprints/B_bp_flotaespecial_conductores.py[cite: 5]
+# app/blueprints/B_bp_flotaespecial_conductores.py
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -68,6 +68,8 @@ def asegurar_tablas_conductores(cur):
     except: pass
     try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN vehiculo_asignado VARCHAR(20) DEFAULT NULL")
     except: pass
+    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN es_relevo BOOLEAN DEFAULT FALSE")
+    except: pass
     try: cur.execute("ALTER TABLE usuarios ADD COLUMN email VARCHAR(150) DEFAULT NULL")
     except: pass
     
@@ -124,7 +126,7 @@ def gestion_conductores():
             telefono = request.form.get('telefono', '').strip()
             email = request.form.get('email', '').strip()
             password = request.form.get('password', '').strip()
-            vehiculo_asignado = request.form.get('vehiculo_asignado', '').strip()
+            # SE ELIMINÓ: vehiculo_asignado = request.form.get('vehiculo_asignado', '').strip()
             departamento_base = request.form.get('departamento_base', '').strip()
             municipio_base = request.form.get('municipio_base', '').strip()
             numero_licencia = request.form.get('numero_licencia_conduccion', '').strip()
@@ -133,6 +135,7 @@ def gestion_conductores():
             fondo_pensiones = request.form.get('fondo_pensiones', '').strip()
             arl = request.form.get('arl', '').strip()
             ultimo_pago_ss = request.form.get('ultimo_pago_seguridad_social') or None
+            es_relevo = 1 if request.form.get('es_relevo') else 0
 
             # Cálculo exacto de vencimiento de seguridad social (+30 días)
             vencimiento_ss = None
@@ -172,11 +175,11 @@ def gestion_conductores():
                             INSERT INTO conductores_flotaespecial 
                             (id_empresa, nombre, cedula, departamento_base, municipio_base, numero_licencia_conduccion, 
                              vencimiento_licencia_conduccion, eps, fondo_pensiones, arl, ultimo_pago_seguridad_social, 
-                             vencimiento_seguridad_social, ruta_pdf_cedula, ruta_pdf_licencia, ruta_pdf_seguridad_social, telefono, email, vehiculo_asignado, estatus) 
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'No Logueado')
+                             vencimiento_seguridad_social, ruta_pdf_cedula, ruta_pdf_licencia, ruta_pdf_seguridad_social, telefono, email, estatus, es_relevo) 
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'No Logueado', %s)
                         """, (empresa_id, nombre, cedula, departamento_base, municipio_base, numero_licencia,
                               vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
-                              vencimiento_ss, r_ced or '', r_lic or '', r_ss or '', telefono or None, email or None, vehiculo_asignado or None))
+                              vencimiento_ss, r_ced or '', r_lic or '', r_ss or '', telefono or None, email or None, es_relevo))
                         
                         mysql.connection.commit()
                         flash(f"Conductor {nombre} registrado exitosamente.", "success")
@@ -188,11 +191,11 @@ def gestion_conductores():
                             SET nombre=%s, cedula=%s, departamento_base=%s, municipio_base=%s, numero_licencia_conduccion=%s, 
                                 vencimiento_licencia_conduccion=%s, eps=%s, fondo_pensiones=%s, arl=%s, 
                                 ultimo_pago_seguridad_social=%s, vencimiento_seguridad_social=%s, telefono=%s, email=%s,
-                                vehiculo_asignado=%s
+                                es_relevo=%s
                             WHERE id=%s AND id_empresa=%s
                         """, (nombre, cedula, departamento_base, municipio_base, numero_licencia,
                               vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
-                              vencimiento_ss, telefono or None, email or None, vehiculo_asignado or None, conductor_id, empresa_id))
+                              vencimiento_ss, telefono or None, email or None, es_relevo, conductor_id, empresa_id))
                         
                         # Actualización de archivos
                         if r_ced: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_cedula=%s WHERE id=%s AND id_empresa=%s", (r_ced, conductor_id, empresa_id))

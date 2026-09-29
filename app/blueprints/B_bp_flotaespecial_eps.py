@@ -1274,10 +1274,11 @@ def gestion_traslados_asignacion_flota():
                 
                 cur.execute("""
                     SELECT id FROM conductores_flotaespecial 
-                    WHERE vehiculo_asignado = %s AND nombre = %s AND (id_empresa = %s OR id_empresa = %s)
+                    WHERE (vehiculo_asignado = %s OR es_relevo = TRUE) 
+                      AND nombre = %s AND (id_empresa = %s OR id_empresa = %s)
                 """, (vehiculo_placa, conductor, empresa_id, empresa_nit))
                 if not cur.fetchone():
-                    flash(f"Error de Integridad: El conductor {conductor} no está vinculado legalmente al vehículo {vehiculo_placa}.", "danger")
+                    flash(f"Error de Integridad: El conductor {conductor} no está vinculado legalmente al vehículo {vehiculo_placa} ni es de relevo.", "danger")
                     return redirect(url_for('flotaespecial_eps.gestion_traslados_asignacion_flota'))
 
                 # Adición de FOR UPDATE para prevenir lecturas sucias en alta concurrencia
@@ -1622,13 +1623,16 @@ def gestion_traslados_asignacion_flota():
     cur.execute("SELECT id, nombre, cedula FROM usuarios WHERE (empresa_id = %s OR empresa_id = %s) AND perfil IN ('operador_flotaespecial', 'auxiliar_transporte_especial')", (empresa_id, empresa_nit))
     cond_usrs = list(cur.fetchall())
     
-    cur.execute("SELECT id, nombre, cedula FROM conductores_flotaespecial WHERE id_empresa = %s OR id_empresa = %s", (empresa_id, empresa_nit))
+    cur.execute("SELECT id, nombre, cedula, COALESCE(es_relevo, 0) as es_relevo FROM conductores_flotaespecial WHERE id_empresa = %s OR id_empresa = %s", (empresa_id, empresa_nit))
     cond_flota = list(cur.fetchall())
     
     cond_dict = {c['cedula']: c for c in cond_usrs}
     for c in cond_flota:
         if c['cedula'] not in cond_dict:
             cond_dict[c['cedula']] = c
+        elif 'es_relevo' in c:
+            cond_dict[c['cedula']]['es_relevo'] = c['es_relevo']
+            
     conductores = list(cond_dict.values())
 
     # 4. Consultar Contratos Activos
