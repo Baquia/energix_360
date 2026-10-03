@@ -1943,7 +1943,6 @@ def match_keyword(celda_val, keywords):
     return False
 
 @bp_bodegas.route('/bodegas/upload_excel', methods=['POST'])
-@csrf.exempt 
 def upload_excel():
     if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
     empresa_id = str(session.get('empresa_id'))
@@ -1955,6 +1954,7 @@ def upload_excel():
     try:
         cur = mysql.connection.cursor()
         
+        # --- CARGA DE CATÁLOGOS MAESTROS EN MEMORIA ---
         cur.execute("SELECT sku, ean, producto, fabricante, factor_conversion, unidad_embalaje FROM productos WHERE id_empresa = %s", (empresa_id,))
         db_products = cur.fetchall()
         
@@ -2028,7 +2028,7 @@ def upload_excel():
                 
                 df_raw = df_raw.fillna('')
 
-                # 1. Detectar Meta-Data (Planilla y Zona combinando Regex robusto y búsqueda posicional)
+                # 1. Detectar Meta-Data (Zona y Pedido)
                 meta_zona = 'GENERAL'
                 meta_orden = filename.split('.')[0].replace('_', ' ').strip()
                 
@@ -2049,7 +2049,6 @@ def upload_excel():
                         celda_val = str(df_raw.iloc[r, c]).strip().upper()
                         if not celda_val or celda_val in ['NAN', 'NULL', 'NONE']: continue
                         
-                        # Buscar Zona (Respaldo por si el regex falló)
                         if meta_zona == 'GENERAL':
                             if celda_val == 'ZONA' or celda_val == 'RUTA':
                                 if c + 1 < len(df_raw.columns) and str(df_raw.iloc[r, c+1]).strip() and str(df_raw.iloc[r, c+1]).strip().upper() != 'NAN':
@@ -2057,50 +2056,36 @@ def upload_excel():
                                 elif r + 1 < len(df_raw) and str(df_raw.iloc[r+1, c]).strip() and str(df_raw.iloc[r+1, c]).strip().upper() != 'NAN':
                                     meta_zona = str(df_raw.iloc[r+1, c]).strip()
                                 
-                        # Buscar Pedido (Derecha y luego Abajo)
                         if any(k == celda_val for k in pedidos_keywords) or any(k in celda_val for k in pedidos_keywords):
                             if c + 1 < len(df_raw.columns) and str(df_raw.iloc[r, c+1]).strip() and str(df_raw.iloc[r, c+1]).strip().upper() != 'NAN':
                                 meta_orden = str(df_raw.iloc[r, c+1]).strip()
                             elif r + 1 < len(df_raw) and str(df_raw.iloc[r+1, c]).strip() and str(df_raw.iloc[r+1, c]).strip().upper() != 'NAN':
                                 meta_orden = str(df_raw.iloc[r+1, c]).strip()
 
-                # 2. Identificar Columnas Estratégicamente (Fuzzy Matching)
-                col_ean = col_prod = col_cant = col_und_med = col_cajas = col_unidades = None
-                
-                keywords_cols = {
-                    'CODIGO': ['CODIGO', 'EAN', 'ITEM', 'SKU', 'REF', 'MATERIAL', 'BARCODE'],
-                    'DESCRIPCION': ['DESCRIPCION', 'DESCRIPCIÓN', 'PRODUCTO', 'NOMBRE', 'DETALLE', 'TEXTO', 'MERCANCIA', 'ARTICULO', 'ART.', 'ART'],
-                    'CANTIDAD': ['CANTIDAD', 'CANT', 'QTY', 'QUANTITY', 'SOLICITADO', 'PZS', 'PIEZAS'],
-                    'UNIDAD_MEDIDA': ['UNIDAD', 'UND', 'UM', 'U.M.', 'MEDIDA', 'EMPAQUE', 'PRESENTACION', 'TIPO'],
-                    'CAJAS': ['CAJAS', 'CAJA', 'CJ', 'CJS', 'BULTOS', 'BTO', 'PACAS', 'CARTON', 'EMP'],
-                    'UNIDADES': ['UNIDADES', 'UND', 'UNDS', 'FRACCIONES', 'FRACC', 'SUELTAS', 'PAQUETES', 'PQT']
-                }
-
+                # 2. Identificar Anclaje Posicional Estricto (indice_base)
                 start_row = 0
-                header_map = {}
-                found_table = False
+                indice_base = None
+                keywords_desc = ['DESCRIPCION', 'DESCRIPCIÓN', 'PRODUCTO', 'NOMBRE', 'DETALLE', 'TEXTO', 'MERCANCIA', 'ARTICULO', 'ART.', 'ART']
 
                 for r in range(min(30, len(df_raw))):
-                    temp_map = {}
                     for c in range(len(df_raw.columns)):
-                        val_raw = str(df_raw.iloc[r, c]).strip()
+                        val_raw = str(df_raw.iloc[r, c]).strip().upper()
                         if not val_raw: continue
                         val_clean = limpiar_texto(val_raw)
                         
-                        for key, words in keywords_cols.items():
-                            if match_keyword(val_clean, words):
-                                if key not in temp_map: temp_map[key] = c
+                        if match_keyword(val_clean, keywords_desc):
+                            # Validar que al menos tenga espacio anatómico a la derecha para las 2 cantidades
+                            if c + 2 < len(df_raw.columns):
+                                indice_base = c
+                                start_row = r + 1
                                 break
-                    
-                    if ('DESCRIPCION' in temp_map) and (('CAJAS' in temp_map or 'UNIDADES' in temp_map) or ('CANTIDAD' in temp_map)):
-                        start_row = r + 1; header_map = temp_map; found_table = True; break
+                    if indice_base is not None: break
 
-                # Filtro Estricto: Si no se detectaron encabezados, se rechaza la carga.
-                if not found_table:
-                    resultados_error.append(f"❌ {filename}: Formato inválido. Por favor utilice la plantilla V2 con las columnas exactas (ej. 'EAN', 'DESCRIPCION', 'CAJAS', 'UNIDADES').")
+                if indice_base is None:
+                    resultados_error.append(f"❌ {filename}: Formato inválido. No se detectó la columna principal de 'DESCRIPCION' o carece de la estructura estricta de 4 columnas (Código, Descripción, Cajas, Unidades).")
                     continue
 
-                # 3. Procesamiento y Comparación Fila por Fila
+                # 3. Procesamiento y Comparación Estricta (Filtro Anti-Fantasmas)
                 data_to_insert = []
                 fecha_creacion = datetime.now()
                 
@@ -2115,42 +2100,39 @@ def upload_excel():
                 for i in range(start_row, len(df_raw)):
                     row = df_raw.iloc[i]
                     
-                    idx_desc = header_map.get('DESCRIPCION')
-                    idx_code = header_map.get('CODIGO')
+                    # Filtro Estricto: Validación Numérica en indice_base + 1 y indice_base + 2
+                    val_cajas = row[indice_base + 1]
+                    val_unidades = row[indice_base + 2]
                     
-                    raw_desc = str(row[idx_desc]).strip() if idx_desc is not None and pd.notna(row[idx_desc]) else ""
-                    if raw_desc.upper() in ['NAN', 'NULL', 'NONE', '']: 
-                        continue
-                    
-                    lineas_detectadas += 1
-                    raw_desc = re.sub(r'[\.\s]+$', '', raw_desc).strip()
-                    
-                    raw_code = str(row[idx_code]).strip() if idx_code is not None and pd.notna(row[idx_code]) else ""
-                    if raw_code.upper() in ['NAN', 'NULL', 'NONE']: raw_code = ""
-                    raw_code = normalizar_codigo(raw_code)
-
                     cajas = 0
                     unidades = 0
                     
-                    if 'CANTIDAD' in header_map and 'UNIDAD_MEDIDA' in header_map:
-                        val_cant = row[header_map['CANTIDAD']]
-                        if str(val_cant).strip() and es_cadena_numerica(val_cant):
-                            cant_num = int(float(val_cant))
-                            str_unidad = str(row[header_map['UNIDAD_MEDIDA']]).strip().upper()
-                            
-                            if str_unidad in ['CAJA', 'CJ', 'CAJAS', 'BTO', 'BULTOS']: cajas = cant_num
-                            else: unidades = cant_num
-                    else:
-                        if 'CAJAS' in header_map:
-                            val = row[header_map['CAJAS']]
-                            if str(val).strip() and es_cadena_numerica(val): cajas = int(float(val))
-                        if 'UNIDADES' in header_map:
-                            val = row[header_map['UNIDADES']]
-                            if str(val).strip() and es_cadena_numerica(val): unidades = int(float(val))
-                            
-                    if cajas <= 0 and unidades <= 0: 
+                    if str(val_cajas).strip() and es_cadena_numerica(val_cajas):
+                        cajas = int(float(val_cajas))
+                        
+                    if str(val_unidades).strip() and es_cadena_numerica(val_unidades):
+                        unidades = int(float(val_unidades))
+                        
+                    # Si ambas son cero o texto, es un "fantasma" (subtotal, combinada, título), se descarta silenciosamente
+                    if cajas <= 0 and unidades <= 0:
                         lineas_ignoradas += 1
                         continue
+
+                    # Extracción del Ancla (Descripción)
+                    raw_desc = str(row[indice_base]).strip() if pd.notna(row[indice_base]) else ""
+                    if raw_desc.upper() in ['NAN', 'NULL', 'NONE', '']: 
+                        lineas_ignoradas += 1
+                        continue
+                        
+                    lineas_detectadas += 1
+                    raw_desc = re.sub(r'[\.\s]+$', '', raw_desc).strip()
+                    
+                    # Captura del Código Condicionado (indice_base - 1)
+                    raw_code = ""
+                    if indice_base - 1 >= 0:
+                        val_code = str(row[indice_base - 1]).strip()
+                        if pd.notna(row[indice_base - 1]) and val_code.upper() not in ['NAN', 'NULL', 'NONE']:
+                            raw_code = normalizar_codigo(val_code)
 
                     final_ean = raw_code
                     final_desc = raw_desc
@@ -2234,7 +2216,6 @@ def upload_excel():
                         desc_upper = str(final_desc).upper() if final_desc else ""
                         es_huerfana = any(k in desc_upper for k in palabras_clave_promo)
                         
-                        # NUEVA REGLA: Si cruzó en BD, NO es huérfana
                         if match_encontrado:
                             es_huerfana = False
                         
@@ -2242,7 +2223,6 @@ def upload_excel():
                         auth_insert = False if es_huerfana else auth
 
                         if cajas > 0 and unidades > 0 and not es_huerfana:
-                            # --- LÓGICA DE BIFURCACIÓN DE LÍNEAS (SPLIT) ---
                             ean_caja = final_ean
                             marca_caja = final_marca
                             desc_caja = final_desc
@@ -2304,39 +2284,36 @@ def upload_excel():
                             cálculo_total_unidades += unidades
                             cálculo_marcas_presentes.add(final_marca)
 
-                if data_to_insert:
-                    cur = mysql.connection.cursor()
-                    query = """INSERT INTO picking_importacion_raw 
-                    (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                    cur.executemany(query, data_to_insert)
-                    mysql.connection.commit()
-                    cur.close()
-                    
-                    resultados_exito.append(
-                        f"✅ {meta_orden}\n"
-                        f"📊 Reporte de Carga Transparente:\n"
-                        f"• Líneas detectadas en Excel: {lineas_detectadas}\n"
-                        f"• Líneas ignoradas (Cantidades en cero): {lineas_ignoradas}\n"
-                        f"• Desdoblamientos (Cajas/Unidades o Kits): +{sub_items_generados} líneas generadas\n"
-                        f"• Total final de líneas a preparar en Bodega: {len(data_to_insert)}\n"
-                        f"• Auditoría Final: {cálculo_total_cajas} Cajas y {cálculo_total_unidades} Unidades."
-                    )
-                    total_items_insertados += len(data_to_insert)
-                else:
-                    resultados_error.append(f"❌ {filename}: Sin items válidos para insertar.")
+            if data_to_insert:
+                cur = mysql.connection.cursor()
+                query = """INSERT INTO picking_importacion_raw 
+                (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                cur.executemany(query, data_to_insert)
+                mysql.connection.commit()
+                cur.close()
+                
+                resultados_exito.append(
+                    f"✅ {meta_orden}\n"
+                    f"📊 Reporte de Carga Transparente:\n"
+                    f"• Líneas detectadas en Excel: {lineas_detectadas}\n"
+                    f"• Líneas ignoradas (Cantidades en cero): {lineas_ignoradas}\n"
+                    f"• Desdoblamientos (Cajas/Unidades o Kits): +{sub_items_generados} líneas generadas\n"
+                    f"• Total final de líneas a preparar en Bodega: {len(data_to_insert)}\n"
+                    f"• Auditoría Final: {cálculo_total_cajas} Cajas y {cálculo_total_unidades} Unidades."
+                )
+                total_items_insertados += len(data_to_insert)
+            else:
+                resultados_error.append(f"❌ {filename}: Sin items válidos para insertar.")
 
-            except Exception as e:
-                resultados_error.append(f"❌ {filename}: Error de lectura ({str(e)})")
+        except Exception as e:
+            resultados_error.append(f"❌ {filename}: Error de lectura ({str(e)})")
 
-        mensaje_alerta = ""
-        if resultados_exito: mensaje_alerta += "\n\n".join(resultados_exito) + "\n\n"
-        if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
+    mensaje_alerta = ""
+    if resultados_exito: mensaje_alerta += "\n\n".join(resultados_exito) + "\n\n"
+    if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
 
-        return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
-
-    except Exception as e:
-        return jsonify({'error': f'Error crítico procesando carga: {str(e)}'}), 500
+    return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
     
 @bp_bodegas.route('/api/bodegas/reportes/importacion')
 def reporte_importacion():
