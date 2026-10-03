@@ -2284,36 +2284,40 @@ def upload_excel():
                             cálculo_total_unidades += unidades
                             cálculo_marcas_presentes.add(final_marca)
 
-            if data_to_insert:
-                cur = mysql.connection.cursor()
-                query = """INSERT INTO picking_importacion_raw 
-                (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                cur.executemany(query, data_to_insert)
-                mysql.connection.commit()
-                cur.close()
-                
-                resultados_exito.append(
-                    f"✅ {meta_orden}\n"
-                    f"📊 Reporte de Carga Transparente:\n"
-                    f"• Líneas detectadas en Excel: {lineas_detectadas}\n"
-                    f"• Líneas ignoradas (Cantidades en cero): {lineas_ignoradas}\n"
-                    f"• Desdoblamientos (Cajas/Unidades o Kits): +{sub_items_generados} líneas generadas\n"
-                    f"• Total final de líneas a preparar en Bodega: {len(data_to_insert)}\n"
-                    f"• Auditoría Final: {cálculo_total_cajas} Cajas y {cálculo_total_unidades} Unidades."
-                )
-                total_items_insertados += len(data_to_insert)
-            else:
-                resultados_error.append(f"❌ {filename}: Sin items válidos para insertar.")
+                if data_to_insert:
+                    cur = mysql.connection.cursor()
+                    query = """INSERT INTO picking_importacion_raw 
+                    (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                    cur.executemany(query, data_to_insert)
+                    mysql.connection.commit()
+                    cur.close()
+                    
+                    resultados_exito.append(
+                        f"✅ {meta_orden}\n"
+                        f"📊 Reporte de Carga Transparente:\n"
+                        f"• Líneas detectadas en Excel: {lineas_detectadas}\n"
+                        f"• Líneas ignoradas (Cantidades en cero): {lineas_ignoradas}\n"
+                        f"• Desdoblamientos (Cajas/Unidades o Kits): +{sub_items_generados} líneas generadas\n"
+                        f"• Total final de líneas a preparar en Bodega: {len(data_to_insert)}\n"
+                        f"• Auditoría Final: {cálculo_total_cajas} Cajas y {cálculo_total_unidades} Unidades."
+                    )
+                    total_items_insertados += len(data_to_insert)
+                else:
+                    resultados_error.append(f"❌ {filename}: Sin items válidos para insertar.")
 
-        except Exception as e:
-            resultados_error.append(f"❌ {filename}: Error de lectura ({str(e)})")
+            except Exception as e:
+                resultados_error.append(f"❌ {filename}: Error de lectura ({str(e)})")
 
-    mensaje_alerta = ""
-    if resultados_exito: mensaje_alerta += "\n\n".join(resultados_exito) + "\n\n"
-    if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
+        mensaje_alerta = ""
+        if resultados_exito: mensaje_alerta += "\n\n".join(resultados_exito) + "\n\n"
+        if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
 
-    return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
+        return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
+
+    except Exception as e:
+        return jsonify({'error': f'Error crítico procesando carga: {str(e)}'}), 500
+
     
 @bp_bodegas.route('/api/bodegas/reportes/importacion')
 def reporte_importacion():
