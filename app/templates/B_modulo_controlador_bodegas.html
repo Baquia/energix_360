@@ -1022,6 +1022,9 @@
     <!-- ============================================== -->
     <!-- MODAL CARGAR PICKING -->
     <!-- ============================================== -->
+    <!-- ============================================== -->
+    <!-- MODAL CARGAR PICKING -->
+    <!-- ============================================== -->
     <div id="modalUpload" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
@@ -1030,6 +1033,9 @@
             </div>
             <div class="modal-body">
                 <form id="frmUpload" enctype="multipart/form-data">
+                    <!-- Inyección de Token CSRF -->
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
                     <div class="drop-area" onclick="document.getElementById('fi').click()">
                         <span id="fn" style="font-weight: 600; color: #475569;">Toca aquí para seleccionar Excel o CSV</span>
                         <input type="file" id="fi" name="file" multiple accept=".xlsx, .xls, .csv" style="display:none;" onchange="actualizarTextoUpload(this)">
@@ -1042,7 +1048,6 @@
             </div>
         </div>
     </div>
-
     <!-- ============================================== -->
     <!-- MODAL RUTAS PICKING (PASILLOS - REORDENABLE) -->
     <!-- ============================================== -->
