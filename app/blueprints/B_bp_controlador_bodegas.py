@@ -2062,30 +2062,7 @@ def upload_excel():
                             elif r + 1 < len(df_raw) and str(df_raw.iloc[r+1, c]).strip() and str(df_raw.iloc[r+1, c]).strip().upper() != 'NAN':
                                 meta_orden = str(df_raw.iloc[r+1, c]).strip()
 
-                # 2. Identificar Anclaje Posicional Estricto (indice_base)
-                start_row = 0
-                indice_base = None
-                keywords_desc = ['DESCRIPCION', 'DESCRIPCIÓN', 'PRODUCTO', 'NOMBRE', 'DETALLE', 'TEXTO', 'MERCANCIA', 'ARTICULO', 'ART.', 'ART']
-
-                for r in range(min(30, len(df_raw))):
-                    for c in range(len(df_raw.columns)):
-                        val_raw = str(df_raw.iloc[r, c]).strip().upper()
-                        if not val_raw: continue
-                        val_clean = limpiar_texto(val_raw)
-                        
-                        if match_keyword(val_clean, keywords_desc):
-                            # Validar que al menos tenga espacio anatómico a la derecha para las 2 cantidades
-                            if c + 2 < len(df_raw.columns):
-                                indice_base = c
-                                start_row = r + 1
-                                break
-                    if indice_base is not None: break
-
-                if indice_base is None:
-                    resultados_error.append(f"❌ {filename}: Formato inválido. No se detectó la columna principal de 'DESCRIPCION' o carece de la estructura estricta de 4 columnas (Código, Descripción, Cajas, Unidades).")
-                    continue
-
-                # 3. Procesamiento y Comparación Estricta (Filtro Anti-Fantasmas)
+                # 2. Extracción por Zonas Estrictas (Zone Mapping)
                 data_to_insert = []
                 fecha_creacion = datetime.now()
                 
@@ -2097,42 +2074,47 @@ def upload_excel():
                 lineas_ignoradas = 0
                 sub_items_generados = 0
 
-                for i in range(start_row, len(df_raw)):
+                # Función helper para extraer el primer valor válido en el rango de columnas combinadas
+                def extraer_de_zona(row, start_idx, end_idx, is_numeric=False):
+                    for col_idx in range(start_idx, min(end_idx + 1, len(row))):
+                        val = str(row[col_idx]).strip()
+                        if val.upper() in ['NAN', 'NULL', 'NONE', '']: continue
+                        if is_numeric:
+                            if es_cadena_numerica(val):
+                                return int(float(val))
+                        else:
+                            return val
+                    return 0 if is_numeric else ""
+
+                for i in range(len(df_raw)):
                     row = df_raw.iloc[i]
                     
-                    # Filtro Estricto: Validación Numérica en indice_base + 1 y indice_base + 2
-                    val_cajas = row[indice_base + 1]
-                    val_unidades = row[indice_base + 2]
+                    # Mapeo basado en anchos fijos de la plantilla
+                    # Col B a E = Índices 1 al 4
+                    raw_code = extraer_de_zona(row, 1, 4, is_numeric=False)
+                    # Col F a L = Índices 5 al 11
+                    raw_desc = extraer_de_zona(row, 5, 11, is_numeric=False)
+                    # Col M a O = Índices 12 al 14
+                    cajas = extraer_de_zona(row, 12, 14, is_numeric=True)
+                    # Col P a S = Índices 15 al 18
+                    unidades = extraer_de_zona(row, 15, 18, is_numeric=True)
                     
-                    cajas = 0
-                    unidades = 0
-                    
-                    if str(val_cajas).strip() and es_cadena_numerica(val_cajas):
-                        cajas = int(float(val_cajas))
+                    # Descartar filas vacías o cabeceras
+                    if not raw_desc:
+                        continue
                         
-                    if str(val_unidades).strip() and es_cadena_numerica(val_unidades):
-                        unidades = int(float(val_unidades))
-                        
-                    # Si ambas son cero o texto, es un "fantasma" (subtotal, combinada, título), se descarta silenciosamente
-                    if cajas <= 0 and unidades <= 0:
-                        lineas_ignoradas += 1
+                    desc_clean = limpiar_texto(raw_desc)
+                    if desc_clean in ['DESCRIPCION', 'PRODUCTO', 'NOMBRE', 'ARTICULO', 'MERCANCIA', 'DETALLE']:
                         continue
 
-                    # Extracción del Ancla (Descripción)
-                    raw_desc = str(row[indice_base]).strip() if pd.notna(row[indice_base]) else ""
-                    if raw_desc.upper() in ['NAN', 'NULL', 'NONE', '']: 
+                    # Filtro Estricto Anti-Fantasmas
+                    if cajas <= 0 and unidades <= 0:
                         lineas_ignoradas += 1
                         continue
                         
                     lineas_detectadas += 1
                     raw_desc = re.sub(r'[\.\s]+$', '', raw_desc).strip()
-                    
-                    # Captura del Código Condicionado (indice_base - 1)
-                    raw_code = ""
-                    if indice_base - 1 >= 0:
-                        val_code = str(row[indice_base - 1]).strip()
-                        if pd.notna(row[indice_base - 1]) and val_code.upper() not in ['NAN', 'NULL', 'NONE']:
-                            raw_code = normalizar_codigo(val_code)
+                    raw_code = normalizar_codigo(raw_code)
 
                     final_ean = raw_code
                     final_desc = raw_desc
@@ -2142,6 +2124,7 @@ def upload_excel():
                     match_encontrado = False
                     es_promo = False
 
+                    # 3. Cruce con Base de Datos
                     if final_ean:
                         if final_ean in diccionario_promos:
                             es_promo = True
@@ -2284,40 +2267,36 @@ def upload_excel():
                             cálculo_total_unidades += unidades
                             cálculo_marcas_presentes.add(final_marca)
 
-                if data_to_insert:
-                    cur = mysql.connection.cursor()
-                    query = """INSERT INTO picking_importacion_raw 
-                    (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                    cur.executemany(query, data_to_insert)
-                    mysql.connection.commit()
-                    cur.close()
-                    
-                    resultados_exito.append(
-                        f"✅ {meta_orden}\n"
-                        f"📊 Reporte de Carga Transparente:\n"
-                        f"• Líneas detectadas en Excel: {lineas_detectadas}\n"
-                        f"• Líneas ignoradas (Cantidades en cero): {lineas_ignoradas}\n"
-                        f"• Desdoblamientos (Cajas/Unidades o Kits): +{sub_items_generados} líneas generadas\n"
-                        f"• Total final de líneas a preparar en Bodega: {len(data_to_insert)}\n"
-                        f"• Auditoría Final: {cálculo_total_cajas} Cajas y {cálculo_total_unidades} Unidades."
-                    )
-                    total_items_insertados += len(data_to_insert)
-                else:
-                    resultados_error.append(f"❌ {filename}: Sin items válidos para insertar.")
+            if data_to_insert:
+                cur = mysql.connection.cursor()
+                query = """INSERT INTO picking_importacion_raw 
+                (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                cur.executemany(query, data_to_insert)
+                mysql.connection.commit()
+                cur.close()
+                
+                resultados_exito.append(
+                    f"✅ {meta_orden}\n"
+                    f"📊 Reporte de Carga Transparente:\n"
+                    f"• Líneas detectadas en Excel: {lineas_detectadas}\n"
+                    f"• Líneas ignoradas (Cantidades en cero/Cabeceras): {lineas_ignoradas}\n"
+                    f"• Desdoblamientos (Cajas/Unidades o Kits): +{sub_items_generados} líneas generadas\n"
+                    f"• Total final de líneas a preparar en Bodega: {len(data_to_insert)}\n"
+                    f"• Auditoría Final: {cálculo_total_cajas} Cajas y {cálculo_total_unidades} Unidades."
+                )
+                total_items_insertados += len(data_to_insert)
+            else:
+                resultados_error.append(f"❌ {filename}: Sin items válidos para insertar.")
 
-            except Exception as e:
-                resultados_error.append(f"❌ {filename}: Error de lectura ({str(e)})")
+        except Exception as e:
+            resultados_error.append(f"❌ {filename}: Error de lectura ({str(e)})")
 
-        mensaje_alerta = ""
-        if resultados_exito: mensaje_alerta += "\n\n".join(resultados_exito) + "\n\n"
-        if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
+    mensaje_alerta = ""
+    if resultados_exito: mensaje_alerta += "\n\n".join(resultados_exito) + "\n\n"
+    if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
 
-        return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
-
-    except Exception as e:
-        return jsonify({'error': f'Error crítico procesando carga: {str(e)}'}), 500
-
+    return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
     
 @bp_bodegas.route('/api/bodegas/reportes/importacion')
 def reporte_importacion():
