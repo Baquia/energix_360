@@ -2074,7 +2074,6 @@ def upload_excel():
                 lineas_ignoradas = 0
                 sub_items_generados = 0
 
-                # Función helper para extraer el primer valor válido en el rango de columnas combinadas
                 def extraer_de_zona(row, start_idx, end_idx, is_numeric=False):
                     for col_idx in range(start_idx, min(end_idx + 1, len(row))):
                         val = str(row[col_idx]).strip()
@@ -2089,17 +2088,11 @@ def upload_excel():
                 for i in range(len(df_raw)):
                     row = df_raw.iloc[i]
                     
-                    # Mapeo basado en anchos fijos de la plantilla
-                    # Col B a E = Índices 1 al 4
                     raw_code = extraer_de_zona(row, 1, 4, is_numeric=False)
-                    # Col F a L = Índices 5 al 11
                     raw_desc = extraer_de_zona(row, 5, 11, is_numeric=False)
-                    # Col M a O = Índices 12 al 14
                     cajas = extraer_de_zona(row, 12, 14, is_numeric=True)
-                    # Col P a S = Índices 15 al 18
                     unidades = extraer_de_zona(row, 15, 18, is_numeric=True)
                     
-                    # Descartar filas vacías o cabeceras
                     if not raw_desc:
                         continue
                         
@@ -2107,7 +2100,6 @@ def upload_excel():
                     if desc_clean in ['DESCRIPCION', 'PRODUCTO', 'NOMBRE', 'ARTICULO', 'MERCANCIA', 'DETALLE']:
                         continue
 
-                    # Filtro Estricto Anti-Fantasmas
                     if cajas <= 0 and unidades <= 0:
                         lineas_ignoradas += 1
                         continue
@@ -2124,7 +2116,6 @@ def upload_excel():
                     match_encontrado = False
                     es_promo = False
 
-                    # 3. Cruce con Base de Datos
                     if final_ean:
                         if final_ean in diccionario_promos:
                             es_promo = True
@@ -2267,7 +2258,6 @@ def upload_excel():
                             cálculo_total_unidades += unidades
                             cálculo_marcas_presentes.add(final_marca)
 
-                # AQUI: Indentación corregida dentro del bloque TRY
                 if data_to_insert:
                     cur = mysql.connection.cursor()
                     query = """INSERT INTO picking_importacion_raw 
@@ -2293,14 +2283,13 @@ def upload_excel():
             except Exception as e:
                 resultados_error.append(f"❌ {filename}: Error de lectura ({str(e)})")
 
-    mensaje_alerta = ""
-    if resultados_exito: mensaje_alerta += "\n\n".join(resultados_exito) + "\n\n"
-    if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
+        mensaje_alerta = ""
+        if resultados_exito: mensaje_alerta += "\n\n".join(resultados_exito) + "\n\n"
+        if resultados_error: mensaje_alerta += "NO SE PUDIERON SUBIR:\n" + "\n".join(resultados_error)
 
-    return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
-
-except Exception as e:
-    return jsonify({'error': f'Error crítico procesando carga: {str(e)}'}), 500
+        return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
+    except Exception as e:
+        return jsonify({'error': f'Error crítico procesando carga: {str(e)}'}), 500
     
 @bp_bodegas.route('/api/bodegas/reportes/importacion')
 def reporte_importacion():
