@@ -191,7 +191,8 @@
                             <option value="Automóvil">Automóvil: Vehículo diseñado para el transporte de pasajeros con capacidad reducida.</option>
                             <option value="Camioneta y Campero">Camioneta y Campero: Vehículos de uso mixto o todoterreno para pasajeros y carga liviana.</option>
                             <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Automotores destinados al transporte colectivo de pasajeros.</option>
-                            <option value="Camión C2">Camión C2 ( 2 ejes sencillo )</option>
+                            <option value="Camión C2 (Llanta Trasera Sencilla)">Camión C2 ( 2 ejes sencillo - Llanta Trasera Sencilla )</option>
+                            <option value="Camión C2 (Pacha Trasera)">Camión C2 ( 2 ejes sencillo - Pacha Trasera )</option>
                             <option value="Camión C3">Camión C3 ( 3 ejes doble troque)</option>
                             <option value="Camión C4">Camión C4 ( 4 ejes-2 ejes direccionales)</option>
                             <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote de 3 ejes con un semirremolque de 2 ejes)</option>
@@ -740,7 +741,12 @@
         } else if (tipo.includes('C2') || tipo.includes('Bus')) {
             addEjeSencillo('ll_dir_izq', 'll_dir_der', 'Dir. Izquierda', 'Dir. Derecha', 'DIR');
             html += `<div style="margin-bottom: 25px;"></div>`;
-            addEjePacha('ll_trac_izq_ext', 'll_trac_izq_int', 'll_trac_der_int', 'll_trac_der_ext', 'Tracción Izq Ext', 'Tracción Izq Int', 'Tracción Der Int', 'Tracción Der Ext', 'TRAC');
+            // AQUÍ ESTÁ EL AJUSTE PARA VALIDAR SI ES SENCILLA O PACHA
+            if (tipo.includes('Sencilla')) {
+                addEjeSencillo('ll_trac_izq', 'll_trac_der', 'Tracción Izquierda', 'Tracción Derecha', 'TRAC');
+            } else {
+                addEjePacha('ll_trac_izq_ext', 'll_trac_izq_int', 'll_trac_der_int', 'll_trac_der_ext', 'Tracción Izq Ext', 'Tracción Izq Int', 'Tracción Der Int', 'Tracción Der Ext', 'TRAC');
+            }
         
         } else if (tipo.includes('Automóvil') || tipo.includes('Camioneta') || tipo.includes('Cuatrimoto')) {
             addEjeSencillo('ll_del_izq', 'll_del_der', 'Delantera Izquierda', 'Delantera Derecha', 'DEL');
