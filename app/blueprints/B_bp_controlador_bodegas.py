@@ -57,6 +57,14 @@ def control_logistica():
             """)
         except Exception:
             pass # La columna ya existe
+        try:
+            cur.execute("""
+                ALTER TABLE actas_despacho_flotacarga
+                ADD COLUMN firma_verificador MEDIUMTEXT NULL,
+                ADD COLUMN firma_supervisor MEDIUMTEXT NULL;
+            """)
+        except Exception:
+            pass # Las columnas ya existen
             
         mysql.connection.commit()
         cur.close()
@@ -1588,11 +1596,22 @@ def despachar_orden():
             WHERE numero_orden_origen=%s AND id_empresa=%s
         """, (d['id_vehiculo'], session.get('usuario_id'), d['numero_orden'], session.get('empresa_id')))
         
-        cur.execute("""
-            INSERT INTO actas_despacho_flotacarga 
-            (id_empresa, numero_orden, placa_vehiculo, id_supervisor_despacho, foto_evidencia, firma_evidencia)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (session.get('empresa_id'), d['numero_orden'], placa, session.get('usuario_id'), d.get('foto'), d.get('firma')))
+        # Verificamos si el verificador ya creó un registro parcial del acta para actualizarlo, o creamos uno nuevo
+        cur.execute("SELECT id FROM actas_despacho_flotacarga WHERE numero_orden = %s AND id_empresa = %s", (d['numero_orden'], session.get('empresa_id')))
+        acta_existente = cur.fetchone()
+
+        if acta_existente:
+            cur.execute("""
+                UPDATE actas_despacho_flotacarga 
+                SET placa_vehiculo=%s, id_supervisor_despacho=%s, foto_evidencia=%s, firma_evidencia=%s, firma_supervisor=%s
+                WHERE numero_orden=%s AND id_empresa=%s
+            """, (placa, session.get('usuario_id'), d.get('foto'), d.get('firma'), d.get('firma_supervisor'), d['numero_orden'], session.get('empresa_id')))
+        else:
+            cur.execute("""
+                INSERT INTO actas_despacho_flotacarga 
+                (id_empresa, numero_orden, placa_vehiculo, id_supervisor_despacho, foto_evidencia, firma_evidencia, firma_supervisor)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (session.get('empresa_id'), d['numero_orden'], placa, session.get('usuario_id'), d.get('foto'), d.get('firma'), d.get('firma_supervisor')))
         
         mysql.connection.commit()
         cur.close()
@@ -1619,7 +1638,7 @@ def imprimir_acta(orden):
         items = cur.fetchall()
         
         cur.execute("""
-            SELECT foto_evidencia, firma_evidencia 
+            SELECT foto_evidencia, firma_evidencia, firma_supervisor, firma_verificador 
             FROM actas_despacho_flotacarga 
             WHERE numero_orden = %s AND id_empresa = %s
             ORDER BY id DESC LIMIT 1
@@ -1630,10 +1649,12 @@ def imprimir_acta(orden):
         if not items: return "Orden no encontrada o no verificada.", 404
             
         head = items[0]
+        # Conservamos únicamente la mercancía conforme
         items_normales = [i for i in items if i['novedad_alistamiento'] is None and (i['cajas_verificadas']>0 or i['unidades_verificadas']>0)]
-        items_novedad = [i for i in items if i['novedad_alistamiento'] is not None or (i['cajas_verificadas']==0 and i['unidades_verificadas']==0)]
         
-        firma_img = f"<img src='{acta_info['firma_evidencia']}' />" if acta_info and acta_info['firma_evidencia'] else ""
+        firma_cond_img = f"<img src='{acta_info['firma_evidencia']}' />" if acta_info and acta_info['firma_evidencia'] else ""
+        firma_sup_img = f"<img src='{acta_info['firma_supervisor']}' />" if acta_info and acta_info['firma_supervisor'] else ""
+        firma_verif_img = f"<img src='{acta_info['firma_verificador']}' />" if acta_info and acta_info['firma_verificador'] else ""
         foto_img = f"<img src='{acta_info['foto_evidencia']}' style='max-width:100%; max-height:300px; display:block; margin: 0 auto; border-radius: 8px;'/>" if acta_info and acta_info['foto_evidencia'] else ""
         
         html = f"""
@@ -1650,7 +1671,7 @@ def imprimir_acta(orden):
                 table {{ width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }}
                 th, td {{ border: 1px solid #000; padding: 10px; text-align: left; font-size:14px; }}
                 th {{ background: #f0f0f0; }}
-                .firmas {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-top: 80px; page-break-inside: avoid; }}
+                .firmas {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-top: 60px; page-break-inside: avoid; }}
                 .firma-col {{ display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }}
                 .firma-espacio {{ height: 100px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 5px; width: 100%; }}
                 .firma-espacio img {{ max-height: 100px; max-width: 100%; object-fit: contain; }}
@@ -1667,7 +1688,7 @@ def imprimir_acta(orden):
                 <div class="info-grid">
                     <div><b>🏢 Muelle/Puerta:</b> {head.get('puerta_asignada', 'SIN PUERTA')}</div>
                     <div><b>🚚 Placa Vehículo:</b> {head.get('placa', 'No Registrado')}</div>
-                    <div><b>👨‍✈️ Conductor:</b> El asignado al vehiculo</div>
+                    <div><b>👨‍✈️ Conductor:</b> El asignado al vehículo</div>
                     <div><b>📅 Fecha de Despacho:</b> {head.get('fecha_despacho', 'N/A')}</div>
                     <div><b>📋 Despachador (Sup):</b> {head.get('supervisor', 'N/A')}</div>
                     <div><b>✅ Verificador:</b> {head.get('nombre_verificador_asignado', 'N/A')}</div>
@@ -1689,38 +1710,21 @@ def imprimir_acta(orden):
             html += "<tr><td colspan='5' style='text-align:center;'>No hay mercancía conforme</td></tr>"
             
         html += """</tbody></table>"""
+        
+        # Eliminada la sección de Novedades HTML
 
-        if items_novedad:
-            html += """
-            <h3 style="color:#b00020;">Novedades y Faltantes</h3>
-            <table>
-                <thead style="background:#fee2e2;">
-                    <tr><th style="background:#fecaca;">Producto</th><th style="background:#fecaca;">Novedad</th><th style="background:#fecaca; text-align:center;">Cajas Entregadas</th><th style="background:#fecaca; text-align:center;">Unid. Entregadas</th><th style="background:#fecaca;">Autoriza</th></tr>
-                </thead>
-                <tbody>
-            """
-            for item in items_novedad:
-                if item['cajas_verificadas'] == 0 and item['unidades_verificadas'] == 0 and not item['novedad_alistamiento']:
-                    novedad_texto = "ÍTEM NO ALISTADO POR FALTA DE EXISTENCIAS"
-                else:
-                    novedad_texto = "Falta Existencia" if item['novedad_alistamiento'] == 'FALTA_EXISTENCIAS' else "Alistado sin EAN (Verificado a ciegas)"
-                
-                auth = item['nombre_supervisor_novedad'] or 'Operario/Sistema'
-                html += f"<tr><td>{item['descripcion_producto']} <small>({item['codigo_producto']})</small></td><td style='color:#b00020; font-weight:bold;'>{novedad_texto}</td><td style='text-align:center;'>{item['cajas_verificadas']}</td><td style='text-align:center;'>{item['unidades_verificadas']}</td><td>{auth}</td></tr>"
-            html += """</tbody></table>"""
-            
         html += f"""
             <div class="firmas">
                 <div class="firma-col">
-                    <div class="firma-espacio"></div>
+                    <div class="firma-espacio">{firma_verif_img}</div>
                     <div class="firma-linea"><b>Verificador</b><br>{head.get('nombre_verificador_asignado', 'Firma Verificador')}</div>
                 </div>
                 <div class="firma-col">
-                    <div class="firma-espacio"></div>
+                    <div class="firma-espacio">{firma_sup_img}</div>
                     <div class="firma-linea"><b>Supervisor Despacho</b><br>{head.get('supervisor', 'Firma Responsable')}</div>
                 </div>
                 <div class="firma-col">
-                    <div class="firma-espacio">{firma_img}</div>
+                    <div class="firma-espacio">{firma_cond_img}</div>
                     <div class="firma-linea">
                         <b>Recibí Conforme (Conductor)</b><br>
                         El asignado al vehiculo

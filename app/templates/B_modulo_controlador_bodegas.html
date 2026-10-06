@@ -1714,7 +1714,7 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="titulo-modal-despacho">Despachar Orden</h3>
-                <button class="btn-cancel" onclick="cerrarModalDespacho()" style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
+                <button type="button" class="btn-cancel" onclick="cerrarModalDespacho()" style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
             </div>
             <div class="modal-body">
                 <p style="color:#6b7280; font-size:0.95rem; margin-top:0; margin-bottom:20px;">
@@ -1742,16 +1742,24 @@
                     </div>
                     <canvas id="canvasEvidencia" style="display: none;"></canvas>
                 </div>
+
+                <!-- FIRMA SUPERVISOR DE DESPACHO -->
+                <div style="margin-top: 30px;">
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">FIRMA SUPERVISOR DESPACHO</label>
+                    <canvas id="canvasFirmaSupervisor" width="400" height="200" style="border: 2px dashed #0369a1; border-radius: 12px; width: 100%; touch-action: none; background: #f0f9ff; margin-top:10px;"></canvas>
+                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600;" onclick="limpiarFirmaSupervisor()">Borrar Firma Supervisor</button>
+                </div>
                 
+                <!-- FIRMA CONDUCTOR -->
                 <div style="margin-top: 30px;">
                     <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">FIRMA CONDUCTOR</label>
                     <canvas id="canvasFirma" width="400" height="200" style="border: 2px dashed #cbd5e1; border-radius: 12px; width: 100%; touch-action: none; background: #f8fafc; margin-top:10px;"></canvas>
-                    <button class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600;" onclick="limpiarFirma()">Borrar Firma</button>
+                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600;" onclick="limpiarFirma()">Borrar Firma Conductor</button>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="cerrarModalDespacho()">Cancelar</button>
-                <button class="btn-confirm" id="btnConfirmarDespacho" onclick="ejecutarDespacho()">Confirmar Despacho 🚀</button>
+                <button type="button" class="btn-cancel" onclick="cerrarModalDespacho()">Cancelar</button>
+                <button type="button" class="btn-confirm" id="btnConfirmarDespacho" onclick="ejecutarDespacho()">Confirmar Despacho 🚀</button>
             </div>
         </div>
     </div>
@@ -3162,64 +3170,89 @@
         }
 
         function tomarFotoEvidencia() {
-            const video = document.getElementById('videoEvidencia');
-            const canvas = document.getElementById('canvasEvidencia');
-            
-            const MAX_WIDTH = 800;
-            let scaleSize = 1;
-            if (video.videoWidth > MAX_WIDTH) scaleSize = MAX_WIDTH / video.videoWidth;
-            
-            canvas.width = video.videoWidth * scaleSize;
-            canvas.height = video.videoHeight * scaleSize;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            fotoComprimidaBase64 = canvas.toDataURL('image/jpeg', 0.5);
-            
-            if (streamEvidencia) {
-                streamEvidencia.getTracks().forEach(track => track.stop());
-                streamEvidencia = null;
+            try {
+                const video = document.getElementById('videoEvidencia');
+                const canvas = document.getElementById('canvasEvidencia');
+                
+                const MAX_WIDTH = 800;
+                let scaleSize = 1;
+                if (video.videoWidth > MAX_WIDTH) scaleSize = MAX_WIDTH / video.videoWidth;
+                
+                canvas.width = video.videoWidth * scaleSize;
+                canvas.height = video.videoHeight * scaleSize;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                fotoComprimidaBase64 = canvas.toDataURL('image/jpeg', 0.5);
+                
+                if (streamEvidencia) {
+                    try {
+                        streamEvidencia.getTracks().forEach(track => track.stop());
+                    } catch (e) { console.warn("Error deteniendo el stream", e); }
+                    streamEvidencia = null;
+                }
+                
+                document.getElementById('camara-evidencia-container').style.display = 'none';
+                document.getElementById('previewFoto').src = fotoComprimidaBase64;
+                document.getElementById('preview-evidencia-container').style.display = 'flex';
+            } catch (error) {
+                console.error("Error capturando la foto:", error);
+                alert("Ocurrió un error al capturar la foto. Intenta nuevamente.");
             }
-            
-            document.getElementById('camara-evidencia-container').style.display = 'none';
-            document.getElementById('previewFoto').src = fotoComprimidaBase64;
-            document.getElementById('preview-evidencia-container').style.display = 'flex';
         }
 
+        
         function reiniciarFotoEvidencia() { fotoComprimidaBase64 = null; iniciarCamaraEvidencia(); }
 
-        const canvasFirma = document.getElementById('canvasFirma');
-        const ctxFirma = canvasFirma.getContext('2d');
-        let isDrawing = false;
+        // ======================= CONFIGURACIÓN FIRMAS =======================
+        function setupCanvasSignature(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            let isDrawing = false;
 
-        function getMousePos(canvas, evt) {
-            const rect = canvas.getBoundingClientRect();
-            let clientX, clientY;
-            if (evt.touches) { clientX = evt.touches[0].clientX; clientY = evt.touches[0].clientY; } 
-            else { clientX = evt.clientX; clientY = evt.clientY; }
-            return {
-                x: (clientX - rect.left) / (rect.right - rect.left) * canvas.width,
-                y: (clientY - rect.top) / (rect.bottom - rect.top) * canvas.height
-            };
+            function getMousePos(canvas, evt) {
+                const rect = canvas.getBoundingClientRect();
+                let clientX, clientY;
+                if (evt.touches && evt.touches.length > 0) { 
+                    clientX = evt.touches[0].clientX; 
+                    clientY = evt.touches[0].clientY; 
+                } else { 
+                    clientX = evt.clientX; 
+                    clientY = evt.clientY; 
+                }
+                return {
+                    x: (clientX - rect.left) / (rect.right - rect.left) * canvas.width,
+                    y: (clientY - rect.top) / (rect.bottom - rect.top) * canvas.height
+                };
+            }
+
+            function startDrawing(e) { isDrawing = true; const pos = getMousePos(canvas, e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+            function draw(e) { if (!isDrawing) return; const pos = getMousePos(canvas, e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
+            function stopDrawing() { isDrawing = false; }
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('touchstart', function(e) { e.preventDefault(); startDrawing(e); }, { passive: false });
+            canvas.addEventListener('touchmove', function(e) { e.preventDefault(); draw(e); }, { passive: false });
+            canvas.addEventListener('touchend', function(e) { e.preventDefault(); stopDrawing(); }, { passive: false });
+            
+            return { canvas, ctx };
         }
 
-        function startDrawing(e) { isDrawing = true; const pos = getMousePos(canvasFirma, e); ctxFirma.beginPath(); ctxFirma.moveTo(pos.x, pos.y); }
-        function draw(e) { if (!isDrawing) return; const pos = getMousePos(canvasFirma, e); ctxFirma.lineTo(pos.x, pos.y); ctxFirma.stroke(); }
-        function stopDrawing(e) { isDrawing = false; }
+        const conductorSig = setupCanvasSignature('canvasFirma');
+        const supervisorSig = setupCanvasSignature('canvasFirmaSupervisor');
 
-        canvasFirma.addEventListener('mousedown', startDrawing);
-        canvasFirma.addEventListener('mousemove', draw);
-        canvasFirma.addEventListener('mouseup', stopDrawing);
-        canvasFirma.addEventListener('mouseout', stopDrawing);
-        canvasFirma.addEventListener('touchstart', function(e) { e.preventDefault(); startDrawing(e); }, { passive: false });
-        canvasFirma.addEventListener('touchmove', function(e) { e.preventDefault(); draw(e); }, { passive: false });
-        canvasFirma.addEventListener('touchend', function(e) { e.preventDefault(); stopDrawing(e); }, { passive: false });
-
-        function limpiarFirma() { ctxFirma.clearRect(0, 0, canvasFirma.width, canvasFirma.height); }
+        function limpiarFirma() { conductorSig.ctx.clearRect(0, 0, conductorSig.canvas.width, conductorSig.canvas.height); }
+        function limpiarFirmaSupervisor() { supervisorSig.ctx.clearRect(0, 0, supervisorSig.canvas.width, supervisorSig.canvas.height); }
 
         function cerrarModalDespacho() {
-            if (streamEvidencia) { streamEvidencia.getTracks().forEach(track => track.stop()); streamEvidencia = null; }
+            if (streamEvidencia) { 
+                try { streamEvidencia.getTracks().forEach(track => track.stop()); } catch(e){}
+                streamEvidencia = null; 
+            }
             document.getElementById('modalDespacho').style.display = 'none';
         }
 
@@ -3241,7 +3274,12 @@
             cargarVehiculos();
             
             limpiarFirma();
-            if (streamEvidencia) { streamEvidencia.getTracks().forEach(track => track.stop()); streamEvidencia = null; }
+            limpiarFirmaSupervisor();
+            
+            if (streamEvidencia) { 
+                try { streamEvidencia.getTracks().forEach(track => track.stop()); } catch(e){} 
+                streamEvidencia = null; 
+            }
             document.getElementById('btn-iniciar-camara-evidencia').style.display = 'block';
             document.getElementById('camara-evidencia-container').style.display = 'none';
             document.getElementById('preview-evidencia-container').style.display = 'none';
@@ -3255,9 +3293,18 @@
             if (!vehiculoId) return alert("⚠️ Selecciona un vehículo para poder despachar.");
             
             let firmaBase64 = null;
+            let firmaSupervisorBase64 = null;
+            
             const blank = document.createElement('canvas');
-            blank.width = canvasFirma.width; blank.height = canvasFirma.height;
-            if(canvasFirma.toDataURL() !== blank.toDataURL()) firmaBase64 = canvasFirma.toDataURL('image/png');
+            blank.width = 400; blank.height = 200;
+            const blankURL = blank.toDataURL();
+            
+            if(conductorSig.canvas.toDataURL() !== blankURL) firmaBase64 = conductorSig.canvas.toDataURL('image/png');
+            if(supervisorSig.canvas.toDataURL() !== blankURL) firmaSupervisorBase64 = supervisorSig.canvas.toDataURL('image/png');
+
+            if (!firmaBase64 || !firmaSupervisorBase64) {
+                return alert("⚠️ Es obligatorio recolectar tanto la firma del Conductor como la del Supervisor de Despacho antes de enviar.");
+            }
 
             const btn = document.getElementById('btnConfirmarDespacho');
             btn.disabled = true; btn.textContent = 'Despachando...';
@@ -3265,7 +3312,13 @@
             fetch('/bodegas/despachar_orden', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ numero_orden: ordenParaDespacho, id_vehiculo: vehiculoId, firma: firmaBase64, foto: fotoComprimidaBase64 })
+                body: JSON.stringify({ 
+                    numero_orden: ordenParaDespacho, 
+                    id_vehiculo: vehiculoId, 
+                    firma: firmaBase64, 
+                    firma_supervisor: firmaSupervisorBase64,
+                    foto: fotoComprimidaBase64 
+                })
             })
                 .then(r => r.json())
                 .then(d => {
@@ -3279,7 +3332,7 @@
                 .catch(e => alert("❌ Error de conexión."))
                 .finally(() => { btn.disabled = false; btn.textContent = 'Confirmar Despacho 🚀'; });
         }
-
+        
         document.addEventListener("DOMContentLoaded", function () {
             if (sessionStorage.getItem('reabrirAlistamiento') === 'true') {
                 if (typeof openAlistamientoModal === "function") openAlistamientoModal();

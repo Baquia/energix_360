@@ -490,6 +490,28 @@
         </div>
     </div>
 
+    <!-- Modal Sellar Orden (Firma Verificador) -->
+    <div id="modal-sellar-orden" class="modal-wrap" style="z-index: 120;">
+        <div class="verify-sheet" style="max-width: 400px;">
+            <div style="font-size: 3.5rem; margin-bottom: 10px;">✍️</div>
+            <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">Firma de Auditoría</h3>
+            <p style="color:#475569; line-height:1.5; font-size:0.95rem; margin-bottom:15px;">
+                La orden <b id="so-orden" style="color:var(--primary);"></b> ha sido verificada completamente. Por favor, registra tu firma para sellar el acta.
+            </p>
+            
+            <div style="margin-top: 10px; text-align: left;">
+                <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">TU FIRMA (VERIFICADOR)</label>
+                <canvas id="canvasFirmaVerificador" width="350" height="200" style="border: 2px dashed #cbd5e1; border-radius: 12px; width: 100%; touch-action: none; background: #f8fafc; margin-top:5px;"></canvas>
+                <button type="button" style="background:transparent; border:none; color:#ef4444; font-weight:700; cursor:pointer; margin-top:5px; width:100%; text-align:right;" onclick="limpiarFirmaVerificador()">Borrar firma</button>
+            </div>
+
+            <div class="verify-btns">
+                <button type="button" class="btn-v-cancel" onclick="cerrarSellarOrden()">Más tarde</button>
+                <button type="button" class="btn-v-confirm" onclick="ejecutarSellarOrden()">GUARDAR FIRMA</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let ordenActual = null, listaItems = [], itemActivo = null;
         let lastScanTime = 0;
@@ -928,7 +950,8 @@
                 <div style="font-size:5rem; margin-bottom:10px;">✅</div>
                 <h3 style="color:#10b981; font-size:1.5rem; margin:0 0 10px 0;">¡Orden Auditada!</h3>
                 <p style="color:#64748b; font-size:1.1rem; font-weight:500;">Todos los ítems han sido verificados.</p>
-                <button onclick="cargarOrdenes()" style="padding:18px 30px; background:var(--primary); color:white; border:none; border-radius:12px; margin-top:20px; font-weight:900; font-size:1.1rem; width:100%; box-shadow: 0 4px 10px rgba(67, 56, 202, 0.3);">Volver a Mis Órdenes</button>
+                <button type="button" onclick="abrirSellarOrden()" style="padding:18px 30px; background:var(--secondary); color:white; border:none; border-radius:12px; margin-top:10px; font-weight:900; font-size:1.1rem; width:100%; cursor:pointer; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);">✍️ Firmar y Sellar Orden</button>
+                <button type="button" onclick="cargarOrdenes()" style="padding:15px 30px; background:#f1f5f9; color:#475569; border:none; border-radius:12px; margin-top:15px; font-weight:800; font-size:1rem; width:100%; cursor:pointer;">Volver a Mis Órdenes</button>
             </div>`;
                 document.getElementById('header-progress-bar').style.width = '100%';
                 detenerCamaraPrincipal();
@@ -1229,6 +1252,86 @@
                 btn.textContent = 'SELLAR';
                 btn.disabled = false;
             });
+        }
+
+        // =====================================
+        // FIRMA DEL VERIFICADOR Y CIERRE DE ORDEN
+        // =====================================
+        const canvasFirmaVerificador = document.getElementById('canvasFirmaVerificador');
+        const ctxFirmaVerificador = canvasFirmaVerificador ? canvasFirmaVerificador.getContext('2d') : null;
+        let isDrawingVerificador = false;
+
+        function getMousePosVerif(canvas, evt) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            if (evt.touches && evt.touches.length > 0) { 
+                clientX = evt.touches[0].clientX; 
+                clientY = evt.touches[0].clientY; 
+            } else { 
+                clientX = evt.clientX; 
+                clientY = evt.clientY; 
+            }
+            return {
+                x: (clientX - rect.left) / (rect.right - rect.left) * canvas.width,
+                y: (clientY - rect.top) / (rect.bottom - rect.top) * canvas.height
+            };
+        }
+
+        function startDrawingVerif(e) { isDrawingVerificador = true; const pos = getMousePosVerif(canvasFirmaVerificador, e); ctxFirmaVerificador.beginPath(); ctxFirmaVerificador.moveTo(pos.x, pos.y); }
+        function drawVerif(e) { if (!isDrawingVerificador) return; const pos = getMousePosVerif(canvasFirmaVerificador, e); ctxFirmaVerificador.lineTo(pos.x, pos.y); ctxFirmaVerificador.stroke(); }
+        function stopDrawingVerif() { isDrawingVerificador = false; }
+
+        if (canvasFirmaVerificador) {
+            canvasFirmaVerificador.addEventListener('mousedown', startDrawingVerif);
+            canvasFirmaVerificador.addEventListener('mousemove', drawVerif);
+            canvasFirmaVerificador.addEventListener('mouseup', stopDrawingVerif);
+            canvasFirmaVerificador.addEventListener('mouseout', stopDrawingVerif);
+            canvasFirmaVerificador.addEventListener('touchstart', function(e) { e.preventDefault(); startDrawingVerif(e); }, { passive: false });
+            canvasFirmaVerificador.addEventListener('touchmove', function(e) { e.preventDefault(); drawVerif(e); }, { passive: false });
+            canvasFirmaVerificador.addEventListener('touchend', function(e) { e.preventDefault(); stopDrawingVerif(); }, { passive: false });
+        }
+
+        function limpiarFirmaVerificador() { if(ctxFirmaVerificador) ctxFirmaVerificador.clearRect(0, 0, canvasFirmaVerificador.width, canvasFirmaVerificador.height); }
+
+        function abrirSellarOrden() {
+            document.getElementById('so-orden').textContent = ordenActual;
+            limpiarFirmaVerificador();
+            document.getElementById('modal-sellar-orden').style.display = 'flex';
+        }
+
+        function cerrarSellarOrden() {
+            document.getElementById('modal-sellar-orden').style.display = 'none';
+        }
+
+        function ejecutarSellarOrden() {
+            const blank = document.createElement('canvas');
+            blank.width = canvasFirmaVerificador.width; blank.height = canvasFirmaVerificador.height;
+            
+            if(canvasFirmaVerificador.toDataURL() === blank.toDataURL()) {
+                return alert("⚠️ Debes registrar tu firma antes de sellar la orden.");
+            }
+            
+            const firmaBase64 = canvasFirmaVerificador.toDataURL('image/png');
+            const btn = document.querySelector('#modal-sellar-orden .btn-v-confirm');
+            btn.textContent = 'Guardando...'; btn.disabled = true;
+
+            fetch('/api/verificador/sellar_orden', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orden: ordenActual, firma_verificador: firmaBase64 })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if(d.status === 'ok') {
+                    alert("✅ Orden sellada correctamente. Firma registrada para el Manifiesto.");
+                    cerrarSellarOrden();
+                    cargarOrdenes();
+                } else {
+                    alert("❌ Error: " + d.error);
+                }
+            })
+            .catch(e => alert("Error de conexión al guardar la firma."))
+            .finally(() => { btn.textContent = 'GUARDAR FIRMA'; btn.disabled = false; });
         }
     </script>
 </body>

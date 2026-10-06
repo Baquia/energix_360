@@ -176,3 +176,52 @@ def verificador_ping():
         return jsonify({'status': 'ok'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
+    
+# ==============================================================================
+# CIERRE Y SELLO DE AUDITORÍA DE LA ORDEN
+# ==============================================================================
+@bp_verificador_bodegas.route('/api/verificador/sellar_orden', methods=['POST'])
+@csrf.exempt
+def sellar_orden():
+    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
+    
+    d = request.json
+    orden = d.get('orden')
+    firma_verificador = d.get('firma_verificador')
+    empresa_id = session.get('empresa_id')
+    
+    if not orden or not firma_verificador:
+        return jsonify({'error': 'Datos incompletos para sellar la orden'}), 400
+
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        
+        # --- HEARTBEAT VERIFICADOR ---
+        cur.execute("""
+            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+            VALUES (%s, NOW())
+            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+        """, (session.get('usuario_id'),))
+        
+        # Verificamos si ya existe el acta (creada previamente o por otro proceso)
+        cur.execute("SELECT id FROM actas_despacho_flotacarga WHERE numero_orden = %s AND id_empresa = %s", (orden, empresa_id))
+        acta_existente = cur.fetchone()
+        
+        if acta_existente:
+            cur.execute("""
+                UPDATE actas_despacho_flotacarga 
+                SET firma_verificador = %s 
+                WHERE numero_orden = %s AND id_empresa = %s
+            """, (firma_verificador, orden, empresa_id))
+        else:
+            cur.execute("""
+                INSERT INTO actas_despacho_flotacarga (id_empresa, numero_orden, firma_verificador)
+                VALUES (%s, %s, %s)
+            """, (empresa_id, orden, firma_verificador))
+            
+        mysql.connection.commit()
+        cur.close()
+        
+        return jsonify({'status': 'ok', 'message': 'Auditoría sellada y firma guardada con éxito.'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
