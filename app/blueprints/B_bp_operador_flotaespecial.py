@@ -1,4 +1,6 @@
+# MÓDULO: TRANSPORTE_ESPECIAL | SUBMÓDULO: OPERADOR_CAMPO
 # app/blueprints/B_bp_operador_flotaespecial.py
+
 import math
 import os
 import base64
@@ -70,6 +72,11 @@ def _guardar_testigo_base64(base64_data, subcarpeta, prefix):
 @bp_operador_flotaespecial.route('/dashboard_operador_especial')
 @login_required_custom
 def dashboard_operador_especial():
+    modulos_activos = session.get('modulos_activos', [])
+    if 'flotaespecial' not in modulos_activos:
+        flash('Acceso denegado: Tu empresa no tiene contratado el módulo de Transporte Especial.', 'danger')
+        return redirect(url_for('index'))
+
     estatus_vehiculo = 'No logueado'
     placa = session.get('placa_prelogueada_especial')
     empresa_id = session.get('empresa_id')

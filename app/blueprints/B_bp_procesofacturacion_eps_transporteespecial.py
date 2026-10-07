@@ -1,3 +1,4 @@
+# MÓDULO: TRANSPORTE_ESPECIAL | SUBMÓDULO: EPS_FACTURACION (OPCIONAL P&P)
 # app/blueprints/B_bp_procesofacturacion_eps_transporteespecial.py
 import os
 import json
@@ -8,7 +9,7 @@ import hashlib
 from datetime import datetime
 from flask import Blueprint, render_template, session, redirect, url_for, request, flash, send_file, Response, current_app, jsonify
 from app import mysql
-from app.utils import login_required_custom
+from app.utils import login_required_custom, submodulo_required
 from functools import wraps
 import MySQLdb.cursors
 import pytz
@@ -76,6 +77,7 @@ def asegurar_tablas_facturacion(cur):
 @bp_procesofacturacion_eps.route('/', methods=['GET'])
 @login_required_custom
 @controlador_flotaespecial_required
+@submodulo_required('eps_facturacion')
 def index_facturacion():
     empresa_id = session.get('empresa_id')
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -113,6 +115,7 @@ def index_facturacion():
 @bp_procesofacturacion_eps.route('/consolidar_lote', methods=['POST'])
 @login_required_custom
 @controlador_flotaespecial_required
+@submodulo_required('eps_facturacion')
 def consolidar_lote():
     empresa_id = session.get('empresa_id')
     id_eps = request.form.get('id_eps_cliente')
@@ -180,6 +183,7 @@ def consolidar_lote():
 @bp_procesofacturacion_eps.route('/descargar_rips/<int:lote_id>', methods=['POST'])
 @login_required_custom
 @controlador_flotaespecial_required
+@submodulo_required('eps_facturacion')
 def descargar_rips(lote_id):
     empresa_id = session.get('empresa_id')
     num_factura = request.form.get('numero_factura', f"FEV-{lote_id}")
@@ -295,6 +299,7 @@ def descargar_rips(lote_id):
 @bp_procesofacturacion_eps.route('/api/obtener_pacientes_lote/<int:lote_id>', methods=['GET'])
 @login_required_custom
 @controlador_flotaespecial_required
+@submodulo_required('eps_facturacion')
 def api_obtener_pacientes_lote(lote_id):
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
@@ -316,6 +321,7 @@ def api_obtener_pacientes_lote(lote_id):
 @bp_procesofacturacion_eps.route('/registrar_cuv', methods=['POST'])
 @login_required_custom
 @controlador_flotaespecial_required
+@submodulo_required('eps_facturacion')
 def registrar_cuv():
     empresa_id = session.get('empresa_id')
     lote_id = request.form.get('lote_id')
@@ -344,6 +350,7 @@ def registrar_cuv():
 @bp_procesofacturacion_eps.route('/exportar_csv/<int:lote_id>', methods=['GET'])
 @login_required_custom
 @controlador_flotaespecial_required
+@submodulo_required('eps_facturacion')
 def exportar_csv(lote_id):
     empresa_id = session.get('empresa_id')
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -396,6 +403,7 @@ def exportar_csv(lote_id):
 @bp_procesofacturacion_eps.route('/auditoria', methods=['GET', 'POST'])
 @login_required_custom
 @controlador_flotaespecial_required
+@submodulo_required('eps_facturacion')
 def gestion_traslados_auditoria():
     empresa_id = session.get('empresa_id')
     
@@ -511,6 +519,7 @@ def gestion_traslados_auditoria():
 @bp_procesofacturacion_eps.route('/auditados', methods=['GET'])
 @login_required_custom
 @controlador_flotaespecial_required
+@submodulo_required('eps_facturacion')
 def gestion_traslados_auditados():
     empresa_id = session.get('empresa_id')
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)

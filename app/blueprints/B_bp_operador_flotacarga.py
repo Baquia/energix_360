@@ -1,7 +1,10 @@
+# MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: OPERADOR_FLOTA | CONDICIÓN: OPCIONAL
 # app/blueprints/B_bp_operador_flotacarga.py
 import math
+import time
+from functools import wraps
 from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash
-from app import mysql, csrf
+from app import mysql
 from app.utils import login_required_custom
 from datetime import datetime
 import MySQLdb.cursors
@@ -9,27 +12,48 @@ import MySQLdb.cursors
 bp_flotacarga = Blueprint('flotacarga', __name__)
 
 # ==============================================================================
+# MIDDLEWARE DE JERARQUÍA Y PERMISOS
+# ==============================================================================
+def operador_flota_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        perfil = str(session.get('perfil', '')).strip().lower()
+        if perfil not in ['operador_flotacarga', 'operador_flotaespecial']:
+            if request.is_json:
+                return jsonify(success=False, message="Acceso denegado: Perfil de Operador requerido."), 403
+            flash('Acceso denegado: Se requiere perfil de Operador de Flota.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ==============================================================================
 # 1. RUTA: DASHBOARD PRINCIPAL DEL OPERADOR
 # ==============================================================================
 @bp_flotacarga.route('/dashboard_operador')
 @login_required_custom
+@operador_flota_required
 def dashboard_operador():
-    return render_template('B_modulo_operador_flotacarga.html',
-                           nit=session.get('nit'),
-                           empresa=session.get('empresa'),
-                           nombre=session.get('nombre'))
-
+    return render_template(
+        'B_modulo_operador_flotacarga.html',
+        nit=session.get('nit'),
+        empresa=session.get('empresa'),
+        nombre=session.get('nombre')
+    )
 
 # ==============================================================================
 # 2. LÓGICA DE PRELOGIN Y VIAJES (Enlace con el Vehículo)
 # ==============================================================================
 @bp_flotacarga.route('/dashboard/flota/prelogin', methods=['POST'])
 @login_required_custom
+@operador_flota_required
 def prelogin_flota():
-    # A. CANDADO COMERCIAL: Verificar que la empresa pagó por este módulo
-    modulos_activos = session.get('modulos_activos', [])
-    if 'flota' not in modulos_activos:
-        return jsonify(success=False, message="Acceso denegado: Tu empresa no tiene contratado el módulo de Flota."), 403
+    # A. CANDADO COMERCIAL: Verificar que la empresa tiene activo el submódulo
+    autorizados = session.get('submodulos_activos', [])
+    if not autorizados:
+        autorizados = session.get('modulos_activos', [])
+        
+    if 'operador_flota' not in autorizados and 'flota' not in autorizados:
+        return jsonify(success=False, message="Acceso denegado: Tu empresa no tiene activo el submódulo de Operador en Ruta."), 403
 
     # B. CAPTURA DE DATOS
     data = request.get_json(silent=True) or {}
@@ -46,24 +70,18 @@ def prelogin_flota():
 
     # C. VERIFICACIÓN EN BASE DE DATOS
     cur = mysql.connection.cursor()
-    cur.execute("SELECT id, empresa FROM vehiculos WHERE placa = %s LIMIT 1", (placa,))
+    cur.execute("SELECT id, empresa FROM vehiculos WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, empresa_id))
     v = cur.fetchone()
 
     if not v:
         cur.close()
-        return jsonify(success=False, message="Vehículo no encontrado en el sistema."), 404
+        return jsonify(success=False, message="Vehículo no encontrado o no pertenece a su empresa."), 404
     
-    v_empresa = v.get("empresa") if isinstance(v, dict) else v[1]
     v_id = v.get("id") if isinstance(v, dict) else v[0]
 
-    # D. CANDADO MULTIEMPRESA: Evitar que modifiquen camiones de otras empresas
-    if str(v_empresa).strip() != str(empresa).strip():
-        cur.close()
-        return jsonify(success=False, message="Este vehículo no pertenece a su empresa."), 403
-
-    # E. ACTUALIZACIÓN DE ESTADO Y REGISTRO DE SESIÓN DE OPERADOR
+    # D. ACTUALIZACIÓN DE ESTADO Y REGISTRO DE SESIÓN DE OPERADOR
     try:
-        cur.execute("UPDATE vehiculos SET estatus='Prelogueado' WHERE id=%s", (v_id,))
+        cur.execute("UPDATE vehiculos SET estatus='Prelogueado' WHERE id=%s AND id_empresa=%s", (v_id, empresa_id))
         
         # Guardar en el historial de sesiones el logueo para el tablero del controlador
         cur.execute("""
@@ -74,14 +92,12 @@ def prelogin_flota():
         mysql.connection.commit()
     except Exception as e:
         mysql.connection.rollback()
-        cur.close()
         return jsonify(success=False, message=f"Error al registrar sesión: {str(e)}"), 500
     finally:
         cur.close()
 
     session["placa_prelogueada"] = placa
     
-    # F. ÉXITO -> Redirección al Enrutador Maestro Universal de energix_360.py
     return jsonify(
         success=True, 
         message="Vehículo prelogueado correctamente.", 
@@ -89,8 +105,8 @@ def prelogin_flota():
     )
 
 @bp_flotacarga.route('/api/viaje/iniciar', methods=['POST'])
-@csrf.exempt
 @login_required_custom
+@operador_flota_required
 def iniciar_viaje():
     empresa_id = session.get('empresa_id')
     usuario_id = session.get('usuario_id')
@@ -101,7 +117,7 @@ def iniciar_viaje():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        # Aseguramos la existencia de la tabla viajes_flotacarga
+        # Aseguramos la existencia de la tabla
         cur.execute("""
             CREATE TABLE IF NOT EXISTS viajes_flotacarga (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -116,11 +132,12 @@ def iniciar_viaje():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
         
-        # Generar consecutivo VIAJE-PLACA-001 (por año en curso)
+        # BLOQUEO PESIMISTA (FOR UPDATE) para prevenir Race Conditions en asignación de consecutivos
         cur.execute("""
             SELECT COUNT(*) as total 
             FROM viajes_flotacarga 
             WHERE id_empresa = %s AND placa_vehiculo = %s AND YEAR(fecha_hora_inicio) = YEAR(NOW())
+            FOR UPDATE
         """, (empresa_id, placa))
         resultado = cur.fetchone()
         contador = (resultado['total'] if resultado else 0) + 1
@@ -149,10 +166,12 @@ def iniciar_viaje():
         cur.close()
 
 @bp_flotacarga.route('/api/viaje/finalizar', methods=['POST'])
-@csrf.exempt
 @login_required_custom
+@operador_flota_required
 def finalizar_viaje():
     id_viaje = session.get('id_viaje')
+    empresa_id = session.get('empresa_id')
+    
     if not id_viaje:
         return jsonify({"status": "error", "message": "No hay un viaje activo para finalizar."}), 400
 
@@ -162,10 +181,10 @@ def finalizar_viaje():
             UPDATE viajes_flotacarga 
             SET fecha_hora_fin = NOW(), estado = 'Finalizado' 
             WHERE id = %s AND id_empresa = %s
-        """, (id_viaje, session.get('empresa_id')))
+        """, (id_viaje, empresa_id))
         mysql.connection.commit()
 
-        # Limpiamos los flags de viaje activo de la sesión (pero conservamos placa_prelogueada)
+        # Limpiamos los flags de viaje activo de la sesión
         session.pop('viaje_activo', None)
         session.pop('consecutivo_viaje', None)
         session.pop('id_viaje', None)
@@ -177,10 +196,9 @@ def finalizar_viaje():
     finally:
         cur.close()
 
-
 @bp_flotacarga.route('/api/viaje/recuperar', methods=['POST'])
-@csrf.exempt
 @login_required_custom
+@operador_flota_required
 def recuperar_viaje():
     """Recupera la sesión del servidor si el dispositivo perdió conexión pero tiene viaje activo"""
     datos = request.get_json(silent=True) or {}
@@ -193,7 +211,6 @@ def recuperar_viaje():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        # 1. Buscar si hay un viaje activo para este operador, placa y empresa
         cur.execute("""
             SELECT id, consecutivo_viaje 
             FROM viajes_flotacarga 
@@ -203,16 +220,13 @@ def recuperar_viaje():
         viaje = cur.fetchone()
 
         if viaje:
-            # 2. Reconstruir las variables de sesión caídas
             session['placa_prelogueada'] = placa
             session['viaje_activo'] = True
             session['consecutivo_viaje'] = viaje['consecutivo_viaje']
             session['id_viaje'] = viaje['id']
 
-            # 3. Restablecer el estatus del vehículo a Logueado en caso de que un CRON lo haya tumbado
             cur.execute("UPDATE vehiculos SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
             
-            # 4. Registrar la reconexión en el historial de sesiones
             cur.execute("""
                 INSERT INTO historial_sesiones_flota (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion)
                 VALUES (%s, %s, %s, NOW(), 'ACTIVA')
@@ -228,38 +242,46 @@ def recuperar_viaje():
     finally:
         cur.close()
 
-
 # ==============================================================================
-# 3. RUTAS DE SESIÓN EN VIVO (HEARTBEAT Y LOGOUT)
+# 3. RUTAS DE SESIÓN EN VIVO Y HEARTBEAT CON MANEJO DE DEADLOCKS (BACKOFF)
 # ==============================================================================
 @bp_flotacarga.route('/api/flota/heartbeat', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def heartbeat_flota():
     """Endpoint llamado por la PWA del operador para mantener su estado en línea"""
     if 'usuario_id' not in session:
         return jsonify({"status": "error", "message": "No autenticado"}), 401
         
-    try:
-        cur = mysql.connection.cursor()
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (session.get('usuario_id'),))
-        mysql.connection.commit()
-        cur.close()
-        return jsonify({"status": "success"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    usuario_id = session.get('usuario_id')
+    
+    # Manejo Silencioso de Deadlocks mediante Retry/Backoff (Máx 3 intentos)
+    for intento in range(3):
+        try:
+            cur = mysql.connection.cursor()
+            cur.execute("""
+                INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                VALUES (%s, NOW())
+                ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+            """, (usuario_id,))
+            mysql.connection.commit()
+            cur.close()
+            return jsonify({"status": "success"})
+        except Exception as e:
+            mysql.connection.rollback()
+            error_msg = str(e).lower()
+            if "deadlock" in error_msg or "lock wait timeout" in error_msg:
+                time.sleep(0.5)  # Backoff de 500ms
+                continue
+            return jsonify({"status": "error", "message": str(e)}), 500
+            
+    return jsonify({"status": "error", "message": "Fricción de base de datos persistente (Deadlock)."}), 500
 
 @bp_flotacarga.route('/api/flota/logout_manual', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def logout_manual_flota():
-    """Cierra la sesión operativa, marcando la hora exacta para el dashboard"""
     if 'usuario_id' not in session: 
         return jsonify({"status": "error"}), 401
     
-    # SEGURIDAD MODO QUIOSCO: Bloquear deslogueo si hay viaje activo
     if session.get('viaje_activo'):
         return jsonify({"status": "error", "message": "No puedes cerrar sesión mientras el viaje está en curso. Finaliza el viaje primero."}), 403
         
@@ -269,8 +291,6 @@ def logout_manual_flota():
     
     try:
         cur = mysql.connection.cursor()
-        
-        # 1. Registrar hora de cierre manual
         cur.execute("""
             UPDATE historial_sesiones_flota 
             SET fecha_logout_manual = NOW(), estado_sesion = 'FINALIZADA'
@@ -278,26 +298,22 @@ def logout_manual_flota():
             ORDER BY id DESC LIMIT 1
         """, (usuario_id, empresa_id))
         
-        # 2. Liberar el vehículo
         if placa:
             cur.execute("UPDATE vehiculos SET estatus='No logueado' WHERE placa=%s AND id_empresa=%s", (placa, empresa_id))
             
         mysql.connection.commit()
         cur.close()
         
-        # Limpiar variable de sesión de la flota
         session.pop('placa_prelogueada', None)
-        
         return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
 
 # ==============================================================================
 # 4. MOTOR DE RASTREO, GEOCERCA Y RUTAS HISTÓRICAS
 # ==============================================================================
 @bp_flotacarga.route('/api/actualizar_ubicacion', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def actualizar_ubicacion():
     if 'usuario_id' not in session or 'placa_prelogueada' not in session:
         return jsonify({"status": "error", "message": "Sesión inválida o vehículo no logueado"}), 401
@@ -306,7 +322,6 @@ def actualizar_ubicacion():
     empresa_id = session.get('empresa_id')
     datos = request.get_json(silent=True) or {}
     
-    # Soporte para sincronización offline (array de ubicaciones) o punto individual
     ubicaciones = datos.get('ubicaciones', [])
     if not ubicaciones:
         latitud = datos.get('lat')
@@ -317,42 +332,48 @@ def actualizar_ubicacion():
     if not ubicaciones:
         return jsonify({"status": "error", "message": "Faltan coordenadas"}), 400
 
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    try:
-        # 1. Actualizar última ubicación en tabla vehículos (usando el punto más reciente)
-        ultima_lat = ubicaciones[-1]['lat']
-        ultima_lng = ubicaciones[-1]['lng']
-        cur.execute("UPDATE vehiculos SET ultima_latitud = %s, ultima_longitud = %s WHERE placa = %s AND id_empresa = %s", (ultima_lat, ultima_lng, placa, empresa_id))
-        
-        # 2. Guardar el recorrido en el historial de rutas PREVINIENDO DUPLICADOS
-        for ubi in ubicaciones:
-            fecha_hora = ubi.get('fecha_hora', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    # Manejo Silencioso de Deadlocks (Retry/Backoff) para inserciones masivas de GPS
+    for intento in range(3):
+        try:
+            cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
             
-            cur.execute("""
-                SELECT id FROM vehiculos_historial_rutas 
-                WHERE id_empresa = %s AND placa = %s AND fecha_hora = %s
-                LIMIT 1
-            """, (empresa_id, placa, fecha_hora))
+            ultima_lat = ubicaciones[-1]['lat']
+            ultima_lng = ubicaciones[-1]['lng']
+            cur.execute("UPDATE vehiculos SET ultima_latitud = %s, ultima_longitud = %s WHERE placa = %s AND id_empresa = %s", (ultima_lat, ultima_lng, placa, empresa_id))
             
-            if not cur.fetchone():
+            for ubi in ubicaciones:
+                fecha_hora = ubi.get('fecha_hora', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                
                 cur.execute("""
-                    INSERT INTO vehiculos_historial_rutas (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro)
-                    VALUES (%s, %s, %s, %s, %s, 'Automático')
-                """, (empresa_id, placa, ubi['lat'], ubi['lng'], fecha_hora))
+                    SELECT id FROM vehiculos_historial_rutas 
+                    WHERE id_empresa = %s AND placa = %s AND fecha_hora = %s
+                    LIMIT 1
+                """, (empresa_id, placa, fecha_hora))
+                
+                if not cur.fetchone():
+                    cur.execute("""
+                        INSERT INTO vehiculos_historial_rutas (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro)
+                        VALUES (%s, %s, %s, %s, %s, 'Automático')
+                    """, (empresa_id, placa, ubi['lat'], ubi['lng'], fecha_hora))
 
-        mysql.connection.commit()
-        return jsonify({"status": "success"}), 200
-    except Exception as e:
-        mysql.connection.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        cur.close()
+            mysql.connection.commit()
+            cur.close()
+            return jsonify({"status": "success"}), 200
+            
+        except Exception as e:
+            mysql.connection.rollback()
+            error_msg = str(e).lower()
+            if "deadlock" in error_msg or "lock wait timeout" in error_msg:
+                time.sleep(0.5)
+                continue
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+    return jsonify({"status": "error", "message": "Deadlock persistente en actualización GPS"}), 500
 
 
 @bp_flotacarga.route('/api/registrar_parada', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def registrar_parada():
-    """Endpoint para clasificar e insertar paradas manuales o automáticas, compatible con offline sync."""
     if 'usuario_id' not in session or 'placa_prelogueada' not in session:
         return jsonify({"status": "error", "message": "Sesión inválida"}), 401
         
@@ -385,10 +406,8 @@ def registrar_parada():
             existente = cur.fetchone()
             
             if existente:
-                # Si ya existe, devolvemos el ID real para que el celular lo saque de su cola
                 ids_insertados.append({"temp_id": p.get('temp_id'), "db_id": existente['id']})
             else:
-                # 1. Guardar en el historial analítico de paradas
                 cur.execute("""
                     INSERT INTO historial_paradas_flota 
                     (id_empresa, placa, usuario_id, fecha, hora_inicio, hora_fin, latitud, longitud, tipo_actividad, nombre_punto, origen_registro)
@@ -405,7 +424,6 @@ def registrar_parada():
                 nuevo_id = cur.lastrowid
                 ids_insertados.append({"temp_id": p.get('temp_id'), "db_id": nuevo_id})
                 
-                # 2. Insertar también un punto destacado en el historial de rutas
                 fecha_hora = f"{fecha_p} {hora_p}"
                 cur.execute("""
                     INSERT INTO vehiculos_historial_rutas (id_empresa, placa, latitud, longitud, fecha_hora, tipo_registro, nombre_punto)
@@ -424,11 +442,9 @@ def registrar_parada():
     finally:
         cur.close()
 
-
 @bp_flotacarga.route('/api/actualizar_fin_parada', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def actualizar_fin_parada():
-    """Endpoint para cerrar una parada (hora_fin) cuando el vehículo reanuda la marcha."""
     if 'usuario_id' not in session: 
         return jsonify({"status": "error"}), 401
     
@@ -439,7 +455,6 @@ def actualizar_fin_parada():
         
     cur = mysql.connection.cursor()
     try:
-        # UPDATE es idempotente, si se ejecuta dos veces no genera duplicados.
         for p in paradas:
             if p.get('id'):
                 cur.execute("""
@@ -455,7 +470,6 @@ def actualizar_fin_parada():
     finally:
         cur.close()
 
-
 def calcular_distancia(lat1, lon1, lat2, lon2):
     R = 6371000 
     phi1 = math.radians(float(lat1))
@@ -466,8 +480,7 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
 
-
-@bp_flotacarga.route('/cron/deslogueo_geocerca', methods=['GET', 'POST'])
+@bp_flotacarga.route('/cron/deslogueo_geocerca', methods=['GET'])
 def cron_deslogueo_geocerca():
     token = request.args.get('token')
     if token != 'BQA_CRON_2026': return jsonify({"status": "error"}), 403

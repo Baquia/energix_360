@@ -1,4 +1,4 @@
-<!-- app/templates/B_modulo_operador_flotacarga.html -->
+<!-- MÓDULO: TRANSPORTE | SUBMÓDULO: OPERACIÓN EN RUTA | CONDICIÓN: OBLIGATORIO -->
 <!DOCTYPE html>
 <html lang="es">
 
@@ -10,6 +10,9 @@
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#015249">
+
+    <!-- Librería para el escáner QR -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
     <style>
         /* PALETA CORPORATIVA BQA-ONE */
@@ -78,6 +81,10 @@
         .btn-submit { background: var(--verde); color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; font-size: 15px; margin-top: 10px;}
         .timer-text { font-size: 12px; color: #ef4444; margin-top: 15px; font-weight: bold;}
 
+        /* Personalización Lector QR */
+        #qr-reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 15px; border: 2px solid var(--verde); }
+        #qr-reader__dashboard_section_csr span { color: var(--verde); font-weight: bold; }
+
         @media (max-width: 600px) {
             .header { flex-direction: column; align-items: flex-start; gap: 15px; }
             .brand-area, .user-info { width: 100%; }
@@ -104,7 +111,7 @@
         </div>
         <div class="user-info">
             <span class="user-name">{{ nombre }}</span>
-            <span class="user-role">Transporte Carga</span>
+            <span class="user-role">Operador de Flota</span>
             {% if session.get('placa_prelogueada') %}
                 <span class="user-role" style="background-color: var(--verde); color: white; margin-top: 5px; font-size: 11px;">Vehículo: {{ session.get('placa_prelogueada') }}</span>
             {% endif %}
@@ -121,7 +128,7 @@
 
     <main class="wrap">
         <h2 class="welcome-title">
-            Panel de Control
+            Consola Operativa
             {% if session.get('viaje_activo') %}
                 <div id="indicador_gps" class="gps-status">⚪ Iniciando GPS...</div>
             {% endif %}
@@ -156,51 +163,80 @@
                         <div class="btn-card">Notificar Parada &rarr;</div>
                     </a>
 
+                    <!-- MECANISMO PLUG & PLAY: BÁSCULA -->
+                    {% if 'carga' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
+                    <a href="{{ url_for('bp_gestion_carga.panel_bascula') }}" class="module-card">
+                        <div class="card-icon">⚖️</div>
+                        <h3 class="card-title">Gestión de Báscula</h3>
+                        <p class="card-desc">Registre cargas, remisiones y valide pesos teóricos vs reales.</p>
+                        <div class="btn-card">Acceder a Báscula &rarr;</div>
+                    </a>
+                    {% endif %}
+
+                    <!-- MECANISMO PLUG & PLAY: COMBUSTIBLE -->
+                    {% if 'combustible' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
                     <a href="{{ url_for('combustible_flota.registrar_combustible') }}" class="module-card">
                         <div class="card-icon">⛽</div>
                         <h3 class="card-title">Combustible</h3>
                         <p class="card-desc">Monitoreo de consumo y eficiencia de combustible.</p>
-                        <div class="btn-card">Gestionar &rarr;</div>
+                        <div class="btn-card">Registrar Tanqueo &rarr;</div>
                     </a>
+                    {% endif %}
+
                 {% else %}
                     <!-- BOTÓN PRINCIPAL PARA INICIAR VIAJE (BLOQUEO TEMPORAL) -->
                     <div style="width: 100%; text-align: center; grid-column: 1 / -1; padding: 30px 10px;">
                         <h3 style="color: var(--verde); margin-bottom: 15px;">Vehículo enlazado: {{ session.get('placa_prelogueada') }}</h3>
                         
-                        <!-- MENSAJE DE RESTRICCIÓN TEMPORAL -->
-                        <div style="background: #fef2f2; border: 1px solid #f87171; border-radius: 12px; padding: 20px; color: #991b1b; max-width: 500px; margin: 0 auto;">
-                            <h4 style="margin-bottom: 10px; font-size: 18px;">⚠️ Módulo en Mantenimiento</h4>
-                            <p style="font-size: 14px;">El inicio de viaje y las funcionalidades en ruta están temporalmente deshabilitados por ajustes en el sistema. Gracias por diligenciar su inspección preoperacional.</p>
-                        </div>
-
-                        <!-- CÓDIGO ORIGINAL COMENTADO PARA FACILITAR SU RESTAURACIÓN FUTURA
-                        <p style="color: var(--text-muted); margin-bottom: 25px;">Habilite su consola de operación e inicie el rastreo satelital marcando el inicio de su viaje.</p>
-                        <button onclick="iniciarViaje()" class="btn-card" style="background: var(--verde); color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(1, 82, 73, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto;">
+                        <p style="color: var(--text-muted); margin-bottom: 25px;">Para activar el rastreo satelital y el registro de eventos en ruta, presione el siguiente botón.</p>
+                        
+                        <button onclick="iniciarViaje()" class="btn-card" style="background: var(--verde); color: white; padding: 18px 30px; font-size: 18px; border-radius: 12px; box-shadow: 0 8px 20px rgba(1, 82, 73, 0.3); width: 100%; max-width: 400px; display: inline-flex; justify-content: center; align-items: center; gap: 10px; margin: 0 auto; border: none; cursor: pointer;">
                             <span style="font-size: 24px;">▶</span> INICIAR VIAJE
                         </button>
-                        -->
                     </div>
                 {% endif %}
             {% else %}
-                <!-- MÓDULOS DE PRE-LOGUEO: (Vehículo NO logueado, redirige al scanner QR) -->
-                <a href="{{ url_for('preoperacional.preoperacional_tc', nit=nit) }}" class="module-card">
-                    <div class="card-icon">🚧</div>
-                    <h3 class="card-title">Preoperacional de seguridad vial</h3>
-                    <p class="card-desc">Reporte de novedades del vehículo y documentos. Autenticación Biométrica.</p>
+                <!-- MÓDULOS DE PRE-LOGUEO: (Vehículo NO logueado) -->
+                
+                <a href="#" onclick="abrirScannerQR(event)" class="module-card">
+                    <div class="card-icon">📱</div>
+                    <h3 class="card-title">Pre-Logueo de Cabina</h3>
+                    <p class="card-desc">Enlace su usuario con la unidad de transporte escaneando el código QR impreso en el vehículo.</p>
                     <div class="btn-card">Escanear QR Cabina &rarr;</div>
+                </a>
+
+                <!-- PREOPERACIONAL (OBLIGATORIO) -->
+                <a href="{{ url_for('preoperacional.preoperacional_tc', nit=nit) }}" class="module-card">
+                    <div class="card-icon">📋</div>
+                    <h3 class="card-title">Preoperacional de seguridad vial</h3>
+                    <p class="card-desc">Diligencie la inspección diaria obligatoria del PESV antes de iniciar su jornada.</p>
+                    <div class="btn-card">Diligenciar Inspección &rarr;</div>
                 </a>
             {% endif %}
         </div>
     </main>
 
     <footer class="footer">
-        <p>&copy; 2026 BQA ONE Technology. Enrutamiento Inteligente.</p>
+        <p>&copy; 2026 BQA ONE Technology. Sistema Multiusuario Seguro.</p>
         {% if session.get('viaje_activo') %}
             <div style="margin-top: 10px; color: #ef4444; font-weight: bold; background: #fee2e2; display: inline-block; padding: 5px 15px; border-radius: 12px;">Cierre de sesión bloqueado en ruta. Finalice el viaje primero.</div>
         {% else %}
             <a href="{{ url_for('logout') }}" class="logout-btn" id="btnLogout">Cerrar Sesión</a>
         {% endif %}
     </footer>
+
+    <!-- MODAL ESCÁNER QR DE CABINA -->
+    <div id="modalScannerQR" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-title">
+                <span>📷 Lector Vehicular</span>
+                <button onclick="cerrarScannerQR()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <p class="modal-text">Apunte la cámara al código QR ubicado en la cabina de la unidad.</p>
+            <div id="qr-reader"></div>
+            <button onclick="cerrarScannerQR()" class="btn-cancel">Cancelar Escaneo</button>
+        </div>
+    </div>
 
     <!-- MODAL DE CLASIFICACIÓN DE PARADA -->
     <div id="modalParada" class="modal-overlay">
@@ -244,7 +280,6 @@
             if (dataMeter) dataMeter.innerText = `📶 ${mb} MB`;
         }
 
-        // Funciones de Ahorro de Energía (Pantalla Negra OLED)
         function activarModoAhorro() {
             document.getElementById('dim-overlay').style.display = 'flex';
             if ('vibrate' in navigator) navigator.vibrate(50);
@@ -271,16 +306,92 @@
             }
         }
 
+        // ============================================
+        // LÓGICA DE ESCANEO DE QR (PRE-LOGUEO)
+        // ============================================
+        let html5QrcodeScanner = null;
+
+        function abrirScannerQR(e) {
+            if(e) e.preventDefault();
+            document.getElementById('modalScannerQR').style.display = 'flex';
+            
+            if (!html5QrcodeScanner) {
+                html5QrcodeScanner = new Html5Qrcode("qr-reader");
+            }
+
+            const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+            
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                config,
+                onScanSuccess,
+                (errorMessage) => { /* Ignorar errores continuos de búsqueda */ }
+            ).catch(err => {
+                alert("Error al iniciar cámara: " + err + ". Por favor verifique los permisos de cámara en su navegador.");
+            });
+        }
+
+        function cerrarScannerQR() {
+            document.getElementById('modalScannerQR').style.display = 'none';
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().catch(err => console.log("Error al detener scanner:", err));
+            }
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            try {
+                const data = JSON.parse(decodedText);
+                if (data.placa) {
+                    cerrarScannerQR();
+                    ejecutarPreLogin(data.placa);
+                } else {
+                    alert("QR no válido para este sistema. Placa no encontrada en el código.");
+                }
+            } catch(e) {
+                if(decodedText && decodedText.length > 2 && decodedText.length < 15 && !decodedText.includes("http")) {
+                    cerrarScannerQR();
+                    ejecutarPreLogin(decodedText.trim().toUpperCase());
+                } else {
+                    alert("Formato de código QR no reconocido para la operación vehicular.");
+                }
+            }
+        }
+
+        function ejecutarPreLogin(placa) {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            fetch("{{ url_for('flotacarga.prelogin_flota') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ placa: placa })
+            })
+            .then(async res => {
+                const isJson = res.headers.get('content-type')?.includes('application/json');
+                const data = isJson ? await res.json() : null;
+
+                if (!res.ok) {
+                    const errorMsg = (data && data.message) || `Error del servidor HTTP ${res.status}`;
+                    throw new Error(errorMsg);
+                }
+                
+                if (data && data.success) {
+                    window.location.reload();
+                } else {
+                    throw new Error((data && data.message) || "Error desconocido en validación.");
+                }
+            })
+            .catch(e => {
+                alert("Falla en la operación: " + e.message);
+            });
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
             
-            // Inicializar Medidor de Datos en la UI
             const dataMeter = document.getElementById('dataMeter');
             if (dataMeter) {
                 const mb = (totalDataBytes / (1024 * 1024)).toFixed(2);
                 dataMeter.innerText = `📶 ${mb} MB`;
             }
 
-            // Inicializar Medidor de Batería Nativos
             if ('getBattery' in navigator) {
                 navigator.getBattery().then(function(battery) {
                     function updateBatteryUI() {
@@ -302,7 +413,6 @@
                 });
             }
 
-            // Navegación legal
             document.querySelectorAll('a, button').forEach(el => {
                 el.addEventListener('click', () => {
                     isNavigatingLegally = true;
@@ -310,9 +420,8 @@
                 });
             });
 
-            // Motor de Latidos (Heartbeat) - Envíos condicionados a isTransmitting
             function sendHeartbeat() {
-                if (!isTransmitting) return; // Ahorro de datos cuando está pausado
+                if (!isTransmitting) return; 
                 
                 const csrfMeta = document.querySelector('meta[name="csrf-token"]');
                 const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
@@ -325,7 +434,6 @@
             setInterval(sendHeartbeat, 15000);
             sendHeartbeat();
 
-            // Recuperación Automática (Offline-First)
             function intentarRecuperarSesion() {
                 const placaGuardada = localStorage.getItem('bqa_placa_activa');
                 const viajeGuardado = localStorage.getItem('bqa_viaje_activo');
@@ -355,7 +463,6 @@
             intentarRecuperarSesion();
             window.addEventListener('online', intentarRecuperarSesion);
 
-            // Logout Manual interceptado
             const btnLogout = document.getElementById('btnLogout');
             if (btnLogout) {
                 btnLogout.addEventListener('click', function(e) {
@@ -374,7 +481,6 @@
                 });
             }
 
-            // Modo Quiosco Anti-Navegación
             history.pushState(null, null, location.href);
             window.addEventListener('popstate', function(event) {
                 history.pushState(null, null, location.href);
@@ -416,7 +522,7 @@
                   if(data.status === 'success') {
                       localStorage.setItem('bqa_viaje_activo', 'true');
                       localStorage.setItem('bqa_placa_activa', '{{ session.get("placa_prelogueada") }}');
-                      localStorage.setItem('bqa_data_bytes', '0'); // Resetear datos en nuevo viaje
+                      localStorage.setItem('bqa_data_bytes', '0'); 
                       window.location.reload();
                   } else {
                       alert("Error al iniciar viaje: " + data.message);
@@ -469,7 +575,7 @@
         document.addEventListener("DOMContentLoaded", function () {
             
             const TOLERANCIA_METROS = 30;         
-            const PRECISION_MINIMA = 120; // Ajustado a 120m para permitir triangulación de red en zonas de baja señal
+            const PRECISION_MINIMA = 120; 
             const TIEMPO_PARA_PARADA = 5;         
             const TIMEOUT_ALERTA = 180;           
 
@@ -489,9 +595,9 @@
                 try {
                     if ('wakeLock' in navigator) {
                         wakeLock = await navigator.wakeLock.request('screen');
-                        wakeLock.addEventListener('release', () => console.log('Wake Lock liberado (Pantalla apagada)'));
+                        wakeLock.addEventListener('release', () => console.log('Wake Lock liberado'));
                     }
-                } catch (err) { console.warn('Wake Lock no soportado o denegado:', err); }
+                } catch (err) { console.warn('Wake Lock no soportado', err); }
             }
             
             document.addEventListener('visibilitychange', async () => {
@@ -500,7 +606,6 @@
             });
             solicitarWakeLock();
 
-            // Disparador agresivo de sincronización en cuanto la conexión vuelva a estar en línea
             window.addEventListener('online', () => {
                 if(typeof sincronizarDatosOffline === 'function') sincronizarDatosOffline();
             });
@@ -525,7 +630,6 @@
                 return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             }
 
-            // CRONÓMETRO DE PARADAS: Independiente de watchPosition, evalúa el tiempo inmóvil
             setInterval(() => {
                 if (!ultimaUbicacion || paradaActiva) return;
                 let tiempoInmovilMinutos = (Date.now() - lastMoveTime) / 60000;
@@ -534,7 +638,6 @@
                 }
             }, 60000);
 
-            // MOTOR GPS PASIVO: watchPosition amarra la antena al hardware
             function procesarLecturaGPS(pos) {
                 if (pos.coords.accuracy > PRECISION_MINIMA) {
                     if(isTransmitting) { indicadorGPS.innerText = '🟠 GPS Señal Débil'; indicadorGPS.className = 'gps-status offline'; }
@@ -550,7 +653,6 @@
 
                 let distancia = ultimaUbicacion ? calcularDistancia(ultimaUbicacion.lat, ultimaUbicacion.lng, lat, lng) : 999;
                 
-                // Evitar saturar la BD: Guardamos si pasó 1 minuto o si se movió más de 50 metros
                 if ((now - lastRecordedTime) > 60000 || distancia > 50) {
                     syncQueue.ubicaciones.push({ lat: lat, lng: lng, fecha_hora: momento.full });
                     lastRecordedTime = now;
@@ -645,7 +747,6 @@
             }
 
             function sincronizarDatosOffline() {
-                // Si no hay red o si el operador pausó la transmisión, NO enviamos
                 if (!navigator.onLine || !isTransmitting) {
                     if (indicadorGPS && isTransmitting) indicadorGPS.innerText = '🟠 Guardando Offline';
                     return; 
@@ -657,7 +758,7 @@
                 if (syncQueue.ubicaciones.length > 0) {
                     let payloadUbi = [...syncQueue.ubicaciones];
                     let bodyStr = JSON.stringify({ ubicaciones: payloadUbi });
-                    let estimatedBytes = new Blob([bodyStr]).size + 500; // body + headers
+                    let estimatedBytes = new Blob([bodyStr]).size + 500; 
                     
                     fetch('/api/actualizar_ubicacion', {
                         method: 'POST',

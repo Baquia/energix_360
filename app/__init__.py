@@ -56,7 +56,7 @@ def create_app():
     login_manager.login_message = "Por favor inicie sesión."
 
     # =========================================================
-    #  REGISTRO DE BLUEPRINTS (Ajustado a los nombres reales)
+    #  REGISTRO DE BLUEPRINTS (Estructura Unificada)
     # =========================================================
 
     # ---------------------------------------------------------
@@ -64,7 +64,7 @@ def create_app():
     # ---------------------------------------------------------
     from app.blueprints.A_bp_pwa_Avicola import gestionavicola_bp  
     
-    # --- NUEVOS SUBMÓDULOS WEBMASTER BQA-ONE ---
+    # --- SUBMÓDULOS WEBMASTER BQA-ONE ---
     from app.blueprints.bp_901811727_main import bp_main
     from app.blueprints.bp_901811727_admin import bp_admin
     from app.blueprints.bp_901811727_energia_glp import bp_energia_glp
@@ -72,7 +72,6 @@ def create_app():
 
     app.register_blueprint(gestionavicola_bp)
     
-    # Registro de la nueva arquitectura modular Webmaster
     app.register_blueprint(bp_main)
     app.register_blueprint(bp_admin)
     app.register_blueprint(bp_energia_glp)
@@ -87,16 +86,13 @@ def create_app():
     from app.blueprints.B_bp_controlador_bodegas import bp_bodegas                     
     from app.blueprints.B_bp_controlador_flotacarga import bp_gestorflota
     from app.blueprints.B_bp_pesaje_carga_avicola import bp_gestion_carga               
-    
-    # --- NUEVO: Comercializador GLP ---
     from app.blueprints.B_bp_comercializador_glp import bp_comercializador_glp
     
-    # --- NUEVO: Transporte Especial ---
+    # --- TRANSPORTE ESPECIAL (4 Blueprints Oficiales) ---
     from app.blueprints.B_bp_controlador_flotaespecial import bp_controlador_flotaespecial
-    from app.blueprints.B_bp_flotaespecial_vehiculos import bp_flotaespecial_vehiculos
+    from app.blueprints.B_bp_flotaespecial_flota import bp_flotaespecial_flota
     from app.blueprints.B_bp_flotaespecial_eps import bp_flotaespecial_eps
     from app.blueprints.B_bp_procesofacturacion_eps_transporteespecial import bp_procesofacturacion_eps
-    from app.blueprints.B_bp_flotaespecial_conductores import bp_flotaespecial_conductores # <-- NUEVO CONDUCTORES
    
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
@@ -104,16 +100,13 @@ def create_app():
     app.register_blueprint(bp_bodegas)
     app.register_blueprint(bp_gestorflota)
     app.register_blueprint(bp_gestion_carga)
-    
-    # --- NUEVO: Comercializador GLP ---
     app.register_blueprint(bp_comercializador_glp)
     
-    # --- NUEVO: Transporte Especial ---
+    # Registro Módulo Transporte Especial
     app.register_blueprint(bp_controlador_flotaespecial)
-    app.register_blueprint(bp_flotaespecial_vehiculos)
+    app.register_blueprint(bp_flotaespecial_flota)
     app.register_blueprint(bp_flotaespecial_eps)
     app.register_blueprint(bp_procesofacturacion_eps)
-    app.register_blueprint(bp_flotaespecial_conductores) # <-- NUEVO CONDUCTORES
 
     # ---------------------------------------------------------
     #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
@@ -123,11 +116,7 @@ def create_app():
     from app.blueprints.B_bp_operador_flotacarga import bp_flotacarga
     from app.blueprints.C_bp_combustible_flota import bp_combustible_flota
     from app.blueprints.C_bp_preoperacional import bp_preoperacional
-    
-    # --- NUEVO: Mecánico GLP (PWA) ---
     from app.blueprints.C_bp_mecanico_glp import bp_mecanico_glp
-    
-    # --- NUEVO: Transporte Especial ---
     from app.blueprints.B_bp_operador_flotaespecial import bp_operador_flotaespecial
     
     app.register_blueprint(bp_oper_bodegas)
@@ -135,11 +124,7 @@ def create_app():
     app.register_blueprint(bp_flotacarga)
     app.register_blueprint(bp_combustible_flota)
     app.register_blueprint(bp_preoperacional)
-    
-    # --- NUEVO: Mecánico GLP (PWA) ---
     app.register_blueprint(bp_mecanico_glp)
-    
-    # --- NUEVO: Transporte Especial ---
     app.register_blueprint(bp_operador_flotaespecial)
 
     return app

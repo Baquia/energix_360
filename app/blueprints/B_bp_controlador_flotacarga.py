@@ -1,3 +1,4 @@
+# MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: CONTROLADOR_FLOTA | CONDICIÓN: OPCIONAL
 # app/blueprints/B_bp_controlador_flotacarga.py
 import os
 import io
@@ -10,33 +11,44 @@ from app.utils import login_required_custom
 from functools import wraps
 import MySQLdb.cursors
 from datetime import datetime, timedelta
-import base64
-from PIL import Image as PILImage
 
 # Librerías PDF (QR)
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 
-# Librerías PDF (Reportes Platypus)
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-
 halfLetter = (5.5 * inch, 8.5 * inch)
 
 bp_gestorflota = Blueprint('gestorflota', __name__, url_prefix='/gestor_flota')
 
+# ==============================================================================
+# MIDDLEWARE DE JERARQUÍA Y PERMISOS (VALIDACIÓN PLUG & PLAY ESTRICTA)
+# ==============================================================================
 def gestor_flota_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         perfil = str(session.get('perfil', '')).strip().lower()
         tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
         
-        if perfil not in ['gestor_flotacarga', 'controlador_transportecarga', 'webmaster',] and 'webmaster' not in tipo_empresa:
+        # 1. Validación de Perfil
+        if perfil not in ['gestor_flotacarga', 'controlador_transportecarga', 'webmaster'] and 'webmaster' not in tipo_empresa:
+            if request.is_json:
+                return jsonify(success=False, message="Acceso denegado: Se requiere perfil de Controlador de Flota."), 403
             flash('Acceso denegado: Se requiere perfil de Gestor/Controlador de Flota para ingresar a este módulo.', 'danger')
             return redirect(url_for('index'))
+            
+        # 2. Validación Plug & Play (Inquilino)
+        if 'webmaster' not in tipo_empresa:
+            autorizados = session.get('submodulos_activos', [])
+            if not autorizados:
+                autorizados = session.get('modulos_activos', [])
+                
+            if 'controlador_flota' not in autorizados and 'flota' not in autorizados:
+                if request.is_json:
+                    return jsonify(success=False, message="Acceso denegado: Tu empresa no tiene activo el submódulo de Controlador de Flota."), 403
+                flash('Acceso denegado: Tu empresa no tiene contratado/activo el submódulo de Controlador de Flota.', 'danger')
+                return redirect(url_for('index'))
+                
         return f(*args, **kwargs)
     return decorated_function
 
@@ -62,7 +74,27 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
 @gestor_flota_required
 def dashboard_gestor():
     empresa_id = session.get('empresa_id')
+    nit = session.get('nit')
     
+    # 0. Sincronización en caliente de submódulos activos (Plug & Play Dinámico)
+    if nit:
+        try:
+            cur = mysql.connection.cursor()
+            cur.execute("SELECT submodulos_activos FROM empresas WHERE nit = %s", (nit,))
+            row = cur.fetchone()
+            cur.close()
+            if row:
+                raw_sub = row[0] if isinstance(row, (tuple, list)) else row.get('submodulos_activos')
+                if raw_sub:
+                    try:
+                        session['submodulos_activos'] = json.loads(raw_sub) if isinstance(raw_sub, str) else raw_sub
+                    except Exception:
+                        session['submodulos_activos'] = []
+                else:
+                    session['submodulos_activos'] = []
+        except Exception as e:
+            print(f"Error actualizando submodulos_activos en sesión: {e}")
+            
     # 1. Crear tablas de monitoreo e inyectar columnas de geolocalización
     try:
         cur = mysql.connection.cursor()
@@ -437,7 +469,7 @@ def gestion_rutas():
     )
 
 # =========================================================
-# NUEVA RUTA: MAPA DE RUTAS Y ANALÍTICA DE PARADAS
+# MAPA DE RUTAS Y ANALÍTICA DE PARADAS
 # =========================================================
 @bp_gestorflota.route('/mapa_rutas', methods=['GET'])
 @login_required_custom
@@ -730,354 +762,4 @@ def gestion_operadores():
         nombre=session.get('nombre'),
         active_module='operadores', 
         operadores=operadores_db
-    )
-
-# =========================================================
-# MÓDULO 5: AUDITORÍA DE PREOPERACIONALES
-# =========================================================
-@bp_gestorflota.route('/preoperacionales')
-@login_required_custom
-@gestor_flota_required
-def historial_preoperacionales():
-    empresa_id = session.get('empresa_id')
-    
-    fecha_inicio = request.args.get('fecha_inicio', (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d'))
-    fecha_fin = request.args.get('fecha_fin', datetime.now().strftime('%Y-%m-%d'))
-    placa_filtro = request.args.get('placa', 'todas')
-
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    # 1. Extraer placas para el selector de filtro
-    cur.execute("SELECT DISTINCT placa FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
-    vehiculos_historicos = cur.fetchall()
-
-    # 2. Consultar Preoperacionales según filtro en la tabla unificada
-    query = """
-        SELECT id_inspeccion, consecutivo_anual, fecha_inspeccion, hora_inspeccion, 
-               placa_vehiculo, nombre_conductor, vehiculo_aprobado 
-        FROM inspeccion_preoperacional 
-        WHERE id_empresa = %s AND fecha_inspeccion BETWEEN %s AND %s
-    """
-    params = [empresa_id, fecha_inicio, fecha_fin]
-    
-    if placa_filtro != 'todas':
-        query += " AND placa_vehiculo = %s"
-        params.append(placa_filtro)
-        
-    query += " ORDER BY fecha_inspeccion DESC, hora_inspeccion DESC"
-    
-    cur.execute(query, tuple(params))
-    inspecciones = cur.fetchall()
-    cur.close()
-
-    return render_template(
-        'B_modulo_controlador_flotacarga.html',
-        nit=session.get('nit'),
-        empresa=session.get('empresa'),
-        nombre=session.get('nombre'),
-        active_module='preoperacionales',
-        inspecciones=inspecciones,
-        vehiculos_historicos=vehiculos_historicos,
-        filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'placa': placa_filtro}
-    )
-
-
-@bp_gestorflota.route('/cron/mantenimiento_bd', methods=['GET'])
-def cron_limpieza_datos():
-    """
-    CRON JOB: Ejecutar el día 1 de cada mes en la madrugada.
-    Elimina los registros preoperacionales antiguos para no saturar el servidor.
-    """
-    # Candado de seguridad para evitar ejecuciones externas
-    if request.args.get('token') != 'BQA_CRON_2026':
-        return jsonify({"success": False, "message": "No autorizado"}), 403
-
-    cur = mysql.connection.cursor()
-    try:
-        # Ejecuta el borrado masivo de registros con más de 1 año (12 meses) en tabla unificada
-        cur.execute("""
-            DELETE FROM inspeccion_preoperacional 
-            WHERE fecha_inspeccion < DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-        """)
-        
-        filas_eliminadas = cur.rowcount
-        mysql.connection.commit()
-        
-        return jsonify({
-            "success": True, 
-            "message": "Mantenimiento BD Flota completado exitosamente.",
-            "registros_eliminados": filas_eliminadas
-        }), 200
-
-    except Exception as e:
-        mysql.connection.rollback()
-        return jsonify({"success": False, "message": f"Error en mantenimiento: {str(e)}"}), 500
-    finally:
-        cur.close()
-
-@bp_gestorflota.route('/preoperacionales/pdf/<consecutivo>', methods=['GET'])
-@login_required_custom
-@gestor_flota_required
-def descargar_preoperacional_pdf(consecutivo):
-    import base64
-    
-    empresa_id = session.get('empresa_id')
-    empresa_nombre = session.get('empresa')
-    nit_empresa = session.get('nit')
-
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT * FROM inspeccion_preoperacional WHERE consecutivo_anual = %s AND id_empresa = %s LIMIT 1", (consecutivo, empresa_id))
-    insp = cur.fetchone()
-    cur.close()
-
-    if not insp:
-        flash("Error: Inspección no encontrada o no pertenece a tu empresa.", "danger")
-        return redirect(url_for('gestorflota.historial_preoperacionales'))
-
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=14, textColor=colors.HexColor('#015249'), alignment=1, spaceAfter=10)
-    sub_title_style = ParagraphStyle('SubTitle', parent=styles['Heading2'], fontSize=11, textColor=colors.HexColor('#015249'), spaceAfter=5, spaceBefore=10)
-    cell_style = ParagraphStyle('CellText', parent=styles['Normal'], fontSize=8, leading=10)
-    cell_bold = ParagraphStyle('CellBold', parent=styles['Normal'], fontSize=8, leading=10, fontName='Helvetica-Bold')
-
-    # 1. Cabecera con Logos
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    static_dir = os.path.join(base_dir, '..', 'static')
-    logo_cliente_path = os.path.join(static_dir, f'logo_{nit_empresa}.PNG')
-    logo_app_path = os.path.join(static_dir, 'logo_energix360.png')
-    
-    img_cliente = RLImage(logo_cliente_path, width=1.5*inch, height=0.5*inch, kind='proportional') if os.path.exists(logo_cliente_path) else Paragraph(empresa_nombre, cell_bold)
-    img_app = RLImage(logo_app_path, width=1.5*inch, height=0.5*inch, kind='proportional') if os.path.exists(logo_app_path) else Paragraph("BQA-ONE", cell_bold)
-    
-    t_logos = Table([[img_cliente, img_app]], colWidths=[270, 270])
-    t_logos.setStyle(TableStyle([('ALIGN', (0,0), (0,0), 'LEFT'), ('ALIGN', (1,0), (1,0), 'RIGHT'), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
-    story.append(t_logos)
-    story.append(Spacer(1, 10))
-
-    story.append(Paragraph("<b>INSPECCIÓN PREOPERACIONAL DETALLADA - SEGURIDAD VIAL</b>", title_style))
-
-    # 2. Metadatos
-    dictamen_texto = "APROBADO (OPERATIVO)" if insp['vehiculo_aprobado'] == 1 else "ALERTA (CRÍTICA)"
-    color_dictamen = colors.HexColor('#d1fae5') if insp['vehiculo_aprobado'] == 1 else colors.HexColor('#fee2e2')
-
-    meta_data = [
-        [Paragraph("<b>Consecutivo:</b>", cell_style), Paragraph(consecutivo, cell_bold), Paragraph("<b>Fecha / Hora:</b>", cell_style), Paragraph(f"{insp['fecha_inspeccion']} {insp['hora_inspeccion']}", cell_style)],
-        [Paragraph("<b>Placa Vehículo:</b>", cell_style), Paragraph(str(insp['placa_vehiculo']).upper(), cell_bold), Paragraph("<b>Conductor:</b>", cell_style), Paragraph(insp['nombre_conductor'], cell_style)],
-        [Paragraph("<b>Kilometraje:</b>", cell_style), Paragraph(str(insp['kilometraje_inicial']), cell_style), Paragraph("<b>Ruta:</b>", cell_style), Paragraph(insp['ruta_destino'], cell_style)],
-        [Paragraph("<b>DICTAMEN:</b>", cell_style), Paragraph(f"<b>{dictamen_texto}</b>", cell_bold), "", ""]
-    ]
-    t_meta = Table(meta_data, colWidths=[100, 170, 100, 170])
-    t_meta.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f9fafb')), ('BACKGROUND', (1,3), (1,3), color_dictamen),
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#e5e7eb')), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e5e7eb')),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('SPAN', (1,3), (3,3))
-    ]))
-    story.append(t_meta)
-
-    # Helper para renderizar estados
-    def get_estado_html(valor, es_doc=False):
-        if es_doc:
-            return "<font color='#16a34a'><b>AL DÍA / PORTA</b></font>" if valor == 1 else "<font color='#dc2626'><b>FALTANTE / VENCIDO</b></font>"
-        if valor == 1: return "<font color='#16a34a'>Operativo</font>"
-        elif valor == 2: return "<font color='#d97706'><b>Ajuste</b></font>"
-        elif valor == 3: return "<font color='#dc2626'><b>Crítico</b></font>"
-        return "N/A"
-
-    # 3. Mapeo del Checklist Completo (Alineado con Paso 16, Resolución 40595 de 2022)
-    checklist_config = [
-        ("DOCUMENTACIÓN LEGAL", True, [
-            ('doc_cedula', 'Cédula de Ciudadanía'),
-            ('doc_licencia_conduccion', 'Licencia de Conducción'), 
-            ('doc_licencia_transito', 'Licencia de Tránsito (Propiedad)'),
-            ('doc_soat_vigente', 'SOAT Vigente'),
-            ('doc_tecnomecanica_vigente', 'Revisión Tecnomecánica'), 
-            ('doc_tarjeta_operacion', 'Tarjeta de Operación')
-        ]),
-        ("ESTADO MECÁNICO Y MOTOR", False, [
-            ('mec_nivel_aceite_motor', 'Nivel Aceite Motor'), ('mec_liquido_frenos', 'Líquido de Frenos/Embrague'),
-            ('mec_nivel_refrigerante', 'Nivel de Refrigerante'), ('mec_estado_correas', 'Estado de Correas'),
-            ('mec_ausencia_fugas', 'Ausencia Fugas (Aceite/Agua/Aire)')
-        ]),
-        ("SISTEMA DE LUCES", False, [
-            ('luc_altas_bajas', 'Luces Altas y Bajas'), ('luc_frenos_stop', 'Luces de Freno (Stop)'),
-            ('luc_direccionales', 'Luces Direccionales'), ('luc_parqueo_estacionarias', 'Luces de Parqueo/Estacionarias'),
-            ('luc_reversa_alarma', 'Luz y Alarma de Reversa'), ('luc_delimitadoras_cocuyos', 'Luces Delimitadoras (Cocuyos)')
-        ]),
-        ("SUSPENSIÓN Y REPUESTO", False, [
-            ('lla_tuercas_pernos', 'Tuercas y Pernos Completos'), ('lla_repuesto_operativa', 'Llanta Repuesto Operativa'),
-            ('lla_suspension_muelles', 'Suspensión y Muelles')
-        ]),
-        ("FRENOS Y MANDOS DE CABINA", False, [
-            ('fre_pedal_firme', 'Firmeza Pedal de Freno'), ('fre_parqueo_mano', 'Freno de Parqueo/Mano'),
-            ('fre_presion_aire_manometro', 'Manómetro Presión Aire'), ('fre_juego_direccion', 'Juego de Dirección'),
-            ('fre_pito_corneta', 'Pito y Corneta'), ('fre_limpiaparabrisas_plumillas', 'Limpiaparabrisas y Plumillas')
-        ]),
-        ("CARROCERÍA Y ESTRUCTURA", False, [
-            ('car_estado_estructura', 'Estado de Estructura General'), ('car_compuertas_carpas_amarres', 'Compuertas, Carpas y Amarres'),
-            ('car_cinturones_seguridad', 'Cinturones de Seguridad'), ('car_espejos_retrovisores', 'Espejos Retrovisores'),
-            ('car_vidrio_parabrisas', 'Vidrio Parabrisas')
-        ]),
-        ("EQUIPO DE PREVENCIÓN", False, [
-            ('equ_extintor_10lbs', 'Extintor Cargado'), ('equ_tacos_bloqueo', 'Tacos de Bloqueo'),
-            ('equ_senales_reflectivas', 'Señales Reflectivas'), ('equ_gato_hidraulico', 'Gato Hidráulico'),
-            ('equ_cruceta_herramientas', 'Cruceta y Herramientas'), ('equ_botiquin_completo', 'Botiquín Completo')
-        ])
-    ]
-
-    try:
-        novedades_dict = json.loads(insp.get('detalles_novedades_json') or '{}')
-    except: novedades_dict = {}
-
-    story.append(Spacer(1, 10))
-
-    # Renderizar cada bloque del checklist
-    for titulo, es_doc, campos in checklist_config:
-        story.append(Paragraph(f"<b>{titulo}</b>", sub_title_style))
-        tabla_datos = [["Ítem Inspeccionado", "Estado", "Observación / Novedad"]]
-        
-        for campo_db, label in campos:
-            valor = insp.get(campo_db)
-            estado_lbl = get_estado_html(valor, es_doc)
-            obs = novedades_dict.get(campo_db, {}).get('detalle', 'Sin novedad') if valor in [2, 3] else ''
-            
-            tabla_datos.append([Paragraph(label, cell_style), Paragraph(estado_lbl, cell_style), Paragraph(obs, cell_style)])
-        
-        t_grupo = Table(tabla_datos, colWidths=[200, 80, 260])
-        t_grupo.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#015249')), ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e5e7eb')),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('BOTTOMPADDING', (0,0), (-1,-1), 2), ('TOPPADDING', (0,0), (-1,-1), 2)
-        ]))
-        story.append(t_grupo)
-        story.append(Spacer(1, 5))
-
-    # 4. Esquema Individual de Llantas (JSON)
-    story.append(Paragraph("<b>ESQUEMA POSICIONAL DE LLANTAS</b>", sub_title_style))
-    try:
-        llantas_dict = json.loads(insp.get('estado_llantas_json') or '{}')
-    except: llantas_dict = {}
-
-    if llantas_dict:
-        llantas_data = [["Posición de la Llanta", "Estado Labrado", "Novedad Reportada"]]
-        for pos, l_data in llantas_dict.items():
-            lab_txt = str(l_data.get('labrado')).upper()
-            color_l = "#16a34a" if lab_txt == 'OPERATIVA' else ("#dc2626" if lab_txt == 'LISA' else "#d97706")
-            llantas_data.append([
-                Paragraph(l_data.get('nombre_legible', pos), cell_style),
-                Paragraph(f"<font color='{color_l}'><b>{lab_txt}</b></font>", cell_style),
-                Paragraph(l_data.get('novedad', ''), cell_style)
-            ])
-        t_llan = Table(llantas_data, colWidths=[200, 80, 260])
-        t_llan.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#015249')), ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e5e7eb')),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('BOTTOMPADDING', (0,0), (-1,-1), 2)
-        ]))
-        story.append(t_llan)
-    else:
-        story.append(Paragraph("No se registró esquema posicional de llantas en esta inspección.", cell_style))
-
-    # Helper para convertir Base64 a RLImage
-    def convertir_base64_rlimage(b64_string, w, h):
-        try:
-            if b64_string and ',' in b64_string:
-                img_data = base64.b64decode(b64_string.split(',')[1])
-                img_buffer = io.BytesIO(img_data)
-                return RLImage(img_buffer, width=w, height=h, kind='proportional')
-        except Exception as e:
-            pass
-        return Paragraph("<i>No disponible</i>", cell_style)
-
-    # 5. Observaciones Finales y Firma Biométrica
-    if insp.get('observaciones_hallazgos'):
-        story.append(Spacer(1, 10))
-        story.append(Paragraph("<b>OBSERVACIONES GENERALES DEL CONDUCTOR</b>", sub_title_style))
-        story.append(Paragraph(f"<i>{insp['observaciones_hallazgos']}</i>", cell_style))
-
-    story.append(Spacer(1, 15))
-    story.append(Paragraph("<b>AUTENTICACIÓN Y FIRMA</b>", sub_title_style))
-    
-    # Declaración de Veracidad
-    declaracion_texto = "<b>Declaración de Veracidad y Cumplimiento Normativo:</b> Declaro bajo la gravedad de juramento que la información aquí registrada es veraz, exacta y ha sido recolectada mediante inspección física directa del vehículo. Este registro preoperacional da cumplimiento estricto al <b>Paso 16 de la Metodología del Plan Estratégico de Seguridad Vial (PESV)</b>, adoptada mediante la <b>Resolución 40595 de 2022 del Ministerio de Transporte de Colombia.</b>"
-    story.append(Paragraph(declaracion_texto, cell_style))
-    story.append(Spacer(1, 10))
-    
-    img_firma = convertir_base64_rlimage(insp.get('firma_grafica_base64'), 2*inch, 1*inch)
-    img_foto = convertir_base64_rlimage(insp.get('foto_conductor_base64'), 1.2*inch, 1.2*inch)
-
-    firma_data = [
-        [Paragraph("<b>Foto Auditoría:</b>", cell_style), Paragraph("<b>Firma Gráfica:</b>", cell_style)], 
-        [img_foto, img_firma]
-    ]
-    t_firma = Table(firma_data, colWidths=[150, 200])
-    t_firma.setStyle(TableStyle([
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#16a34a')), 
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e5e7eb')), 
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f0fdf4')), 
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'), 
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
-    ]))
-    story.append(t_firma)
-
-    doc.build(story)
-    buffer.seek(0)
-    
-    return send_file(
-        buffer, 
-        as_attachment=True, 
-        download_name=f"Preoperacional_{consecutivo}.pdf", 
-        mimetype='application/pdf'
-    )
-
-# =========================================================
-# MÓDULO 6: MONITOREO DE COMBUSTIBLE
-# =========================================================
-@bp_gestorflota.route('/monitoreo_combustible', methods=['GET'])
-@login_required_custom
-@gestor_flota_required
-def monitoreo_combustible():
-    empresa_id = session.get('empresa_id')
-    
-    # Filtros de búsqueda (Por defecto últimos 30 días)
-    fecha_inicio = request.args.get('fecha_inicio', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
-    fecha_fin = request.args.get('fecha_fin', datetime.now().strftime('%Y-%m-%d'))
-    placa_filtro = request.args.get('placa', 'todas')
-
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
-    # 1. Extraer placas para el selector de filtro
-    cur.execute("SELECT DISTINCT placa FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
-    vehiculos_historicos = cur.fetchall()
-
-    # 2. Consultar registros de combustible según filtro
-    query = """
-        SELECT id, placa, tipo_combustible, fecha_tanqueo, kilometraje_actual, galones, valor_total, nombre_operador, ruta_comprobante
-        FROM vehiculos_combustible_flota 
-        WHERE id_empresa = %s AND fecha_tanqueo BETWEEN %s AND %s
-    """
-    params = [empresa_id, fecha_inicio, fecha_fin]
-    
-    if placa_filtro != 'todas':
-        query += " AND placa = %s"
-        params.append(placa_filtro)
-        
-    query += " ORDER BY fecha_tanqueo DESC, id DESC"
-    
-    cur.execute(query, tuple(params))
-    registros_combustible = cur.fetchall()
-    cur.close()
-
-    return render_template(
-        'B_modulo_controlador_flotacarga.html',
-        nit=session.get('nit'),
-        empresa=session.get('empresa'),
-        nombre=session.get('nombre'),
-        active_module='monitoreo_combustible',
-        registros_combustible=registros_combustible,
-        vehiculos_historicos=vehiculos_historicos,
-        filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'placa': placa_filtro}
     )

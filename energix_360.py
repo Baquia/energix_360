@@ -1,6 +1,7 @@
 # energix_360.py
 import os
 import uuid
+import json
 from flask import render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory
 from app import create_app, mysql, csrf, bcrypt
 from app.forms import LoginForm
@@ -80,6 +81,22 @@ def login_required_custom(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def submodulo_required(submodulo_nombre):
+    """
+    Middleware Plug & Play: Verifica si el inquilino (empresa) tiene habilitado 
+    el submódulo opcional en su arreglo JSON de base de datos.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            submodulos_activos = session.get('submodulos_activos', [])
+            if submodulo_nombre not in submodulos_activos:
+                flash(f'Acceso denegado: Su empresa no tiene activo el submódulo de {submodulo_nombre}.', 'danger')
+                return redirect(url_for('panel_principal'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 # ==============================================================================
 # 4. RUTAS OFFLINE (PWA)
 # ==============================================================================
@@ -156,8 +173,8 @@ def login():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
-    # Se elimina el filtro estatus = 'ACTIVO' que causaba el error 1054
-    cur.execute("SELECT nit, tipo_empresa FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
+    # NUEVO: Se extrae la columna JSON submodulos_activos
+    cur.execute("SELECT nit, tipo_empresa, submodulos_activos FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
     emp_info = cur.fetchone()
     if not emp_info:
         cur.close()
@@ -165,6 +182,18 @@ def login():
 
     nit_empresa = str(emp_info['nit'])
     tipo_empresa = str(emp_info.get('tipo_empresa') or '').lower()
+
+    # Procesamiento y validación del JSON Plug & Play
+    submodulos_raw = emp_info.get('submodulos_activos')
+    submodulos_activos_empresa = []
+    if submodulos_raw:
+        if isinstance(submodulos_raw, str):
+            try:
+                submodulos_activos_empresa = json.loads(submodulos_raw)
+            except:
+                submodulos_activos_empresa = []
+        else:
+            submodulos_activos_empresa = submodulos_raw
 
     cur.execute("SELECT * FROM usuarios WHERE cedula = %s", (cedula,))
     usuario = cur.fetchone()
@@ -212,11 +241,12 @@ def login():
         'tipo_empresa': tipo_empresa,
         'perfil': str(usuario.get('perfil') or '').strip().lower(),
         'modulos_activos': modulos_activos,
+        'submodulos_activos': submodulos_activos_empresa,  # INYECCIÓN DEL MARCADOR EN SESIÓN
         'token_sesion': token_sesion,
         'login_time': login_timestamp
     })
 
-    print(f"[{datetime.now()}] Login Exitoso - CC: {session['cedula']} | NIT: {session['empresa_id']} | Perfil: {session['perfil']} | Modulos: {session['modulos_activos']}")
+    print(f"[{datetime.now()}] Login Exitoso - CC: {session['cedula']} | NIT: {session['empresa_id']} | Perfil: {session['perfil']} | Modulos: {session['modulos_activos']} | Submodulos: {session['submodulos_activos']}")
 
     return jsonify(
         success=True,
@@ -258,10 +288,19 @@ def router_universal(modulo):
     perfil_usuario = str(session.get('perfil', '')).strip().lower()
     nit_empresa = str(session.get('empresa_id', '')).strip()
     modulos_comprados = session.get('modulos_activos', [])
+    tipo_empresa = session.get('tipo_empresa')
 
+    # Excepción para permitir paso si el módulo es nativo del tipo de empresa
     if modulo not in modulos_comprados:
-        flash(f"Tu empresa no tiene contratado el módulo de {modulo.upper()}.", "warning")
-        return redirect(url_for('panel_principal'))
+        es_nativo = False
+        if modulo == 'flotaespecial' and tipo_empresa == 'transporte_especial': es_nativo = True
+        elif modulo == 'carga' and tipo_empresa == 'transporte_carga': es_nativo = True
+        elif modulo == 'ventas' and tipo_empresa == 'ventas_distribucion': es_nativo = True
+        elif modulo == 'avicola' and tipo_empresa == 'cria_beneficio_aves_corral': es_nativo = True
+        
+        if not es_nativo:
+            flash(f"Tu empresa no tiene contratado el módulo de {modulo.upper()}.", "warning")
+            return redirect(url_for('panel_principal'))
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cur.execute("""

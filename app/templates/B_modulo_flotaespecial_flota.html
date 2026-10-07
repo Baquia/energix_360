@@ -1,0 +1,1221 @@
+<!-- MÓDULO: TRANSPORTE_ESPECIAL | SUBMÓDULO: FLOTA (FIJO) -->
+<!-- app/templates/B_modulo_flotaespecial_flota.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gestión de Flota Unificada | Transporte Especial | {{ empresa }}</title>
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+    <meta name="theme-color" content="#015249">
+
+    <style>
+        /* PALETA CORPORATIVA BQA-ONE */
+        :root {
+            --verde: #015249;        
+            --verde-osc: #003b35;    
+            --bg-grad-start: #d7f2ec; 
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --radius: 10px;
+            --sidebar-width: 260px;
+            --topbar-height: 70px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Verdana, Geneva, Tahoma, sans-serif; background-color: #f3f4f6; color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+        a { text-decoration: none; color: inherit; }
+
+        /* SIDEBAR Y MENÚ */
+        .sidebar { width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: transform 0.3s ease; z-index: 1000; }
+        .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
+        .logo-app { max-height: 35px; width: auto; }
+        .nav-menu { flex-grow: 1; padding: 20px 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        
+        .nav-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; border-radius: var(--radius); color: var(--text-muted); font-size: 14px; font-weight: 600; transition: all 0.2s; cursor: pointer; }
+        .nav-item-content { display: flex; align-items: center; gap: 12px; }
+        .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
+        .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
+        .nav-item.back-btn { color: #f59e0b; border-bottom: 1px solid var(--border); border-radius: 0; margin-bottom: 10px; padding-bottom: 15px;}
+        .nav-icon { font-size: 18px; }
+        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
+        .logout-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444; font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2; }
+
+        /* MAIN CONTENT */
+        .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; flex-shrink: 0; }
+        .topbar-left { display: flex; align-items: center; gap: 15px; }
+        .menu-toggle { display: none; background: none; border: none; font-size: 24px; color: var(--verde); cursor: pointer; }
+        .logo-cliente { max-height: 40px; width: auto; object-fit: contain; }
+        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
+        .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
+
+        .content-area { flex-grow: 1; padding: 25px; overflow-y: auto; background: radial-gradient(circle at top left, var(--bg-grad-start) 0, #f3f4f6 60%, #f3f4f6 100%); }
+
+        /* Alertas y Botones */
+        .flash-messages { width: 100%; max-width: 1200px; margin-bottom: 20px; }
+        .flash-alert { padding: 12px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; border: 1px solid currentColor; margin-bottom: 10px; }
+        .flash-success { background-color: #d1fae5; color: #065f46; }
+        .flash-danger { background-color: #fee2e2; color: #991b1b; }
+        .flash-warning { background-color: #fef3c7; color: #92400e; }
+
+        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;}
+        .action-title-group { display: flex; align-items: center; gap: 15px; }
+        .action-header h2 { color: var(--verde); font-size: 20px; margin: 0;}
+        .btn-close-view { background: #e5e7eb; color: #4b5563; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; font-weight: bold;}
+        
+        .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 6px;}
+        .btn-primary:hover { background: var(--verde-osc); }
+        .btn-info { background: #0ea5e9; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; transition: 0.2s;}
+        .btn-info:hover { background: #0284c7; }
+
+        /* KPIS */
+        .kpi-container { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 25px; max-width: 1200px;}
+        .kpi-card { background: var(--surface); flex: 1; min-width: 150px; padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.03); text-align: center; }
+        .kpi-value { font-size: 24px; font-weight: bold; color: var(--verde); }
+        .kpi-label { font-size: 11px; color: var(--text-muted); margin-top: 5px; font-weight: 600; text-transform: uppercase; }
+
+        /* Tablas */
+        .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-width: 1200px; overflow-x: auto; margin-bottom: 25px; border: 1px solid var(--border);}
+        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;}
+        .data-table th { background: #f9fafb; padding: 15px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+        .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); }
+        .data-table tr:hover { background-color: #fdfdfd; }
+        
+        .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        .badge-gray { background: #f3f4f6; color: #4b5563; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+
+        .btn-icon { background: none; border: none; cursor: pointer; font-size: 16px; margin-left: 10px; transition: 0.2s; }
+        .btn-icon.edit:hover { color: #f59e0b; transform: scale(1.1); }
+        .btn-icon.delete:hover { color: #ef4444; transform: scale(1.1); }
+        .btn-icon.map:hover { color: #0ea5e9; transform: scale(1.1); }
+        .btn-icon.qr:hover { color: #10b981; transform: scale(1.1); }
+        
+        .btn-pdf-mini { background: #eefcf9; color: var(--verde); border: 1px solid #ccfbf1; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; margin-bottom: 3px;}
+        .btn-pdf-mini:hover { background: #ccfbf1; }
+
+        /* Formularios y Modales */
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
+        .grid-form.full { grid-template-columns: 1fr; }
+        .readonly-box { background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px; color: var(--text); min-height: 34px; display: flex; align-items: center; }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
+        .modal-box { background: var(--surface); width: 95%; max-width: 900px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;}
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; position: sticky; top: 0; background: var(--surface); z-index: 10;}
+        .modal-header h3 { color: var(--verde); font-size: 18px; margin: 0; }
+        .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
+        
+        .form-group { margin-bottom: 15px; text-align: left; }
+        .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;}
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; font-family: inherit;}
+        
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border); position: sticky; bottom: 0; background: var(--surface); z-index: 10;}
+        .btn-cancel { padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); background: #f9fafb; cursor: pointer; font-weight: bold; color: var(--text);}
+        .section-divider { grid-column: 1 / -1; margin-top: 15px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px; }
+        .section-divider h4 { color: var(--verde-osc); font-size: 14px; margin: 0; display: flex; align-items: center; gap: 8px;}
+
+        /* Preoperacional */
+        .dictamen-card { background: #f9fafb; border-radius: 8px; border: 1px solid var(--border); padding: 15px; margin-top: 15px; }
+        .llantas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; height: 100vh; left: 0; top: 0; transform: translateX(-100%); box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+            .sidebar.open { transform: translateX(0); }
+            .menu-toggle { display: block; }
+            .grid-form { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+        </div>
+        <nav class="nav-menu">
+            <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="nav-item back-btn">
+                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Volver al Panel Central</div>
+            </a>
+            
+            <a href="{{ url_for('flotaespecial_flota.gestion_flota', active_module='vehiculos') }}" class="nav-item {% if active_module == 'vehiculos' %}active{% endif %}">
+                <div class="nav-item-content"><span class="nav-icon">🚐</span> Vehículos</div>
+            </a>
+            
+            <a href="{{ url_for('flotaespecial_flota.gestion_flota', active_module='conductores') }}" class="nav-item {% if active_module == 'conductores' %}active{% endif %}">
+                <div class="nav-item-content"><span class="nav-icon">👨‍✈️</span> Conductores</div>
+            </a>
+            
+            <a href="{{ url_for('flotaespecial_flota.gestion_flota', active_module='preoperacionales') }}" class="nav-item {% if active_module == 'preoperacionales' %}active{% endif %}">
+                <div class="nav-item-content"><span class="nav-icon">📋</span> Preoperacionales</div>
+            </a>
+            
+            <a href="{{ url_for('flotaespecial_flota.gestion_flota', active_module='terceros') }}" class="nav-item {% if active_module == 'terceros' %}active{% endif %}">
+                <div class="nav-item-content"><span class="nav-icon">🏢</span> Empresas Terceras</div>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="logout-btn"><span>🚪</span> Cerrar Sesión</a>
+        </div>
+    </aside>
+
+    <main class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="menu-toggle" id="menuToggle">☰</button>
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo-app" alt="BQA-ONE" style="max-height: 35px; width: auto; margin-right: 5px;">
+                <span style="border-left: 1px solid var(--border); height: 30px; margin: 0 10px;"></span>
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ nombre }}</span>
+                <span class="user-role">Controlador Transporte Especial</span>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div class="flash-messages">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash-alert {% if category == 'success' %}flash-success{% elif category == 'warning' %}flash-warning{% else %}flash-danger{% endif %}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- VISTA VEHÍCULOS (DEFAULT)                                -->
+            <!-- ======================================================== -->
+            {% if active_module == 'vehiculos' %}
+            
+            <div class="action-header" style="margin-bottom: 10px;">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Volver al Panel Central">&times;</a>
+                    <h2>Maestro de Vehículos Especiales</h2>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <a href="{{ url_for('flotaespecial_flota.descargar_reporte_vencimientos_pdf') }}" class="btn-primary" style="background: #ef4444;">📊 Generar Reporte Vencimientos</a>
+                    <button class="btn-primary" onclick="abrirCrearVehiculo()"><span>➕</span> Nuevo Vehículo</button>
+                </div>
+            </div>
+
+            <div class="kpi-container">
+                <div class="kpi-card"><div class="kpi-value" style="color: #6b7280;">{{ kpis.total_flota }}</div><div class="kpi-label">Total Flota</div></div>
+                <div class="kpi-card"><div class="kpi-value" style="color: #f59e0b;">{{ kpis.exentos_rtm }}</div><div class="kpi-label">Exentos RTM (&lt; 5 años)</div></div>
+                <div class="kpi-card"><div class="kpi-value" style="color: #0ea5e9;">{{ kpis.total_conductores }}</div><div class="kpi-label">Conductores Registrados</div></div>
+                <div class="kpi-card"><div class="kpi-value" style="color: #10b981;">{{ kpis.total_activos }}</div><div class="kpi-label">Conductores Activos Hoy</div></div>
+            </div>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Placa / ID</th>
+                            <th>Características</th>
+                            <th>Conductor Base</th>
+                            <th>Vinculación</th>
+                            <th>Vencimientos Críticos</th>
+                            <th>Documentos (PDF)</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in vehiculos %}
+                        <tr>
+                            <td>
+                                <b style="font-size: 16px; color: var(--verde);">{{ v.placa }}</b><br>
+                                <span class="badge badge-gray" style="margin-top: 4px;">{{ v.clase }}</span><br>
+                                <a href="{{ url_for('flotaespecial_flota.descargar_qr_vehiculo_pdf', placa=v.placa) }}" class="btn-pdf-mini" style="margin-top: 5px;">🔲 Descargar QR</a>
+                            </td>
+                            <td>{{ v.marca }} - {{ v.modelo }}<br><small>{{ v.carroceria }} | {{ v.color }}</small><br><small>Cap: {{ v.capacidad }} pasajeros</small></td>
+                            <td>
+                                {% if v.cedulas_conductores %}
+                                    <span style="color: #10b981; font-weight: bold;">✔️ Asignado(s)</span><br>
+                                    <small>{{ v.conductor_asignado|default('Revisar ID: ' ~ v.cedulas_conductores) }}</small>
+                                {% else %}
+                                    <span class="badge badge-warning">Sin conductor</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ v.tipo_vinculacion }}<br><small>{{ v.empresa_vinculadora or v.empresa_transporte }}</small></td>
+                            <td>
+                                <div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;">
+                                    <span><b>SOAT:</b> {{ v.vencimiento_soat or 'N/D' }}</span>
+                                    <span><b>RTM:</b> {% if v.rtm_exento %}<span style="color: #10b981; font-weight: bold;">EXENTO (&lt; 5 años)</span>{% else %}{{ v.vencimiento_rtm or 'N/D' }}{% endif %}</span>
+                                    <span><b>Poliza RCC:</b> {{ v.vencimiento_rcc_rce or 'N/D' }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    {% if v.ruta_pdf_tarjeta_propiedad %}<a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_tarjeta_propiedad }}')" class="btn-pdf-mini">📄 Propiedad</a>{% endif %}
+                                    {% if v.ruta_pdf_tarjeta_operacion %}<a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_tarjeta_operacion }}')" class="btn-pdf-mini">📄 Operación</a>{% endif %}
+                                    {% if v.ruta_pdf_soat %}<a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_soat }}')" class="btn-pdf-mini">📄 SOAT</a>{% endif %}
+                                    {% if v.ruta_pdf_tecnomecanica %}<a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_tecnomecanica }}')" class="btn-pdf-mini">📄 RTM</a>{% endif %}
+                                    {% if v.ruta_pdf_rcc_rce %}<a href="javascript:void(0)" onclick="verPDF('{{ v.ruta_pdf_rcc_rce }}')" class="btn-pdf-mini">📄 Póliza RCC</a>{% endif %}
+                                    {% if not v.ruta_pdf_tarjeta_propiedad and not v.ruta_pdf_tarjeta_operacion and not v.ruta_pdf_soat and not v.ruta_pdf_tecnomecanica and not v.ruta_pdf_rcc_rce %}
+                                        <span style="font-size: 11px; color: #9ca3af;">Sin documentos</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td style="white-space: nowrap;">
+                                <button class="btn-icon edit" title="Editar Expediente" onclick="abrirEditarVehiculo(this)"
+                                    data-id="{{ v.id }}" data-placa="{{ v.placa }}" data-clase="{{ v.clase }}" data-carroceria="{{ v.carroceria }}"
+                                    data-marca="{{ v.marca }}" data-linea="{{ v.linea }}" data-modelo="{{ v.modelo }}" data-color="{{ v.color }}"
+                                    data-combustible="{{ v.combustible }}" data-cilindraje="{{ v.cilindraje }}" data-capacidad="{{ v.capacidad }}"
+                                    data-potencia_hp="{{ v.potencia_hp }}" data-puertas="{{ v.puertas }}" data-vin="{{ v.vin }}" data-chasis="{{ v.chasis }}"
+                                    data-motor="{{ v.motor }}" data-numero_serie="{{ v.numero_serie }}" data-servicio="{{ v.servicio }}"
+                                    data-organismo_transito="{{ v.organismo_transito }}" data-fecha_matricula="{{ v.fecha_matricula }}"
+                                    data-fecha_expedicion_licencia="{{ v.fecha_expedicion_licencia }}" data-limitacion_propiedad="{{ v.limitacion_propiedad }}"
+                                    data-declaracion_importacion="{{ v.declaracion_importacion }}" data-fecha_importacion="{{ v.fecha_importacion }}"
+                                    data-restriccion_movilidad="{{ v.restriccion_movilidad }}" data-blindaje="{{ v.blindaje }}"
+                                    data-tipo_vinculacion="{{ v.tipo_vinculacion }}" data-numero_tarjeta_operacion="{{ v.numero_tarjeta_operacion }}"
+                                    data-modalidad_servicio="{{ v.modalidad_servicio }}" data-nivel_servicio="{{ v.nivel_servicio }}" data-radio_accion="{{ v.radio_accion }}"
+                                    data-empresa_vinculadora="{{ v.empresa_vinculadora }}" data-nit_empresa_vinculadora="{{ v.nit_empresa_vinculadora }}"
+                                    data-empresa_transporte="{{ v.empresa_transporte }}" data-fecha_expedicion_tarjeta_operacion="{{ v.fecha_expedicion_tarjeta_operacion }}"
+                                    data-fecha_inicio_tarjeta_operacion="{{ v.fecha_inicio_tarjeta_operacion }}" data-vencimiento_tarjeta_operacion="{{ v.vencimiento_tarjeta_operacion }}"
+                                    data-numero_poliza_rcc_rce="{{ v.numero_poliza_rcc_rce }}" data-aseguradora_rcc_rce="{{ v.aseguradora_rcc_rce }}"
+                                    data-fecha_inicio_rcc_rce="{{ v.fecha_inicio_rcc_rce }}" data-vencimiento_rcc_rce="{{ v.vencimiento_rcc_rce }}"
+                                    data-numero_poliza_soat="{{ v.numero_poliza_soat }}" data-aseguradora_soat="{{ v.aseguradora_soat }}" data-vencimiento_soat="{{ v.vencimiento_soat }}"
+                                    data-numero_certificado_rtm="{{ v.numero_certificado_rtm }}" data-vencimiento_rtm="{{ v.vencimiento_rtm }}"
+                                    data-cedulas="{{ v.cedulas_conductores|default('') }}"
+                                    data-dep="{{ v.departamento_base }}" data-mun="{{ v.municipio_base }}"
+                                >✏️</button>
+                                <button class="btn-icon map" title="Tiempos de Conducción" onclick="abrirVisorTiempos('{{ v.placa }}')">⏱️</button>
+                                <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarVehiculo('{{ v.id }}', '{{ v.placa }}')">🗑️</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay vehículos registrados en la flota.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- MODAL VEHÍCULO -->
+            <div id="modalVehiculo" class="modal-overlay">
+                <div class="modal-box">
+                    <div class="modal-header">
+                        <h3 id="tituloModalVehiculo">Registrar Nuevo Vehículo</h3>
+                        <button class="close-btn" onclick="closeModal('modalVehiculo')">&times;</button>
+                    </div>
+
+                    <form action="{{ url_for('flotaespecial_flota.gestion_flota') }}" method="POST" class="grid-form" enctype="multipart/form-data" id="formVehiculo">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="accion" id="accionVehiculo" value="crear_vehiculo">
+                        <input type="hidden" name="vehiculo_id" id="vehiculo_id">
+
+                        <div class="section-divider"><h4>1️⃣ Identificación y Características del Vehículo</h4></div>
+                        <div class="form-group"><label>Placa *</label><input type="text" name="placa" id="v_placa" required style="font-weight: bold; text-transform: uppercase;"></div>
+                        <div class="form-group">
+                            <label>Clase de Vehículo *</label>
+                            <select name="clase" id="v_clase" required>
+                                <option value="">Seleccione...</option>
+                                <option value="AUTOMOVIL">Automóvil</option>
+                                <option value="BUS">Bus</option>
+                                <option value="BUSETA">Buseta</option>
+                                <option value="CAMIONETA">Camioneta</option>
+                                <option value="CAMPERO">Campero</option>
+                                <option value="MICROBUS">Microbús</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Marca</label><input type="text" name="marca" id="v_marca"></div>
+                        <div class="form-group"><label>Línea</label><input type="text" name="linea" id="v_linea"></div>
+                        <div class="form-group"><label>Modelo (Año)</label><input type="text" name="modelo" id="v_modelo"></div>
+                        <div class="form-group"><label>Color</label><input type="text" name="color" id="v_color"></div>
+                        <div class="form-group"><label>Carrocería</label><input type="text" name="carroceria" id="v_carroceria"></div>
+                        <div class="form-group"><label>Combustible</label><select name="combustible" id="v_combustible"><option value="GASOLINA">Gasolina</option><option value="DIESEL">Diésel</option><option value="GAS">Gas</option><option value="ELECTRICO">Eléctrico</option><option value="HIBRIDO">Híbrido</option></select></div>
+                        <div class="form-group"><label>Cilindraje (cc)</label><input type="text" name="cilindraje" id="v_cilindraje"></div>
+                        <div class="form-group"><label>Capacidad (Pasajeros)</label><input type="number" name="capacidad" id="v_capacidad" min="1"></div>
+                        <div class="form-group"><label>Potencia (HP)</label><input type="text" name="potencia_hp" id="v_potencia"></div>
+                        <div class="form-group"><label>Número de Puertas</label><input type="number" name="puertas" id="v_puertas" min="2"></div>
+                        
+                        <div class="section-divider"><h4>2️⃣ Identificadores de Fábrica y Matrícula</h4></div>
+                        <div class="form-group"><label>Número de Motor</label><input type="text" name="motor" id="v_motor"></div>
+                        <div class="form-group"><label>Número de Chasis</label><input type="text" name="chasis" id="v_chasis"></div>
+                        <div class="form-group"><label>Número VIN</label><input type="text" name="vin" id="v_vin"></div>
+                        <div class="form-group"><label>Número de Serie</label><input type="text" name="numero_serie" id="v_serie"></div>
+                        <div class="form-group"><label>Fecha Matrícula</label><input type="date" name="fecha_matricula" id="v_fmatricula"></div>
+                        <div class="form-group"><label>Organismo de Tránsito</label><input type="text" name="organismo_transito" id="v_transito"></div>
+                        <div class="form-group"><label>Servicio</label><input type="text" name="servicio" id="v_servicio" value="PÚBLICO" readonly style="background: #f3f4f6;"></div>
+                        <div class="form-group"><label>Declaración Importación</label><input type="text" name="declaracion_importacion" id="v_decimp"></div>
+
+                        <div class="section-divider"><h4>3️⃣ Operación y Vinculación</h4></div>
+                        <div class="form-group">
+                            <label>Ubicación Base (Departamento)</label>
+                            <select name="departamento_base" id="v_dep_base" onchange="cargarMunicipios('v_dep_base', 'v_mun_base')"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ubicación Base (Municipio)</label>
+                            <select name="municipio_base" id="v_mun_base"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo de Vinculación</label>
+                            <select name="tipo_vinculacion" id="v_tipo_vinculacion" onchange="toggleEmpresaTercera()">
+                                <option value="Propio">Vehículo Propio (De la Empresa)</option>
+                                <option value="Tercero">Vehículo Vinculado (De Tercero)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="div_empresa_vinculadora" style="display: none; grid-column: 1 / -1;">
+                            <label>Seleccionar Empresa Propietaria (Tercero)</label>
+                            <select name="empresa_vinculadora" id="v_empresa_vinculadora">
+                                <option value="">Seleccione una empresa tercera...</option>
+                                {% for t in terceros %}
+                                <option value="{{ t.nombre }}">{{ t.nombre }} (NIT: {{ t.nit }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Conductor(es) Asignado(s)</label>
+                            <div style="background: #f9fafb; padding: 10px; border: 1px solid var(--border); border-radius: 8px; max-height: 150px; overflow-y: auto;">
+                                {% for c in operadores_flota %}
+                                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 5px; cursor: pointer;">
+                                        <input type="checkbox" name="conductores_asignados" value="{{ c.cedula }}" class="chk-conductor">
+                                        {{ c.nombre }} ({{ c.cedula }})
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="section-divider"><h4>4️⃣ Pólizas y Tarjeta de Operación</h4></div>
+                        <div class="form-group"><label>Número Tarjeta Operación</label><input type="text" name="numero_tarjeta_operacion" id="v_tarjeta_operacion"></div>
+                        <div class="form-group"><label>Fecha Vencimiento Tarjeta Op.</label><input type="date" name="vencimiento_tarjeta_operacion" id="v_vtarjeta_operacion"></div>
+                        <div class="form-group"><label>Número Póliza RCC y RCE</label><input type="text" name="numero_poliza_rcc_rce" id="v_poliza_rcc"></div>
+                        <div class="form-group"><label>Vencimiento Póliza RCC y RCE</label><input type="date" name="vencimiento_rcc_rce" id="v_vpoliza_rcc"></div>
+                        <div class="form-group"><label>Número SOAT</label><input type="text" name="numero_poliza_soat" id="v_soat"></div>
+                        <div class="form-group"><label>Vencimiento SOAT</label><input type="date" name="vencimiento_soat" id="v_vsoat"></div>
+                        <div class="form-group"><label>Número Certificado RTM</label><input type="text" name="numero_certificado_rtm" id="v_rtm"></div>
+                        <div class="form-group"><label>Vencimiento RTM</label><input type="date" name="vencimiento_rtm" id="v_vrtm"></div>
+
+                        <div class="section-divider"><h4>📂 Carga de Documentos (PDF)</h4></div>
+                        <p style="grid-column: 1 / -1; font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Solo archivos .pdf. En edición, dejar en blanco para mantener el archivo actual.</p>
+                        <div class="form-group"><label>Licencia de Tránsito (Propiedad)</label><input type="file" name="file_pdf_propiedad" accept=".pdf"></div>
+                        <div class="form-group"><label>Tarjeta de Operación</label><input type="file" name="file_pdf_operacion" accept=".pdf"></div>
+                        <div class="form-group"><label>Póliza RCC y RCE</label><input type="file" name="file_pdf_poliza" accept=".pdf"></div>
+                        <div class="form-group"><label>SOAT</label><input type="file" name="file_pdf_soat" accept=".pdf"></div>
+                        <div class="form-group"><label>Revisión Tecnomecánica (RTM)</label><input type="file" name="file_pdf_rtm" accept=".pdf"></div>
+
+                        <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalVehiculo')">Cancelar</button><button type="submit" class="btn-primary" id="btnGuardarVehiculo">Guardar Vehículo</button></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL TIEMPOS DE CONDUCCIÓN -->
+            <div id="modalVisorTiempos" class="modal-overlay">
+                <div class="modal-box" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h3 id="tituloVisorTiempos">Tiempos de Conducción</h3>
+                        <button class="close-btn" onclick="closeModal('modalVisorTiempos')">&times;</button>
+                    </div>
+                    <form id="formTiempos" onsubmit="event.preventDefault(); buscarTiempos();" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <input type="hidden" id="visor_placa">
+                        <input type="date" id="visor_fecha_inicio" required style="padding: 8px; border: 1px solid var(--border); border-radius: 6px;">
+                        <input type="date" id="visor_fecha_fin" required style="padding: 8px; border: 1px solid var(--border); border-radius: 6px;">
+                        <button type="submit" class="btn-info" style="border-radius: 6px;">🔍 Buscar Tiempos</button>
+                    </form>
+                    <div style="background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 15px; display: flex; justify-content: space-between;">
+                        <div><span style="font-size: 11px; color: var(--text-muted); display: block;">Vehículo</span><b id="lbl_visor_placa" style="color: var(--verde);"></b></div>
+                        <div style="text-align: right;"><span style="font-size: 11px; color: var(--text-muted); display: block;">Total Minutos Efectivos</span><b id="lbl_visor_total_minutos" style="color: #b45309; font-size: 18px;">0</b></div>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead><tr><th>Consecutivo Viaje / EPS</th><th>Conductor</th><th>Inicio</th><th>Fin</th><th>Duración</th></tr></thead>
+                            <tbody id="tbodyTiempos"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL ELIMINAR VEHÍCULO -->
+            <div id="modalEliminarVehiculo" class="modal-overlay">
+                <div class="modal-box" style="max-width: 400px; width: 90%;">
+                    <div class="modal-header">
+                        <h3 style="color: #ef4444;">⚠️ Eliminar Vehículo</h3>
+                        <button class="close-btn" onclick="closeModal('modalEliminarVehiculo')">&times;</button>
+                    </div>
+                    <form action="{{ url_for('flotaespecial_flota.gestion_flota') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="accion" value="eliminar_vehiculo">
+                        <input type="hidden" name="vehiculo_id" id="delete_vehiculo_id">
+                        <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro de eliminar el expediente del vehículo Placa: <b id="delete_vehiculo_placa"></b>?</p>
+                        <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarVehiculo')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- VISTA CONDUCTORES                                        -->
+            <!-- ======================================================== -->
+            {% elif active_module == 'conductores' %}
+            
+            <div class="action-header" style="margin-bottom: 10px;">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Volver al Panel Central">&times;</a>
+                    <h2>Gestión de Conductores (Operadores de Flota)</h2>
+                </div>
+                <button class="btn-primary" onclick="abrirCrearConductor()"><span>➕</span> Ingresar Conductor</button>
+            </div>
+
+            <div class="table-card" style="padding: 15px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="form-group" style="margin-bottom: 0; flex: 1; max-width: 400px;">
+                    <label style="color: var(--verde);">🔎 Auditar Conductor (Visor por Cédula)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="input_consulta_cedula" placeholder="Ingrese número de cédula...">
+                        <button class="btn-primary" onclick="buscarYMostrarVisor()" style="height: 38px;">Auditar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nombre / Cédula</th>
+                            <th>Contacto (Tel/Email)</th>
+                            <th>Ubicación Base</th>
+                            <th>Estatus / Vehículo</th>
+                            <th>Licencia (Vence)</th>
+                            <th>Seg. Social (Vence)</th>
+                            <th>Documentos (PDF)</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in conductores %}
+                        <tr>
+                            <td>
+                                <b style="color: var(--verde);">{{ c.nombre }}</b><br>
+                                <small>{{ c.cedula }}</small><br>
+                                {% if c.es_relevo %}
+                                    <span class="badge badge-warning" style="margin-top: 4px; display: inline-block;">[UNIVERSAL / RELEVO]</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ c.telefono or 'N/D' }}<br><small>{{ c.email or 'N/D' }}</small></td>
+                            <td>{{ c.municipio_base or 'N/D' }}<br><small>{{ c.departamento_base or '' }}</small></td>
+                            <td>
+                                {% if c.estatus == 'Logueado' %}
+                                    <span class="badge badge-success">Logueado (Activo)</span>
+                                {% elif c.estatus == 'Prelogueado' %}
+                                    <span class="badge badge-warning">Prelogueado</span>
+                                {% else %}
+                                    <span class="badge badge-gray">No Logueado</span>
+                                {% endif %}
+                                <br><small style="color: var(--text-muted); margin-top: 4px; display: inline-block;"><b>🚐 Vehículo:</b> <span style="color: var(--verde);">{{ c.vehiculo_asignado or 'Sin asignar' }}</span></small>
+                            </td>
+                            <td>{{ c.numero_licencia_conduccion or 'N/D' }}<br><small>{{ c.vencimiento_licencia_conduccion or 'N/D' }}</small></td>
+                            <td><b>{{ c.vencimiento_seguridad_social or 'N/D' }}</b></td>
+                            <td>
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    {% if c.ruta_pdf_cedula %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_cedula }}')" class="btn-pdf-mini">📄 Cédula</a> {% endif %}
+                                    {% if c.ruta_pdf_licencia %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_licencia }}')" class="btn-pdf-mini">📄 Licencia</a> {% endif %}
+                                    {% if c.ruta_pdf_seguridad_social %} <a href="javascript:void(0)" onclick="verPDF('{{ c.ruta_pdf_seguridad_social }}')" class="btn-pdf-mini">📄 Seg. Social</a> {% endif %}
+                                    {% if not c.ruta_pdf_cedula and not c.ruta_pdf_licencia and not c.ruta_pdf_seguridad_social %}
+                                        <span style="font-size: 11px; color: #9ca3af;">Sin documentos</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td style="white-space: nowrap;">
+                                <button class="btn-icon edit" title="Editar" 
+                                        data-id="{{ c.id }}"
+                                        data-nombre="{{ c.nombre }}"
+                                        data-cedula="{{ c.cedula }}"
+                                        data-telefono="{{ c.telefono }}"
+                                        data-email="{{ c.email }}"
+                                        data-dep="{{ c.departamento_base }}"
+                                        data-mun="{{ c.municipio_base }}"
+                                        data-lic="{{ c.numero_licencia_conduccion }}"
+                                        data-vlic="{{ c.vencimiento_licencia_conduccion }}"
+                                        data-eps="{{ c.eps }}"
+                                        data-afp="{{ c.fondo_pensiones }}"
+                                        data-arl="{{ c.arl }}"
+                                        data-pago="{{ c.ultimo_pago_seguridad_social }}"
+                                        data-relevo="{{ c.es_relevo }}"
+                                        onclick="abrirEditarConductor(this)">✏️</button>
+                                <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarConductor('{{ c.id }}', '{{ c.cedula }}', '{{ c.nombre }}')">🗑️</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay conductores registrados en la base de datos.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- MODAL CRUD CONDUCTOR (CREAR/EDITAR) -->
+            <div id="modalConductor" class="modal-overlay">
+                <div class="modal-box">
+                    <div class="modal-header">
+                        <h3 id="tituloModalConductor">Registrar Nuevo Conductor</h3>
+                        <button class="close-btn" onclick="closeModal('modalConductor')">&times;</button>
+                    </div>
+
+                    <form action="{{ url_for('flotaespecial_flota.gestion_flota') }}" method="POST" class="grid-form" enctype="multipart/form-data" id="formConductor">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="accion" id="accionConductor" value="crear_conductor">
+                        <input type="hidden" name="conductor_id" id="conductor_id">
+
+                        <div class="section-divider"><h4>👤 Identificación y Contacto</h4></div>
+                        <div class="form-group"><label>Nombre Completo *</label><input type="text" name="nombre" id="c_nombre" required></div>
+                        <div class="form-group">
+                            <label>Número de Cédula *</label>
+                            <input type="text" name="cedula" id="c_cedula" required style="font-weight: bold;">
+                        </div>
+                        
+                        <div class="form-group"><label>Teléfono</label><input type="text" name="telefono" id="c_telefono"></div>
+                        <div class="form-group"><label>Email</label><input type="email" name="email" id="c_email"></div>
+
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Contraseña de Acceso (Perfil Operador)</label>
+                            <input type="password" name="password" id="c_password">
+                            <small style="color: #f59e0b; font-size: 10px;">En creación es obligatoria. En edición, si se deja en blanco, se conservará la contraseña actual.</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Departamento Base</label>
+                            <select name="departamento_base" id="c_dep_base" onchange="cargarMunicipios('c_dep_base', 'c_mun_base')"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Municipio Base</label>
+                            <select name="municipio_base" id="c_mun_base"></select>
+                        </div>
+                        
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #111827; font-weight: bold; background: #fffbeb; padding: 10px; border-radius: 8px; border: 1px solid #f59e0b;">
+                                <input type="checkbox" name="es_relevo" id="c_es_relevo" style="width: auto; transform: scale(1.2);">
+                                ¿Es conductor de relevo / comodín? (Le permite operar cualquier vehículo sin restricción de asignación)
+                            </label>
+                        </div>
+
+                        <!-- CAMPO TELEGRAM ID BLOQUEADO (REGLA DE SEGURIDAD) -->
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label style="color: #ef4444;">ID Telegram (Bloqueado por Seguridad)</label>
+                            <input type="text" name="telegram_id" id="c_telegram" readonly style="background-color: #f3f4f6; color: #9ca3af; cursor: not-allowed; border-color: #e5e7eb;" value="BLOQUEADO" title="No se permite ingresar Telegram ID en este módulo">
+                            <small style="color: #ef4444; font-size: 10px;">🚫 El registro de Telegram ha sido restringido para este perfil.</small>
+                        </div>
+
+                        <div class="section-divider"><h4>🪪 Licencia de Conducción</h4></div>
+                        <div class="form-group"><label>Número de Licencia</label><input type="text" name="numero_licencia_conduccion" id="c_licencia"></div>
+                        <div class="form-group"><label>Fecha Vencimiento Licencia</label><input type="date" name="vencimiento_licencia_conduccion" id="c_vlicencia"></div>
+
+                        <div class="section-divider"><h4>🏥 Seguridad Social Integral</h4></div>
+                        <div class="form-group"><label>EPS</label><input type="text" name="eps" id="c_eps"></div>
+                        <div class="form-group"><label>Fondo de Pensiones (AFP)</label><input type="text" name="fondo_pensiones" id="c_afp"></div>
+                        <div class="form-group"><label>ARL</label><input type="text" name="arl" id="c_arl"></div>
+                        <div class="form-group">
+                            <label>Fecha de Último Pago (Seguridad Social)</label>
+                            <input type="date" name="ultimo_pago_seguridad_social" id="c_pago_ss">
+                            <small style="color: #10b981; font-size: 10px;">El sistema calculará automáticamente el vencimiento a 30 días.</small>
+                        </div>
+
+                        <div class="section-divider"><h4>📂 Digitalización de Documentos (PDF)</h4></div>
+                        <p style="grid-column: 1 / -1; font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Solo archivos .pdf. En edición, dejar en blanco para mantener el archivo actual.</p>
+                        <div class="form-group"><label>Cédula Ciudadanía</label><input type="file" name="file_pdf_cedula" accept=".pdf"></div>
+                        <div class="form-group"><label>Licencia de Conducción</label><input type="file" name="file_pdf_licencia" accept=".pdf"></div>
+                        <div class="form-group"><label>Planilla Seguridad Social</label><input type="file" name="file_pdf_seguridad_social" accept=".pdf"></div>
+
+                        <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalConductor')">Cancelar</button><button type="submit" class="btn-primary" id="btnGuardarConductor">Guardar Conductor</button></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL VISOR INDIVIDUAL CONDUCTOR -->
+            <div id="modalVisorConductor" class="modal-overlay">
+                <div class="modal-box" style="max-width: 900px; width: 95%;">
+                    <div class="modal-header">
+                        <h3>🔍 Auditoría de Conductor: <span id="vis_nombre_titulo" style="color: var(--verde);"></span></h3>
+                        <button class="close-btn" onclick="closeModal('modalVisorConductor')">&times;</button>
+                    </div>
+                    
+                    <div class="grid-form" style="background: #f9fafb; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
+                        <div class="form-group"><label>Nombre y Cédula</label><div id="vis_id" class="readonly-box" style="font-weight: bold; color: var(--verde); font-size: 15px;"></div></div>
+                        <div class="form-group"><label>Contacto (Tel / Email)</label><div id="vis_contacto" class="readonly-box"></div></div>
+                        <div class="form-group"><label>Ubicación Base</label><div id="vis_ubicacion" class="readonly-box"></div></div>
+                        <div class="form-group"><label>Vehículo Asignado</label><div id="vis_vehiculo" class="readonly-box" style="font-weight: bold; color: var(--verde);"></div></div>
+                        <div class="form-group"><label>Estatus / Telegram ID</label><div id="vis_tg" class="readonly-box"></div></div>
+                        <div class="form-group"><label>Licencia de Conducción</label><div id="vis_lic" class="readonly-box"></div></div>
+                        <div class="form-group"><label>Afiliaciones (EPS / AFP / ARL)</label><div id="vis_afil" class="readonly-box"></div></div>
+                        <div class="form-group"><label>Seguridad Social (Pago / Vence)</label><div id="vis_ss" class="readonly-box"></div></div>
+                    </div>
+
+                    <div class="section-divider"><h4>📄 Documentos Digitalizados</h4></div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                        <button id="btnVisCed" class="btn-info">Cédula PDF</button>
+                        <button id="btnVisLic" class="btn-info">Licencia PDF</button>
+                        <button id="btnVisSS" class="btn-info">Seguridad Social PDF</button>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn-cancel" onclick="closeModal('modalVisorConductor')">Cerrar Visor</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL ELIMINAR CONDUCTOR -->
+            <div id="modalEliminarConductor" class="modal-overlay">
+                <div class="modal-box" style="max-width: 400px; width: 90%;">
+                    <div class="modal-header">
+                        <h3 style="color: #ef4444;">⚠️ Eliminar Conductor</h3>
+                        <button class="close-btn" onclick="closeModal('modalEliminarConductor')">&times;</button>
+                    </div>
+                    <form action="{{ url_for('flotaespecial_flota.gestion_flota') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="accion" value="eliminar_conductor">
+                        <input type="hidden" name="conductor_id" id="delete_conductor_id">
+                        <input type="hidden" name="cedula" id="delete_conductor_cedula">
+                        <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro de eliminar el expediente del conductor <b id="delete_conductor_nombre"></b>? Esto también revocará su acceso al sistema.</p>
+                        <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarConductor')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- VISTA PREOPERACIONALES                                   -->
+            <!-- ======================================================== -->
+            {% elif active_module == 'preoperacionales' %}
+            
+            <div class="action-header" style="margin-bottom: 10px;">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Volver al Panel Central">&times;</a>
+                    <h2>Historial de Inspecciones Preoperacionales</h2>
+                </div>
+            </div>
+
+            <form class="table-card" style="padding: 15px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;" method="GET">
+                <input type="hidden" name="active_module" value="preoperacionales">
+                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;"><label>Fecha Inicio</label><input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}"></div>
+                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;"><label>Fecha Fin</label><input type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}"></div>
+                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;">
+                    <label>Vehículo (Placa)</label>
+                    <select name="placa">
+                        <option value="todas" {% if filtros.placa == 'todas' %}selected{% endif %}>Todos los vehículos</option>
+                        {% for v in vehiculos_historicos %}
+                            <option value="{{ v.placa }}" {% if filtros.placa == v.placa %}selected{% endif %}>{{ v.placa }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary" style="height: 38px;">🔍 Filtrar</button>
+            </form>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Consecutivo (Físico / Sistema)</th>
+                            <th>Fecha y Hora</th>
+                            <th>Vehículo / Conductor</th>
+                            <th>Dictamen Sistema</th>
+                            <th>Descargar PDF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for i in inspecciones %}
+                        <tr>
+                            <td><span style="font-family: monospace; font-weight: bold; color: var(--verde);">{{ i.consecutivo_anual }}</span><br><small>SysID: {{ i.id_inspeccion }}</small></td>
+                            <td>{{ i.fecha_inspeccion }}<br><small>{{ i.hora_inspeccion }}</small></td>
+                            <td><b>{{ i.placa_vehiculo }}</b><br><small>{{ i.nombre_conductor }}</small></td>
+                            <td>
+                                {% if i.vehiculo_aprobado == 1 %}
+                                    <span class="badge badge-success">✅ APROBADO (Operativo)</span>
+                                {% else %}
+                                    <span class="badge badge-danger">🚨 ALERTA (Fallo crítico detectado)</span>
+                                {% endif %}
+                            </td>
+                            <td><a href="{{ url_for('flotaespecial_flota.descargar_preoperacional_pdf', consecutivo=i.consecutivo_anual) }}" class="btn-pdf-mini">📄 Descargar PDF</a></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay inspecciones registradas en este periodo.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- VISTA EMPRESAS TERCERAS                                  -->
+            <!-- ======================================================== -->
+            {% elif active_module == 'terceros' %}
+            
+            <div class="action-header" style="margin-bottom: 10px;">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Volver al Panel Central">&times;</a>
+                    <h2>Maestro de Empresas Terceras (Propietarios)</h2>
+                </div>
+                <button class="btn-primary" onclick="abrirCrearTercero()"><span>➕</span> Ingresar Tercero</button>
+            </div>
+
+            <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Administre el directorio de empresas de transporte propietarias o vinculadoras de los vehículos que operan como terceros.</p>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Empresa / Razón Social</th>
+                            <th>NIT</th>
+                            <th>Sede Base</th>
+                            <th>Contacto (Tel / Email)</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in terceros %}
+                        <tr>
+                            <td><b style="color: var(--verde);">{{ t.nombre }}</b></td>
+                            <td>{{ t.nit or 'N/D' }}</td>
+                            <td>{{ t.municipio_sede or 'N/D' }} ({{ t.departamento_sede or 'N/D' }})</td>
+                            <td>{{ t.telefono_contacto or 'N/D' }}<br><small>{{ t.email_contacto or 'N/D' }}</small></td>
+                            <td style="white-space: nowrap;">
+                                <button class="btn-icon edit" title="Editar Tercero" onclick="abrirEditarTercero('{{ t.id }}', '{{ t.nombre }}', '{{ t.nit }}', '{{ t.departamento_sede }}', '{{ t.municipio_sede }}', '{{ t.telefono_contacto }}', '{{ t.email_contacto }}')">✏️️</button>
+                                <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarTercero('{{ t.id }}', '{{ t.nombre }}')">🗑️</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay empresas terceras registradas.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- MODAL CRUD TERCEROS -->
+            <div id="modalTercero" class="modal-overlay">
+                <div class="modal-box" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h3 id="tituloModalTercero">Registrar Empresa Tercera</h3>
+                        <button class="close-btn" onclick="closeModal('modalTercero')">&times;</button>
+                    </div>
+
+                    <form action="{{ url_for('flotaespecial_flota.gestion_flota') }}" method="POST" class="grid-form" id="formTercero">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="accion" id="accionTercero" value="crear_tercero">
+                        <input type="hidden" name="tercero_id" id="tercero_id">
+
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Nombre / Razón Social *</label><input type="text" name="nombre" id="t_nombre" required></div>
+                        <div class="form-group"><label>NIT</label><input type="text" name="nit" id="t_nit"></div>
+                        <div class="form-group"><label>Teléfono Contacto</label><input type="text" name="telefono_contacto" id="t_telefono"></div>
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Email Contacto</label><input type="email" name="email_contacto" id="t_email"></div>
+                        
+                        <div class="form-group">
+                            <label>Departamento Sede</label>
+                            <select name="departamento_sede" id="t_dep_sede" onchange="cargarMunicipios('t_dep_sede', 't_mun_sede')"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Municipio Sede</label>
+                            <select name="municipio_sede" id="t_mun_sede"></select>
+                        </div>
+
+                        <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalTercero')">Cancelar</button><button type="submit" class="btn-primary" id="btnGuardarTercero">Guardar</button></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL ELIMINAR TERCERO -->
+            <div id="modalEliminarTercero" class="modal-overlay">
+                <div class="modal-box" style="max-width: 400px; width: 90%;">
+                    <div class="modal-header">
+                        <h3 style="color: #ef4444;">⚠️ Eliminar Tercero</h3>
+                        <button class="close-btn" onclick="closeModal('modalEliminarTercero')">&times;</button>
+                    </div>
+                    <form action="{{ url_for('flotaespecial_flota.gestion_flota') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="accion" value="eliminar_tercero">
+                        <input type="hidden" name="tercero_id" id="delete_tercero_id">
+                        <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro de eliminar a la empresa <b id="delete_tercero_nombre"></b>? Esto afectará los vínculos de vehículos asociados.</p>
+                        <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarTercero')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
+                    </form>
+                </div>
+            </div>
+
+            {% endif %}
+
+            <div style="margin-top: 30px; font-size: 11px; color: #9ca3af; border-top: 1px solid var(--border); padding-top: 15px; max-width: 1200px;">
+                <p>&copy; 2026 BQA ONE Technology. Sistema Multiusuario Seguro.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- SCRIPTS GLOBALES Y DIVIPOLA -->
+    <script>
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+        function toggleSidebar() { sidebar.classList.toggle('open'); }
+        if(menuToggle) menuToggle.addEventListener('click', toggleSidebar);
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        function verPDF(rutaRelativa) {
+            if (rutaRelativa && rutaRelativa !== 'None' && rutaRelativa.trim() !== '') {
+                let finalRoute = rutaRelativa.startsWith('static/') ? '/' + rutaRelativa : '/static/' + rutaRelativa;
+                window.open(finalRoute, '_blank');
+            } else {
+                alert('Documento PDF no disponible.');
+            }
+        }
+
+        const divipolaColombia = {
+            "AMAZONAS": ["LETICIA", "PUERTO NARIÑO", "EL ENCANTO", "LA CHORRERA", "LA PEDRERA", "MIRITI - PARANA", "PUERTO ALEGRIA", "PUERTO ARICA", "PUERTO SANTANDER", "TARAPACA"],
+            "ANTIOQUIA": ["MEDELLIN", "ABEJORRAL", "ABRIAQUI", "ALEJANDRIA", "AMAGA", "AMALFI", "ANDES", "ANGELOPOLIS", "ANGOSTURA", "ANORI", "SANTAFE DE ANTIOQUIA", "ANZA", "APARTADO", "ARBOLETES", "ARGELIA", "ARMENIA", "BARBOSA", "BELMIRA", "BELLO", "BETANIA", "BETULIA", "CIUDAD BOLIVAR", "BRICEÑO", "BURITICA", "CACERES", "CAICEDO", "CALDAS", "CAMPAMENTO", "CAÑASGORDAS", "CARACOLI", "CARAMANTA", "CAREPA", "EL CARMEN DE VIBORAL", "CAROLINA", "CAUCASIA", "CHIGORODO", "CISNEROS", "COCORNA", "CONCEPCION", "CONCORDIA", "COPACABANA", "DABEIBA", "DONMATIAS", "EBEJICO", "EL BAGRE", "ENTRERRIOS", "ENVIGADO", "FREDONIA", "FRONTINO", "GIRALDO", "GIRARDOTA", "GOMEZ PLATA", "GRANADA", "GUADALUPE", "GUARNE", "GUATAPE", "HELICONIA", "HISPANIA", "ITAGUI", "ITUANGO", "JARDIN", "JERICO", "LA CEJA", "LA ESTRELLA", "LA PINTADA", "LA UNION", "LIBORINA", "MACEO", "MARINILLA", "MONTEBELLO", "MURINDO", "MUTATA", "NARIÑO", "NECOCLI", "NECHI", "OLAYA", "PEÑOL", "PEQUE", "PUEBLORRICO", "PUERTO BERRIO", "PUERTO NARE", "PUERTO TRIUNFO", "REMEDIOS", "RETIRO", "RIONEGRO", "SABANALARGA", "SABANETA", "SALGAR", "SAN ANDRES DE CUERQUIA", "SAN CARLOS", "SAN FRANCISCO", "SAN JERONIMO", "SAN JOSE DE LA MONTAÑA", "SAN JUAN DE URABA", "SAN LUIS", "SAN PEDRO DE LOS MILAGROS", "SAN PEDRO DE URABA", "SAN RAFAEL", "SAN ROQUE", "SAN VICENTE FERRER", "SANTA BARBARA", "SANTA ROSA DE OSOS", "SANTO DOMINGO", "EL SANTUARIO", "SEGOVIA", "SONSON", "SOPETRAN", "TAMESIS", "TARAZA", "TARSO", "TITIRIBI", "TOLEDO", "TURBO", "URAMITA", "URRAO", "VALDIVIA", "VALPARAISO", "VEGACHI", "VENECIA", "VIGIA DEL FUERTE", "YALI", "YARUMAL", "YOLOMBO", "YONDO", "ZARAGOZA"],
+            "ARAUCA": ["ARAUCA", "ARAUQUITA", "CRAVO NORTE", "FORTUL", "PUERTO RONDON", "SARAVENA", "TAME"],
+            "ATLANTICO": ["BARRANQUILLA", "BARANOA", "CAMPO DE LA CRUZ", "CANDELARIA", "GALAPA", "JUAN DE ACOSTA", "LURUACO", "MALAMBO", "MANATI", "PALMAR DE VARELA", "PIOJO", "POLONUEVO", "PONEDERA", "PUERTO COLOMBIA", "REPELON", "SABANAGRANDE", "SABANALARGA", "SANTA LUCIA", "SANTO TOMAS", "SOLEDAD", "SUAN", "TUBARA", "USIACURI"],
+            "BOGOTA D.C.": ["BOGOTA, D.C."],
+            "BOLIVAR": ["CARTAGENA DE INDIAS", "ACHI", "ALTOS DEL ROSARIO", "ARENAL", "ARJONA", "ARROYOHONDO", "BARRANCO DE LOBA", "CALAMAR", "CANTAGALLO", "CICUCO", "CORDOBA", "CLEMENCIA", "EL CARMEN DE BOLIVAR", "EL GUAMO", "EL PEÑON", "HATILLO DE LOBA", "MAGANGUE", "MAHATES", "MARGARITA", "MARIA LA BAJA", "MONTECRISTO", "MOMPOS", "MORALES", "NOROSI", "PINILLOS", "REGIDOR", "RIO VIEJO", "SAN CRISTOBAL", "SAN ESTANISLAO", "SAN FERNANDO", "SAN JACINTO", "SAN JACINTO DEL CAUCA", "SAN JUAN NEPOMUCENO", "SAN MARTIN DE LOBA", "SAN PABLO", "SANTA CATALINA", "SANTA ROSA", "SANTA ROSA DEL SUR", "SIMITI", "SOPLAVIENTO", "TALAIGUA NUEVO", "TIQUISIO", "TURBACO", "TURBANA", "VILLANUEVA", "ZAMBRANO"],
+            "BOYACA": ["TUNJA", "AQUITANIA", "CHIQUINQUIRA", "DUITAMA", "PAIPA", "SOGAMOSO", "VILLA DE LEYVA"],
+            "CALDAS": ["MANIZALES", "CHINCHINA", "LA DORADA", "VILLAMARIA"],
+            "CAQUETA": ["FLORENCIA", "SAN VICENTE DEL CAGUAN"],
+            "CASANARE": ["YOPAL", "AGUAZUL", "VILLANUEVA"],
+            "CAUCA": ["POPAYAN", "SANTANDER DE QUILICHAO", "PUERTO TEJADA"],
+            "CESAR": ["VALLEDUPAR", "AGUACHICA", "BOSCONIA", "AGUSTIN CODAZZI"],
+            "CHOCO": ["QUIBDO", "ISTMINA"],
+            "CORDOBA": ["MONTERIA", "CERETE", "LORICA", "MONTELIBANO", "SAHAGUN"],
+            "CUNDINAMARCA": ["BOGOTA", "CAJICA", "CHIA", "FACATATIVA", "FUNZA", "FUSAGASUGA", "GIRARDOT", "MADRID", "MOSQUERA", "SOACHA", "TOCANCIPA", "ZIPAQUIRA"],
+            "GUAVIARE": ["SAN JOSE DEL GUAVIARE"],
+            "HUILA": ["NEIVA", "GARZON", "PITALITO", "LA PLATA"],
+            "LA GUAJIRA": ["RIOHACHA", "MAICAO", "URIBIA", "SAN JUAN DEL CESAR"],
+            "MAGDALENA": ["SANTA MARTA", "CIENAGA", "FUNDACION", "EL BANCO"],
+            "META": ["VILLAVICENCIO", "ACACIAS", "GRANADA", "PUERTO LOPEZ"],
+            "NARIÑO": ["PASTO", "IPIALES", "TUMACO"],
+            "NORTE DE SANTANDER": ["CUCUTA", "OCAÑA", "PAMPLONA", "VILLA DEL ROSARIO", "LOS PATIOS"],
+            "PUTUMAYO": ["MOCOA", "PUERTO ASIS"],
+            "QUINDIO": ["ARMENIA", "CALARCA", "MONTENEGRO", "QUIMBAYA", "LA TEBAIDA"],
+            "RISARALDA": ["PEREIRA", "DOSQUEBRADAS", "SANTA ROSA DE CABAL", "LA VIRGINIA"],
+            "SAN ANDRES": ["SAN ANDRES", "PROVIDENCIA"],
+            "SANTANDER": ["BUCARAMANGA", "FLORIDABLANCA", "GIRON", "PIEDECUESTA", "BARRANCABERMEJA", "SAN GIL", "SOCORRO"],
+            "SUCRE": ["SINCELEJO", "COROZAL", "SAN MARCOS", "TOLU"],
+            "TOLIMA": ["IBAGUE", "ESPINAL", "MELGAR", "HONDA", "MARIQUITA", "CHAPARRAL", "LÍBANO"],
+            "VALLE DEL CAUCA": ["CALI", "BUENAVENTURA", "PALMIRA", "TULUA", "YUMBO", "CARTAGO", "JAMUNDI", "BUGA", "CANDELARIA"],
+            "VAUPES": ["MITU"],
+            "VICHADA": ["PUERTO CARREÑO"]
+        };
+
+        function cargarMunicipios(depSelectId, munSelectId) {
+            const depSelect = document.getElementById(depSelectId);
+            const munSelect = document.getElementById(munSelectId);
+            if (!depSelect || !munSelect) return;
+            const dep = depSelect.value;
+            munSelect.innerHTML = '<option value="">Seleccione Municipio...</option>';
+            if (dep && divipolaColombia[dep]) {
+                divipolaColombia[dep].sort().forEach(mun => {
+                    let option = document.createElement('option');
+                    option.value = mun; option.text = mun; munSelect.appendChild(option);
+                });
+            }
+        }
+
+        function initSelectoresDivipola() {
+            const selectoresDeps = ['v_dep_base', 'c_dep_base', 't_dep_sede'];
+            let optionsHTML = '<option value="">Seleccione Departamento...</option>';
+            Object.keys(divipolaColombia).sort().forEach(dep => { optionsHTML += `<option value="${dep}">${dep}</option>`; });
+            
+            selectoresDeps.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = optionsHTML;
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", initSelectoresDivipola);
+
+        /* SCRIPTS ESPECÍFICOS: VEHÍCULOS */
+        function abrirCrearVehiculo() {
+            document.getElementById('formVehiculo').reset();
+            document.getElementById('tituloModalVehiculo').innerText = 'Registrar Nuevo Vehículo';
+            document.getElementById('accionVehiculo').value = 'crear_vehiculo';
+            document.getElementById('v_placa').readOnly = false;
+            document.getElementById('v_servicio').value = 'PÚBLICO';
+            document.getElementById('btnGuardarVehiculo').innerText = 'Guardar Vehículo';
+            
+            document.querySelectorAll('.chk-conductor').forEach(chk => chk.checked = false);
+            toggleEmpresaTercera();
+            openModal('modalVehiculo');
+        }
+
+        function abrirEditarVehiculo(btn) {
+            const d = btn.dataset;
+            document.getElementById('formVehiculo').reset();
+            document.getElementById('tituloModalVehiculo').innerText = 'Editar Expediente Vehículo';
+            document.getElementById('accionVehiculo').value = 'editar_vehiculo';
+            document.getElementById('btnGuardarVehiculo').innerText = 'Guardar Cambios';
+            
+            document.getElementById('vehiculo_id').value = d.id;
+            document.getElementById('v_placa').value = d.placa;
+            document.getElementById('v_placa').readOnly = true; 
+            document.getElementById('v_clase').value = d.clase;
+            document.getElementById('v_carroceria').value = d.carroceria !== 'None' ? d.carroceria : '';
+            document.getElementById('v_marca').value = d.marca !== 'None' ? d.marca : '';
+            document.getElementById('v_linea').value = d.linea !== 'None' ? d.linea : '';
+            document.getElementById('v_modelo').value = d.modelo !== 'None' ? d.modelo : '';
+            document.getElementById('v_color').value = d.color !== 'None' ? d.color : '';
+            document.getElementById('v_combustible').value = d.combustible !== 'None' ? d.combustible : 'GASOLINA';
+            document.getElementById('v_cilindraje').value = d.cilindraje !== 'None' ? d.cilindraje : '';
+            document.getElementById('v_capacidad').value = d.capacidad !== 'None' ? d.capacidad : '';
+            document.getElementById('v_potencia').value = d.potencia_hp !== 'None' ? d.potencia_hp : '';
+            document.getElementById('v_puertas').value = d.puertas !== 'None' ? d.puertas : '';
+            
+            document.getElementById('v_vin').value = d.vin !== 'None' ? d.vin : '';
+            document.getElementById('v_chasis').value = d.chasis !== 'None' ? d.chasis : '';
+            document.getElementById('v_motor').value = d.motor !== 'None' ? d.motor : '';
+            document.getElementById('v_serie').value = d.numero_serie !== 'None' ? d.numero_serie : '';
+            
+            document.getElementById('v_servicio').value = d.servicio !== 'None' ? d.servicio : 'PÚBLICO';
+            document.getElementById('v_transito').value = d.organismo_transito !== 'None' ? d.organismo_transito : '';
+            document.getElementById('v_fmatricula').value = d.fecha_matricula !== 'None' ? d.fecha_matricula : '';
+            document.getElementById('v_decimp').value = d.declaracion_importacion !== 'None' ? d.declaracion_importacion : '';
+            
+            let depSelect = document.getElementById('v_dep_base');
+            if (d.dep && d.dep !== 'None') {
+                depSelect.value = d.dep;
+                cargarMunicipios('v_dep_base', 'v_mun_base');
+                let munSelect = document.getElementById('v_mun_base');
+                if (d.mun && d.mun !== 'None') munSelect.value = d.mun;
+            }
+
+            document.getElementById('v_tipo_vinculacion').value = (d.tipo_vinculacion && d.tipo_vinculacion !== 'None') ? d.tipo_vinculacion : 'Propio';
+            toggleEmpresaTercera();
+            if(d.tipo_vinculacion === 'Tercero') {
+                document.getElementById('v_empresa_vinculadora').value = d.empresa_vinculadora !== 'None' ? d.empresa_vinculadora : '';
+            }
+
+            let cedulas_asignadas = (d.cedulas && d.cedulas !== 'None') ? d.cedulas.split(',') : [];
+            document.querySelectorAll('.chk-conductor').forEach(chk => {
+                chk.checked = cedulas_asignadas.includes(chk.value);
+            });
+
+            document.getElementById('v_tarjeta_operacion').value = d.numero_tarjeta_operacion !== 'None' ? d.numero_tarjeta_operacion : '';
+            document.getElementById('v_vtarjeta_operacion').value = d.vencimiento_tarjeta_operacion !== 'None' ? d.vencimiento_tarjeta_operacion : '';
+            document.getElementById('v_poliza_rcc').value = d.numero_poliza_rcc_rce !== 'None' ? d.numero_poliza_rcc_rce : '';
+            document.getElementById('v_vpoliza_rcc').value = d.vencimiento_rcc_rce !== 'None' ? d.vencimiento_rcc_rce : '';
+            document.getElementById('v_soat').value = d.numero_poliza_soat !== 'None' ? d.numero_poliza_soat : '';
+            document.getElementById('v_vsoat').value = d.vencimiento_soat !== 'None' ? d.vencimiento_soat : '';
+            document.getElementById('v_rtm').value = d.numero_certificado_rtm !== 'None' ? d.numero_certificado_rtm : '';
+            document.getElementById('v_vrtm').value = d.vencimiento_rtm !== 'None' ? d.vencimiento_rtm : '';
+
+            openModal('modalVehiculo');
+        }
+
+        function toggleEmpresaTercera() {
+            const val = document.getElementById('v_tipo_vinculacion').value;
+            const divTercero = document.getElementById('div_empresa_vinculadora');
+            const selectTercero = document.getElementById('v_empresa_vinculadora');
+            if (val === 'Tercero') {
+                divTercero.style.display = 'block';
+                selectTercero.required = true;
+            } else {
+                divTercero.style.display = 'none';
+                selectTercero.required = false;
+                selectTercero.value = '';
+            }
+        }
+
+        function confirmarEliminarVehiculo(id, placa) {
+            document.getElementById('delete_vehiculo_id').value = id;
+            document.getElementById('delete_vehiculo_placa').innerText = placa;
+            openModal('modalEliminarVehiculo');
+        }
+
+        function abrirVisorTiempos(placa) {
+            document.getElementById('visor_placa').value = placa;
+            document.getElementById('lbl_visor_placa').innerText = placa;
+            
+            let hoy = new Date();
+            let inicio = new Date();
+            inicio.setDate(hoy.getDate() - 7);
+            
+            document.getElementById('visor_fecha_inicio').value = inicio.toISOString().split('T')[0];
+            document.getElementById('visor_fecha_fin').value = hoy.toISOString().split('T')[0];
+            
+            document.getElementById('tbodyTiempos').innerHTML = '';
+            document.getElementById('lbl_visor_total_minutos').innerText = '0';
+            
+            openModal('modalVisorTiempos');
+            buscarTiempos();
+        }
+
+        function buscarTiempos() {
+            const placa = document.getElementById('visor_placa').value;
+            const fini = document.getElementById('visor_fecha_inicio').value;
+            const ffin = document.getElementById('visor_fecha_fin').value;
+            
+            fetch(`{{ url_for('flotaespecial_flota.visor_tiempos_conduccion') }}?placa=${placa}&fecha_inicio=${fini}&fecha_fin=${ffin}`)
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById('tbodyTiempos');
+                const lblTotal = document.getElementById('lbl_visor_total_minutos');
+                
+                if (data.success) {
+                    if (data.viajes.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No se encontraron viajes finalizados en este periodo.</td></tr>';
+                        lblTotal.innerText = '0';
+                        return;
+                    }
+                    
+                    let html = '';
+                    let totalMin = 0;
+                    
+                    data.viajes.forEach(v => {
+                        html += `
+                        <tr>
+                            <td><b style="font-family: monospace; color: var(--verde);">${v.consecutivo_viaje || 'N/A'}</b><br><small>EPS: ${v.id_viaje}</small></td>
+                            <td>${v.nombre_usuario || 'N/A'}</td>
+                            <td><small>${v.fecha_hora_inicio}</small></td>
+                            <td><small>${v.fecha_hora_fin}</small></td>
+                            <td><b style="color: #b45309;">${v.tiempo_efectivo_minutos} min</b></td>
+                        </tr>`;
+                        totalMin += parseInt(v.tiempo_efectivo_minutos) || 0;
+                    });
+                    
+                    tbody.innerHTML = html;
+                    lblTotal.innerText = totalMin;
+                } else {
+                    alert("Error: " + data.message);
+                }
+            }).catch(err => alert("Error de red al consultar tiempos."));
+        }
+
+        /* SCRIPTS ESPECÍFICOS: CONDUCTORES */
+        function abrirCrearConductor() {
+            const form = document.getElementById('formConductor');
+            if(form) {
+                form.reset();
+                document.getElementById('tituloModalConductor').innerText = 'Registrar Nuevo Conductor';
+                document.getElementById('accionConductor').value = 'crear_conductor';
+                document.getElementById('c_cedula').readOnly = false;
+                document.getElementById('c_password').required = true;
+                document.getElementById('c_es_relevo').checked = false;
+                document.getElementById('btnGuardarConductor').innerText = 'Guardar Conductor';
+                openModal('modalConductor');
+            }
+        }
+
+        function abrirEditarConductor(btn) {
+            const d = btn.dataset;
+            document.getElementById('formConductor').reset();
+            document.getElementById('tituloModalConductor').innerText = 'Editar Expediente Conductor';
+            document.getElementById('accionConductor').value = 'editar_conductor';
+            document.getElementById('c_password').required = false;
+            document.getElementById('btnGuardarConductor').innerText = 'Guardar Cambios';
+            
+            document.getElementById('conductor_id').value = d.id;
+            document.getElementById('c_nombre').value = d.nombre;
+            document.getElementById('c_cedula').value = d.cedula;
+            document.getElementById('c_cedula').readOnly = true; 
+            document.getElementById('c_telefono').value = (d.telefono !== 'None' && d.telefono) ? d.telefono : '';
+            document.getElementById('c_email').value = (d.email !== 'None' && d.email) ? d.email : '';
+            document.getElementById('c_password').value = ''; 
+            document.getElementById('c_es_relevo').checked = (d.relevo === '1' || d.relevo === 'True');
+
+            let depSelect = document.getElementById('c_dep_base');
+            if (d.dep && d.dep !== 'None') {
+                depSelect.value = d.dep;
+                cargarMunicipios('c_dep_base', 'c_mun_base');
+                let munSelect = document.getElementById('c_mun_base');
+                if (d.mun && d.mun !== 'None') munSelect.value = d.mun;
+            }
+
+            document.getElementById('c_licencia').value = (d.lic !== 'None') ? d.lic : '';
+            document.getElementById('c_vlicencia').value = (d.vlic !== 'None') ? d.vlic : '';
+            document.getElementById('c_eps').value = (d.eps !== 'None') ? d.eps : '';
+            document.getElementById('c_afp').value = (d.afp !== 'None') ? d.afp : '';
+            document.getElementById('c_arl').value = (d.arl !== 'None') ? d.arl : '';
+            document.getElementById('c_pago_ss').value = (d.pago !== 'None') ? d.pago : '';
+
+            openModal('modalConductor');
+        }
+
+        function confirmarEliminarConductor(id, cedula, nombre) {
+            document.getElementById('delete_conductor_id').value = id;
+            document.getElementById('delete_conductor_cedula').value = cedula;
+            document.getElementById('delete_conductor_nombre').innerText = nombre;
+            openModal('modalEliminarConductor');
+        }
+
+        async function buscarYMostrarVisor() {
+            let cedula = document.getElementById('input_consulta_cedula').value.trim();
+            if (!cedula) { alert("Ingrese un número de cédula válido."); return; }
+
+            try {
+                let res = await fetch(`{{ url_for('flotaespecial_flota.visor_conductor_individual') }}?cedula=${cedula}`);
+                let data = await res.json();
+                
+                if (data.success && data.conductor) {
+                    const c = data.conductor;
+                    document.getElementById('vis_nombre_titulo').innerText = c.nombre;
+                    document.getElementById('vis_id').innerText = `${c.nombre} (CC: ${c.cedula})`;
+                    document.getElementById('vis_contacto').innerText = `${c.telefono || 'N/D'} / ${c.email || 'N/D'}`;
+                    document.getElementById('vis_ubicacion').innerText = `${c.municipio_base || 'N/D'} - ${c.departamento_base || 'N/D'}`;
+                    document.getElementById('vis_vehiculo').innerText = c.vehiculo_asignado || 'Sin asignar';
+                    document.getElementById('vis_tg').innerText = `${c.estatus || 'No Logueado'} / ${c.telegram_id || 'No registrado'}`;
+                    document.getElementById('vis_lic').innerText = `N° ${c.numero_licencia_conduccion || 'N/D'} | Vence: ${c.vencimiento_licencia_conduccion || 'N/D'}`;
+                    document.getElementById('vis_afil').innerText = `EPS: ${c.eps || 'N/D'} | AFP: ${c.fondo_pensiones || 'N/D'} | ARL: ${c.arl || 'N/D'}`;
+                    document.getElementById('vis_ss').innerText = `Pago: ${c.ultimo_pago_seguridad_social || 'N/D'} | Vence: ${c.vencimiento_seguridad_social || 'N/D'}`;
+
+                    configurarBotonVisor('btnVisCed', c.ruta_pdf_cedula);
+                    configurarBotonVisor('btnVisLic', c.ruta_pdf_licencia);
+                    configurarBotonVisor('btnVisSS', c.ruta_pdf_seguridad_social);
+
+                    openModal('modalVisorConductor');
+                } else {
+                    alert(data.message || "Conductor no encontrado en la flota de esta empresa.");
+                }
+            } catch (error) {
+                alert("Error de red al consultar el expediente.");
+            }
+        }
+
+        function configurarBotonVisor(idBtn, ruta) {
+            const btn = document.getElementById(idBtn);
+            if(btn) {
+                if (ruta && ruta !== 'None' && ruta.trim() !== '') {
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
+                    btn.onclick = function() { verPDF(ruta); };
+                } else {
+                    btn.style.opacity = '0.5';
+                    btn.style.cursor = 'not-allowed';
+                    btn.onclick = function() { alert("Documento no disponible en el expediente."); };
+                }
+            }
+        }
+
+        /* SCRIPTS ESPECÍFICOS: TERCEROS */
+        function abrirCrearTercero() {
+            document.getElementById('formTercero').reset();
+            document.getElementById('tituloModalTercero').innerText = 'Registrar Empresa Tercera';
+            document.getElementById('accionTercero').value = 'crear_tercero';
+            document.getElementById('btnGuardarTercero').innerText = 'Guardar';
+            openModal('modalTercero');
+        }
+
+        function abrirEditarTercero(id, nombre, nit, dep, mun, tel, email) {
+            document.getElementById('formTercero').reset();
+            document.getElementById('tituloModalTercero').innerText = 'Editar Empresa Tercera';
+            document.getElementById('accionTercero').value = 'editar_tercero';
+            document.getElementById('btnGuardarTercero').innerText = 'Guardar Cambios';
+            
+            document.getElementById('tercero_id').value = id;
+            document.getElementById('t_nombre').value = nombre;
+            document.getElementById('t_nit').value = nit !== 'None' ? nit : '';
+            document.getElementById('t_telefono').value = tel !== 'None' ? tel : '';
+            document.getElementById('t_email').value = email !== 'None' ? email : '';
+            
+            let depSelect = document.getElementById('t_dep_sede');
+            if (dep && dep !== 'None') {
+                depSelect.value = dep;
+                cargarMunicipios('t_dep_sede', 't_mun_sede');
+                let munSelect = document.getElementById('t_mun_sede');
+                if (mun && mun !== 'None') munSelect.value = mun;
+            }
+
+            openModal('modalTercero');
+        }
+
+        function confirmarEliminarTercero(id, nombre) {
+            document.getElementById('delete_tercero_id').value = id;
+            document.getElementById('delete_tercero_nombre').innerText = nombre;
+            openModal('modalEliminarTercero');
+        }
+    </script>
+</body>
+</html>

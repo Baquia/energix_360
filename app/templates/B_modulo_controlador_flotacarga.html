@@ -1,4 +1,4 @@
-<!-- app/templates/B_modulo_controlador_flotacarga.html -->
+<!-- MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: CONTROLADOR_FLOTA | CONDICIÓN: OBLIGATORIO -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -61,6 +61,14 @@
         }
         .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
         .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
+        .nav-item.disabled {
+         color: #6c757d !important;      
+         pointer-events: none;           
+         cursor: not-allowed;            
+         opacity: 0.65;                  
+         text-decoration: none;          
+        }
+
         .nav-icon { font-size: 18px; }
         
         .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
@@ -97,6 +105,8 @@
         
         .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 6px;}
         .btn-primary:hover { background: var(--verde-osc); }
+        #monitor_operadores_enlinea{display:none;}
+        #tablero_monitor_operadores_enlinea{display:none;}
 
         /* Tablas */
         .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-width: 1000px; overflow-x: auto; }
@@ -156,31 +166,57 @@
         </div>
         
         <nav class="nav-menu">
+            <!-- MÓDULOS OBLIGATORIOS (CORE FLOTA) -->
             <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="nav-item {% if active_module == 'dashboard' or not active_module %}active{% endif %}">
                 <span class="nav-icon">📊</span> Panel Central
-            </a>
-            <a href="{{ url_for('gestorflota.gestion_vehiculos') }}" class="nav-item {% if active_module == 'vehiculos' %}active{% endif %}">
-                <span class="nav-icon">🚚</span> Vehículos
-            </a>
-            <a href="{{ url_for('gestorflota.gestion_rutas') }}" class="nav-item {% if active_module == 'rutas' %}active{% endif %}">
-                <span class="nav-icon">🗺️</span> Configurar Rutas
             </a>
             <a href="{{ url_for('gestorflota.mapa_rutas') }}" class="nav-item {% if active_module == 'mapa_rutas' %}active{% endif %}">
                 <span class="nav-icon">📍</span> Mapa de Rutas
             </a>
-            <a href="{{ url_for('gestorflota.gestion_operadores') }}" class="nav-item {% if active_module == 'operadores' %}active{% endif %}">
-                <span class="nav-icon">👷</span> Conductores / Auxiliares
+            <a href="{{ url_for('gestorflota.gestion_rutas') }}" class="nav-item {% if active_module == 'rutas' %}active{% endif %}">
+                <span class="nav-icon">🗺️</span> Configurar Rutas
+            </a>
+            <a href="{{ url_for('gestorflota.gestion_vehiculos') }}" class="nav-item {% if active_module == 'vehiculos' %}active{% endif %}">
+                <span class="nav-icon">🚚</span> Vehículos
+            </a>
+             <a href="{{ url_for('gestorflota.gestion_operadores') }}" class="nav-item {% if active_module == 'operadores' %}active{% endif %}">
+                <span class="nav-icon">👷</span> Personal (Conductores)
             </a>
             <a href="{{ url_for('gestorflota.generacion_qrs') }}" class="nav-item {% if active_module == 'qrs' %}active{% endif %}">
                 <span class="nav-icon">🖨️</span> Códigos QR
             </a>
-            <a href="{{ url_for('gestorflota.historial_preoperacionales') }}" class="nav-item {% if active_module == 'preoperacionales' %}active{% endif %}">
-                <span class="nav-icon">📋</span> Preoperacionales
+            
+            <!-- SUB-SUBMÓDULO PREOPERACIONAL (OBLIGATORIO) -->
+            <a href="{{ url_for('preoperacional.historial_preoperacionales') }}" class="nav-item">
+                <span class="nav-icon">📋</span> Preoperacionales PESV
             </a>
-            <!-- NUEVO ENLACE AL MÓDULO DE COMBUSTIBLE -->
-            <a href="{{ url_for('gestorflota.monitoreo_combustible') }}" class="nav-item {% if active_module == 'monitoreo_combustible' %}active{% endif %}">
+
+            <!-- GESTIÓN DE CARGA / BÁSCULA (OPCIONAL P&P) -->
+            {% if 'carga' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
+            <a href="{{ url_for('bp_gestion_carga.panel_bascula') }}" class="nav-item">
+                <span class="nav-icon">⚖️</span> Gestión de Báscula
+            </a>
+            {% endif %}
+
+            <!-- COMBUSTIBLE (OPCIONAL P&P) -->
+            {% if 'combustible' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
+            <a href="{{ url_for('combustible_flota.monitoreo_combustible') }}" class="nav-item">
                 <span class="nav-icon">⛽</span> Combustible
             </a>
+            {% endif %}
+
+            <!-- MÓDULOS PROYECTADOS P&P -->
+            {% if 'mantenimiento' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
+            <a href="#" class="nav-item disabled" aria-disabled="true">
+                <span class="nav-icon">🔧</span> Mantenimiento
+            </a>
+            {% endif %}
+            
+            {% if 'contabilidad' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
+            <a href="#" class="nav-item disabled" aria-disabled="true">
+                <span class="nav-icon">🧾</span> Contabilidad
+            </a>
+            {% endif %}
         </nav>
 
         <div class="sidebar-footer">
@@ -370,7 +406,7 @@
                                 <td style="text-transform: capitalize;">{{ v.tipo }} / {{ v.caja_de_carga }}</td>
                                 <td>{{ v['capacidad (kg)'] }} kg</td>
                                 <td>
-                                    <a href="{{ url_for('gestorflota.imprimir_qr_individual', vehiculo_id=v.id) }}" target="_blank" class="btn-icon edit" title="Imprimir QR Individual">🖨️ PDF</a>
+                                    <a href="{{ url_for('gestorflota.imprimir_qr_individual', vehiculo_id=v.id) }}" target="_blank" class="btn-icon edit" title="Imprimir QR Individual">🖨 PDF</a>
                                 </td>
                             </tr>
                             {% else %}
@@ -427,154 +463,15 @@
                     </table>
                 </div>
 
-            {% elif active_module == 'preoperacionales' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Auditoría de Preoperacionales</h2>
-                    </div>
-                </div>
-
-                <form class="filter-bar" method="GET" action="{{ url_for('gestorflota.historial_preoperacionales') }}">
-                    <div class="form-group">
-                        <label>Desde</label>
-                        <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
-                    </div>
-                    <div class="form-group">
-                        <label>Hasta</label>
-                        <input type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}">
-                    </div>
-                    <div class="form-group">
-                        <label>Placa Vehículo</label>
-                        <select name="placa">
-                            <option value="todas">Todas las placas</option>
-                            {% for vh in vehiculos_historicos %}
-                                <option value="{{ vh.placa }}" {% if filtros.placa == vh.placa %}selected{% endif %}>{{ vh.placa }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="submit" class="filter-btn">🔍 Filtrar</button>
-                </form>
-
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Fecha / Hora</th>
-                                <th>Consecutivo</th>
-                                <th>Placa</th>
-                                <th>Conductor</th>
-                                <th>Dictamen General</th>
-                                <th>Descargar</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for insp in inspecciones %}
-                            <tr>
-                                <td>{{ insp.fecha_inspeccion }} {{ insp.hora_inspeccion }}</td>
-                                <td style="font-weight: bold; color: var(--verde);">{{ insp.consecutivo_anual }}</td>
-                                <td>{{ insp.placa_vehiculo }}</td>
-                                <td>{{ insp.nombre_conductor }}</td>
-                                <td>
-                                    {% if insp.vehiculo_aprobado == 1 %}
-                                        <span class="badge badge-success">✅ Operativo</span>
-                                    {% else %}
-                                        <span class="badge badge-danger">⚠️ Alerta Crítica</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <a href="{{ url_for('gestorflota.descargar_preoperacional_pdf', consecutivo=insp.consecutivo_anual) }}" target="_blank" class="btn-icon edit" title="Descargar PDF">📄 PDF</a>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No se encontraron inspecciones en el rango seleccionado.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-            <!-- NUEVO MÓDULO: AUDITORÍA DE COMBUSTIBLE -->
-            {% elif active_module == 'monitoreo_combustible' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Auditoría de Combustible</h2>
-                    </div>
-                </div>
-
-                <form class="filter-bar" method="GET" action="{{ url_for('gestorflota.monitoreo_combustible') }}">
-                    <div class="form-group">
-                        <label>Desde</label>
-                        <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}">
-                    </div>
-                    <div class="form-group">
-                        <label>Hasta</label>
-                        <input type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}">
-                    </div>
-                    <div class="form-group">
-                        <label>Placa Vehículo</label>
-                        <select name="placa">
-                            <option value="todas">Todas las placas</option>
-                            {% for vh in vehiculos_historicos %}
-                                <option value="{{ vh.placa }}" {% if filtros.placa == vh.placa %}selected{% endif %}>{{ vh.placa }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="submit" class="filter-btn">🔍 Filtrar</button>
-                </form>
-
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Fecha Tanqueo</th>
-                                <th>Placa</th>
-                                <th>Operador</th>
-                                <th>Combustible</th>
-                                <th>Galones/M3</th>
-                                <th>Kilometraje</th>
-                                <th>Valor Total</th>
-                                <th>Comprobante</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for reg in registros_combustible %}
-                            <tr>
-                                <td>{{ reg.fecha_tanqueo }}</td>
-                                <td style="font-weight: bold; color: var(--verde);">{{ reg.placa }}</td>
-                                <td>{{ reg.nombre_operador }}</td>
-                                <td>{{ reg.tipo_combustible }}</td>
-                                <td>{{ reg.galones }}</td>
-                                <td>{{ reg.kilometraje_actual }} KM</td>
-                                <td style="font-weight: bold;">${{ "{:,.2f}".format(reg.valor_total) }}</td>
-                                <td>
-                                    {% if reg.ruta_comprobante %}
-                                        <a href="{{ url_for('static', filename=reg.ruta_comprobante) }}" target="_blank" class="btn-icon edit" title="Ver Voucher" style="text-decoration: none;">📸 Ver</a>
-                                    {% else %}
-                                        <span class="badge badge-gray">No adjunto</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">No se encontraron registros de combustible en el rango seleccionado.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
             {% else %}
-                <div class="action-header">
+                <div class="action-header" id="monitor_operadores_enlinea">
                     <div class="action-title-group">
                         <h2>Monitor de Operadores en Línea</h2>
                     </div>
                 </div>
                 
                 <!-- NUEVA GRÁFICA DE HEARTBEAT (Chart.js) -->
-                <div class="table-card" style="margin-bottom: 25px; padding: 20px; height: 350px;">
+                <div class="table-card" style="margin-bottom: 25px; padding: 20px; height: 350px;" id="tablero_monitor_operadores_enlinea">
                     <canvas id="heartbeatChart"></canvas>
                 </div>
 
@@ -1215,17 +1112,15 @@
                                     if (!dataset) {
                                         dataset = {
                                             label: op.nombre_operador,
-                                            data: new Array(heartbeatChart.data.labels.length - 1).fill(null), // rellenar histórico en blanco
+                                            data: new Array(heartbeatChart.data.labels.length - 1).fill(null), 
                                             borderColor: stringToColor(op.nombre_operador),
                                             borderWidth: 2,
-                                            stepped: true, // Línea escalonada para simular señal digital
+                                            stepped: true, 
                                             tension: 0
                                         };
                                         heartbeatChart.data.datasets.push(dataset);
                                     }
                                     
-                                    // Separar visualmente las líneas si coinciden en 1 o 0 (Offset visual)
-                                    // Para evitar que se superpongan todas en el valor exacto
                                     let baseValue = op.en_linea;
                                     let visualOffset = (Math.random() * 0.08) - 0.04; 
                                     dataset.data.push(baseValue + visualOffset);
@@ -1242,7 +1137,6 @@
                     .catch(err => console.error("Error actualizando panel:", err));
             }
 
-            // Iniciar ciclo de actualización cada 10 segundos
             actualizarOperadores();
             setInterval(actualizarOperadores, 10000);
         });

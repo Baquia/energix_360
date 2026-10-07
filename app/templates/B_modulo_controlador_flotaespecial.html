@@ -189,29 +189,33 @@
 
     <div class="cards-grid">
 
-      <!-- TARJETA 1: GESTIÓN DE FLOTA -->
-      <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" class="card-link">
+      <!-- TARJETA 1: GESTIÓN DE FLOTA (Módulo Fijo Base) -->
+      <a href="{{ url_for('flotaespecial_flota.gestion_flota') }}" class="card-link">
         <div class="card">
           <div class="card-icon">🚐</div>
           <div class="card-title">Gestión de Flota</div>
         </div>
       </a>
 
-      <!-- TARJETA 2: OPERATIVIDAD EPS -->
-      <a href="{{ url_for('controlador_flotaespecial.dashboard_operativo') }}" class="card-link">
+      <!-- TARJETA 2: OPERATIVIDAD EPS (Submódulo Opcional Plug & Play) -->
+      {% if 'eps_gestion' in session.get('submodulos_activos', []) %}
+      <a href="{{ url_for('flotaespecial_eps.dashboard_operativo') }}" class="card-link">
         <div class="card">
           <div class="card-icon">🏥</div>
           <div class="card-title">Gestión Operativa EPS</div>
         </div>
       </a>
+      {% endif %}
 
-      <!-- TARJETA 3: PRE-FACTURACIÓN Y RIPS -->
+      <!-- TARJETA 3: PRE-FACTURACIÓN Y RIPS (Submódulo Opcional Plug & Play) -->
+      {% if 'eps_facturacion' in session.get('submodulos_activos', []) %}
       <a href="{{ url_for('procesofacturacion_eps.index_facturacion') }}" class="card-link">
         <div class="card">
           <div class="card-icon">💵</div>
           <div class="card-title">Pre-Facturación y RIPS</div>
         </div>
       </a>
+      {% endif %}
 
     </div>
 

@@ -1,14 +1,16 @@
+# MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: CARGA (BASCULA) | CONDICIÓN: OPCIONAL
+# app/blueprints/B_bp_pesaje_carga_avicola.py
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, session, url_for, send_file
 from datetime import datetime, timedelta
 from app import mysql
-from app.utils import login_required_custom
+from app.utils import login_required_custom, submodulo_required
 import MySQLdb.cursors
 import json
 from io import BytesIO
 
 # Importaciones de ReportLab para la construcción del documento físico
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
@@ -16,7 +18,6 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from app import csrf
 
 bp_gestion_carga = Blueprint('bp_gestion_carga', __name__, url_prefix='/bqa_bascula')
 
@@ -25,13 +26,9 @@ bp_gestion_carga = Blueprint('bp_gestion_carga', __name__, url_prefix='/bqa_basc
 # ========================================================
 @bp_gestion_carga.route('/panel', methods=['GET'])
 @login_required_custom
+@submodulo_required('carga')
 def panel_bascula():
     id_empresa = session.get('empresa_id')
-    tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
-
-    if 'cria_beneficio_aves_corral' not in tipo_empresa and str(id_empresa) != '890707006':
-        flash('Acceso denegado. Módulo de pesaje exclusivo para operación avícola.', 'danger')
-        return redirect('/')
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
@@ -74,6 +71,7 @@ def panel_bascula():
 # ========================================================
 @bp_gestion_carga.route('/api/validar_preoperacional', methods=['POST'])
 @login_required_custom
+@submodulo_required('carga')
 def api_validar_preoperacional():
     data = request.get_json()
     placa = data.get('placa')
@@ -107,6 +105,7 @@ def api_validar_preoperacional():
 # ========================================================
 @bp_gestion_carga.route('/registrar_pesaje', methods=['POST'])
 @login_required_custom
+@submodulo_required('carga')
 def procesar_pesaje_avicola():
     id_empresa = session.get('empresa_id')
     empresa_nombre = session.get('empresa')
@@ -117,7 +116,6 @@ def procesar_pesaje_avicola():
     auxiliar = request.form.get('auxiliar', 'N/A')
     peso_bascula = float(request.form.get('peso_bascula', 0))
 
-    # Lógica de Canastas vs Alimento
     if tipo_carga == 'alimento':
         total_canastas = 0
         peso_unitario = 0.0
@@ -158,13 +156,11 @@ def procesar_pesaje_avicola():
             capacidad_camion = float(request.form.get('capacidad_tercero', 0))
             conductor = request.form.get('conductor_tercero', '')
 
-        # Generar Consecutivo
         fecha_str = fecha_actual.strftime("%Y%m%d")
-        cur.execute("SELECT COUNT(*) AS total FROM pesajes_producto_avicola WHERE placa = %s AND id_empresa = %s AND tipo_registro = 'cierre_pesaje' AND DATE(fecha_hora) = CURDATE()", (placa, id_empresa))
+        cur.execute("SELECT COUNT(*) AS total FROM pesajes_producto_avicola WHERE placa = %s AND id_empresa = %s AND tipo_registro = 'cierre_pesaje' AND DATE(fecha_hora) = CURDATE() FOR UPDATE", (placa, id_empresa))
         num_viaje = int(cur.fetchone()['total']) + 1
         consecutivo = f"Viaje-{placa}-{fecha_str}-{num_viaje:02d}"
 
-        # Grabar Remisiones
         kg_remisiones_total = 0.0
         for i in range(len(remisiones_numeros)):
             p_rem = float(remisiones_pesos[i])
@@ -175,7 +171,6 @@ def procesar_pesaje_avicola():
                 VALUES (%s, %s, %s, %s, 'remision', %s, %s, %s, %s, %s, %s)
             """, (id_empresa, empresa_nombre, fecha_actual, consecutivo, tipo_vehiculo, tipo_carga, placa, remisiones_numeros[i], p_rem, usuario_registro))
 
-        # Ecuaciones
         peso_canastas_total = total_canastas * peso_unitario
         kg_pesados_neto = peso_bascula - tara_camion - peso_canastas_total
         
@@ -190,7 +185,6 @@ def procesar_pesaje_avicola():
 
         aprobado = 'si' if porcentaje_diferencia <= 1.5 else 'rev-despachos'
 
-        # Grabar Cierre
         cur.execute("""
             INSERT INTO pesajes_producto_avicola 
             (id_empresa, empresa, fecha_hora, consecutivo_viaje, tipo_registro, tipo_vehiculo, tipo_carga, placa, rutas_y_kilos, 
@@ -217,14 +211,14 @@ def procesar_pesaje_avicola():
         cur.close()
 
 # ========================================================
-# RUTA 4: REPORTES Y MÉTRICAS (ACTUALIZADO CON CAJA_DE_CARGA)
+# RUTA 4: REPORTES Y MÉTRICAS
 # ========================================================
 @bp_gestion_carga.route('/reportes', methods=['GET'])
 @login_required_custom
+@submodulo_required('carga')
 def reportes_bascula():
     id_empresa = session.get('empresa_id')
 
-    # Parámetros de Filtro
     fecha_inicio = request.args.get('fecha_inicio', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
     fecha_fin = request.args.get('fecha_fin', datetime.now().strftime('%Y-%m-%d'))
     tipo_flota = request.args.get('tipo_flota', 'todas')
@@ -233,11 +227,9 @@ def reportes_bascula():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-    # 1. Obtener placas históricas para el filtro
     cur.execute("SELECT DISTINCT placa FROM pesajes_producto_avicola WHERE id_empresa = %s ORDER BY placa", (id_empresa,))
     placas_historicas = cur.fetchall()
 
-    # 2. Construcción de la Query Dinámica para Cierres
     query = """
         SELECT c.*, 
                (SELECT SUM(kg_remision) FROM pesajes_producto_avicola r WHERE r.consecutivo_viaje = c.consecutivo_viaje AND r.tipo_registro = 'remision') as total_teorico
@@ -262,7 +254,6 @@ def reportes_bascula():
     cur.execute(query, tuple(params))
     viajes = cur.fetchall()
 
-    # 3. Consulta de Eficiencia de Carga (SOLO FLOTA PROPIA, CORREGIDO A caja_de_carga)
     query_ef = """
         SELECT p.placa, v.caja_de_carga, AVG(p.capacidad_usada) as prom_cap_usada
         FROM pesajes_producto_avicola p
@@ -283,7 +274,6 @@ def reportes_bascula():
     data_eficiencia = cur.fetchall()
     cur.close()
 
-    # 4. Calcular KPIs Consolidados
     kpis = {
         'total_viajes': len(viajes),
         'kg_pollo_pie': 0,
@@ -301,7 +291,6 @@ def reportes_bascula():
         if v['aprobado'] == 'rev-despachos':
             kpis['viajes_con_desviacion'] += 1
 
-    # 5. Procesar Datos de Eficiencia Propia
     eficiencia = {
         'global': 0.0,
         'por_tipo': {},
@@ -316,11 +305,9 @@ def reportes_bascula():
             promedio_placa = float(e['prom_cap_usada'] or 0)
             tipo_veh = str(e['caja_de_carga']).capitalize()
             
-            # Ranking por Placa
             eficiencia['por_placa'].append({'placa': e['placa'], 'promedio': promedio_placa, 'tipo': tipo_veh})
             suma_total += promedio_placa
             
-            # Agrupación por Tipo
             if tipo_veh not in eficiencia['por_tipo']:
                 eficiencia['por_tipo'][tipo_veh] = {'suma': 0, 'conteo': 0}
             eficiencia['por_tipo'][tipo_veh]['suma'] += promedio_placa
@@ -328,7 +315,6 @@ def reportes_bascula():
             
         eficiencia['global'] = round(suma_total / len(data_eficiencia), 1)
         
-        # Calcular promedio final por tipo
         for tipo, valores in eficiencia['por_tipo'].items():
             eficiencia['por_tipo'][tipo] = round(valores['suma'] / valores['conteo'], 1)
 
@@ -344,11 +330,13 @@ def reportes_bascula():
         eficiencia=eficiencia,
         filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'tipo_flota': tipo_flota, 'tipo_carga': tipo_carga, 'placa': placa_filtro}
     )
+
 # ========================================================
 # RUTA 5: DESCARGAR MANIFIESTO EN PDF
 # ========================================================
 @bp_gestion_carga.route('/descargar_manifiesto/<consecutivo>', methods=['GET'])
 @login_required_custom
+@submodulo_required('carga')
 def generar_manifiesto_pdf(consecutivo):
     id_empresa = session.get('empresa_id')
     empresa_nombre = session.get('empresa')
@@ -387,8 +375,6 @@ def generar_manifiesto_pdf(consecutivo):
     story.append(Spacer(1, 15))
     
     rutas_lista = json.loads(cierre['rutas_y_kilos']) if cierre['rutas_y_kilos'] else []
-    
-    # Formatear Tipo de Carga
     tc_format = cierre['tipo_carga'].replace('_', ' ').capitalize()
 
     meta_data = [
@@ -424,15 +410,15 @@ def generar_manifiesto_pdf(consecutivo):
     return send_file(buffer, as_attachment=True, download_name=f"Manifiesto_{consecutivo}.pdf", mimetype='application/pdf')
 
 # ========================================================
-# RUTA 6: GENERAR REPORTE GLOBAL EN PDF (ACTUALIZADO CON CAJA_DE_CARGA)
+# RUTA 6: GENERAR REPORTE GLOBAL EN PDF
 # ========================================================
 @bp_gestion_carga.route('/descargar_reporte_pdf', methods=['GET'])
 @login_required_custom
+@submodulo_required('carga')
 def descargar_reporte_pdf():
     id_empresa = session.get('empresa_id')
     empresa_nombre = session.get('empresa')
 
-    # Capturar mismos filtros
     fecha_inicio = request.args.get('fecha_inicio', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'))
     fecha_fin = request.args.get('fecha_fin', datetime.now().strftime('%Y-%m-%d'))
     tipo_flota = request.args.get('tipo_flota', 'todas')
@@ -441,7 +427,6 @@ def descargar_reporte_pdf():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-    # 1. Consultar Viajes
     query = """
         SELECT c.*, 
                (SELECT SUM(kg_remision) FROM pesajes_producto_avicola r WHERE r.consecutivo_viaje = c.consecutivo_viaje AND r.tipo_registro = 'remision') as total_teorico
@@ -464,7 +449,6 @@ def descargar_reporte_pdf():
     cur.execute(query, tuple(params))
     viajes = cur.fetchall()
 
-    # 2. Consultar Eficiencia (Solo si aplica)
     data_eficiencia = []
     if tipo_flota in ['todas', 'propio']:
         query_ef = """
@@ -488,7 +472,6 @@ def descargar_reporte_pdf():
 
     cur.close()
 
-    # Construcción del PDF
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     story = []
@@ -502,7 +485,6 @@ def descargar_reporte_pdf():
     story.append(Paragraph(f"Empresa: {empresa_nombre} | Periodo: {fecha_inicio} al {fecha_fin}", sub_style))
     story.append(Spacer(1, 15))
 
-    # Tabla de Eficiencia (Solo Propia)
     if data_eficiencia:
         story.append(Paragraph("<b>Eficiencia de Ocupación (Flota Propia)</b>", ParagraphStyle('H2', fontSize=10, textColor=colors.HexColor('#015249'))))
         story.append(Spacer(1, 5))
@@ -522,7 +504,6 @@ def descargar_reporte_pdf():
         story.append(t_eff)
         story.append(Spacer(1, 15))
 
-    # Tabla de Viajes
     story.append(Paragraph("<b>Detalle de Viajes</b>", ParagraphStyle('H2', fontSize=10, textColor=colors.HexColor('#015249'))))
     story.append(Spacer(1, 5))
     viajes_data = [["Fecha", "Viaje", "Placa", "Carga", "Teórico (Kg)", "Báscula (Kg)", "Desv %"]]
@@ -545,7 +526,7 @@ def descargar_reporte_pdf():
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ('FONTSIZE', (0,0), (-1,-1), 8),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e5e7eb')),
-        ('ALIGN', (4,1), (6,-1), 'RIGHT'), # Alinear números a la derecha
+        ('ALIGN', (4,1), (6,-1), 'RIGHT'),
     ]))
     story.append(t_viajes)
 
@@ -555,12 +536,10 @@ def descargar_reporte_pdf():
     return send_file(buffer, as_attachment=True, download_name=f"Reporte_Bascula_{fecha_inicio}_al_{fecha_fin}.pdf", mimetype='application/pdf')
 
 # ========================================================
-# RUTA 7: CRON - REPORTE DIARIO 8:00 AM (ACTUALIZADO CON CAJA_DE_CARGA)
+# RUTA 7: CRON - REPORTE DIARIO 8:00 AM
 # ========================================================
 @bp_gestion_carga.route('/cron/reporte_diario_logistica', methods=['GET'])
-@csrf.exempt
 def cron_reporte_diario_logistica():
-    # Solo permite acceso mediante un token de seguridad para evitar que lo corran externos
     if request.args.get('token') != 'BQA_CRON_2026':
         return jsonify({"success": False, "message": "No autorizado"}), 403
 
@@ -569,7 +548,6 @@ def cron_reporte_diario_logistica():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
-    # 1. Buscar qué empresas tuvieron movimiento de flota propia ayer
     cur.execute("""
         SELECT DISTINCT id_empresa, empresa 
         FROM pesajes_producto_avicola 
@@ -581,7 +559,6 @@ def cron_reporte_diario_logistica():
         id_empresa = emp['id_empresa']
         nombre_empresa = emp['empresa']
 
-        # 2. Calcular eficiencia por placa de ESE día para ESA empresa
         cur.execute("""
             SELECT p.placa, v.caja_de_carga, AVG(p.capacidad_usada) as prom_cap_usada, COUNT(*) as total_viajes
             FROM pesajes_producto_avicola p
@@ -594,7 +571,6 @@ def cron_reporte_diario_logistica():
 
         if not resultados: continue
 
-        # 3. Buscar destinatarios de Logística
         cur.execute("""
             SELECT email FROM contactos 
             WHERE empresa = %s AND LOWER(area_contacto) = 'logistica' AND email IS NOT NULL
@@ -604,7 +580,6 @@ def cron_reporte_diario_logistica():
 
         if not destinatarios: continue
 
-        # 4. Construir HTML del correo
         filas_html = ""
         for r in resultados:
             eff = float(r['prom_cap_usada'] or 0)
@@ -655,7 +630,6 @@ def cron_reporte_diario_logistica():
         </html>
         """
 
-        # 5. Enviar el Correo
         email_user = os.environ.get("EMAIL_USER")
         email_pass = os.environ.get("EMAIL_PASS")
         email_host = os.environ.get("EMAIL_HOST", "smtp.gmail.com")

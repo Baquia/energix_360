@@ -1,6 +1,7 @@
 # app/utils.py
 from flask import session, flash, redirect, url_for
 from functools import wraps
+from app import mysql
 
 def login_required_custom(f):
     @wraps(f)
@@ -12,12 +13,22 @@ def login_required_custom(f):
     return decorated_function
 
 
-# --- Asegúrate de que esta línea esté al inicio de app/utils.py ---
-from app import mysql 
-# (Si ya tienes 'from app import mysql, csrf...', no la repitas, solo verifica que esté mysql)
+def submodulo_required(submodulo_nombre):
+    """
+    Decorador de autorización Plug & Play para verificar si la empresa
+    posee activo el submódulo en su sesión (session['submodulos_activos']).
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            submodulos_activos = session.get('submodulos_activos', [])
+            if submodulo_nombre not in submodulos_activos:
+                flash('Acceso denegado: Su empresa no tiene habilitado este submódulo.', 'danger')
+                return redirect(url_for('index'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
-
-# --- PEGA ESTO AL FINAL DEL ARCHIVO ---
 
 def registrar_auditoria(empresa_id, empresa_nombre, modulo, usuario, accion, detalle, nivel='INFO'):
     """

@@ -1,3 +1,5 @@
+<!-- MÓDULO: WEBMASTER_ADMIN | ARCHIVO: 901811727_admin.html -->
+<!-- app/templates/901811727_admin.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -139,6 +141,12 @@
       <button class="nav-item" onclick="mostrarSeccion('gestionEmpresas'); cargarTablaEmpresas();">
         <span class="icon-spacer">🏢</span> Empresas
       </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionEmpresasTransporteEspecial'); cargarTablaEmpresasEspecial();">
+        <span class="icon-spacer">🚐</span> Empresas Transporte Especial
+      </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionEmpresasTransporteCarga'); cargarTablaEmpresasCarga();">
+        <span class="icon-spacer">🚛</span> Empresas Transporte Carga
+      </button>
       <button class="nav-item" onclick="mostrarSeccion('gestionTiposEmpresa'); cargarTablaTiposEmpresa();">
         <span class="icon-spacer">🏷️</span> Tipos de Empresa
       </button>
@@ -166,10 +174,10 @@
               <p class="text-secondary">Seleccione una opción del submenú lateral para gestionar usuarios, empresas o perfiles.</p>
           </div>
 
-          <!-- 1. GESTIÓN DE EMPRESAS -->
+          <!-- 1. GESTIÓN DE EMPRESAS (GENERAL) -->
           <div id="gestionEmpresas" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="text-primary fw-bold mb-0">Gestión de Empresas</h4>
+                <h4 class="text-primary fw-bold mb-0">Gestión de Empresas (General)</h4>
                 <div>
                     <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Empresa')">+ Nueva Empresa</button>
                     <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
@@ -186,6 +194,54 @@
                     </tr>
                   </thead>
                   <tbody id="bodyEmpresas"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 1B. GESTIÓN DE EMPRESAS TRANSPORTE ESPECIAL -->
+          <div id="gestionEmpresasTransporteEspecial" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Empresas de Transporte Especial</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('EmpresaEspecial')">+ Nueva Empresa Especial</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>NIT</th>
+                      <th>Nombre Comercial</th>
+                      <th>Submódulos Activos</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyEmpresasEspecial"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 1C. GESTIÓN DE EMPRESAS TRANSPORTE DE CARGA -->
+          <div id="gestionEmpresasTransporteCarga" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Empresas de Transporte de Carga</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('EmpresaCarga')">+ Nueva Empresa Carga</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>NIT</th>
+                      <th>Nombre Comercial</th>
+                      <th>Submódulos Activos</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyEmpresasCarga"></tbody>
                 </table>
               </div>
           </div>
@@ -387,10 +443,54 @@
                       <td class="text-muted small">${e.nit}</td>
                       <td class="fw-bold">${e.nombre_comercial}</td>
                       <td><span class="badge bg-secondary">${e.tipo_empresa || 'general'}</span></td>
-                      <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Empresa', '${dataStr}')">✏️ Editar</button></td>
+                      <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Empresa', '${dataStr}')">✏ Editar</button></td>
                   </tr>`;
               });
           }
+      }
+
+      window.cargarTablaEmpresasEspecial = function() {
+          fetch('/obtener_empresas_transporte_especial').then(r => r.json()).then(d => {
+              const b = document.getElementById('bodyEmpresasEspecial');
+              b.innerHTML = '';
+              if (d.success && d.empresas) {
+                  d.empresas.forEach(e => {
+                      const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(e))));
+                      const submodulosText = (e.submodulos_activos && e.submodulos_activos.length > 0)
+                          ? e.submodulos_activos.map(s => `<span class="badge bg-info text-dark me-1">${s}</span>`).join('')
+                          : '<span class="text-muted small">Ninguno</span>';
+                      
+                      b.innerHTML += `<tr>
+                          <td class="text-muted small">${e.nit}</td>
+                          <td class="fw-bold">${e.nombre_comercial}</td>
+                          <td>${submodulosText}</td>
+                          <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('EmpresaEspecial', '${dataStr}')">✏️ Editar</button></td>
+                      </tr>`;
+                  });
+              }
+          });
+      }
+
+      window.cargarTablaEmpresasCarga = function() {
+          fetch('/obtener_empresas_transporte_carga').then(r => r.json()).then(d => {
+              const b = document.getElementById('bodyEmpresasCarga');
+              b.innerHTML = '';
+              if (d.success && d.empresas) {
+                  d.empresas.forEach(e => {
+                      const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(e))));
+                      const submodulosText = (e.submodulos_activos && e.submodulos_activos.length > 0)
+                          ? e.submodulos_activos.map(s => `<span class="badge bg-success text-white me-1">${s}</span>`).join('')
+                          : '<span class="text-muted small">Ninguno</span>';
+                      
+                      b.innerHTML += `<tr>
+                          <td class="text-muted small">${e.nit}</td>
+                          <td class="fw-bold">${e.nombre_comercial}</td>
+                          <td>${submodulosText}</td>
+                          <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('EmpresaCarga', '${dataStr}')">✏️ Editar</button></td>
+                      </tr>`;
+                  });
+              }
+          });
       }
 
       window.cargarTablaTiposEmpresa = function() {
@@ -483,6 +583,81 @@
           }
       }
 
+      // -------------------------------------------------------------
+      // FUNCIONES DE AUTO-DESCUBRIMIENTO (EMPRESAS, MÓDULOS, RUTAS)
+      // -------------------------------------------------------------
+      window.cargarModulosPerfil = function(selectElem) {
+          let nit = selectElem.options[selectElem.selectedIndex].getAttribute('data-nit');
+          if (!nit) return;
+          
+          let fd = new FormData();
+          fd.append('nit', nit);
+          
+          fetch('/obtener_modulos_empresa', { method: 'POST', body: fd })
+          .then(r => r.json())
+          .then(res => {
+              let selectOp = document.getElementById('f_op');
+              if (!selectOp) return;
+              selectOp.innerHTML = '<option value="">Seleccione Módulo Autorizado...</option>';
+              
+              let modulosDisponibles = [];
+              if (res.success) {
+                  modulosDisponibles = [...new Set([...res.modulos, ...res.submodulos_activos])];
+              }
+              
+              let tempOp = document.getElementById('f_op_temp') ? document.getElementById('f_op_temp').value : '';
+              
+              modulosDisponibles.forEach(m => {
+                  let sel = (tempOp === m) ? 'selected' : '';
+                  selectOp.innerHTML += `<option value="${m}" ${sel} class="text-uppercase">${m}</option>`;
+              });
+              
+              if (selectOp.value !== "") {
+                  window.cargarRutasModulo(selectOp.value);
+              }
+          });
+      }
+
+      window.cargarRutasModulo = function(modulo) {
+          if (!modulo) return;
+          fetch('/api/obtener_rutas_modulo?modulo=' + modulo)
+          .then(r => r.json())
+          .then(res => {
+              let r1 = document.getElementById('f_ruta_1');
+              let r2 = document.getElementById('f_ruta_2');
+              let r3 = document.getElementById('f_ruta_3');
+              if (!r1 || !r2 || !r3) return;
+              
+              let opts1 = '<option value="">Seleccione Ruta Principal...</option>';
+              let opts2 = '<option value="">Seleccione Ruta Secundaria (Opcional)...</option>';
+              let opts3 = '<option value="">Seleccione Ruta Terciaria (Opcional)...</option>';
+              
+              let rutasGuardadasStr = document.getElementById('f_rutas_temp') ? document.getElementById('f_rutas_temp').value : '';
+              let rutasArray = rutasGuardadasStr.split(',').map(s => s.trim());
+              
+              if (res.success && res.rutas) {
+                  res.rutas.forEach(r => {
+                      opts1 += `<option value="${r}" ${rutasArray[0] === r ? 'selected' : ''}>${r}</option>`;
+                      opts2 += `<option value="${r}" ${rutasArray[1] === r ? 'selected' : ''}>${r}</option>`;
+                      opts3 += `<option value="${r}" ${rutasArray[2] === r ? 'selected' : ''}>${r}</option>`;
+                  });
+                  
+                  // Inyectar manualmente rutas previas (legacy) que no fueron descubiertas
+                  rutasArray.forEach((rg, index) => {
+                      if (rg && !res.rutas.includes(rg)) {
+                          if (index === 0) opts1 += `<option value="${rg}" selected>${rg} (Actual)</option>`;
+                          if (index === 1) opts2 += `<option value="${rg}" selected>${rg} (Actual)</option>`;
+                          if (index === 2) opts3 += `<option value="${rg}" selected>${rg} (Actual)</option>`;
+                      }
+                  });
+              }
+              
+              r1.innerHTML = opts1;
+              r2.innerHTML = opts2;
+              r3.innerHTML = opts3;
+          });
+      }
+
       window.nuevoItem = function(tipo) {
           currentMode = tipo; currentAction = "crear";
           document.getElementById('modalTituloMaestro').innerText = "Crear Nuevo: " + tipo;
@@ -528,6 +703,30 @@
                       <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando módulos...</span>
                   </div>`;
           } 
+          else if (tipo === 'EmpresaEspecial') {
+              currentUrl = "/gestionar_empresa_transporte_especial";
+              html += `
+                  <label class="fw-bold small mt-2 text-primary">NIT</label>
+                  <input type="text" id="f_nit_esp" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+                  <label class="fw-bold small mt-2">Nombre Comercial</label>
+                  <input type="text" id="f_nom_esp" class="form-control" value="${data.nombre_comercial || ''}">
+                  <label class="fw-bold small mt-3 mb-2 text-success">Submódulos y Módulos Universales Habilitados (Descubrimiento Dinámico Plug & Play)</label>
+                  <div id="contenedor_switches_transporte_especial" class="row g-2">
+                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando submódulos dinámicos...</span>
+                  </div>`;
+          }
+          else if (tipo === 'EmpresaCarga') {
+              currentUrl = "/gestionar_empresa_transporte_carga";
+              html += `
+                  <label class="fw-bold small mt-2 text-primary">NIT</label>
+                  <input type="text" id="f_nit_carga" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+                  <label class="fw-bold small mt-2">Nombre Comercial</label>
+                  <input type="text" id="f_nom_carga" class="form-control" value="${data.nombre_comercial || ''}">
+                  <label class="fw-bold small mt-3 mb-2 text-success">Submódulos y Módulos Universales Habilitados (Descubrimiento Dinámico Plug & Play)</label>
+                  <div id="contenedor_switches_transporte_carga" class="row g-2">
+                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando submódulos dinámicos...</span>
+                  </div>`;
+          }
           else if (tipo === 'TipoEmpresa') {
               currentUrl = "/gestionar_tipo_empresa";
               html += `
@@ -581,14 +780,26 @@
               html += `
                   <input type="hidden" id="f_pid" value="${data.id || ''}">
                   <label class="fw-bold small mt-2">Empresa (Inquilino)</label>
-                  <select id="f_enom_p" class="form-select fw-bold" onchange="document.getElementById('f_nit_p').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select>
+                  <select id="f_enom_p" class="form-select fw-bold" onchange="document.getElementById('f_nit_p').value = this.options[this.selectedIndex].getAttribute('data-nit'); window.cargarModulosPerfil(this);">${optsEmpresas}</select>
                   <input type="hidden" id="f_nit_p" value="${data.nit || ''}">
+                  
                   <label class="fw-bold small mt-2">Módulo / Operación</label>
-                  <input type="text" id="f_op" class="form-control" value="${data.operacion || ''}" placeholder="Ej: gas">
-                  <label class="fw-bold small text-success mt-2">Identificador del Perfil</label>
-                  <input type="text" id="f_perf_p" class="form-control border-success fw-bold" value="${data.perfil || ''}" placeholder="Ej: supervisor_gas">
-                  <label class="fw-bold small text-danger mt-2">Ruta Física (HTML o ViewFunc)</label>
-                  <input type="text" id="f_archivo" class="form-control border-danger fw-bold" value="${data.archivo_destino || ''}" placeholder="Ej: 901811727_energia.html">`;
+                  <select id="f_op" class="form-select" onchange="window.cargarRutasModulo(this.value)">
+                      <option value="">Seleccione Empresa primero...</option>
+                  </select>
+                  
+                  <label class="fw-bold small text-success mt-2">Nombre Perfil</label>
+                  <input type="text" id="f_perf_p" class="form-control border-success fw-bold" value="${data.perfil || ''}" placeholder="Ej: supervisor_gas" autocomplete="off">
+                  
+                  <label class="fw-bold small text-danger mt-2">Rutas Físicas (HTML o ViewFunc) - Hasta 3 accesos</label>
+                  <div id="contenedor_rutas_perfil" class="p-2 border rounded bg-light border-danger">
+                      <select id="f_ruta_1" class="form-select border-danger mb-2"><option value="">Seleccione Ruta Principal...</option></select>
+                      <select id="f_ruta_2" class="form-select border-danger mb-2"><option value="">Seleccione Ruta Secundaria (Opcional)...</option></select>
+                      <select id="f_ruta_3" class="form-select border-danger"><option value="">Seleccione Ruta Terciaria (Opcional)...</option></select>
+                  </div>
+                  
+                  <input type="hidden" id="f_op_temp" value="${data.operacion || ''}">
+                  <input type="hidden" id="f_rutas_temp" value="${data.archivo_destino || ''}">`;
           } 
           else if (tipo === 'Contacto') {
               currentUrl = "/gestionar_contacto";
@@ -626,6 +837,88 @@
                   const contenedor = document.getElementById('contenedor_switches_modulos');
                   if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error escaneando módulos del sistema.</span>';
               });
+          } else if (tipo === 'EmpresaEspecial') {
+              fetch('/api/submodulos_transporte_especial').then(r => r.json()).then(res => {
+                  const contenedor = document.getElementById('contenedor_switches_transporte_especial');
+                  if (contenedor && res.success) {
+                      const subActivos = data.submodulos_activos || [];
+                      let htmlSwitches = '<div class="col-12"><h6 class="fw-bold text-primary mt-2 mb-1">Submódulos Directos de Transporte Especial</h6></div>';
+                      
+                      res.directos.forEach(s => {
+                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
+                          htmlSwitches += `
+                              <div class="col-md-6 mb-2">
+                                  <div class="form-check form-switch p-3 border rounded bg-light">
+                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
+                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
+                                      <div class="text-muted small ms-1">${s.desc}</div>
+                                  </div>
+                              </div>`;
+                      });
+
+                      htmlSwitches += '<div class="col-12"><h6 class="fw-bold text-success mt-3 mb-1">Módulos Universales / Proyectados</h6></div>';
+                      res.universales.forEach(s => {
+                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
+                          htmlSwitches += `
+                              <div class="col-md-6 mb-2">
+                                  <div class="form-check form-switch p-3 border rounded bg-light">
+                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
+                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
+                                      <div class="text-muted small ms-1">${s.desc}</div>
+                                  </div>
+                              </div>`;
+                      });
+
+                      contenedor.innerHTML = htmlSwitches;
+                  }
+              }).catch(err => {
+                  const contenedor = document.getElementById('contenedor_switches_transporte_especial');
+                  if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error consultando submódulos del sistema.</span>';
+              });
+          } else if (tipo === 'EmpresaCarga') {
+              fetch('/api/submodulos_transporte_carga').then(r => r.json()).then(res => {
+                  const contenedor = document.getElementById('contenedor_switches_transporte_carga');
+                  if (contenedor && res.success) {
+                      const subActivos = data.submodulos_activos || [];
+                      let htmlSwitches = '<div class="col-12"><h6 class="fw-bold text-primary mt-2 mb-1">Submódulos Directos de Transporte de Carga</h6></div>';
+                      
+                      res.directos.forEach(s => {
+                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
+                          htmlSwitches += `
+                              <div class="col-md-6 mb-2">
+                                  <div class="form-check form-switch p-3 border rounded bg-light">
+                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
+                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
+                                      <div class="text-muted small ms-1">${s.desc}</div>
+                                  </div>
+                              </div>`;
+                      });
+
+                      htmlSwitches += '<div class="col-12"><h6 class="fw-bold text-success mt-3 mb-1">Módulos Universales / Proyectados</h6></div>';
+                      res.universales.forEach(s => {
+                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
+                          htmlSwitches += `
+                              <div class="col-md-6 mb-2">
+                                  <div class="form-check form-switch p-3 border rounded bg-light">
+                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
+                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
+                                      <div class="text-muted small ms-1">${s.desc}</div>
+                                  </div>
+                              </div>`;
+                      });
+
+                      contenedor.innerHTML = htmlSwitches;
+                  }
+              }).catch(err => {
+                  const contenedor = document.getElementById('contenedor_switches_transporte_carga');
+                  if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error consultando submódulos del sistema.</span>';
+              });
+          } else if (tipo === 'Perfil') {
+              // Pre-carga automática de módulos y rutas al estar en modo edición
+              let selEmpresa = document.getElementById('f_enom_p');
+              if (selEmpresa && selEmpresa.value !== "") {
+                  window.cargarModulosPerfil(selEmpresa);
+              }
           }
       }
 
@@ -639,6 +932,16 @@
               fd.append('tipo_empresa', document.getElementById('f_tipo').value);
               document.querySelectorAll('.chk-modulo:checked').forEach(chk => { fd.append('modulos[]', chk.value); });
           } 
+          else if (currentMode === 'EmpresaEspecial') {
+              fd.append('nit', document.getElementById('f_nit_esp').value);
+              fd.append('nombre_comercial', document.getElementById('f_nom_esp').value);
+              document.querySelectorAll('.chk-submodulo:checked').forEach(chk => { fd.append('submodulos[]', chk.value); });
+          }
+          else if (currentMode === 'EmpresaCarga') {
+              fd.append('nit', document.getElementById('f_nit_carga').value);
+              fd.append('nombre_comercial', document.getElementById('f_nom_carga').value);
+              document.querySelectorAll('.chk-submodulo:checked').forEach(chk => { fd.append('submodulos[]', chk.value); });
+          }
           else if (currentMode === 'TipoEmpresa') {
               fd.append('id', document.getElementById('f_tid') ? document.getElementById('f_tid').value : '');
               fd.append('tipo', document.getElementById('f_tnom') ? document.getElementById('f_tnom').value : '');
@@ -668,7 +971,14 @@
               fd.append('nit', document.getElementById('f_nit_p').value);
               fd.append('operacion', document.getElementById('f_op').value);
               fd.append('perfil', document.getElementById('f_perf_p').value);
-              fd.append('archivo_destino', document.getElementById('f_archivo').value);
+              
+              // Recolección y unificación multi-rutas
+              let r1 = document.getElementById('f_ruta_1') ? document.getElementById('f_ruta_1').value : '';
+              let r2 = document.getElementById('f_ruta_2') ? document.getElementById('f_ruta_2').value : '';
+              let r3 = document.getElementById('f_ruta_3') ? document.getElementById('f_ruta_3').value : '';
+              let rutasFinales = [r1, r2, r3].filter(r => r.trim() !== '').join(',');
+              
+              fd.append('archivo_destino', rutasFinales);
           } 
           else if (currentMode === 'Contacto') {
               fd.append('id', document.getElementById('f_cid').value);
@@ -683,7 +993,7 @@
               alert(d.message);
               if (d.success) {
                   bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
-                  if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa') location.reload();
+                  if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa' || currentMode === 'EmpresaEspecial' || currentMode === 'EmpresaCarga') location.reload();
                   else if (currentMode === 'Usuario') window.cargarTablaUsuarios();
                   else if (currentMode === 'Proveedor') window.cargarTablaProveedores();
                   else if (currentMode === 'Perfil') window.cargarTablaPerfiles();

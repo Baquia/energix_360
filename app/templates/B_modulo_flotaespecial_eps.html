@@ -1,6 +1,8 @@
+<!-- MÓDULO: TRANSPORTE_ESPECIAL | SUBMÓDULO: EPS_GESTION (OPCIONAL P&P) -->
 <!-- app/templates/B_modulo_flotaespecial_eps.html -->
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -10,14 +12,15 @@
     <meta name="theme-color" content="#015249">
 
     <!-- Google Maps JS API -->
-    <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBloN0EeBxRj9CWnHZ9Wgjz721846DT4KY&libraries=places,marker&v=weekly"></script>
+    <script async
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBloN0EeBxRj9CWnHZ9Wgjz721846DT4KY&libraries=places,marker&v=weekly"></script>
 
     <style>
         /* PALETA CORPORATIVA BQA-ONE */
         :root {
-            --verde: #015249;        
-            --verde-osc: #003b35;    
-            --bg-grad-start: #d7f2ec; 
+            --verde: #015249;
+            --verde-osc: #003b35;
+            --bg-grad-start: #d7f2ec;
             --surface: #ffffff;
             --text: #111827;
             --text-muted: #6b7280;
@@ -27,144 +30,838 @@
             --topbar-height: 70px;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
         body {
             font-family: Verdana, Geneva, Tahoma, sans-serif;
-            background-color: #f3f4f6; 
+            background-color: #f3f4f6;
             color: var(--text);
             display: flex;
             height: 100vh;
             overflow: hidden;
         }
 
-        a { text-decoration: none; color: inherit; }
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
 
         /* ================= SIDEBAR Y MENÚ ================= */
         .sidebar {
-            width: var(--sidebar-width); background: var(--surface);
-            border-right: 1px solid var(--border); display: flex;
-            flex-direction: column; transition: transform 0.3s ease;
+            width: var(--sidebar-width);
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
             z-index: 1000;
         }
-        .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
-        .logo-app { max-height: 35px; width: auto; }
-        .nav-menu { flex-grow: 1; padding: 20px 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
-        
-        .nav-item {
-            display: flex; align-items: center; justify-content: space-between; padding: 12px 15px;
-            border-radius: var(--radius); color: var(--text-muted);
-            font-size: 14px; font-weight: 600; transition: all 0.2s; cursor: pointer;
+
+        .sidebar-header {
+            height: var(--topbar-height);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid var(--border);
         }
-        .nav-item-content { display: flex; align-items: center; gap: 12px; }
-        .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
-        .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
-        .nav-item.back-btn { color: #f59e0b; border-bottom: 1px solid var(--border); border-radius: 0; margin-bottom: 10px; padding-bottom: 15px;}
-        .nav-icon { font-size: 18px; }
+
+        .logo-app {
+            max-height: 35px;
+            width: auto;
+        }
+
+        .nav-menu {
+            flex-grow: 1;
+            padding: 20px 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            border-radius: var(--radius);
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-item-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-item:hover {
+            background-color: #f9fafb;
+            color: var(--verde);
+        }
+
+        .nav-item.active {
+            background-color: #eefcf9;
+            color: var(--verde);
+            border-left: 4px solid var(--verde);
+        }
+
+        .nav-item.back-btn {
+            color: #f59e0b;
+            border-bottom: 1px solid var(--border);
+            border-radius: 0;
+            margin-bottom: 10px;
+            padding-bottom: 15px;
+        }
+
+        .nav-icon {
+            font-size: 18px;
+        }
 
         /* Dropdown Menu Estilos */
-        .dropdown-container { display: none; flex-direction: column; padding-left: 35px; margin-top: 5px; gap: 5px; }
-        .dropdown-container.open { display: flex; animation: slideDown 0.3s ease; }
-        .dropdown-item { padding: 8px 15px; font-size: 13px; color: var(--text-muted); border-radius: 8px; transition: 0.2s; }
-        .dropdown-item:hover { background: #f3f4f6; color: var(--verde); }
-        .dropdown-item.active { color: var(--verde); font-weight: bold; }
-        .dropdown-arrow { font-size: 10px; transition: transform 0.3s; }
-        .nav-item.open .dropdown-arrow { transform: rotate(180deg); }
-        
-        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
+        .dropdown-container {
+            display: none;
+            flex-direction: column;
+            padding-left: 35px;
+            margin-top: 5px;
+            gap: 5px;
+        }
+
+        .dropdown-container.open {
+            display: flex;
+            animation: slideDown 0.3s ease;
+        }
+
+        .dropdown-item {
+            padding: 8px 15px;
+            font-size: 13px;
+            color: var(--text-muted);
+            border-radius: 8px;
+            transition: 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background: #f3f4f6;
+            color: var(--verde);
+        }
+
+        .dropdown-item.active {
+            color: var(--verde);
+            font-weight: bold;
+        }
+
+        .dropdown-arrow {
+            font-size: 10px;
+            transition: transform 0.3s;
+        }
+
+        .nav-item.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .sidebar-footer {
+            padding: 20px 15px;
+            border-top: 1px solid var(--border);
+        }
+
         .logout-btn {
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444;
-            font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 10px;
+            border-radius: var(--radius);
+            color: #ef4444;
+            font-size: 13px;
+            font-weight: bold;
+            border: 1px solid #fee2e2;
+            background: #fef2f2;
         }
 
         /* ================= MAIN CONTENT ================= */
-        .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; flex-shrink: 0; }
-        .topbar-left { display: flex; align-items: center; gap: 15px; }
-        .menu-toggle { display: none; background: none; border: none; font-size: 24px; color: var(--verde); cursor: pointer; }
-        .logo-cliente { max-height: 40px; width: auto; object-fit: contain; }
-        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
-        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
-        .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
+        .main-wrapper {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-        .content-area { flex-grow: 1; padding: 25px; overflow-y: auto; background: radial-gradient(circle at top left, var(--bg-grad-start) 0, #f3f4f6 60%, #f3f4f6 100%); }
+        .topbar {
+            height: var(--topbar-height);
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 25px;
+            flex-shrink: 0;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--verde);
+            cursor: pointer;
+        }
+
+        .logo-cliente {
+            max-height: 40px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .user-info {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .user-name {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--verde);
+        }
+
+        .user-role {
+            font-size: 10px;
+            color: var(--text-muted);
+            background: #f3f4f6;
+            padding: 2px 8px;
+            border-radius: 10px; margin-top: 2px;
+        }
+
+        .content-area {
+            flex-grow: 1;
+            padding: 25px;
+            overflow-y: auto;
+            background: radial-gradient(circle at top left, var(--bg-grad-start) 0, #f3f4f6 60%, #f3f4f6 100%);
+        }
 
         /* Alertas Flash y Banner de Emergencia */
-        .flash-messages { width: 100%; max-width: 1000px; margin-bottom: 20px; }
-        .flash-alert { padding: 12px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; border: 1px solid currentColor; margin-bottom: 10px; }
-        .flash-success { background-color: #d1fae5; color: #065f46; }
-        .flash-danger { background-color: #fee2e2; color: #991b1b; }
-        .flash-warning { background-color: #fef3c7; color: #92400e; }
-        
-        #bannerNovedades { display: none; width: 100%; max-width: 1000px; background-color: #ef4444; color: white; padding: 15px 20px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); animation: pulseAlert 2s infinite; }
-        @keyframes pulseAlert { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
+        .flash-messages {
+            width: 100%;
+            max-width: 1000px;
+            margin-bottom: 20px;
+        }
+
+        .flash-alert {
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            border: 1px solid currentColor;
+            margin-bottom: 10px;
+        }
+
+        .flash-success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .flash-danger {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .flash-warning {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        #bannerNovedades {
+            display: none;
+            width: 100%;
+            max-width: 1000px;
+            background-color: #ef4444;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+            animation: pulseAlert 2s infinite;
+        }
+
+        @keyframes pulseAlert {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
 
         /* Panel Superior Acción */
-        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;}
-        .action-title-group { display: flex; align-items: center; gap: 15px; }
-        .action-header h2 { color: var(--verde); font-size: 20px; margin: 0;}
-        .btn-close-view { background: #e5e7eb; color: #4b5563; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; font-weight: bold;}
-        .btn-close-view:hover { background: #d1d5db; color: #111827; }
-        
-        .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 6px;}
-        .btn-primary:hover { background: var(--verde-osc); }
-        .btn-success { background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;}
-        .btn-warning { background: #f59e0b; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;}
-        .btn-danger { background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;}
-        .btn-info { background: #0ea5e9; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;}
+        .action-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1000px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .action-title-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .action-header h2 {
+            color: var(--verde);
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .btn-close-view {
+            background: #e5e7eb;
+            color: #4b5563;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+            font-weight: bold;
+        }
+
+        .btn-close-view:hover {
+            background: #d1d5db;
+            color: #111827;
+        }
+
+        .btn-primary {
+            background: var(--verde);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary:hover {
+            background: var(--verde-osc);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-info {
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
 
         /* Tablas */
-        .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-width: 1000px; overflow-x: auto; margin-bottom: 25px;}
-        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;}
-        .data-table th { background: #f9fafb; padding: 15px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
-        .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); }
-        .data-table tr:hover { background-color: #fdfdfd; }
-        
-        .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
-        .badge-gray { background: #f3f4f6; color: #4b5563; }
-        .badge-success { background: #d1fae5; color: #065f46; }
-        .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-danger { background: #fee2e2; color: #991b1b; }
-        .badge-info { background: #e0f2fe; color: #075985; }
-        .badge-purple { background: #f3e8ff; color: #6b21a8; }
+        .table-card {
+            background: var(--surface);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+            max-width: 1000px;
+            overflow-x: auto;
+            margin-bottom: 25px;
+        }
 
-        .btn-pdf { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.2s;}
-        .btn-pdf:hover { background: #bae6fd; }
-        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        .data-table th {
+            background: #f9fafb;
+            padding: 15px;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table td {
+            padding: 15px;
+            border-bottom: 1px solid #f3f4f6;
+            color: var(--text);
+        }
+
+        .data-table tr:hover {
+            background-color: #fdfdfd;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .badge-gray {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-info {
+            background: #e0f2fe;
+            color: #075985;
+        }
+
+        .badge-purple {
+            background: #f3e8ff;
+            color: #6b21a8;
+        }
+
+        .btn-pdf {
+            background: #e0f2fe;
+            color: #0284c7;
+            border: 1px solid #bae6fd;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-pdf:hover {
+            background: #bae6fd;
+        }
+
         /* Formularios Integrados */
-        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
-        .grid-form.full { grid-template-columns: 1fr; }
+        .grid-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            padding: 20px;
+        }
+
+        .grid-form.full {
+            grid-template-columns: 1fr;
+        }
 
         /* ================= MODALES ================= */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; overflow-y: auto;}
-        .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
-        .modal-box { background: var(--surface); width: 90%; max-width: 450px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative; margin: auto;}
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-        .modal-header h3 { color: var(--verde); font-size: 18px; margin: 0; }
-        .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
-        
-        .form-group { margin-bottom: 15px; text-align: left;}
-        .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;}
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; font-family: inherit;}
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--verde); }
-        
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .btn-cancel { padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); background: #f9fafb; cursor: pointer; font-weight: bold; color: var(--text);}
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            overflow-y: auto;
+        }
 
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-overlay.active {
+            display: flex;
+            animation: fadeIn 0.2s;
+        }
+
+        .modal-box {
+            background: var(--surface);
+            width: 90%;
+            max-width: 450px;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            position: relative;
+            margin: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .modal-header h3 {
+            color: var(--verde);
+            font-size: 18px;
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: var(--verde);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-cancel {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #f9fafb;
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--text);
+        }
+
+        /* Kanban Board */
+        .kanban-board {
+            display: flex;
+            overflow-x: auto;
+            gap: 15px;
+            padding-bottom: 15px;
+            min-height: 400px;
+            align-items: flex-start;
+        }
+
+        .kanban-column {
+            flex: 0 0 320px;
+            background: #e5e7eb;
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border-top: 4px solid var(--border);
+        }
+
+        .kanban-column.col-ida-ejec {
+            border-top-color: #10b981;
+            background: #d1fae5;
+        }
+
+        .kanban-column.col-ida-term {
+            border-top-color: #6b7280;
+            background: #f3f4f6;
+        }
+
+        .kanban-column.col-vuel-pend {
+            border-top-color: #8b5cf6;
+            background: #ede9fe;
+        }
+
+        .kanban-column.col-vuel-ejec {
+            border-top-color: #f59e0b;
+            background: #fef3c7;
+        }
+
+        .kanban-column.col-vuel-term {
+            border-top-color: #ef4444;
+            background: #fee2e2;
+        }
+
+        .kanban-col-header {
+            font-weight: bold;
+            font-size: 13px;
+            color: #374151;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .kanban-col-count {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        .kanban-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+
+        .kanban-card.border-top-info {
+            border-top: 4px solid #0ea5e9;
+        }
+
+        .kanban-card.border-top-success {
+            border-top: 4px solid #10b981;
+        }
+
+        .kanban-card.border-top-warning {
+            border-top: 4px solid #f59e0b;
+        }
+
+        .kanban-card.border-top-purple {
+            border-top: 4px solid #8b5cf6;
+        }
+
+        /* KPIS */
+        .kpi-container {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+            max-width: 1000px;
+        }
+
+        .kpi-card {
+            background: var(--surface);
+            flex: 1;
+            min-width: 140px;
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+            text-align: center;
+        }
+
+        .kpi-value {
+            font-size: 22px;
+            font-weight: bold;
+            color: var(--verde);
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* Utilidades Notificaciones */
+        .flash-critical {
+            animation: criticalFlash 1.5s infinite !important;
+            border-width: 2px !important;
+        }
+
+        @keyframes criticalFlash {
+            0% {
+                box-shadow: 0 0 10px #ef4444;
+                border-color: #ef4444;
+                background-color: #fee2e2;
+            }
+
+            50% {
+                box-shadow: 0 0 25px #ef4444;
+                border-color: #dc2626;
+                background-color: #fca5a5;
+            }
+
+            100% {
+                box-shadow: 0 0 10px #ef4444;
+                border-color: #ef4444;
+                background-color: #fee2e2;
+            }
+        }
+
+        .urgencia-12h {
+            border: 2px solid #ef4444 !important;
+            animation: titileoUrgencia 1.5s infinite;
+        }
+
+        @keyframes titileoUrgencia {
+            0% {
+                border-color: #ef4444;
+                box-shadow: 0 0 5px rgba(239, 68, 68, 0.2);
+            }
+
+            50% {
+                border-color: #fca5a5;
+                box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+            }
+
+            100% {
+                border-color: #ef4444;
+                box-shadow: 0 0 5px rgba(239, 68, 68, 0.2);
+            }
+        }
+
+        .pac-container {
+            z-index: 9999 !important;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
         @media (max-width: 768px) {
-            .sidebar { position: fixed; height: 100vh; left: 0; top: 0; transform: translateX(-100%); box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
-            .sidebar.open { transform: translateX(0); }
-            .menu-toggle { display: block; }
-            .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 999; }
-            .sidebar-overlay.active { display: block; }
-            .grid-form { grid-template-columns: 1fr; }
+            .sidebar {
+                position: fixed;
+                height: 100vh;
+                left: 0;
+                top: 0;
+                transform: translateX(-100%);
+                box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.4);
+                z-index: 999;
+            }
+
+            .sidebar-overlay.active {
+                display: block;
+            }
+
+            .grid-form {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -173,39 +870,53 @@
         <div class="sidebar-header">
             <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
         </div>
-        
+
         <nav class="nav-menu">
             <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="nav-item back-btn">
-                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Menú Transporte Especial</div>
+                <div class="nav-item-content"><span class="nav-icon">⬅️</span> Menú Principal BQA</div>
             </a>
 
-            <a href="{{ url_for('controlador_flotaespecial.dashboard_operativo') }}" class="nav-item">
+            <a href="{{ url_for('flotaespecial_eps.dashboard_operativo') }}"
+                class="nav-item {% if active_module == 'dashboard' %}active{% endif %}">
                 <div class="nav-item-content"><span class="nav-icon">📡</span> Kanban en Vivo</div>
             </a>
 
-            <a href="{{ url_for('flotaespecial_eps.gestion_contratos') }}" class="nav-item {% if active_module == 'gestion_contratos' %}active{% endif %}">
+            <a href="{{ url_for('flotaespecial_eps.gestion_contratos') }}"
+                class="nav-item {% if active_module == 'gestion_contratos' %}active{% endif %}">
                 <div class="nav-item-content"><span class="nav-icon">🤝</span> Gestión de Contratos</div>
             </a>
 
-            <div class="nav-item {% if active_module in ['traslados_captura', 'traslados_asignacion', 'traslados_verificacion', 'traslados_programacion', 'traslados_asignacion_flota'] %}open{% endif %}" onclick="toggleDropdown('epsMenu', this)">
+            <div class="nav-item" onclick="abrirModalContingencias()"
+                style="background: #fffbeb; border-left: 4px solid #f59e0b; color: #b45309;">
+                <div class="nav-item-content"><span class="nav-icon">🚨</span> Reprogramaciones Viajes EPS</div>
+            </div>
+
+            <div class="nav-item {% if active_module in ['traslados_captura', 'traslados_asignacion', 'traslados_verificacion', 'traslados_programacion', 'traslados_asignacion_flota'] %}open{% endif %}"
+                onclick="toggleDropdown('epsMenu', this)">
                 <div class="nav-item-content"><span class="nav-icon">🏥</span> Flujo Operativo EPS</div>
                 <span class="dropdown-arrow">▼</span>
             </div>
-            
-            <div class="dropdown-container {% if active_module in ['traslados_captura', 'traslados_asignacion', 'traslados_verificacion', 'traslados_programacion', 'traslados_asignacion_flota'] %}open{% endif %}" id="epsMenu">
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" class="dropdown-item {% if active_module == 'traslados_captura' %}active{% endif %}">1. Captura de Autorización</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}" class="dropdown-item {% if active_module == 'traslados_asignacion' %}active{% endif %}">2. Desglose de Viajes</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}" class="dropdown-item {% if active_module == 'traslados_verificacion' %}active{% endif %}">3. Verificación de Datos</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_programacion') }}" class="dropdown-item {% if active_module == 'traslados_programacion' %}active{% endif %}">4. Programar Viajes</a>
-                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}" class="dropdown-item {% if active_module == 'traslados_asignacion_flota' %}active{% endif %}">5. Asignación de Flota</a>
+            <div class="dropdown-container {% if active_module in ['traslados_captura', 'traslados_asignacion', 'traslados_verificacion', 'traslados_programacion', 'traslados_asignacion_flota'] %}open{% endif %}"
+                id="epsMenu">
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}"
+                    class="dropdown-item {% if active_module == 'traslados_captura' %}active{% endif %}">1. Captura de
+                    Autorización</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}"
+                    class="dropdown-item {% if active_module == 'traslados_asignacion' %}active{% endif %}">2. Desglose
+                    de Viajes</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_verificacion') }}"
+                    class="dropdown-item {% if active_module == 'traslados_verificacion' %}active{% endif %}">3.
+                    Verificación de Datos</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_programacion') }}"
+                    class="dropdown-item {% if active_module == 'traslados_programacion' %}active{% endif %}">4.
+                    Programar Viajes</a>
+                <a href="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion_flota') }}"
+                    class="dropdown-item {% if active_module == 'traslados_asignacion_flota' %}active{% endif %}">5.
+                    Asignación de Flota</a>
             </div>
-            
-            <a href="{{ url_for('flotaespecial_vehiculos.gestion_vehiculos') }}" class="nav-item">
-                <div class="nav-item-content"><span class="nav-icon">🚐</span> Gestión de Flota</div>
-            </a>
 
-            <a href="{{ url_for('controlador_flotaespecial.gestion_operadores') }}" class="nav-item">
-                <div class="nav-item-content"><span class="nav-icon">🧑‍✈️</span> Gestor Operadores</div>
+            <a href="{{ url_for('flotaespecial_flota.gestion_flota') }}" class="nav-item">
+                <div class="nav-item-content"><span class="nav-icon">🚐</span> Gestión de Flota</div>
             </a>
         </nav>
 
@@ -220,11 +931,13 @@
         <header class="topbar">
             <div class="topbar-left">
                 <button class="menu-toggle" id="menuToggle">☰</button>
-                <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo-app" alt="BQA-ONE" style="max-height: 35px; width: auto; margin-right: 5px;">
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo-app" alt="BQA-ONE"
+                    style="max-height: 35px; width: auto; margin-right: 5px;">
                 <span style="border-left: 1px solid var(--border); height: 30px; margin: 0 10px;"></span>
-                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente"
+                    onerror="this.style.display='none'">
             </div>
-            
+
             <div class="user-info">
                 <span class="user-name">{{ nombre }}</span>
                 <span class="user-role">Controlador Transporte Especial</span>
@@ -232,537 +945,849 @@
         </header>
 
         <div class="content-area">
-            
+
+            <div id="bannerNovedades">
+                🚨 ATENCIÓN: Hay <span id="contadorNovedades">0</span> viaje(s) con novedad activa que requieren
+                intervención de reasignación y FUEC.
+                <a href="{{ url_for('flotaespecial_eps.dashboard_operativo') }}"
+                    style="color: white; text-decoration: underline; margin-left: 10px;">Ver en Kanban</a>
+            </div>
+
             <div class="flash-messages">
                 {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="flash-alert {% if category == 'success' %}flash-success{% elif category == 'warning' %}flash-warning{% else %}flash-danger{% endif %}">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div
+                    class="flash-alert {% if category == 'success' %}flash-success{% elif category == 'warning' %}flash-warning{% else %}flash-danger{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+                {% endif %}
                 {% endwith %}
             </div>
 
-            {% if active_module == 'gestion_contratos' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Gestión de Contratos y Clientes</h2>
+            {% if active_module == 'dashboard' %}
+            <!-- ================= PANEL FIJO DE RETRASOS CRÍTICOS (>15 MIN) ================= -->
+            <div id="panel_retrasos_fijo"
+                style="display: {% if viajes_retrasados and viajes_retrasados|length > 0 %}block{% else %}none{% endif %}; background: #fffbeb; border: 2px solid #f59e0b; border-radius: 12px; padding: 15px; margin-bottom: 25px; max-width: 1000px;">
+                <h3
+                    style="color: #b45309; font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                    ⚠️ SERVICIOS RETRASADOS (> 15 MIN) <span id="badge_retrasos"
+                        style="background: #f59e0b; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">{{
+                        viajes_retrasados|length }}</span>
+                </h3>
+                <p style="font-size: 12px; color: #92400e; margin-bottom: 15px;">Estos servicios ya superaron en más de
+                    15 minutos su hora programada de inicio y el conductor aún no ha reportado el viaje en la App.</p>
+                <div id="contenedor_retrasos"
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+                    {% for v in viajes_retrasados %}
+                    <div class="kanban-card border-top-warning" style="background: white;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                            <span class="id-token">{{ v.id_viaje }}</span>
+                            <span class="badge badge-warning">RETRASADO</span>
+                        </div>
+                        <div style="font-size: 12px; margin-bottom: 2px;"><b>{{ v.nombre_usuario }}</b></div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">{{
+                            v.conductor_asignado }} ({{ v.vehiculo_asignado }})</div>
+                        <div style="font-size: 11px; color: #b45309;"><b>Prog:</b> {{ v.hora_inicio }}</div>
+                        <div style="margin-top: 10px;">
+                            <button type="button" class="btn-info"
+                                style="font-size: 10px; padding: 4px 6px; width: 100%;"
+                                onclick="notificarVuelta('{{ v.id }}')">
+                                🔔 Llamar / Notificar Operador
+                            </button>
+                        </div>
                     </div>
-                    <button class="btn-primary" onclick="openModal('modalNuevoContrato')">➕ Nuevo Contrato</button>
+                    {% endfor %}
                 </div>
-                
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Administre los contratos activos requeridos normativamente para la generación del FUEC.</p>
+            </div>
 
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>No. Contrato</th>
-                                <th>Contratante</th>
-                                <th>Categoría</th>
-                                <th>Vigencia</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for c in contratos %}
-                            <tr>
-                                <td><b style="font-family: monospace; color: var(--verde);">{{ c.numero_contrato }}</b></td>
-                                <td>{{ c.contratante_nombre }}<br><small>NIT/CC: {{ c.contratante_nit_cedula }}</small></td>
-                                <td><span class="badge badge-info">{{ c.categoria_contrato }}</span></td>
-                                <td>{{ c.fecha_inicio }} <span style="color:var(--text-muted);">al</span> {{ c.fecha_fin }}</td>
-                                <td>
-                                    <form action="{{ url_for('flotaespecial_eps.gestion_contratos') }}" method="POST" style="display:inline;">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                        <input type="hidden" name="accion" value="eliminar_contrato">
-                                        <input type="hidden" name="contrato_id" value="{{ c.id }}">
-                                        <button type="button" class="btn-danger" style="padding: 6px 10px; font-size: 11px;" onclick="if(confirm('¿Está seguro de inactivar este contrato? Ya no estará disponible para asociar a nuevos FUEC.')) this.form.submit();">✖️ Inactivar</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay contratos vigentes registrados.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            <!-- ================= KPIS ================= -->
+            <div style="margin-bottom: 20px;">
+                <h2 style="color: var(--verde); font-size: 20px;">Tablero de Control Operativo</h2>
+                <p style="color: var(--text-muted); font-size: 13px;">Monitoreo en tiempo real y bolsa de programaciones.</p>
+            </div>
+
+            <div class="kpi-container">
+                <div class="kpi-card">
+                    <div class="kpi-value" style="color: #6b7280;">{{ kpis.capturados }}</div>
+                    <div class="kpi-label">Capturados</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" style="color: #0ea5e9;">{{ kpis.programados }}</div>
+                    <div class="kpi-label">Programados</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" style="color: #8b5cf6;">{{ kpis.verificados }}</div>
+                    <div class="kpi-label">Verificados</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" style="color: #10b981;">{{ kpis.asignados }}</div>
+                    <div class="kpi-label">Asignados</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-value" style="color: #f59e0b;">{{ kpis.ejecucion }}</div>
+                    <div class="kpi-label">En Ejecución</div>
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- PARTE 1: COLA DE VIAJES IDA PROGRAMADOS (PENDIENTES DE ASIGNAR)   -->
+            <!-- ================================================================= -->
+            <div
+                style="font-size: 15px; font-weight: bold; color: var(--verde-osc); margin: 25px 0 12px 0; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid var(--verde); padding-bottom: 6px;">
+                <span>📋 PARTE 1: VIAJES IDA PROGRAMADOS (DESGLOSADOS - PENDIENTES ASIGNAR FLOTA)</span>
+            </div>
+
+            <div class="table-card"
+                style="border-left: 4px solid #0ea5e9; background: transparent; box-shadow: none; border: none; overflow: visible; padding-bottom: 5px;">
+                <div class="card-header"
+                    style="color: #0369a1; background: var(--surface); border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--border);">
+                    <span>Bolsa de Viajes IDA Programados</span>
+                    <span id="contador_parte1"
+                        style="background: #e0f2fe; padding: 2px 8px; border-radius: 12px; font-size: 11px;">{{
+                        parte1_ida_programados|length }} pendientes</span>
                 </div>
 
-            {% elif active_module == 'traslados_captura' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 1: Captura de Autorización</h2>
+                <div id="contenedor_parte1"
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+                    {% for v in parte1_ida_programados %}
+                    <div class="kanban-card border-top-info {% if v.is_urgencia %}urgencia-12h{% endif %}"
+                        data-id="{{ v.id }}">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                            <span class="id-token">{{ v.id_viaje }}</span>
+                            <span class="badge badge-info">{{ v.estatus_servicio }}</span>
+                        </div>
+                        <div style="font-size: 12px; margin-bottom: 5px;"><b>Prescripción:</b> {{ v.numero_prescripcion
+                            }}</div>
+                        <div style="font-size: 13px; margin-bottom: 2px;"><b>{{ v.nombre_usuario }}</b></div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">ID: {{ v.id_usuario
+                            }} | Tel: {{ v.telefono_usuario }}</div>
+                        <div style="font-size: 12px; margin-bottom: 2px;"><b>📍 Origen:</b> {{ v.municipio }} ({{ v.departamento }}) - {{ v.direccion_origen }}</div>
+                        <div style="font-size: 12px; margin-bottom: 5px;"><b>🏁 Destino:</b> {{ v.municipio_destino }} ({{ v.departamento_destino }}) - {{ v.direccion_destino }}</div>
+                        <div style="font-size: 12px; margin-bottom: 10px; color: #b45309;"><b>Prog:</b> {{ v.hora_inicio or 'N/D' }}</div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            {% if v.estado_novedad == 'ACTIVA' %}
+                            <button type="button" class="btn-danger"
+                                style="font-size: 10px; padding: 4px 6px; width: 100%; text-align: center; animation: pulseAlert 1.5s infinite;"
+                                onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado|default('N/A') }}', '{{ v.conductor_asignado|default('N/A') }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                🚨 Resolver Novedad
+                            </button>
+                            {% endif %}
+                            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                <button type="button" class="btn-success"
+                                    style="padding: 5px 8px; font-size: 11px; flex-grow: 1;"
+                                    onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ (v.nombre_usuario or '')|replace('\"', '
+                                    &quot;') }}')">
+                                    🚐 Asignar FUEC
+                                </button>
+                                <button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf"
+                                    style="flex-grow: 1;">📄 PDF</button>
+                            </div>
+                        </div>
                     </div>
+                    {% else %}
+                    <div id="no_viajes_parte1"
+                        style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 20px; background: var(--surface); border-radius: 10px; border: 1px solid var(--border);">
+                        No hay viajes IDA programados pendientes de asignación.</div>
+                    {% endfor %}
                 </div>
+            </div>
 
-                <div class="table-card" style="padding: 20px; margin-bottom: 20px; border-top: 4px solid var(--verde);">
-                    <h3 style="margin-bottom: 15px; font-size: 16px; color: var(--verde);">Paso 1: Subir Archivo (Extracción Automática)</h3>
-                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" method="POST" enctype="multipart/form-data" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="accion" value="subir_pdf">
-                        <input type="file" name="archivo_pdf" accept=".pdf" required style="border: 1px dashed var(--border); padding: 10px; border-radius: 8px; flex-grow: 1; max-width: 400px;">
-                        <button type="submit" class="btn-primary" style="background: #0ea5e9;">Leer y Extraer PDF</button>
-                    </form>
-                </div>
+            <!-- ================================================================= -->
+            <!-- PARTE 2: FLUJO OPERATIVO DEL DÍA EN LÍNEA (4 COLUMNAS KANBAN)    -->
+            <!-- ================================================================= -->
+            <div
+                style="font-size: 15px; font-weight: bold; color: var(--verde-osc); margin: 35px 0 12px 0; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid var(--verde); padding-bottom: 6px;">
+                <span>📡 PARTE 2: FLUJO OPERATIVO EN VIVO (MONITOREO EN LÍNEA)</span>
+            </div>
 
-                <div class="table-card" style="padding: 0;">
-                    <h3 style="padding: 20px 20px 0 20px; font-size: 16px; color: var(--verde);">Paso 2: Validar y Guardar</h3>
-                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" method="POST" class="grid-form">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <input type="hidden" name="accion" value="guardar_captura">
-                        <input type="hidden" name="ruta_documento" value="{{ datos_extraidos.ruta_documento if datos_extraidos else '' }}">
-                        
-                        <input type="hidden" name="TipoTec" value="S">
-                        <input type="hidden" name="ConTec" value="1">
-                        <input type="hidden" name="NoEntrega" value="1">
-                        <input type="hidden" name="NoSubEntrega" value="0">
-                        <input type="hidden" name="TipoIDProv" value="NI">
-                        <input type="hidden" name="CodMunEnt" value="{{ datos_extraidos.cod_mun_ent if datos_extraidos else '' }}">
-                        <input type="hidden" id="hidden_dep_captura" value="{{ datos_extraidos.departamento if datos_extraidos else '' }}">
-                        <input type="hidden" id="hidden_mun_captura" value="{{ datos_extraidos.municipio if datos_extraidos else '' }}">
-
-                        <div style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
-                            <h4 style="color: var(--verde-osc); font-size: 14px;">📄 Datos de la Autorización</h4>
+            <div class="kanban-board">
+                <!-- COLUMNA 1: IDA EJECUCIÓN -->
+                <div class="kanban-column col-ida-ejec">
+                    <div class="kanban-col-header">
+                        <span>1. IDA - En Progreso</span>
+                        <span class="kanban-col-count" id="count_col1">{{ parte2_col1|length }}</span>
+                    </div>
+                    <div id="container_col1" style="display: flex; flex-direction: column; gap: 10px;">
+                        {% for v in parte2_col1 %}
+                        <div class="kanban-card border-top-success {% if v.estatus_servicio in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO'] %}flash-critical{% endif %}"
+                            data-id="{{ v.id }}">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                <span class="id-token">{{ v.id_viaje }}</span>
+                                <span
+                                    class="badge {% if v.estatus_servicio == 'NOVEDAD_RECORRIDO' %}badge-danger{% else %}badge-success{% endif %}"
+                                    style="font-size: 9px;">{{ v.estatus_servicio }}</span>
+                            </div>
+                            <div style="font-size: 12px; margin-bottom: 2px;"><b>{{ v.nombre_usuario }}</b></div>
+                            <div style="font-size: 12px; margin-bottom: 2px;"><b>📍 Origen:</b> {{ v.municipio }} ({{ v.departamento }}) - {{ v.direccion_origen }}</div>
+                            <div style="font-size: 12px; margin-bottom: 5px;"><b>🏁 Destino:</b> {{ v.municipio_destino }} ({{ v.departamento_destino }}) - {{ v.direccion_destino }}</div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">{{
+                                v.conductor_asignado or 'N/D' }} ({{ v.vehiculo_asignado or 'N/D' }})</div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                {% if v.estado_novedad == 'ACTIVA' %}
+                                <button type="button" class="btn-danger"
+                                    style="font-size: 10px; padding: 4px 6px; width: 100%; text-align: center; animation: pulseAlert 1.5s infinite;"
+                                    onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado|default('N/A') }}', '{{ v.conductor_asignado|default('N/A') }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                    🚨 Resolver Novedad
+                                </button>
+                                {% endif %}
+                                <button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 PDF</button>
+                            </div>
                         </div>
-                        <div class="form-group"><label>EPS Cliente</label><input type="text" name="eps_cliente" value="{{ datos_extraidos.eps_nombre if datos_extraidos else '' }}" required></div>
-                        <div class="form-group"><label>ID EPS Cliente (NIT)</label><input type="text" name="IDProv" value="{{ datos_extraidos.eps_nit if datos_extraidos else '' }}" required></div>
-                        <div class="form-group"><label>Número de Prescripción (ID PRINCIPAL)</label><input type="text" name="NoPrescripcion" value="{{ datos_extraidos.numero_prescripcion if datos_extraidos else '' }}"></div>
-                        <div class="form-group"><label>Número de Autorización</label><input type="text" name="numero_autorizacion" value="{{ datos_extraidos.numero_autorizacion if datos_extraidos else '' }}" required></div>
-                        <div class="form-group"><label>Fecha de Entrega</label><input type="date" name="fecha_entrega_servicio" value="{{ datos_extraidos.fecha_entrega_servicio if datos_extraidos else '' }}" required></div>
-
-                        <div style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
-                            <h4 style="color: var(--verde-osc); font-size: 14px;">👤 Datos del Paciente</h4>
-                        </div>
-                        <div class="form-group">
-                            <label>Tipo Documento</label>
-                            <select name="tipo_documento" required>
-                                <option value="">Seleccione...</option>
-                                <option value="CC" {% if datos_extraidos and datos_extraidos.tipo_documento == 'CC' %}selected{% endif %}>Cédula de Ciudadanía (CC)</option>
-                                <option value="TI" {% if datos_extraidos and datos_extraidos.tipo_documento == 'TI' %}selected{% endif %}>Tarjeta de Identidad (TI)</option>
-                                <option value="RC" {% if datos_extraidos and datos_extraidos.tipo_documento == 'RC' %}selected{% endif %}>Registro Civil (RC)</option>
-                                <option value="CE" {% if datos_extraidos and datos_extraidos.tipo_documento == 'CE' %}selected{% endif %}>Cédula de Extranjería (CE)</option>
-                                <option value="PA" {% if datos_extraidos and datos_extraidos.tipo_documento == 'PA' %}selected{% endif %}>Pasaporte (PA)</option>
-                                <option value="PPT" {% if datos_extraidos and datos_extraidos.tipo_documento == 'PPT' %}selected{% endif %}>Permiso de Protección Temporal (PPT)</option>
-                            </select>
-                        </div>
-                        <div class="form-group"><label>Número Documento (ID Paciente)</label><input type="text" name="NoIDPaciente" value="{{ datos_extraidos.id_usuario if datos_extraidos else '' }}" required></div>
-                        <div class="form-group" style="grid-column: 1 / -1;"><label>Nombre Completo Paciente</label><input type="text" name="nombre_usuario" value="{{ datos_extraidos.nombre_usuario if datos_extraidos else '' }}" required></div>
-                        <div class="form-group"><label>Fecha Nacimiento</label><input type="date" name="fecha_nacimiento" value="{{ datos_extraidos.fecha_nacimiento if datos_extraidos else '' }}"></div>
-                        <div class="form-group"><label>Edad</label><input type="text" name="edad" value="{{ datos_extraidos.edad if datos_extraidos else '' }}"></div>
-                        <div class="form-group"><label>Sexo</label><input type="text" name="sexo" value="{{ datos_extraidos.sexo if datos_extraidos else '' }}"></div>
-                        <div class="form-group"><label>Número Carné</label><input type="text" name="numero_carne" value="{{ datos_extraidos.numero_carne if datos_extraidos else '' }}"></div>
-                        <div class="form-group"><label>Tipo Usuario</label><input type="text" name="tipo_usuario" value="{{ datos_extraidos.tipo_usuario if datos_extraidos else '' }}"></div>
-                        <div class="form-group"><label>Nivel Sisbén</label><input type="text" name="nivel_sisben" value="{{ datos_extraidos.nivel_sisben if datos_extraidos else '' }}"></div>
-                        <div class="form-group"><label>Teléfono Paciente</label><input type="text" name="telefono_usuario" value="{{ datos_extraidos.telefono_usuario if datos_extraidos else '' }}"></div>
-                        <div class="form-group"><label>Email Paciente</label><input type="text" name="email_usuario" value="{{ datos_extraidos.email_usuario if datos_extraidos else '' }}"></div>
-
-                        <div style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
-                            <h4 style="color: var(--verde-osc); font-size: 14px;">📍 Datos de Origen y Servicio</h4>
-                        </div>
-                        <div class="form-group">
-                            <label>Departamento Origen</label>
-                            <select name="departamento" id="cap_dep_ori" onchange="cargarMunicipios('cap_dep_ori', 'cap_mun_ori')"></select>
-                        </div>
-                        <div class="form-group">
-                            <label>Municipio Origen</label>
-                            <select name="municipio" id="cap_mun_ori"></select>
-                        </div>
-                        <div class="form-group" style="grid-column: 1 / -1;"><label>Dirección Origen Exacta</label><input type="text" name="DirPaciente" value="{{ datos_extraidos.direccion_origen if datos_extraidos else '' }}" required></div>
-                        
-                        <div style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
-                            <h4 style="color: var(--verde-osc); font-size: 14px;">🏁 Datos de Destino</h4>
-                        </div>
-                        <div class="form-group">
-                            <label>Departamento Destino</label>
-                            <select name="departamento_destino" id="cap_dep_des" onchange="cargarMunicipios('cap_dep_des', 'cap_mun_des')"></select>
-                        </div>
-                        <div class="form-group">
-                            <label>Municipio Destino</label>
-                            <select name="municipio_destino" id="cap_mun_des"></select>
-                        </div>
-                        <div class="form-group" style="grid-column: 1 / -1;"><label>Dirección Destino Exacta</label><input type="text" name="direccion_destino"></div>
-                        
-                        <div class="form-group"><label>Código Servicio</label><input type="text" name="CodSerTecAEntregar" value="{{ datos_extraidos.codigo_servicio if datos_extraidos else '' }}" required></div>
-                        <div class="form-group"><label>Total Traslados Aprobados</label><input type="number" name="CantTotAEntregar" value="{{ datos_extraidos.cantidad if datos_extraidos else '1' }}" required></div>
-                        
-                        <div class="form-group" style="grid-column: 1 / -1;"><label>Observaciones</label><textarea name="observaciones" rows="2"></textarea></div>
-                        
-                        <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--border);">
-                            <button type="submit" class="btn-primary">Guardar Orden</button>
-                        </div>
-                    </form>
-                </div>
-                
-                <h3 style="margin-bottom: 10px; font-size: 16px; color: var(--text);">Órdenes con Traslados Disponibles</h3>
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Prescripción (ID)</th>
-                                <th>Paciente</th>
-                                <th>Origen</th>
-                                <th>Procedimiento</th>
-                                <th>Disponibles</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for t in traslados_capturados %}
-                            <tr>
-                                <td><b>{{ t.numero_prescripcion }}</b></td>
-                                <td>{{ t.nombre_usuario }}</td>
-                                <td>{{ t.direccion_origen }}</td>
-                                <td><span class="badge badge-gray">{{ t.tipo_servicio }}</span></td>
-                                <td style="text-align: center;"><span class="badge badge-success" style="font-size: 12px;">+{{ t.diferencia }}</span></td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 20px;">No hay órdenes con traslados pendientes.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-            {% elif active_module == 'traslados_asignacion' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 2: Desglose de Viajes (Ida y Vuelta)</h2>
+                        {% else %}
+                        <div class="empty-col"
+                            style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">
+                            Vacío</div>
+                        {% endfor %}
                     </div>
                 </div>
-                
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Seleccione una orden maestra para desglosar el saldo en viajes individuales estrictamente divididos en IDA y VUELTA.</p>
 
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Prescripción (ID)</th>
-                                <th>Paciente / Contacto</th>
-                                <th>Origen (Dep - Mun)</th>
-                                <th>Disponibles</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for t in ordenes_maestras %}
-                            <tr>
-                                <td><b>{{ t.numero_prescripcion }}</b></td>
-                                <td>{{ t.nombre_usuario }}<br><small>{{ t.telefono_usuario }}</small></td>
-                                <td>{{ t.departamento }}<br><small>{{ t.municipio }}</small></td>
-                                <td style="text-align: center;"><span class="badge badge-success" style="font-size: 12px;">{{ t.diferencia }}</span></td>
-                                <td>
-                                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}" method="POST" style="display:inline;">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                        <input type="hidden" name="accion" value="Desglosar Viajes"/>
-                                        <input type="hidden" name="maestra_id" value="{{ t.id }}">
-                                        <button type="submit" class="btn-primary" style="padding: 6px 12px; font-size: 12px; background: #0ea5e9;">⚡ Desglosar Viajes</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay órdenes maestras con traslados disponibles para desglosar.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-            {% elif active_module == 'traslados_verificacion' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 3: Verificación Telefónica de Datos (Paquetes)</h2>
+                <!-- COLUMNA 2: IDA TERMINADOS -->
+                <div class="kanban-column col-ida-term">
+                    <div class="kanban-col-header">
+                        <span>2. IDA - Terminadas</span>
+                        <span class="kanban-col-count" id="count_col2">{{ parte2_col2|length }}</span>
+                    </div>
+                    <div id="container_col2" style="display: flex; flex-direction: column; gap: 10px;">
+                        {% for v in parte2_col2 %}
+                        <div class="kanban-card" style="border-top: 4px solid #6b7280;" data-id="{{ v.id }}">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                <span class="id-token">{{ v.id_viaje }}</span>
+                                <span class="badge badge-gray" style="font-size: 9px;">TERMINADO</span>
+                            </div>
+                            <div style="font-size: 12px; margin-bottom: 2px;"><b>{{ v.nombre_usuario }}</b></div>
+                            <div style="font-size: 12px; margin-bottom: 2px;"><b>📍 Origen:</b> {{ v.municipio }} ({{ v.departamento }}) - {{ v.direccion_origen }}</div>
+                            <div style="font-size: 12px; margin-bottom: 5px;"><b>🏁 Destino:</b> {{ v.municipio_destino }} ({{ v.departamento_destino }}) - {{ v.direccion_destino }}</div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">{{
+                                v.conductor_asignado }} ({{ v.vehiculo_asignado }})</div>
+                            <div style="display: flex; gap: 5px;">
+                                <button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 PDF</button>
+                                <button type="button" class="btn-info"
+                                    style="font-size: 10px; padding: 4px 6px; flex-grow: 1;"
+                                    onclick="ocultarDelKanban('{{ v.id }}')">Siguiente Fase: Activar Vuelta ➡️</button>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="empty-col"
+                            style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">
+                            Vacío</div>
+                        {% endfor %}
                     </div>
                 </div>
-                
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Audite la información del paciente telefónicamente. La verificación se aplicará masivamente a <b>todos los viajes IDA</b> del mismo paquete para agilizar la operación.</p>
 
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Prescripción</th>
-                                <th>Paciente / Teléfono</th>
-                                <th>Viajes (Paquete)</th>
-                                <th>ID Viaje Ref.</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for v in viajes %}
-                            <tr>
-                                <td><b>{{ v.numero_prescripcion }}</b></td>
-                                <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
-                                <td><span class="badge badge-info">{{ v.total_idas }} viajes IDA</span></td>
-                                <td><span style="font-family: monospace; font-size: 14px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span></td>
-                                <td>
-                                    <button type="button" class="btn-primary" style="padding: 6px 10px; font-size: 11px;"
-                                        onclick="abrirRevision(this)"
-                                        data-id="{{ v.id }}"
-                                        data-idpadre="{{ v.id_viaje_padre }}"
-                                        data-ruta="{{ v.ruta_documento or '' }}"
+                <!-- COLUMNA 3: VUELTA PENDIENTES -->
+                <div class="kanban-column col-vuel-pend">
+                    <div class="kanban-col-header">
+                        <span style="color: #5b21b6;">3. VUELTAS Pdtes. Asignar</span>
+                        <span class="kanban-col-count" id="count_col3">{{ parte2_col3|length }}</span>
+                    </div>
+                    <div id="container_col3" style="display: flex; flex-direction: column; gap: 10px;">
+                        {% for v in parte2_col3 %}
+                        <div class="kanban-card border-top-purple {% if v.estatus_servicio in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO'] %}flash-critical{% endif %}"
+                            data-id="{{ v.id }}">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                <span class="id-token">{{ v.id_viaje }}</span>
+                                <span class="badge badge-purple" style="font-size: 9px;">{{ v.estatus_servicio }}</span>
+                            </div>
+                            <div style="font-size: 12px; margin-bottom: 2px;"><b>{{ v.nombre_usuario }}</b></div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Tel: {{
+                                v.telefono_usuario }}</div>
+                            <div style="font-size: 11px; margin-bottom: 8px; line-height: 1.3;"><b>📍 Origen:</b> {{ v.municipio }} ({{ v.departamento }}) - {{ v.direccion_origen
+                                }}<br><b>🏁 Destino:</b> {{ v.municipio_destino }} ({{ v.departamento_destino }}) - {{ v.direccion_destino }}</div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                {% if v.estado_novedad == 'ACTIVA' %}
+                                <button type="button" class="btn-danger"
+                                    style="font-size: 10px; padding: 4px 6px; width: 100%; margin-bottom: 5px; animation: pulseAlert 1.5s infinite;"
+                                    onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado|default('N/A') }}', '{{ v.conductor_asignado|default('N/A') }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                    🚨 Resolver Novedad
+                                </button>
+                                {% endif %}
+                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                    {% if v.estatus_servicio == 'ASIGNADO' %}
+                                    <div
+                                        style="width: 100%; padding: 6px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; font-size: 10px; color: #065f46; text-align: center; font-weight: bold; margin-bottom: 5px;">
+                                        ✔️ Asignado a: {{ v.conductor_asignado }}
+                                    </div>
+                                    <button type="button" class="btn-info"
+                                        style="font-size: 10px; padding: 4px 6px; width: 100%;"
+                                        onclick="notificarVuelta('{{ v.id }}')">
+                                        🔔 Enviar Notificación al Operador
+                                    </button>
+                                    {% else %}
+                                    <button type="button" class="btn-success"
+                                        style="font-size: 10px; padding: 4px 6px; flex-grow: 1;"
+                                        onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ (v.nombre_usuario or '')|replace('\"', '
+                                        &quot;') }}')">
+                                        🚐 Asignar FUEC
+                                    </button>
+                                    <button type="button" class="btn-info"
+                                        style="font-size: 10px; padding: 4px 6px; flex-grow: 1;"
+                                        onclick="abrirRevision(this)" data-id="{{ v.id }}"
+                                        data-idpadre="{{ v.id_viaje_padre }}" data-ruta="{{ v.ruta_documento or '' }}"
                                         data-nombre="{{ v.nombre_usuario or '' }}"
                                         data-tipodoc="{{ v.tipo_documento or '' }}"
-                                        data-idusr="{{ v.id_usuario or '' }}"
-                                        data-tel="{{ v.telefono_usuario or '' }}"
-                                        data-dep="{{ v.departamento or '' }}"
-                                        data-mun="{{ v.municipio or '' }}"
+                                        data-idusr="{{ v.id_usuario or '' }}" data-tel="{{ v.telefono_usuario or '' }}"
+                                        data-dep="{{ v.departamento or '' }}" data-mun="{{ v.municipio or '' }}"
                                         data-ori="{{ v.direccion_origen or '' }}"
                                         data-dep-des="{{ v.departamento_destino or '' }}"
                                         data-mun-des="{{ v.municipio_destino or '' }}"
                                         data-des="{{ v.direccion_destino or '' }}">
-                                        📞 Auditar Paquete Completo
+                                        📞 Verificación
                                     </button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay paquetes pendientes de verificación.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="empty-col"
+                            style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">
+                            Vacío</div>
+                        {% endfor %}
+                    </div>
                 </div>
+
+                <!-- COLUMNA 4: VUELTA EJECUCIÓN -->
+                <div class="kanban-column col-vuel-ejec">
+                    <div class="kanban-col-header">
+                        <span style="color: #b45309;">4. VUELTAS - En Progreso</span>
+                        <span class="kanban-col-count" id="count_col4">{{ parte2_col4|length }}</span>
+                    </div>
+                    <div id="container_col4" style="display: flex; flex-direction: column; gap: 10px;">
+                        {% for v in parte2_col4 %}
+                        <div class="kanban-card border-top-warning {% if v.estatus_servicio in ['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO'] %}flash-critical{% endif %}"
+                            data-id="{{ v.id }}">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                <span class="id-token">{{ v.id_viaje }}</span>
+                                <span
+                                    class="badge {% if v.estatus_servicio == 'NOVEDAD_RECORRIDO' %}badge-danger{% else %}badge-warning{% endif %}"
+                                    style="font-size: 9px;">{{ v.estatus_servicio }}</span>
+                            </div>
+                            <div style="font-size: 12px; margin-bottom: 2px;"><b>{{ v.nombre_usuario }}</b></div>
+                            <div style="font-size: 12px; margin-bottom: 2px;"><b>📍 Origen:</b> {{ v.municipio }} ({{ v.departamento }}) - {{ v.direccion_origen }}</div>
+                            <div style="font-size: 12px; margin-bottom: 5px;"><b>🏁 Destino:</b> {{ v.municipio_destino }} ({{ v.departamento_destino }}) - {{ v.direccion_destino }}</div>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">{{
+                                v.conductor_asignado or 'N/D' }} ({{ v.vehiculo_asignado or 'N/D' }})</div>
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                {% if v.estado_novedad == 'ACTIVA' %}
+                                <button type="button" class="btn-danger"
+                                    style="font-size: 10px; padding: 4px 6px; width: 100%; text-align: center; animation: pulseAlert 1.5s infinite;"
+                                    onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado|default('N/A') }}', '{{ v.conductor_asignado|default('N/A') }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                    🚨 Resolver Novedad
+                                </button>
+                                {% endif %}
+                                <button onclick="abrirPDF('{{ v.ruta_documento }}')" class="btn-pdf">📄 PDF</button>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="empty-col"
+                            style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">
+                            Vacío</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+
+            {% elif active_module == 'gestion_contratos' %}
+            <!-- ================= ETAPA 0: GESTIÓN DE CONTRATOS CRUD ================= -->
+            <div class="action-header">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view"
+                        title="Cerrar vista">&times;</a>
+                    <h2>Gestión de Contratos y Clientes</h2>
+                </div>
+                <button class="btn-primary" onclick="openModal('modalNuevoContrato')">➕ Nuevo Contrato</button>
+            </div>
+
+            <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Administre los contratos activos
+                requeridos normativamente para la generación del FUEC.</p>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>No. Contrato</th>
+                            <th>Contratante</th>
+                            <th>Categoría</th>
+                            <th>Vigencia</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in contratos %}
+                        <tr>
+                            <td><b style="font-family: monospace; color: var(--verde);">{{ c.numero_contrato }}</b></td>
+                            <td>{{ c.contratante_nombre }}<br><small>NIT/CC: {{ c.contratante_nit_cedula }}</small></td>
+                            <td><span class="badge badge-info">{{ c.categoria_contrato }}</span></td>
+                            <td>{{ c.fecha_inicio }} <span style="color:var(--text-muted);">al</span> {{ c.fecha_fin }}
+                            </td>
+                            <td>
+                                <form action="{{ url_for('flotaespecial_eps.gestion_contratos') }}" method="POST"
+                                    style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                    <input type="hidden" name="accion" value="eliminar_contrato">
+                                    <input type="hidden" name="contrato_id" value="{{ c.id }}">
+                                    <button type="button" class="btn-danger" style="padding: 6px 10px; font-size: 11px;"
+                                        onclick="if(confirm('¿Está seguro de inactivar este contrato? Ya no estará disponible para asociar a nuevos FUEC.')) this.form.submit();">✖️
+                                        Inactivar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay
+                                contratos vigentes registrados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% elif active_module == 'traslados_captura' %}
+            <!-- ================= ETAPA 1: CAPTURA DE ÓRDENES MAESTRAS ================= -->
+            <div class="action-header">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view"
+                        title="Cerrar vista">&times;</a>
+                    <h2>Etapa 1: Captura de Autorización</h2>
+                </div>
+            </div>
+
+            <div class="table-card" style="padding: 20px; margin-bottom: 20px; border-top: 4px solid var(--verde);">
+                <h3 style="margin-bottom: 15px; font-size: 16px; color: var(--verde);">Paso 1: Subir Archivo (Extracción
+                    Automática)</h3>
+                <form action="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" method="POST"
+                    enctype="multipart/form-data"
+                    style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <input type="hidden" name="accion" value="subir_pdf">
+                    <input type="file" name="archivo_pdf" accept=".pdf" required
+                        style="border: 1px dashed var(--border); padding: 10px; border-radius: 8px; flex-grow: 1; max-width: 400px;">
+                    <button type="submit" class="btn-primary" style="background: #0ea5e9;">Leer y Extraer PDF</button>
+                </form>
+            </div>
+
+            <div class="table-card" style="padding: 0;">
+                <h3 style="padding: 20px 20px 0 20px; font-size: 16px; color: var(--verde);">Paso 2: Validar y Guardar
+                </h3>
+                <form action="{{ url_for('flotaespecial_eps.gestion_traslados_captura') }}" method="POST"
+                    class="grid-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <input type="hidden" name="accion" value="guardar_captura">
+                    <input type="hidden" name="ruta_documento"
+                        value="{{ datos_extraidos.ruta_documento if datos_extraidos else '' }}">
+
+                    <input type="hidden" name="TipoTec" value="S">
+                    <input type="hidden" name="ConTec" value="1">
+                    <input type="hidden" name="NoEntrega" value="1">
+                    <input type="hidden" name="NoSubEntrega" value="0">
+                    <input type="hidden" name="TipoIDProv" value="NI">
+                    <input type="hidden" name="CodMunEnt"
+                        value="{{ datos_extraidos.cod_mun_ent if datos_extraidos else '' }}">
+                    <input type="hidden" id="hidden_dep_captura"
+                        value="{{ datos_extraidos.departamento if datos_extraidos else '' }}">
+                    <input type="hidden" id="hidden_mun_captura"
+                        value="{{ datos_extraidos.municipio if datos_extraidos else '' }}">
+
+                    <div
+                        style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
+                        <h4 style="color: var(--verde-osc); font-size: 14px;">📄 Datos de la Autorización</h4>
+                    </div>
+                    <div class="form-group"><label>EPS Cliente</label><input type="text" name="eps_cliente"
+                            value="{{ datos_extraidos.eps_nombre if datos_extraidos else '' }}" required></div>
+                    <div class="form-group"><label>ID EPS Cliente (NIT)</label><input type="text" name="IDProv"
+                            value="{{ datos_extraidos.eps_nit if datos_extraidos else '' }}" required></div>
+                    <div class="form-group"><label>Número de Prescripción (ID PRINCIPAL)</label><input type="text"
+                            name="NoPrescripcion"
+                            value="{{ datos_extraidos.numero_prescripcion if datos_extraidos else '' }}"></div>
+                    <div class="form-group"><label>Número de Autorización</label><input type="text"
+                            name="numero_autorizacion"
+                            value="{{ datos_extraidos.numero_autorizacion if datos_extraidos else '' }}" required></div>
+                    <div class="form-group"><label>Fecha de Entrega</label><input type="date"
+                            name="fecha_entrega_servicio"
+                            value="{{ datos_extraidos.fecha_entrega_servicio if datos_extraidos else '' }}" required>
+                    </div>
+
+                    <div
+                        style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
+                        <h4 style="color: var(--verde-osc); font-size: 14px;">👤 Datos del Paciente</h4>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo Documento</label>
+                        <select name="tipo_documento" required>
+                            <option value="">Seleccione...</option>
+                            <option value="CC" {% if datos_extraidos and datos_extraidos.tipo_documento=='CC'
+                                %}selected{% endif %}>Cédula de Ciudadanía (CC)</option>
+                            <option value="TI" {% if datos_extraidos and datos_extraidos.tipo_documento=='TI'
+                                %}selected{% endif %}>Tarjeta de Identidad (TI)</option>
+                            <option value="RC" {% if datos_extraidos and datos_extraidos.tipo_documento=='RC'
+                                %}selected{% endif %}>Registro Civil (RC)</option>
+                            <option value="CE" {% if datos_extraidos and datos_extraidos.tipo_documento=='CE'
+                                %}selected{% endif %}>Cédula de Extranjería (CE)</option>
+                            <option value="PA" {% if datos_extraidos and datos_extraidos.tipo_documento=='PA'
+                                %}selected{% endif %}>Pasaporte (PA)</option>
+                            <option value="PPT" {% if datos_extraidos and datos_extraidos.tipo_documento=='PPT'
+                                %}selected{% endif %}>Permiso de Protección Temporal (PPT)</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Número Documento (ID Paciente)</label><input type="text"
+                            name="NoIDPaciente" value="{{ datos_extraidos.id_usuario if datos_extraidos else '' }}"
+                            required></div>
+                    <div class="form-group" style="grid-column: 1 / -1;"><label>Nombre Completo Paciente</label><input
+                            type="text" name="nombre_usuario"
+                            value="{{ datos_extraidos.nombre_usuario if datos_extraidos else '' }}" required></div>
+                    <div class="form-group"><label>Fecha Nacimiento</label><input type="date" name="fecha_nacimiento"
+                            value="{{ datos_extraidos.fecha_nacimiento if datos_extraidos else '' }}"></div>
+                    <div class="form-group"><label>Edad</label><input type="text" name="edad"
+                            value="{{ datos_extraidos.edad if datos_extraidos else '' }}"></div>
+                    <div class="form-group"><label>Sexo</label><input type="text" name="sexo"
+                            value="{{ datos_extraidos.sexo if datos_extraidos else '' }}"></div>
+                    <div class="form-group"><label>Número Carné</label><input type="text" name="numero_carne"
+                            value="{{ datos_extraidos.numero_carne if datos_extraidos else '' }}"></div>
+                    <div class="form-group"><label>Tipo Usuario</label><input type="text" name="tipo_usuario"
+                            value="{{ datos_extraidos.tipo_usuario if datos_extraidos else '' }}"></div>
+                    <div class="form-group"><label>Nivel Sisbén</label><input type="text" name="nivel_sisben"
+                            value="{{ datos_extraidos.nivel_sisben if datos_extraidos else '' }}"></div>
+                    <div class="form-group"><label>Teléfono Paciente</label><input type="text" name="telefono_usuario"
+                            value="{{ datos_extraidos.telefono_usuario if datos_extraidos else '' }}"></div>
+                    <div class="form-group"><label>Email Paciente</label><input type="text" name="email_usuario"
+                            value="{{ datos_extraidos.email_usuario if datos_extraidos else '' }}"></div>
+
+                    <div
+                        style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
+                        <h4 style="color: var(--verde-osc); font-size: 14px;">📍 Datos de Origen y Servicio</h4>
+                    </div>
+                    <div class="form-group">
+                        <label>Departamento Origen</label>
+                        <select name="departamento" id="cap_dep_ori"
+                            onchange="cargarMunicipios('cap_dep_ori', 'cap_mun_ori')"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Municipio Origen</label>
+                        <select name="municipio" id="cap_mun_ori"></select>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;"><label>Dirección Origen Exacta</label><input
+                            type="text" name="DirPaciente"
+                            value="{{ datos_extraidos.direccion_origen if datos_extraidos else '' }}" required></div>
+
+                    <div
+                        style="grid-column: 1 / -1; margin-top: 10px; border-bottom: 2px solid var(--bg-grad-start); padding-bottom: 5px;">
+                        <h4 style="color: var(--verde-osc); font-size: 14px;">🏁 Datos de Destino</h4>
+                    </div>
+                    <div class="form-group">
+                        <label>Departamento Destino</label>
+                        <select name="departamento_destino" id="cap_dep_des"
+                            onchange="cargarMunicipios('cap_dep_des', 'cap_mun_des')"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Municipio Destino</label>
+                        <select name="municipio_destino" id="cap_mun_des"></select>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;"><label>Dirección Destino Exacta</label><input
+                            type="text" name="direccion_destino"></div>
+
+                    <div class="form-group"><label>Código Servicio</label><input type="text" name="CodSerTecAEntregar"
+                            value="{{ datos_extraidos.codigo_servicio if datos_extraidos else '' }}" required></div>
+                    <div class="form-group"><label>Total Traslados Aprobados</label><input type="number"
+                            name="CantTotAEntregar" value="{{ datos_extraidos.cantidad if datos_extraidos else '1' }}"
+                            required></div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;"><label>Observaciones</label><textarea
+                            name="observaciones" rows="2"></textarea></div>
+
+                    <div
+                        style="grid-column: 1 / -1; display: flex; justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--border);">
+                        <button type="submit" class="btn-primary">Guardar Orden</button>
+                    </div>
+                </form>
+            </div>
+
+            <h3 style="margin-bottom: 10px; font-size: 16px; color: var(--text);">Órdenes con Traslados Disponibles</h3>
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Prescripción (ID)</th>
+                            <th>Paciente</th>
+                            <th>Origen</th>
+                            <th>Procedimiento</th>
+                            <th>Disponibles</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in traslados_capturados %}
+                        <tr>
+                            <td><b>{{ t.numero_prescripcion }}</b></td>
+                            <td>{{ t.nombre_usuario }}</td>
+                            <td>{{ t.direccion_origen }}</td>
+                            <td><span class="badge badge-gray">{{ t.tipo_servicio }}</span></td>
+                            <td style="text-align: center;"><span class="badge badge-success"
+                                    style="font-size: 12px;">+{{ t.diferencia }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 20px;">No hay órdenes con traslados
+                                pendientes.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% elif active_module == 'traslados_asignacion' %}
+            <!-- ================= ETAPA 2: DESGLOSE DE VIAJES ================= -->
+            <div class="action-header">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view"
+                        title="Cerrar vista">&times;</a>
+                    <h2>Etapa 2: Desglose de Viajes (Ida y Vuelta)</h2>
+                </div>
+            </div>
+
+            <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Seleccione una orden maestra para
+                desglosar el saldo en viajes individuales estrictamente divididos en IDA y VUELTA.</p>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Prescripción (ID)</th>
+                            <th>Paciente / Contacto</th>
+                            <th>Origen (Dep - Mun)</th>
+                            <th>Disponibles</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in ordenes_maestras %}
+                        <tr>
+                            <td><b>{{ t.numero_prescripcion }}</b></td>
+                            <td>{{ t.nombre_usuario }}<br><small>{{ t.telefono_usuario }}</small></td>
+                            <td>{{ t.departamento }}<br><small>{{ t.municipio }}</small></td>
+                            <td style="text-align: center;"><span class="badge badge-success"
+                                    style="font-size: 12px;">{{ t.diferencia }}</span></td>
+                            <td>
+                                <form action="{{ url_for('flotaespecial_eps.gestion_traslados_asignacion') }}"
+                                    method="POST" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                    <input type="hidden" name="accion" value="Desglosar Viajes" />
+                                    <input type="hidden" name="maestra_id" value="{{ t.id }}">
+                                    <button type="submit" class="btn-primary"
+                                        style="padding: 6px 12px; font-size: 12px; background: #0ea5e9;">⚡ Desglosar
+                                        Viajes</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay
+                                órdenes maestras con traslados disponibles para desglosar.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% elif active_module == 'traslados_verificacion' %}
+            <!-- ================= ETAPA 3: VERIFICACIÓN DE DATOS (AGRUPADA) ================= -->
+            <div class="action-header">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view"
+                        title="Cerrar vista">&times;</a>
+                    <h2>Etapa 3: Verificación Telefónica de Datos (Paquetes)</h2>
+                </div>
+            </div>
+
+            <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Audite la información del
+                paciente telefónicamente. La verificación se aplicará masivamente a <b>todos los viajes IDA</b> del
+                mismo paquete para agilizar la operación.</p>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Prescripción</th>
+                            <th>Paciente / Teléfono</th>
+                            <th>Viajes (Paquete)</th>
+                            <th>ID Viaje Ref.</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in viajes %}
+                        <tr>
+                            <td><b>{{ v.numero_prescripcion }}</b></td>
+                            <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
+                            <td><span class="badge badge-info">{{ v.total_idas }} viajes IDA</span></td>
+                            <td><span
+                                    style="font-family: monospace; font-size: 14px; font-weight: bold; color: var(--verde);">{{
+                                    v.id_viaje }}</span></td>
+                            <td>
+                                <button type="button" class="btn-primary" style="padding: 6px 10px; font-size: 11px;"
+                                    onclick="abrirRevision(this)" data-id="{{ v.id }}"
+                                    data-idpadre="{{ v.id_viaje_padre }}" data-ruta="{{ v.ruta_documento or '' }}"
+                                    data-nombre="{{ v.nombre_usuario or '' }}"
+                                    data-tipodoc="{{ v.tipo_documento or '' }}" data-idusr="{{ v.id_usuario or '' }}"
+                                    data-tel="{{ v.telefono_usuario or '' }}" data-dep="{{ v.departamento or '' }}"
+                                    data-mun="{{ v.municipio or '' }}" data-ori="{{ v.direccion_origen or '' }}"
+                                    data-dep-des="{{ v.departamento_destino or '' }}"
+                                    data-mun-des="{{ v.municipio_destino or '' }}"
+                                    data-des="{{ v.direccion_destino or '' }}">
+                                    📞 Auditar Paquete Completo
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay
+                                paquetes pendientes de verificación.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
             {% elif active_module == 'traslados_programacion' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 4: Programar Viajes</h2>
-                    </div>
+            <!-- ================= ETAPA 4: PROGRAMACIÓN DE VIAJES ================= -->
+            <div class="action-header">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view"
+                        title="Cerrar vista">&times;</a>
+                    <h2>Etapa 4: Programar Viajes</h2>
                 </div>
-                
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">El modal solicitará definir el Tipo de Servicio y se ajustará automáticamente dependiendo de si es Diálisis u Otros Procedimientos y la cantidad de viajes de la orden.</p>
+            </div>
 
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Prescripción (ID)</th>
-                                <th>Paciente / Teléfono</th>
-                                <th>Procedimiento</th>
-                                <th>ID Viaje</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for v in viajes %}
-                            <tr>
-                                <td><b>{{ v.numero_prescripcion }}</b></td>
-                                <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
-                                <td><span class="badge badge-purple" id="tipo_srv_{{ v.id }}">{{ v.tipo_servicio }}</span></td>
-                                <td><span style="font-family: monospace; font-size: 14px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span></td>
-                                <td>
-                                    <button type="button" class="btn-info" style="padding: 6px 10px; font-size: 11px;"
-                                        onclick="abrirProgramacion('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}', {{ v.total_idas|default(1) }})">
-                                        📅 Programar Viajes
-                                    </button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes verificados pendientes de programar.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+            <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">El modal solicitará definir el
+                Tipo de Servicio y se ajustará automáticamente dependiendo de si es Diálisis u Otros Procedimientos y la
+                cantidad de viajes de la orden.</p>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Prescripción (ID)</th>
+                            <th>Paciente / Teléfono</th>
+                            <th>Procedimiento</th>
+                            <th>ID Viaje</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in viajes %}
+                        <tr>
+                            <td><b>{{ v.numero_prescripcion }}</b></td>
+                            <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
+                            <td><span class="badge badge-purple" id="tipo_srv_{{ v.id }}">{{ v.tipo_servicio }}</span>
+                            </td>
+                            <td><span
+                                    style="font-family: monospace; font-size: 14px; font-weight: bold; color: var(--verde);">{{
+                                    v.id_viaje }}</span></td>
+                            <td>
+                                <button type="button" class="btn-info" style="padding: 6px 10px; font-size: 11px;"
+                                    onclick="abrirProgramacion('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}', {{ v.total_idas|default(1) }})">
+                                    📅 Programar Viajes
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay
+                                viajes verificados pendientes de programar.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
             {% elif active_module == 'traslados_asignacion_flota' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 5: Asignación de Flota (Generación FUEC)</h2>
-                    </div>
+            <!-- ================= ETAPA 5: ASIGNACIÓN DE FLOTA Y FUEC ================= -->
+            <div class="action-header">
+                <div class="action-title-group">
+                    <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view"
+                        title="Cerrar vista">&times;</a>
+                    <h2>Etapa 5: Asignación de Flota (Generación FUEC)</h2>
                 </div>
-                
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Asigne vehículo y conductor. El sistema validará normativas (Decreto 1079), generará el FUEC en PDF y lo enviará al Telegram del conductor.</p>
+            </div>
 
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Prescripción</th>
-                                <th>ID Viaje / Trayecto</th>
-                                <th>Paciente / Teléfono</th>
-                                <th>Fechas Prog.</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for v in viajes %}
-                            <tr {% if v.estado_novedad == 'ACTIVA' %}style="background-color: #fef2f2; border-left: 4px solid #ef4444;"{% endif %}>
-                                <td><b>{{ v.numero_prescripcion }}</b></td>
-                                <td>
-                                    <span style="font-family: monospace; font-size: 15px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span><br>
-                                    <span class="badge {% if v.trayecto == 'IDA' %}badge-info{% else %}badge-purple{% endif %}">[ {{ v.trayecto }} ]</span>
-                                </td>
-                                <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
-                                <td>{{ v.fecha_servicio or 'N/D' }}<br><small>{{ v.hora_inicio or '' }}</small></td>
-                                <td>
-                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                                        {% if v.estado_novedad == 'ACTIVA' %}
-                                            <button type="button" class="btn-danger" style="padding: 6px 10px; font-size: 11px; animation: pulseAlert 1.5s infinite;"
-                                                onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado }}', '{{ v.conductor_asignado }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
-                                                🚨 Resolver Novedad
-                                            </button>
-                                        {% else %}
-                                            <button type="button" class="btn-success" style="padding: 6px 10px; font-size: 11px;"
-                                                onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}')">
-                                                🚐 Generar FUEC y Asignar
-                                            </button>
-                                            
-                                            <button type="button" class="btn-warning" style="padding: 6px 10px; font-size: 11px;"
-                                                onclick="abrirExcepcionIndividual(this)"
-                                                data-id="{{ v.id }}"
-                                                data-ruta="{{ v.ruta_documento or '' }}"
-                                                data-nombre="{{ v.nombre_usuario or '' }}"
-                                                data-tipodoc="{{ v.tipo_documento or '' }}"
-                                                data-idusr="{{ v.id_usuario or '' }}"
-                                                data-tel="{{ v.telefono_usuario or '' }}"
-                                                data-dep="{{ v.departamento or '' }}"
-                                                data-mun="{{ v.municipio or '' }}"
-                                                data-ori="{{ v.direccion_origen or '' }}"
-                                                data-dep-des="{{ v.departamento_destino or '' }}"
-                                                data-mun-des="{{ v.municipio_destino or '' }}"
-                                                data-des="{{ v.direccion_destino or '' }}">
-                                                ✏️ Editar Ruta (Excepción)
-                                            </button>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes programados en cola de asignación.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+            <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Asigne vehículo y conductor. El
+                sistema validará normativas (Decreto 1079), generará el FUEC en PDF y lo enviará al Telegram del
+                conductor.</p>
 
-            {% elif active_module == 'traslados_auditoria' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 6: Auditoría de Viajes Ejecutados</h2>
-                    </div>
-                </div>
-                
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Revise las evidencias adjuntas y el cálculo algorítmico de distancias. Los viajes se auditan por <b>paquetes completos</b> (Ida y Vuelta).</p>
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Prescripción</th>
+                            <th>ID Viaje / Trayecto</th>
+                            <th>Paciente / Teléfono</th>
+                            <th>Fechas Prog.</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in viajes %}
+                        <tr {% if v.estado_novedad=='ACTIVA'
+                            %}style="background-color: #fef2f2; border-left: 4px solid #ef4444;" {% endif %}>
+                            <td><b>{{ v.numero_prescripcion }}</b></td>
+                            <td>
+                                <span
+                                    style="font-family: monospace; font-size: 15px; font-weight: bold; color: var(--verde);">{{
+                                    v.id_viaje }}</span><br>
+                                <span
+                                    class="badge {% if v.trayecto == 'IDA' %}badge-info{% else %}badge-purple{% endif %}">[
+                                    {{ v.trayecto }} ]</span>
+                            </td>
+                            <td>{{ v.nombre_usuario }}<br><small>{{ v.telefono_usuario }}</small></td>
+                            <td><small>{{ v.hora_inicio or 'N/D' }}</small></td>
+                            <td>
+                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                    {% if v.estado_novedad == 'ACTIVA' %}
+                                    <button type="button" class="btn-danger"
+                                        style="padding: 6px 10px; font-size: 11px; animation: pulseAlert 1.5s infinite;"
+                                        onclick="verDetalleNovedad('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.estatus_servicio }}', '{{ v.vehiculo_asignado }}', '{{ v.conductor_asignado }}', '{{ v.descripcion_novedad|default('')|replace("'", "\\'") }}', '{{ v.nombre_usuario }}')">
+                                        🚨 Resolver Novedad
+                                    </button>
+                                    {% else %}
+                                    <button type="button" class="btn-success"
+                                        style="padding: 6px 10px; font-size: 11px;"
+                                        onclick="abrirAsignacionFlota('{{ v.id }}', '{{ v.id_viaje }}', '{{ v.nombre_usuario }}')">
+                                        🚐 Generar FUEC y Asignar
+                                    </button>
 
-                <div class="table-card" style="padding: 15px; border-top: 4px solid var(--verde);">
-                    {% if viajes_agrupados %}
-                        {% for raiz, tramos in viajes_agrupados.items() %}
-                            <div style="border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: hidden;">
-                                <div style="background: #f9fafb; padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                                    <div>
-                                        <h4 style="color: var(--verde-osc); margin: 0; font-size: 15px;">📦 Paquete Base: <span style="font-family: monospace; color: var(--verde);">{{ raiz }}</span></h4>
-                                        <span style="font-size: 12px; color: var(--text-muted);">Paciente: <b>{{ tramos[0].nombre_usuario }}</b> | Auth: {{ tramos[0].numero_prescripcion }}</span>
-                                    </div>
-                                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                        <div style="text-align: right; background: white; padding: 5px 10px; border-radius: 6px; border: 1px solid #e5e7eb;">
-                                            <span style="font-size: 10px; color: var(--text-muted); display: block;">Resumen Paquete (Distancia)</span>
-                                            <span style="font-size: 12px;">Estimada: <b>{{ "%.2f"|format(tramos[0].consolidado_estimado_paquete|default(0)) }} km</b> | Real (GPS): <b style="color: var(--verde);">{{ "%.2f"|format(tramos[0].consolidado_real_paquete|default(0)) }} km</b></span>
-                                        </div>
-                                        <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST" style="margin: 0;">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <input type="hidden" name="accion" value="aprobar_paquete">
-                                            <input type="hidden" name="id_viaje_padre" value="{{ raiz }}">
-                                            <button type="submit" class="btn-primary" style="height: 100%;">✔️ Aprobar Paquete (Facturable)</button>
-                                        </form>
-                                    </div>
+                                    <button type="button" class="btn-warning"
+                                        style="padding: 6px 10px; font-size: 11px;"
+                                        onclick="abrirExcepcionIndividual(this)" data-id="{{ v.id }}"
+                                        data-ruta="{{ v.ruta_documento or '' }}"
+                                        data-nombre="{{ v.nombre_usuario or '' }}"
+                                        data-tipodoc="{{ v.tipo_documento or '' }}"
+                                        data-idusr="{{ v.id_usuario or '' }}" data-tel="{{ v.telefono_usuario or '' }}"
+                                        data-dep="{{ v.departamento or '' }}" data-mun="{{ v.municipio or '' }}"
+                                        data-ori="{{ v.direccion_origen or '' }}"
+                                        data-dep-des="{{ v.departamento_destino or '' }}"
+                                        data-mun-des="{{ v.municipio_destino or '' }}"
+                                        data-des="{{ v.direccion_destino or '' }}">
+                                        ✏️ Editar Ruta (Excepción)
+                                    </button>
+                                    {% endif %}
                                 </div>
-                                <table class="data-table" style="margin: 0; border: none;">
-                                    <thead style="background: white;">
-                                        <tr>
-                                            <th>Tramo / ID</th>
-                                            <th>Vehículo / Cond.</th>
-                                            <th>Tiempos Ejecución</th>
-                                            <th>Métricas Algoritmo</th>
-                                            <th>Evidencias</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for t in tramos %}
-                                        <tr>
-                                            <td>
-                                                <span class="badge {% if t.trayecto == 'IDA' %}badge-info{% else %}badge-purple{% endif %}" style="margin-bottom: 5px; display: inline-block;">{{ t.trayecto }}</span><br>
-                                                <span style="font-family: monospace; font-weight: bold; font-size: 12px;">{{ t.id_viaje }}</span>
-                                            </td>
-                                            <td>
-                                                <span style="font-size: 12px;"><b>{{ t.vehiculo_asignado }}</b></span><br>
-                                                <span style="font-size: 11px; color: var(--text-muted);">{{ t.conductor_asignado }}</span>
-                                            </td>
-                                            <td>
-                                                <span style="font-size: 11px;">Ini: <b>{{ t.hora_origen.strftime('%H:%M') if t.hora_origen else 'N/D' }}</b></span><br>
-                                                <span style="font-size: 11px;">Fin: <b>{{ t.hora_destino.strftime('%H:%M') if t.hora_destino else 'N/D' }}</b></span><br>
-                                                <span style="font-size: 11px; color: #b45309; font-weight: bold;">Ef: {{ t.tiempo_efectivo_minutos|default(0) }} min</span>
-                                            </td>
-                                            <td>
-                                                <span style="font-size: 11px; display: block; margin-bottom: 3px;">Dist. Estimada: <b>{{ t.distancia_estimada_km|default('0.0') }} km</b></span>
-                                                <span style="font-size: 11px; display: block; margin-bottom: 3px;">Dist. Real (GPS): <b style="color: var(--verde);">{{ t.distancia_real_km|default('0.0') }} km</b></span>
-                                                <span style="font-size: 10px; color: #6b7280; display: block;">Desv. Origen: <b>{{ t.desviacion_origen_m|default(0) }}m</b> | Destino: <b>{{ t.desviacion_destino_m|default(0) }}m</b></span>
-                                            </td>
-                                            <td>
-                                                <div style="display: flex; gap: 5px; flex-direction: column;">
-                                                    <button type="button" class="btn-pdf-mini" style="font-size: 11px; padding: 4px 8px; width: 100%; text-align: center; border-radius: 4px;" onclick="abrirPDF('{{ t.ruta_documento }}')">📄 Ver Reporte Operativo</button>
-                                                    
-                                                    <form action="{{ url_for('flotaespecial_eps.gestion_traslados_auditoria') }}" method="POST" style="margin: 0; width: 100%;">
-                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                                        <input type="hidden" name="accion" value="rechazar_tramo">
-                                                        <input type="hidden" name="viaje_id" value="{{ t.id }}">
-                                                        <button type="submit" class="btn-danger" style="font-size: 10px; padding: 4px 8px; width: 100%; background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5;">✖️ Devolver al Operador</button>
-                                                    </form>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay
+                                viajes programados en cola de asignación.</td>
+                        </tr>
                         {% endfor %}
-                    {% else %}
-                        <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">No hay paquetes de viajes listos para auditar en este momento.</div>
-                    {% endif %}
-                </div>
-
-            {% elif active_module == 'traslados_auditados' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('controlador_flotaespecial.dashboard_controlador') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Etapa 7: Historial Auditados (Facturables)</h2>
-                    </div>
-                </div>
-                
-                <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">Listado de los últimos 100 viajes con auditoría cerrada y firma criptográfica aplicada. Listos para cruce de RIPS.</p>
-
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID Viaje</th>
-                                <th>Paciente / EPS</th>
-                                <th>Ejecución (Flota)</th>
-                                <th>Auditor / Criptografía</th>
-                                <th>Soporte PDF</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for v in viajes %}
-                            <tr>
-                                <td><span style="font-family: monospace; font-size: 14px; font-weight: bold; color: var(--verde);">{{ v.id_viaje }}</span><br><small>{{ v.numero_autorizacion }}</small></td>
-                                <td>{{ v.nombre_usuario }}<br><small>{{ v.eps_cliente }}</small></td>
-                                <td><span class="badge badge-gray">{{ v.vehiculo_asignado }}</span><br><small>{{ v.fecha_fin_real.strftime('%Y-%m-%d %H:%M') if v.fecha_fin_real else 'N/D' }}</small></td>
-                                <td>
-                                    <span style="font-size: 11px; font-weight: bold; color: #0ea5e9;">{{ v.auditor_nombre }}</span><br>
-                                    <span style="font-family: monospace; font-size: 9px; color: #9ca3af;" title="{{ v.hash_auditoria }}">{{ v.hash_auditoria[:15] }}...</span>
-                                </td>
-                                <td>
-                                    <button type="button" class="btn-pdf-mini" style="font-size: 11px; padding: 6px 10px;" onclick="abrirPDF('{{ v.ruta_documento }}')">📄 Ver Reporte Sellado</button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay viajes auditados en el historial reciente.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                    </tbody>
+                </table>
+            </div>
 
             {% endif %}
 
@@ -1073,7 +2098,7 @@
                 <button class="close-btn" onclick="closeModal('modalAsignacionFlota')">&times;</button>
             </div>
             <div style="background: #eefcf9; border-left: 4px solid var(--verde); padding: 12px 15px; margin-bottom: 20px; border-radius: 4px; font-size: 13px; color: var(--text-muted); text-align: left;">
-                <h4 style="color: var(--verde-osc); font-size: 14px; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">ℹ️ Reglas Operativas de esta Etapa</h4>
+                <h4 style="color: var(--verde-osc); font-size: 14px; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">ℹ️️ Reglas Operativas de esta Etapa</h4>
                 <ul style="padding-left: 20px; margin-top: 5px;">
                     <li>Asigne el contrato, vehículo y conductor para este servicio.</li>
                     <li>El sistema evaluará la <strong>capacidad residual</strong> y validará normativas (SOAT, RTM, Licencia vigentes).</li>
@@ -1193,7 +2218,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT COMÚN -->
+    <!-- ================= DICCIONARIO Y LÓGICA JAVASCRIPT INTEGRAL ================= -->
     <script>
         // Mapeo JS extendido con Capacidad
         const mapaFlota = [
@@ -1212,47 +2237,79 @@
             {% endif %}
         ];
 
+        // NUEVO: Mapa Dinámico de Conductores (Titulares y Relevos)
+        const mapaConductores = [
+            {% if conductores is defined %}
+            {% for c in conductores %}
+            {
+                nombre: "{{ c.nombre }}",
+                cedula: "{{ c.cedula }}",
+                relevo: {{ 'true' if c.get('es_relevo') else 'false' }}
+            },
+            {% endfor %}
+            {% endif %}
+        ];
+
         let currentBaseCupos = 1;
 
-        // Lógica de Autocompletado Vehículo y Capacidad
-        document.addEventListener("DOMContentLoaded", function() {
+        // Lógica de Autocompletado Vehículo, Capacidad y Conductores Relevadores
+        document.addEventListener("DOMContentLoaded", function () {
             const asigVehiculo = document.getElementById('asig_vehiculo');
             if (asigVehiculo) {
-                asigVehiculo.addEventListener('input', function(e) {
+                asigVehiculo.addEventListener('input', function (e) {
                     const val = this.value.toUpperCase();
                     this.value = val;
                     const vFind = mapaFlota.find(x => x.placa === val);
                     const btnSubmit = document.getElementById('btn_submit_asignacion');
                     const selCond = document.getElementById('asig_conductor');
-                    
+
                     if (vFind) {
-                        if (!vFind.conductor || vFind.conductor.trim() === '') {
-                            const spanCap = document.getElementById('info_capacidad_vehiculo');
-                            spanCap.style.display = 'block';
-                            spanCap.innerHTML = `⚠️ Operación denegada: Este vehículo no tiene un conductor vinculado.`;
-                            spanCap.style.background = '#fee2e2';
-                            spanCap.style.borderColor = '#ef4444';
-                            spanCap.style.color = '#991b1b';
+                        if (selCond) {
+                            selCond.innerHTML = '<option value="">Seleccione conductor...</option>';
                             
-                            this.value = '';
-                            if (selCond) selCond.selectedIndex = 0;
-                            if (btnSubmit) btnSubmit.disabled = true;
-                            return; 
-                        } else {
-                            if (selCond) {
-                                for (let i = 0; i < selCond.options.length; i++) {
-                                    if (selCond.options[i].value === vFind.conductor) {
-                                        selCond.selectedIndex = i;
-                                        break;
-                                    }
+                            let titulares = vFind.conductor ? vFind.conductor.split(',').map(s => s.trim()) : [];
+                            let foundOptions = 0;
+
+                            mapaConductores.forEach(c => {
+                                if (titulares.includes(c.nombre)) {
+                                    selCond.innerHTML += `<option value="${c.nombre}">${c.nombre} (${c.cedula}) [TITULAR]</option>`;
+                                    foundOptions++;
+                                } else if (c.relevo) {
+                                    selCond.innerHTML += `<option value="${c.nombre}">${c.nombre} (${c.cedula}) [RELEVO]</option>`;
+                                    foundOptions++;
                                 }
+                            });
+
+                            if (foundOptions === 0) {
+                                const spanCap = document.getElementById('info_capacidad_vehiculo');
+                                spanCap.style.display = 'block';
+                                spanCap.innerHTML = `⚠️ Operación denegada: El vehículo no tiene conductor titular y no hay personal de relevo en la flota.`;
+                                spanCap.style.background = '#fee2e2';
+                                spanCap.style.borderColor = '#ef4444';
+                                spanCap.style.color = '#991b1b';
+                                
+                                this.value = '';
+                                if (btnSubmit) btnSubmit.disabled = true;
+                                return; 
+                            }
+
+                            // Autoseleccionar por defecto al primer titular, o al primer relevo
+                            if (titulares.length > 0) {
+                                selCond.value = titulares[0];
+                            } else {
+                                selCond.selectedIndex = 1;
                             }
                         }
                         validarDisponibilidadEstricta();
                     } else {
                         document.getElementById('info_capacidad_vehiculo').style.display = 'none';
                         if (btnSubmit) btnSubmit.disabled = false;
-                        if (selCond) selCond.selectedIndex = 0;
+                        if (selCond) {
+                            selCond.innerHTML = '<option value="">Seleccione conductor...</option>';
+                            mapaConductores.forEach(c => {
+                                selCond.innerHTML += `<option value="${c.nombre}">${c.nombre} (${c.cedula})</option>`;
+                            });
+                        }
                     }
                 });
             }
@@ -1283,6 +2340,142 @@
             });
             datalist.innerHTML = html;
             document.getElementById('info_capacidad_vehiculo').style.display = 'none';
+        }
+
+        // =========================================================
+        // GESTIÓN DE REPROGRAMACIONES (CONTINGENCIAS)
+        // =========================================================
+        function abrirModalContingencias() {
+            document.getElementById('contingencia_cedula').value = '';
+            document.getElementById('contingencias_resultados').style.display = 'none';
+            document.getElementById('tbody_contingencias').innerHTML = '';
+            openModal('modalContingencias');
+        }
+
+        function buscarContingencias() {
+            const cedula = document.getElementById('contingencia_cedula').value.trim();
+            if (!cedula) {
+                alert("Por favor ingrese la cédula del paciente.");
+                return;
+            }
+
+            const btn = document.getElementById('btnBuscarContingencias');
+            btn.disabled = true;
+            btn.innerHTML = 'Buscando...';
+
+            fetch("{{ url_for('flotaespecial_eps.api_contingencias_buscar') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ cedula: cedula })
+            })
+            .then(res => res.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Buscar Viajes';
+                if (data.status === 'success') {
+                    renderTablaContingencias(data.data);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Buscar Viajes';
+                alert('Error de conexión.');
+            });
+        }
+
+        function renderTablaContingencias(viajes) {
+            const tbody = document.getElementById('tbody_contingencias');
+            document.getElementById('contingencias_resultados').style.display = 'block';
+
+            if (viajes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No se encontraron viajes IDA pendientes para esta cédula.</td></tr>';
+                return;
+            }
+
+            let html = '';
+            viajes.forEach(v => {
+                html += `
+                <tr id="tr_contingencia_${v.id}">
+                    <td><span class="id-token">${v.id_viaje}</span><br><small>${v.numero_prescripcion}</small></td>
+                    <td><b>${v.nombre_usuario}</b><br><small>${v.telefono_usuario || 'S/N'}</small></td>
+                    <td>
+                        <input type="date" id="fecha_reprog_${v.id}" value="${v.fecha_servicio !== 'Sin Fecha' ? v.fecha_servicio : ''}" style="padding: 5px; border-radius: 4px; border: 1px solid var(--border); margin-bottom: 5px; width: 100%;">
+                        <input type="time" id="hora_reprog_${v.id}" value="${v.hora_inicio !== 'Sin Hora' ? v.hora_inicio : ''}" style="padding: 5px; border-radius: 4px; border: 1px solid var(--border); width: 100%;">
+                    </td>
+                    <td><span class="badge badge-purple">${v.estatus_servicio}</span></td>
+                    <td>
+                        <div style="display: flex; gap: 5px; flex-direction: column;">
+                            <button type="button" class="btn-success" style="padding: 6px; font-size: 11px;" onclick="reprogramarContingencia('${v.id}')">💾 Guardar Cambios</button>
+                            <button type="button" class="btn-danger" style="padding: 6px; font-size: 11px;" onclick="anularContingencia('${v.id}')">✖️ Anular Viaje</button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function reprogramarContingencia(viaje_id) {
+            const nueva_fecha = document.getElementById(`fecha_reprog_${viaje_id}`).value;
+            const nueva_hora = document.getElementById(`hora_reprog_${viaje_id}`).value;
+
+            if (!nueva_fecha || !nueva_hora) {
+                alert("Debe seleccionar fecha y hora para reprogramar.");
+                return;
+            }
+
+            if (!confirm('¿Está seguro de reprogramar este viaje con la nueva fecha y hora?')) return;
+
+            fetch("{{ url_for('flotaespecial_eps.api_contingencias_reprogramar') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ viaje_id: viaje_id, fecha_servicio: nueva_fecha, hora_inicio: nueva_hora })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Viaje reprogramado exitosamente.');
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(err => alert('Error de conexión.'));
+        }
+
+        function anularContingencia(viaje_id) {
+            const motivo = prompt("Por favor, ingrese el motivo de anulación (Ej. Fallecimiento, Inasistencia):");
+            if (motivo === null) return;
+            if (motivo.trim() === "") {
+                alert("El motivo es obligatorio para anular el viaje.");
+                return;
+            }
+
+            fetch("{{ url_for('flotaespecial_eps.api_contingencias_anular') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ viaje_id: viaje_id, motivo: motivo })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Viaje anulado exitosamente.');
+                    document.getElementById(`tr_contingencia_${viaje_id}`).style.display = 'none';
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(err => alert('Error de conexión.'));
         }
 
         // =========================================================
@@ -1458,6 +2651,10 @@
                 }
             });
         }
+
+        let mapVerifOri, mapVerifDes;
+        let markerVerifOri, markerVerifDes;
+        let markerOriEstatico, markerDesEstatico;
 
         function geocodificarYUbicar(direccion, municipio, departamento, mapObj, markerInteractivo, markerEstatico, hiddenLatId, hiddenLngId) {
             if (!direccion || !mapObj || !markerInteractivo) return;
@@ -1939,7 +3136,7 @@
 
         function notificarVuelta(viajeId) {
             if (!confirm('¿Desea enviar (o reenviar) la notificación de este viaje al conductor por Telegram?')) return;
-            fetch("{{ url_for('controlador_flotaespecial.api_notificar_viaje') }}", {
+            fetch("{{ url_for('flotaespecial_eps.api_notificar_viaje') }}", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
                 body: JSON.stringify({ viaje_id: viajeId })
@@ -1961,7 +3158,7 @@
         function ocultarDelKanban(viajeId) {
             if (!confirm('¿Desea avanzar la tarjeta y activar la siguiente fase del ciclo?')) return;
             
-            fetch("{{ url_for('controlador_flotaespecial.api_ocultar_kanban') }}", {
+            fetch("{{ url_for('flotaespecial_eps.api_ocultar_kanban') }}", {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -2040,6 +3237,198 @@
             openModal('modalAsignacionFlota');
             filtrarVehiculosPorGeografia();
         }
+
+        // =========================================================
+        // POLLING EN TIEMPO REAL DEL TABLERO KANBAN Y NOVEDADES
+        // =========================================================
+        function actualizarTableroEnVivo() {
+            // Anti-Caché estricto: Forzamos al navegador a no usar respuestas almacenadas.
+            fetch("{{ url_for('flotaespecial_eps.api_operativa_vivo') }}?_=" + new Date().getTime(), {
+                method: 'GET',
+                cache: 'no-store',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const dashboard = data.data;
+
+                    // 1. Actualizar KPIs Superiores
+                    if (dashboard.kpis) {
+                        const kpiCards = document.querySelectorAll('.kpi-value');
+                        if(kpiCards.length >= 6) {
+                            kpiCards[0].innerText = dashboard.kpis.capturados || 0;
+                            kpiCards[1].innerText = dashboard.kpis.programados || 0;
+                            kpiCards[2].innerText = dashboard.kpis.verificados || 0;
+                            kpiCards[3].innerText = dashboard.kpis.asignados || 0;
+                            kpiCards[4].innerText = dashboard.kpis.ejecucion || 0;
+                            kpiCards[5].innerText = dashboard.kpis.ejecutados || 0;
+                        }
+                    }
+
+                    // 2. Actualizar Banner de Novedades Activas
+                    const banner = document.getElementById('bannerNovedades');
+                    const contadorNov = document.getElementById('contadorNovedades');
+                    if (dashboard.novedades_activas && dashboard.novedades_activas.length > 0) {
+                        contadorNov.innerText = dashboard.novedades_activas.length;
+                        banner.style.display = 'block';
+                    } else {
+                        banner.style.display = 'none';
+                    }
+
+                    // 3. Actualizar Panel de Retrasos Críticos (> 15 MIN)
+                    const panelRetrasos = document.getElementById('panel_retrasos_fijo');
+                    const badgeRetrasos = document.getElementById('badge_retrasos');
+                    const contenedorRetrasos = document.getElementById('contenedor_retrasos');
+                    
+                    if (dashboard.viajes_retrasados && dashboard.viajes_retrasados.length > 0) {
+                        badgeRetrasos.innerText = dashboard.viajes_retrasados.length;
+                        let htmlRetrasos = '';
+                        dashboard.viajes_retrasados.forEach(v => {
+                            htmlRetrasos += `
+                            <div class="kanban-card border-top-warning" style="background: white;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                    <span class="id-token">${v.id_viaje}</span>
+                                    <span class="badge badge-warning">RETRASADO</span>
+                                </div>
+                                <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario}</b></div>
+                                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">${v.conductor_asignado || 'N/D'} (${v.vehiculo_asignado || 'N/D'})</div>
+                                <div style="font-size: 11px; color: #b45309;"><b>Prog:</b> ${v.hora_inicio}</div>
+                                <div style="margin-top: 10px;">
+                                    <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; width: 100%;" onclick="notificarVuelta('${v.id}')">
+                                        🔔 Llamar / Notificar Operador
+                                    </button>
+                                </div>
+                            </div>`;
+                        });
+                        contenedorRetrasos.innerHTML = htmlRetrasos;
+                        panelRetrasos.style.display = 'block';
+                    } else {
+                        panelRetrasos.style.display = 'none';
+                        contenedorRetrasos.innerHTML = '';
+                    }
+
+                    // 4. Función auxiliar para re-renderizar dinámicamente el HTML de las tarjetas
+                    const renderizarTarjetas = (viajes, contenedorId, contadorId, claseBorde, isTerminado = false) => {
+                        const contenedor = document.getElementById(contenedorId);
+                        const contador = document.getElementById(contadorId);
+                        
+                        if (!contenedor) return;
+                        if (contador) contador.innerText = viajes.length + (contenedorId === 'contenedor_parte1' ? ' pendientes' : '');
+
+                        if (viajes.length === 0) {
+                            if (contenedorId === 'contenedor_parte1') {
+                                contenedor.innerHTML = '<div id="no_viajes_parte1" style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 20px; background: var(--surface); border-radius: 10px; border: 1px solid var(--border);">No hay viajes IDA programados pendientes de asignación.</div>';
+                            } else {
+                                contenedor.innerHTML = '<div class="empty-col" style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">Vacío</div>';
+                            }
+                            return;
+                        }
+
+                        let html = '';
+                        viajes.forEach(v => {
+                            let badgeClass = 'badge-info';
+                            if (v.estatus_servicio === 'NOVEDAD_RECORRIDO' || v.estatus_servicio === 'NOVEDAD_PRE_VIAJE') badgeClass = 'badge-danger';
+                            else if (v.estatus_servicio === 'EN EJECUCION') badgeClass = contenedorId.includes('col4') ? 'badge-warning' : 'badge-success';
+                            else if (isTerminado) badgeClass = 'badge-gray';
+                            else if (contenedorId.includes('col3')) badgeClass = 'badge-purple';
+
+                            let estatusTexto = isTerminado ? 'TERMINADO' : v.estatus_servicio;
+
+                            let btnNovedad = '';
+                            if (v.estado_novedad === 'ACTIVA') {
+                                btnNovedad = `<button type="button" class="btn-danger" style="font-size: 10px; padding: 4px 6px; width: 100%; text-align: center; animation: pulseAlert 1.5s infinite; margin-bottom: 5px;" onclick="verDetalleNovedad('${v.id}', '${v.id_viaje}', '${v.estatus_servicio}', '${v.vehiculo_asignado || 'N/A'}', '${v.conductor_asignado || 'N/A'}', '${(v.descripcion_novedad || '').replace(/'/g, "\\'")}', '${v.nombre_usuario}')">🚨 Resolver Novedad</button>`;
+                            }
+
+                            let acciones = '';
+                            
+                            // A) RENDERIZADO EXPANDIDO EXCLUSIVO PARA LA PARTE 1
+                            if (contenedorId === 'contenedor_parte1') {
+                                acciones = `
+                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                        <button type="button" class="btn-success" style="padding: 5px 8px; font-size: 11px; flex-grow: 1;" onclick="abrirAsignacionFlota('${v.id}', '${v.id_viaje}', '${(v.nombre_usuario || '').replace(/"/g, '&quot;')}')">🚐 Asignar FUEC</button>
+                                        <button onclick="abrirPDF('${v.ruta_documento}')" class="btn-pdf" style="flex-grow: 1;">📄 PDF</button>
+                                    </div>`;
+                                
+                                html += `
+                                <div class="kanban-card ${claseBorde} ${v.is_urgencia ? 'urgencia-12h' : ''}" data-id="${v.id}">
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                                        <span class="id-token">${v.id_viaje}</span>
+                                        <span class="badge ${badgeClass}">${estatusTexto}</span>
+                                    </div>
+                                    <div style="font-size: 12px; margin-bottom: 5px;"><b>Prescripción:</b> ${v.numero_prescripcion || 'N/A'}</div>
+                                    <div style="font-size: 13px; margin-bottom: 2px;"><b>${v.nombre_usuario}</b></div>
+                                    <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">ID: ${v.id_usuario || 'N/D'} | Tel: ${v.telefono_usuario || 'N/D'}</div>
+                                    <div style="font-size: 12px; margin-bottom: 2px;"><b>📍 Origen:</b> ${v.municipio || ''} (${v.departamento || ''}) - ${v.direccion_origen || ''}</div>
+                                    <div style="font-size: 12px; margin-bottom: 5px;"><b>🏁 Destino:</b> ${v.municipio_destino || ''} (${v.departamento_destino || ''}) - ${v.direccion_destino || ''}</div>
+                                    <div style="font-size: 12px; margin-bottom: 10px; color: #b45309;"><b>Prog:</b> ${v.hora_inicio || 'N/D'}</div>
+                                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                                        ${btnNovedad}
+                                        ${acciones}
+                                    </div>
+                                </div>`;
+                            } 
+                            // B) RENDERIZADO COMPACTO PARA EL KANBAN (PARTE 2)
+                            else {
+                                if (contenedorId === 'container_col2') {
+                                    acciones = `
+                                        <div style="display: flex; gap: 5px;">
+                                            <button onclick="abrirPDF('${v.ruta_documento}')" class="btn-pdf">📄 PDF</button>
+                                            <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="ocultarDelKanban('${v.id}')">Siguiente Fase: Activar Vuelta ➡️</button>
+                                        </div>`;
+                                } else if (contenedorId === 'container_col3') {
+                                    if (v.estatus_servicio === 'ASIGNADO') {
+                                        acciones = `
+                                            <div style="width: 100%; padding: 6px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; font-size: 10px; color: #065f46; text-align: center; font-weight: bold; margin-bottom: 5px;">✔️ Asignado a: ${v.conductor_asignado}</div>
+                                            <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; width: 100%;" onclick="notificarVuelta('${v.id}')">🔔 Enviar Notificación al Operador</button>`;
+                                    } else {
+                                        acciones = `
+                                            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                                <button type="button" class="btn-success" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="abrirAsignacionFlota('${v.id}', '${v.id_viaje}', '${(v.nombre_usuario || '').replace(/"/g, '&quot;')}')">🚐 Asignar FUEC</button>
+                                                <button type="button" class="btn-info" style="font-size: 10px; padding: 4px 6px; flex-grow: 1;" onclick="abrirRevision(this)" data-id="${v.id}" data-idpadre="${v.id_viaje_padre}" data-ruta="${v.ruta_documento || ''}" data-nombre="${v.nombre_usuario || ''}" data-tipodoc="${v.tipo_documento || ''}" data-idusr="${v.id_usuario || ''}" data-tel="${v.telefono_usuario || ''}" data-dep="${v.departamento || ''}" data-mun="${v.municipio || ''}" data-ori="${v.direccion_origen || ''}" data-dep-des="${v.departamento_destino || ''}" data-mun-des="${v.municipio_destino || ''}" data-des="${v.direccion_destino || ''}">📞 Verificación</button>
+                                            </div>`;
+                                    }
+                                } else {
+                                    acciones = `<button onclick="abrirPDF('${v.ruta_documento}')" class="btn-pdf">📄 PDF</button>`;
+                                }
+
+                                html += `
+                                <div class="kanban-card ${claseBorde} ${['NOVEDAD_PRE_VIAJE', 'NOVEDAD_RECORRIDO'].includes(v.estatus_servicio) ? 'flash-critical' : ''} ${v.is_urgencia ? 'urgencia-12h' : ''}" data-id="${v.id}">
+                                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                                        <span class="id-token">${v.id_viaje}</span>
+                                        <span class="badge ${badgeClass}" style="font-size: 9px;">${estatusTexto}</span>
+                                    </div>
+                                    <div style="font-size: 12px; margin-bottom: 2px;"><b>${v.nombre_usuario}</b></div>
+                                    <div style="font-size: 12px; margin-bottom: 2px;"><b>📍 Origen:</b> ${v.municipio || ''} (${v.departamento || ''}) - ${v.direccion_origen || ''}</div>
+                                    <div style="font-size: 12px; margin-bottom: 5px;"><b>🏁 Destino:</b> ${v.municipio_destino || ''} (${v.departamento_destino || ''}) - ${v.direccion_destino || ''}</div>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">${v.conductor_asignado || 'N/D'} (${v.vehiculo_asignado || 'N/D'})</div>
+                                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                                        ${btnNovedad}
+                                        ${acciones}
+                                    </div>
+                                </div>`;
+                            }
+                        });
+                        contenedor.innerHTML = html;
+                    };
+
+                    // 5. Renderizar columnas Kanban y Bolsa de Viajes
+                    renderizarTarjetas(dashboard.parte1_ida_programados, 'contenedor_parte1', 'contador_parte1', 'border-top-info');
+                    renderizarTarjetas(dashboard.parte2_col1, 'container_col1', 'count_col1', 'border-top-success');
+                    renderizarTarjetas(dashboard.parte2_col2, 'container_col2', 'count_col2', 'border-top-gray', true);
+                    renderizarTarjetas(dashboard.parte2_col3, 'container_col3', 'count_col3', 'border-top-purple');
+                    renderizarTarjetas(dashboard.parte2_col4, 'container_col4', 'count_col4', 'border-top-warning');
+                }
+            })
+            .catch(err => console.error("Error actualizando tablero en vivo:", err));
+        }
+
+        // Ejecutar el short-polling automáticamente cada 15 segundos
+        setInterval(actualizarTableroEnVivo, 15000);
     </script>
 </body>
 </html>
