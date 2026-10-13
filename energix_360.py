@@ -1,4 +1,4 @@
-# energix_360.py
+# MÓDULO: UNIVERSAL | ARCHIVO: energix_360.py
 import os
 import uuid
 import json
@@ -8,6 +8,7 @@ from app.forms import LoginForm
 from functools import wraps
 import MySQLdb.cursors
 from datetime import datetime, timedelta, timezone
+import time
 
 # ==============================================================================
 # 1. CONFIGURACIÓN DE RUTAS FÍSICAS E INICIALIZACIÓN (App Factory)
@@ -119,7 +120,6 @@ def index():
     form = LoginForm()
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        # Se elimina el filtro estatus = 'ACTIVO' que causaba el error 1054
         cur.execute("SELECT nit, nombre_comercial FROM empresas ORDER BY nombre_comercial ASC")
         empresas_db = cur.fetchall()
         cur.close()
@@ -139,11 +139,39 @@ def panel_principal():
     if 'webmaster' in str(session.get('tipo_empresa', '')).lower() or session.get('empresa_id') == '901811727':
         return redirect(url_for('bp_901811727_main.panel_webmaster'))
 
+    perfil_usuario = str(session.get('perfil', '')).strip().lower()
+    tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
+
+    # REGLA M1, M2 Y M3 ESTRICTA: El Operador NUNCA pasa por el panel de tarjetas unificado
+    if perfil_usuario == 'operador_flotaespecial':
+        return redirect(url_for('router_universal', modulo='flotaespecial'))
+    elif perfil_usuario == 'operador_flotacarga':
+        return redirect(url_for('router_universal', modulo='carga'))
+    elif perfil_usuario == 'operador_logistica':
+        return redirect(url_for('router_universal', modulo='operador_bodegas'))
+    elif perfil_usuario == 'verificador_bodegas':
+        return redirect(url_for('router_universal', modulo='verificador_bodegas'))
+    elif perfil_usuario == 'vendedor':
+        return redirect(url_for('router_universal', modulo='vendedor'))
+    elif perfil_usuario == 'controlador_pesv':
+        return redirect('/gestor_flota/pesv_bp/')
+
+    # SALTO DIRECTO Y DEFINITIVO: Omite la vista universal (Imágenes 4 y 7 redundantes)
+    # Encamina la petición incondicionalmente a la vista nativa consolidada del controlador.
+    if tipo_empresa == 'transporte_especial':
+        return redirect('/gestor_flotaespecial/dashboard')
+    elif tipo_empresa == 'transporte_carga':
+        return redirect('/gestor_flota/dashboard')
+    elif tipo_empresa == 'ventas_distribucion':
+        return redirect('/hub_ventas_distribucion/dashboard')
+    elif tipo_empresa == 'cria_beneficio_aves_corral':
+        return redirect(url_for('router_universal', modulo='avicola'))
+
+    # Fallback para empresas generales que requieran vista de tarjetas mezclada
     nombre_empresa = session.get('empresa', 'Empresa')
     nombre_usuario = session.get('nombre', 'Usuario')
     nit_empresa = session.get('empresa_id')
     modulos_activos = session.get('modulos_activos', [])
-    perfil_usuario = session.get('perfil')
 
     return render_template(
         'A_dashboard_universal.html',
@@ -173,7 +201,6 @@ def login():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
-    # NUEVO: Se extrae la columna JSON submodulos_activos
     cur.execute("SELECT nit, tipo_empresa, submodulos_activos FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
     emp_info = cur.fetchone()
     if not emp_info:
@@ -183,7 +210,6 @@ def login():
     nit_empresa = str(emp_info['nit'])
     tipo_empresa = str(emp_info.get('tipo_empresa') or '').lower()
 
-    # Procesamiento y validación del JSON Plug & Play
     submodulos_raw = emp_info.get('submodulos_activos')
     submodulos_activos_empresa = []
     if submodulos_raw:
@@ -206,7 +232,7 @@ def login():
         cur.close()
         return jsonify(success=False, message="El usuario no pertenece a la empresa seleccionada.")
 
-    # --- GENERACIÓN DE TOKEN DE SESIÓN Y TIMESTAMP (HORA COLOMBIA) ---
+    # --- GENERACIÓN DE TOKEN DE SESIÓN Y TIMESTAMP ---
     token_sesion = str(uuid.uuid4())
     ahora_utc = datetime.now(timezone.utc)
     ahora_colombia = ahora_utc - timedelta(hours=5)
@@ -217,7 +243,6 @@ def login():
         mysql.connection.commit()
     except Exception as e:
         print(f"Error al guardar token de sesión: {e}")
-    # ------------------------------------------------------------------
 
     modulos_activos = []
     try:
@@ -241,7 +266,7 @@ def login():
         'tipo_empresa': tipo_empresa,
         'perfil': str(usuario.get('perfil') or '').strip().lower(),
         'modulos_activos': modulos_activos,
-        'submodulos_activos': submodulos_activos_empresa,  # INYECCIÓN DEL MARCADOR EN SESIÓN
+        'submodulos_activos': submodulos_activos_empresa, 
         'token_sesion': token_sesion,
         'login_time': login_timestamp
     })
@@ -270,6 +295,11 @@ def ejecutar_escaneo_introspeccion():
     nuevo_mapa = {}
     from flask import current_app
     for endpoint, func in current_app.view_functions.items():
+        # REGLA ESTRICTA BQA-ONE: Ignorar router_universal para no crear un loop infinito 
+        # en la asignación del mapa de introspección que causa el BuildError.
+        if endpoint == 'router_universal':
+            continue
+            
         try:
             codigo_fuente = inspect.getsource(func)
             htmls_encontrados = re.findall(r'[\'"]([^\'"]+\.html)[\'"]', codigo_fuente)
@@ -288,19 +318,96 @@ def router_universal(modulo):
     perfil_usuario = str(session.get('perfil', '')).strip().lower()
     nit_empresa = str(session.get('empresa_id', '')).strip()
     modulos_comprados = session.get('modulos_activos', [])
+    submodulos_activos = session.get('submodulos_activos', [])
     tipo_empresa = session.get('tipo_empresa')
 
     # Excepción para permitir paso si el módulo es nativo del tipo de empresa
-    if modulo not in modulos_comprados:
-        es_nativo = False
-        if modulo == 'flotaespecial' and tipo_empresa == 'transporte_especial': es_nativo = True
-        elif modulo == 'carga' and tipo_empresa == 'transporte_carga': es_nativo = True
-        elif modulo == 'ventas' and tipo_empresa == 'ventas_distribucion': es_nativo = True
-        elif modulo == 'avicola' and tipo_empresa == 'cria_beneficio_aves_corral': es_nativo = True
-        
-        if not es_nativo:
-            flash(f"Tu empresa no tiene contratado el módulo de {modulo.upper()}.", "warning")
-            return redirect(url_for('panel_principal'))
+    es_nativo = False
+    if modulo == 'flotaespecial' and tipo_empresa == 'transporte_especial': es_nativo = True
+    elif modulo == 'carga' and tipo_empresa == 'transporte_carga': es_nativo = True
+    elif modulo == 'ventas' and tipo_empresa == 'ventas_distribucion': es_nativo = True
+    elif modulo == 'avicola' and tipo_empresa == 'cria_beneficio_aves_corral': es_nativo = True
+    
+    # Módulos transversales universales permitidos (Evita bloqueos falsos)
+    modulos_transversales_permitidos = ['preoperacional', 'eps_gestion', 'eps_facturacion', 'operador_flotaespecial', 'operador_flotacarga', 'operador_bodegas', 'verificador_bodegas', 'vendedor', 'pesv']
+    
+    if modulo not in modulos_comprados and modulo not in submodulos_activos and not es_nativo and modulo not in modulos_transversales_permitidos:
+        flash(f"Tu empresa no tiene habilitado el módulo o submódulo de {modulo.upper()}.", "warning")
+        return redirect(url_for('panel_principal'))
+
+    # FALLBACK ESTRUCTURAL PARA SUB-HUBS NATIVOS
+    if es_nativo:
+        if modulo == 'ventas':
+            return redirect('/hub_ventas_distribucion/dashboard')
+        elif modulo == 'flotaespecial':
+            # REGLA M1 ESTRICTA: Aislamiento estricto del Operador Flota Especial
+            if perfil_usuario == 'operador_flotaespecial':
+                try:
+                    max_reintentos = 3
+                    preop = None
+                    for intento in range(max_reintentos):
+                        try:
+                            cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+                            # Bloqueo pesimista OBLIGATORIO para prevenir race conditions en turno
+                            cur.execute("""
+                                SELECT id_inspeccion 
+                                FROM inspeccion_preoperacional 
+                                WHERE id_usuario_conductor = %s 
+                                  AND id_empresa = %s 
+                                  AND fecha_inspeccion = CURDATE() 
+                                FOR UPDATE
+                            """, (session.get('usuario_id'), nit_empresa))
+                            preop = cur.fetchone()
+                            mysql.connection.commit()
+                            cur.close()
+                            break
+                        except Exception as e:
+                            mysql.connection.rollback()
+                            if intento == max_reintentos - 1:
+                                raise e
+                            time.sleep(0.5)
+                    
+                    if preop:
+                        return redirect(url_for('router_universal', modulo='operador_flotaespecial'))
+                    else:
+                        return redirect(url_for('router_universal', modulo='preoperacional'))
+                except Exception as e:
+                    print(f"Error en validación M1 (Preoperacional): {e}")
+                    return redirect(url_for('router_universal', modulo='preoperacional'))
+            else:
+                return redirect('/gestor_flotaespecial/dashboard')
+        elif modulo == 'carga':
+            # REGLA M2 ESTRICTA: Aislamiento estricto del Operador Transporte Carga
+            if perfil_usuario == 'operador_flotacarga':
+                # El flujo dicta que el operador de carga entra directamente a su Hub/Lector QR
+                return redirect(url_for('router_universal', modulo='operador_flotacarga'))
+            elif perfil_usuario == 'controlador_pesv':
+                return redirect('/gestor_flota/pesv_bp/')
+            else:
+                return redirect('/gestor_flota/dashboard')
+        elif modulo == 'avicola':
+            return render_template('A_gestion_avicola_offline.html', nombre=session.get('nombre'), empresa=session.get('empresa'), perfil=perfil_usuario, nit=nit_empresa, tipo_empresa=tipo_empresa)
+
+    # FALLBACK ANTI-LOOP DE SUBMÓDULOS CON ENRUTAMIENTO DIRECTO A BLUEPRINTS
+    if modulo == 'eps_gestion':
+        return redirect('/gestor_flotaespecial/eps_bp/')
+    elif modulo == 'eps_facturacion':
+        return redirect('/gestor_flotaespecial/facturacion_eps_bp/')
+    elif modulo == 'pesv':
+        return redirect('/gestor_flota/pesv_bp/')
+    elif modulo == 'preoperacional':
+        return redirect(url_for('preoperacional.preoperacional_tc'))
+    elif modulo == 'operador_flotaespecial':
+        return redirect(url_for('operador_flotaespecial.dashboard_operador_especial'))
+    elif modulo == 'operador_flotacarga':
+        return redirect(url_for('flotacarga.dashboard_operador'))
+    elif modulo == 'operador_bodegas':
+        return redirect(url_for('oper_bodegas.bodega_operativa'))
+    elif modulo == 'verificador_bodegas':
+        return redirect(url_for('verificador_bodegas.bodega_verificador'))
+    elif modulo == 'vendedor':
+        flash("Módulo de ventas proyectado a futuro.", "info")
+        return redirect(url_for('index'))
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cur.execute("""
@@ -311,7 +418,7 @@ def router_universal(modulo):
     cur.close()
 
     if not regla_perfil or not regla_perfil.get('archivo_destino'):
-        flash(f"Acceso denegado: Tu perfil no tiene rutas asignadas.", "danger")
+        flash(f"Acceso denegado: Tu perfil no tiene rutas asignadas para {modulo}.", "danger")
         return redirect(url_for('panel_principal'))
 
     archivo_destino = str(regla_perfil['archivo_destino']).strip()
@@ -338,7 +445,8 @@ def api_modulos_sistema_disponibles():
     from flask import current_app
     excluir = ['static', 'bp_901811727_main', 'bp_901811727_admin', 'bp_901811727_energia_glp', 'bp_901811727_audit', 'main_router']
     
-    modulos_raw = list(set([name.replace('bp_', '').replace('B_bp_', '').replace('B_modulo_', '') 
+    # Saneamiento unificado reconociendo los prefijos arquitectónicos B_ y C_
+    modulos_raw = list(set([name.replace('bp_', '').replace('B_bp_', '').replace('C_bp_', '').replace('B_modulo_', '').replace('C_modulo_', '') 
                         for name in current_app.blueprints.keys() if name not in excluir]))
     
     mapa_normalizacion = {
@@ -352,7 +460,13 @@ def api_modulos_sistema_disponibles():
         'gestionavicola_bp': 'carga',
         'gestion_mermas': 'mermas',
         'controlador_flotaespecial': 'flotaespecial',
-        'operador_flotaespecial': 'flotaespecial'
+        'operador_flotaespecial': 'flotaespecial',
+        'bodegas': 'bodegas',
+        'oper_bodegas': 'bodegas',
+        'verificador_bodegas': 'bodegas',
+        'hub_ventas_distribucion': 'ventas',
+        'controlador_pesv': 'pesv',
+        'auditorias_pesv': 'pesv'
     }
     
     modulos_v2 = set()

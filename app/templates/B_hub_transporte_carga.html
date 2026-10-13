@@ -1,0 +1,295 @@
+<!-- MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: HUB NATIVO | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hub: Transporte de Carga | BQA-ONE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#015249">
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f4f6f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .navbar {
+      background-color: #015249;
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .navbar-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .navbar-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background-color: #ffffff22;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .navbar-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .navbar-info .user-name {
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .navbar-info .company-name {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    .btn-logout {
+      background-color: #ffffff22;
+      color: white;
+      text-decoration: none;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .btn-logout:hover {
+      background-color: #ffffff44;
+    }
+
+    .dashboard-container {
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 20px;
+      text-align: center;
+    }
+
+    .dashboard-title {
+      color: #015249;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .dashboard-subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-top: 0;
+      margin-bottom: 35px;
+    }
+
+    .cards-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .card-link {
+      text-decoration: none;
+      color: inherit;
+      flex: 1 1 260px;
+      max-width: 320px;
+      min-width: 250px;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 28px 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      border: 1px solid #eef2f3;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      height: 100%;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.09);
+    }
+
+    .card-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #2c3e50;
+    }
+
+    .badge-tipo {
+      font-size: 10px;
+      font-weight: bold;
+      padding: 3px 8px;
+      border-radius: 10px;
+      margin-top: 8px;
+      text-transform: uppercase;
+    }
+
+    .badge-tipo-1 {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+
+    .badge-tipo-2 {
+      background-color: #e0f2fe;
+      color: #0369a1;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: #999;
+      margin-top: 60px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA SUPERIOR -->
+  <div class="navbar">
+    <div class="navbar-user">
+      <div class="navbar-avatar">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo" style="height: 24px;" onerror="this.style.display='none'">
+      </div>
+      <div class="navbar-info">
+        <span class="user-name">{{ usuario }}</span>
+        <span class="company-name">{{ empresa }}</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a href="/panel_principal.html" class="btn-logout" style="background-color: #475569;">⬅ Volver</a>
+        <a href="/logout" class="btn-logout">Salir</a>
+    </div>
+  </div>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <div class="dashboard-container">
+    <h1 class="dashboard-title">Transporte de Carga</h1>
+    <p class="dashboard-subtitle">Hub Operativo de Submódulos Activos</p>
+
+    <div class="cards-grid">
+
+      <!-- ======================================================= -->
+      <!-- SUBMÓDULOS TIPO 1 (OBLIGATORIOS POR ARQUITECTURA CORE)  -->
+      <!-- ======================================================= -->
+
+      <!-- SUBMÓDULO TIPO 1: CONTROLADOR DE FLOTA -->
+      <a href="/gestor_flota/dashboard" class="card-link">
+        <div class="card">
+          <div class="card-icon">💻</div>
+          <div class="card-title">Controlador Flota (Carga)</div>
+          <span class="badge-tipo badge-tipo-1">Tipo 1 (Estructural)</span>
+        </div>
+      </a>
+
+      <!-- SUBMÓDULO TIPO 1: OPERADOR EN RUTA -->
+      <a href="/router/operador_flotacarga" class="card-link">
+        <div class="card">
+          <div class="card-icon">📱</div>
+          <div class="card-title">Operador en Ruta</div>
+          <span class="badge-tipo badge-tipo-1">Tipo 1 (Estructural)</span>
+        </div>
+      </a>
+
+      <!-- SUBMÓDULO TIPO 1: VALIDACIÓN PÚBLICA DE TERCEROS (QR EXTERNO) -->
+      <a href="{{ url_for('validacion_terceros_carga.ingreso_terceros', nit_empresa=session.get('nit')) }}" class="card-link" target="_blank">
+        <div class="card">
+          <div class="card-icon">🔍</div>
+          <div class="card-title">Validación Acceso Terceros (QR)</div>
+          <span class="badge-tipo badge-tipo-1">Tipo 1 (Pre-Logueo)</span>
+        </div>
+      </a>
+
+      <!-- ======================================================= -->
+      <!-- SUBMÓDULOS TIPO 2 (OPCIONALES / BQA-ONE PLUG & PLAY)    -->
+      <!-- ======================================================= -->
+
+      <!-- SUBMÓDULO TIPO 2: GESTIÓN DE CARGA / BÁSCULA -->
+      {% if 'carga' in session.get('submodulos_activos', []) %}
+      <a href="/router/carga" class="card-link">
+        <div class="card">
+          <div class="card-icon">⚖️</div>
+          <div class="card-title">Gestión de Carga (Báscula)</div>
+          <span class="badge-tipo badge-tipo-2">Tipo 2 (Opcional)</span>
+        </div>
+      </a>
+      {% endif %}
+
+      <!-- SUBMÓDULO TIPO 2: CONTROL DE COMBUSTIBLES -->
+      {% if 'combustible' in session.get('submodulos_activos', []) %}
+      <a href="/router/combustible" class="card-link">
+        <div class="card">
+          <div class="card-icon">⛽</div>
+          <div class="card-title">Control de Combustibles</div>
+          <span class="badge-tipo badge-tipo-2">Tipo 2 (Opcional)</span>
+        </div>
+      </a>
+      {% endif %}
+
+      <!-- SUBMÓDULO TIPO 2: MANTENIMIENTO PREVENTIVO -->
+      {% if 'mantenimiento' in session.get('submodulos_activos', []) %}
+      <a href="/router/mantenimiento" class="card-link">
+        <div class="card">
+          <div class="card-icon">🔧</div>
+          <div class="card-title">Mantenimiento Preventivo</div>
+          <span class="badge-tipo badge-tipo-2">Tipo 2 (Opcional)</span>
+        </div>
+      </a>
+      {% endif %}
+
+      <!-- SUBMÓDULO TIPO 2: SEGURIDAD VIAL (PESV) -->
+      {% if 'pesv' in session.get('submodulos_activos', []) %}
+      <a href="/router/pesv" class="card-link">
+        <div class="card">
+          <div class="card-icon">🛡️</div>
+          <div class="card-title">Seguridad Vial (PESV)</div>
+          <span class="badge-tipo badge-tipo-2">Tipo 2 (Opcional)</span>
+        </div>
+      </a>
+      {% endif %}
+
+      <!-- SUBMÓDULO TIPO 2: CONTABILIDAD GENERAL -->
+      {% if 'contabilidad' in session.get('submodulos_activos', []) %}
+      <a href="/router/contabilidad" class="card-link">
+        <div class="card">
+          <div class="card-icon">📊</div>
+          <div class="card-title">Contabilidad General</div>
+          <span class="badge-tipo badge-tipo-2">Tipo 2 (Opcional)</span>
+        </div>
+      </a>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <div class="footer">
+    BQA-ONE © 2026 | Módulo Hub Operativo Carga
+  </div>
+
+</body>
+</html>

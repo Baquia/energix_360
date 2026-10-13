@@ -1,0 +1,230 @@
+<!-- MÓDULO: Transporte Especial | SUBMÓDULO: Hub Herramientas Flota Especial | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
+<!-- app/templates/C_hub_herramientas_flotaespecial.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hub: Herramientas de Flota | BQA-ONE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#015249">
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f4f6f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .navbar {
+      background-color: #015249;
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .navbar-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .navbar-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background-color: #ffffff22;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .navbar-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .navbar-info .user-name {
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .navbar-info .company-name {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    .btn-logout {
+      background-color: #ffffff22;
+      color: white;
+      text-decoration: none;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .btn-logout:hover {
+      background-color: #ffffff44;
+    }
+
+    .dashboard-container {
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 20px;
+      text-align: center;
+    }
+
+    .dashboard-title {
+      color: #015249;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .dashboard-subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-top: 0;
+      margin-bottom: 35px;
+    }
+
+    /* REGLA FORZADA DE DISTRIBUCIÓN HORIZONTAL */
+    .cards-grid {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      justify-content: center !important;
+      align-items: stretch !important;
+      gap: 20px !important;
+      margin: 0 auto;
+    }
+
+    .card-link {
+      text-decoration: none;
+      color: inherit;
+      flex: 1 1 calc(33.333% - 20px) !important;
+      max-width: 320px !important;
+      min-width: 250px !important;
+      display: flex;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 28px 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      border: 1px solid #eef2f3;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.09);
+    }
+
+    .card-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #2c3e50;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: #999;
+      margin-top: 60px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA SUPERIOR -->
+  <div class="navbar">
+    <div class="navbar-user">
+      <div class="navbar-avatar">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo" style="height: 24px;" onerror="this.style.display='none'">
+      </div>
+      <div class="navbar-info">
+        <span class="user-name">{{ usuario }}</span>
+        <span class="company-name">{{ empresa }}</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <!-- Retorna al Controlador Nativo -->
+        <a href="/router/flotaespecial" class="btn-logout" style="background-color: #475569;">⬅ Volver</a>
+        <a href="/logout" class="btn-logout">Salir</a>
+    </div>
+  </div>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <div class="dashboard-container">
+    <h1 class="dashboard-title">Herramientas de Flota</h1>
+    <p class="dashboard-subtitle">Hub Operativo - Transporte Especial</p>
+
+    <div class="cards-grid">
+      
+      <!-- 1. Gestión de vehículos y conductores (Tipo 1 - Obligatorio, Activo) -->
+      <a href="/gestor_flotaespecial/flota_bp/" class="card-link">
+        <div class="card">
+          <div class="card-icon">🚐</div>
+          <div class="card-title">Gestión de vehículos y conductores</div>
+        </div>
+      </a>
+
+      <!-- 2. Mantenimiento de flota (Tipo 1 - Obligatorio, En desarrollo) -->
+      <a href="#" class="card-link" style="cursor: not-allowed; opacity: 0.6;" onclick="return false;">
+        <div class="card" style="background: #e2e8f0;">
+          <div class="card-icon" style="filter: grayscale(100%);">🔧</div>
+          <div class="card-title" style="color: #64748b;">Mantenimiento de flota<br><small>(En construcción)</small></div>
+        </div>
+      </a>
+
+      <!-- 3. Combustible (Tipo 2 - Opcional, En desarrollo) -->
+      {% if 'combustible' in session.get('submodulos_activos', []) %}
+      <a href="#" class="card-link" style="cursor: not-allowed; opacity: 0.6;" onclick="return false;">
+        <div class="card" style="background: #e2e8f0;">
+          <div class="card-icon" style="filter: grayscale(100%);">⛽</div>
+          <div class="card-title" style="color: #64748b;">Combustible<br><small>(En construcción)</small></div>
+        </div>
+      </a>
+      {% endif %}
+
+      <!-- 4. PESV (Tipo 2 - Opcional, En desarrollo) -->
+      {% if 'pesv' in session.get('submodulos_activos', []) %}
+      <a href="#" class="card-link" style="cursor: not-allowed; opacity: 0.6;" onclick="return false;">
+        <div class="card" style="background: #e2e8f0;">
+          <div class="card-icon" style="filter: grayscale(100%);">🛡️</div>
+          <div class="card-title" style="color: #64748b;">PESV<br><small>(En construcción)</small></div>
+        </div>
+      </a>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <div class="footer">
+    BQA-ONE © 2026 | Sub-Hub Herramientas Flota Especial
+  </div>
+
+</body>
+</html>

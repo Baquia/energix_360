@@ -1,3 +1,4 @@
+<!-- MÓDULO: UNIVERSAL | ARCHIVO: A_dashboard_universal.html -->
 <!-- app/templates/A_dashboard_universal.html -->
 <!DOCTYPE html>
 <html lang="es">
@@ -172,7 +173,7 @@
     <div class="cards-grid">
 
       <!-- MÓDULO 1: GESTIÓN DE FLOTA (Módulo General) -->
-      {% if 'flota' in modulos_activos and perfil not in ['operador_logistica', 'verificador_bodegas'] %}
+      {% if 'flota' in modulos_activos and perfil not in ['operador_logistica', 'verificador_bodegas'] and session.get('tipo_empresa') != 'ventas_distribucion' %}
       <a href="/router/flota" class="card-link">
         <div class="card">
           <div class="card-icon">🚚</div>
@@ -242,7 +243,7 @@
       {% endif %}
 
       <!-- MÓDULO 4: GESTIÓN DE BODEGAS / LOGÍSTICA -->
-      {% if 'aws' in modulos_activos or 'bodegas' in modulos_activos %}
+      {% if ('aws' in modulos_activos or 'bodegas' in modulos_activos) and session.get('tipo_empresa') != 'ventas_distribucion' %}
       <a href="/router/aws" class="card-link">
         <div class="card">
           <div class="card-icon">📦</div>

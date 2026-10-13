@@ -1,0 +1,170 @@
+<!-- MÓDULO: TRANSPORTE CARGA | SUBMÓDULO: PESV | CONDICIÓN: OPCIONAL | TIPO: 2 -->
+<!-- app/templates/B_controlador_pesv.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Plan Estratégico de Seguridad Vial (PESV) | {{ empresa }}</title>
+    <meta name="theme-color" content="#015249">
+    <style>
+        :root {
+            --verde: #015249;        
+            --verde-osc: #003b35;    
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --radius: 10px;
+            --sidebar-width: 260px;
+            --topbar-height: 70px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { 
+            width: 100%; height: 100%; font-family: Verdana, sans-serif; 
+            background-color: #f8fafc; color: var(--text); display: flex; overflow: hidden; 
+        }
+        a { text-decoration: none; color: inherit; }
+        .sidebar { 
+            width: var(--sidebar-width); min-width: var(--sidebar-width); 
+            background: var(--surface); border-right: 1px solid var(--border); 
+            display: flex; flex-direction: column; height: 100vh; z-index: 1000; 
+        }
+        .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
+        .logo-app { max-height: 35px; width: auto; }
+        .nav-menu { flex-grow: 1; padding: 20px 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: var(--radius); color: var(--text-muted); font-size: 14px; font-weight: 600; transition: all 0.2s; }
+        .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
+        .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
+        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
+        .logout-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444; font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2; }
+        .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
+        .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 3px 10px; border-radius: 12px; margin-top: 3px; font-weight: 600; }
+        .content-area { flex-grow: 1; padding: 30px; overflow-y: auto; }
+        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto 25px auto; }
+        .action-header h2 { color: var(--verde); font-size: 22px; font-weight: 800; }
+        .btn-close-view { background: #e2e8f0; color: #475569; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 18px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; max-width: 1100px; margin: 0 auto 30px auto; }
+        .kpi-card { background: var(--surface); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.02); display: flex; align-items: center; gap: 15px; }
+        .kpi-icon { font-size: 28px; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 12px; flex-shrink: 0; }
+        .kpi-data h3 { font-size: 24px; color: var(--verde); margin-bottom: 2px; }
+        .kpi-data p { font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; line-height: 1.2; }
+        .cards-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-width: 1100px; margin: 0 auto; }
+        .card { background: var(--surface); border-radius: 16px; padding: 25px 20px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; flex: 1 1 250px; transition: transform 0.2s; cursor: pointer; }
+        .card:hover { transform: translateY(-5px); border-color: var(--verde); }
+        .card-icon { font-size: 36px; margin-bottom: 12px; }
+        .card-title { font-size: 15px; font-weight: 800; color: #1e293b; margin-bottom: 8px; }
+        .card-desc { font-size: 12px; color: #64748b; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+        </div>
+        <nav class="nav-menu">
+            <div style="margin: 15px 0 5px 15px; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Gestión PESV</div>
+            <a href="{{ url_for('controlador_pesv.index_pesv') }}" class="nav-item {% if active_module == 'dashboard' %}active{% endif %}">
+                <span class="nav-icon">🛡️</span> Dashboard Principal
+            </a>
+            <a href="{{ url_for('auditorias_pesv.index_auditorias') }}" class="nav-item">
+                <span class="nav-icon">📋</span> Auditorías Flota
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="logout-btn"><span>🚪</span> Cerrar Sesión</a>
+        </div>
+    </aside>
+
+    <main class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ nombre }}</span>
+                <span class="user-role">Controlador PESV</span>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div class="action-header">
+                <div class="action-title-group">
+                    <a href="/panel_principal.html" class="btn-close-view" title="Cerrar vista">&times;</a>
+                    <h2>Dashboard: Plan Estratégico de Seguridad Vial</h2>
+                </div>
+            </div>
+
+            <!-- KPIs GENERADOS AUTOMÁTICAMENTE DESDE TABLAS OPERATIVAS -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="color: #0284c7; background: #e0f2fe;">👷</div>
+                    <div class="kpi-data">
+                        <h3>{{ kpis.conductores_activos }}</h3>
+                        <p>Conductores<br>Activos</p>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="color: #ea580c; background: #ffedd5;">⚠️</div>
+                    <div class="kpi-data">
+                        <h3>{{ kpis.alertas_documentos_cond }}</h3>
+                        <p>Docs. Personal<br>Vencidos</p>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="color: #8b5cf6; background: #ede9fe;">⏱️</div>
+                    <div class="kpi-data">
+                        <h3>{{ kpis.horas_conduccion_hoy }}h</h3>
+                        <p>Horas Conducción<br>Acumuladas Hoy</p>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="color: #e11d48; background: #ffe4e6;">🛑</div>
+                    <div class="kpi-data">
+                        <h3>{{ kpis.vehiculos_bloqueados }}</h3>
+                        <p>Vehículos<br>Bloqueados</p>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="color: #f59e0b; background: #fef3c7;">🚨</div>
+                    <div class="kpi-data">
+                        <h3>{{ kpis.novedades_ruta }}</h3>
+                        <p>Novedades<br>en Ruta (Hoy)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACCESOS A MÓDULOS DE AUDITORÍA -->
+            <div class="cards-grid">
+                
+                <a href="#" onclick="alert('La auditoría de Comportamiento Humano se consolidará en la próxima actualización.'); return false;" class="card" style="text-decoration: none;">
+                    <div class="card-icon">🪪</div>
+                    <div class="card-title">Comportamiento Humano</div>
+                    <div class="card-desc">Control automatizado de fatiga y verificación en tiempo real de licencias y seguridad social.</div>
+                </a>
+                
+                <a href="#" onclick="alert('La auditoría de Vehículos Seguros se consolidará en la próxima actualización.'); return false;" class="card" style="text-decoration: none;">
+                    <div class="card-icon">🚛</div>
+                    <div class="card-title">Vehículos Seguros</div>
+                    <div class="card-desc">Consolidación de inspecciones preoperacionales y control documental (SOAT, Tecnomecánica).</div>
+                </a>
+                
+                <a href="#" onclick="alert('El mapa de atención de novedades se consolidará en la próxima actualización.'); return false;" class="card" style="text-decoration: none;">
+                    <div class="card-icon">🗺️</div>
+                    <div class="card-title">Atención de Novedades</div>
+                    <div class="card-desc">Trazabilidad analítica extraída de los reportes operativos de incidentes y varadas en campo.</div>
+                </a>
+
+                <a href="{{ url_for('auditorias_pesv.index_auditorias') }}" class="card" style="text-decoration: none; border-color: var(--verde); box-shadow: 0 4px 12px rgba(1, 82, 73, 0.1);">
+                    <div class="card-icon">📋</div>
+                    <div class="card-title">Auditorías Flota</div>
+                    <div class="card-desc">Panel centralizado de inspecciones diarias obligatorias con firma digital y registro fotográfico.</div>
+                </a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

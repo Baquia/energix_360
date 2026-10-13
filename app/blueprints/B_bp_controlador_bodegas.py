@@ -1,3 +1,4 @@
+# MÓDULO: VENTAS Y DISTRIBUCIÓN | SUBMÓDULO: CONTROLADOR BODEGAS | CONDICIÓN: OBLIGATORIO | TIPO: 1
 from flask import Blueprint, render_template, request, jsonify, session, redirect, send_file
 import io
 from app import mysql, csrf
@@ -7,6 +8,8 @@ from datetime import datetime, timedelta
 import MySQLdb.cursors
 import unicodedata
 import math
+import time
+from app.utils import login_required_custom
 
 bp_bodegas = Blueprint('bodegas', __name__)
 
@@ -14,8 +17,8 @@ bp_bodegas = Blueprint('bodegas', __name__)
 # MANUAL DE OPERACIÓN WMS
 # ==============================================================================
 @bp_bodegas.route('/bodegas/manual_operacion')
+@login_required_custom
 def manual_operacion():
-    if 'usuario_id' not in session: return redirect('/')
     return render_template('B_manual_operacion_wms.html')
 
 # ==============================================================================
@@ -23,9 +26,8 @@ def manual_operacion():
 # ==============================================================================
 
 @bp_bodegas.route('/B_modulo_controlador_bodegas.html')
+@login_required_custom
 def control_logistica():
-    if 'usuario_id' not in session: return redirect('/')
-    
     empresa_id = session.get('empresa_id')
 
     try:
@@ -382,8 +384,8 @@ def control_logistica():
 # ==============================================================================
 
 @bp_bodegas.route('/api/bodegas/novedades_en_vivo')
+@login_required_custom
 def novedades_en_vivo():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -405,9 +407,8 @@ def novedades_en_vivo():
         return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/resolver_novedad_vivo', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def resolver_novedad_vivo():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
     data = request.json
     id_row = data.get('id_row')
     accion = data.get('accion') 
@@ -432,12 +433,20 @@ def resolver_novedad_vivo():
             if embalaje not in ['CAJA', 'DISPLAY']:
                 embalaje = 'UND'
             
-            cur.execute("""
-                INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE 
-                producto=VALUES(producto), fabricante=VALUES(fabricante), unidad_embalaje=VALUES(unidad_embalaje)
-            """, (session.get('empresa_id'), session.get('nombre_empresa'), 'general', ean, ean, desc, marca, embalaje))
+            for intento in range(3):
+                try:
+                    cur.execute("""
+                        INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE 
+                        producto=VALUES(producto), fabricante=VALUES(fabricante), unidad_embalaje=VALUES(unidad_embalaje)
+                    """, (session.get('empresa_id'), session.get('nombre_empresa'), 'general', ean, ean, desc, marca, embalaje))
+                    break
+                except Exception as e:
+                    if "deadlock" in str(e).lower() and intento < 2:
+                        time.sleep(0.5)
+                        continue
+                    raise e
             
             cur.execute("""
                 UPDATE picking_importacion_raw 
@@ -459,11 +468,12 @@ def resolver_novedad_vivo():
         cur.close()
         return jsonify({'status': 'success', 'message': 'Novedad resuelta y flujo liberado correctamente.'})
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'error': str(e)}), 500
 
 @bp_bodegas.route('/api/bodegas/buscar_producto_maestro')
+@login_required_custom
 def buscar_producto_maestro():
-    if 'usuario_id' not in session: return jsonify([])
     q = request.args.get('q', '').strip()
     if len(q) < 3: return jsonify([])
     
@@ -488,24 +498,29 @@ def buscar_producto_maestro():
 # ENDPOINT DE MONITOREO EN TIEMPO REAL (DASHBOARD)
 # ==============================================================================
 @bp_bodegas.route('/api/bodegas/monitoreo_realtime')
+@login_required_custom
 def monitoreo_realtime():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'})
-    
     empresa_id = session.get('empresa_id')
     usuario_id = session.get('usuario_id')
     
     # --- HEARTBEAT CONTROLADOR ---
-    try:
-        cur_hb = mysql.connection.cursor()
-        cur_hb.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (usuario_id,))
-        mysql.connection.commit()
-        cur_hb.close()
-    except Exception as e:
-        print(f"Error heartbeat controlador: {e}")
+    for intento in range(3):
+        try:
+            cur_hb = mysql.connection.cursor()
+            cur_hb.execute("""
+                INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                VALUES (%s, NOW())
+                ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+            """, (usuario_id,))
+            mysql.connection.commit()
+            cur_hb.close()
+            break
+        except Exception as e:
+            if "deadlock" in str(e).lower() and intento < 2:
+                time.sleep(0.5)
+                continue
+            print(f"Error heartbeat controlador: {e}")
+            break
     # -----------------------------
 
     kpis = {
@@ -782,7 +797,7 @@ def monitoreo_realtime():
             o.pop('fin', None)
 
         kpis['pedidos_pendientes_reales'] = len(ordenes_sin_asignar) + len(activos)
-        kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']
+        kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']  
         
         if total_mins_speed > 0:
             kpis['velocidad_promedio'] = round(total_items_speed / total_mins_speed, 2)
@@ -811,8 +826,8 @@ def monitoreo_realtime():
 # ALIAS Y EXCEPCIONES IA
 # ==============================================================================
 @bp_bodegas.route('/api/bodegas/alias/pendientes', methods=['GET'])
+@login_required_custom
 def alias_pendientes():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -829,8 +844,8 @@ def alias_pendientes():
         return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/alias/catalogo', methods=['GET'])
+@login_required_custom
 def alias_catalogo():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -846,9 +861,8 @@ def alias_catalogo():
         return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/alias/guardar', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def alias_guardar():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
     data = request.json
     desc_origen = data.get('descripcion_origen')
     ean_correcto = data.get('ean_correcto')
@@ -873,12 +887,12 @@ def alias_guardar():
         cur.close()
         return jsonify({'status': 'success', 'message': 'Alias guardado y pedidos liberados.'})
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
 
 @bp_bodegas.route('/api/bodegas/alias/permitir', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def alias_permitir():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
     data = request.json
     desc_origen = data.get('descripcion_origen')
     
@@ -896,13 +910,13 @@ def alias_permitir():
         cur.close()
         return jsonify({'status': 'success', 'message': 'Bypass exitoso. Item liberado.'})
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
 
 
 @bp_bodegas.route('/api/bodegas/resolver_promo_huerfana', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def resolver_promo_huerfana():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
     try:
         data = request.get_json()
         id_row = data.get('id_row')
@@ -977,8 +991,8 @@ def resolver_promo_huerfana():
 
 
 @bp_bodegas.route('/api/bodegas/reportes/novedades')
+@login_required_custom
 def reporte_novedades():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -997,8 +1011,8 @@ def reporte_novedades():
     except: return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/historial_actas')
+@login_required_custom
 def historial_actas():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -1029,8 +1043,8 @@ def historial_actas():
 # ==============================================================================
 
 @bp_bodegas.route('/api/bodegas/operarios_asignacion', methods=['GET'])
+@login_required_custom
 def operarios_asignacion():
-    if 'usuario_id' not in session: return jsonify({})
     empresa_id = session.get('empresa_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -1056,9 +1070,8 @@ def operarios_asignacion():
         return jsonify({'operarios': [], 'marcas': []})
 
 @bp_bodegas.route('/api/bodegas/guardar_asignacion_marcas', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def guardar_asignacion_marcas():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'}), 401
     d = request.json
     empresa_id = session.get('empresa_id')
     id_operario = d.get('id_operario')
@@ -1072,22 +1085,30 @@ def guardar_asignacion_marcas():
         
         if marcas:
             data_to_insert = [(empresa_id, str(m).upper(), id_operario) for m in marcas]
-            cur.executemany("""
-                INSERT INTO fabricantes_proveedores (id_empresa, marca, operador_asignado)
-                VALUES (%s, %s, %s)
-                ON DUPLICATE KEY UPDATE operador_asignado = VALUES(operador_asignado)
-            """, data_to_insert)
+            for intento in range(3):
+                try:
+                    cur.executemany("""
+                        INSERT INTO fabricantes_proveedores (id_empresa, marca, operador_asignado)
+                        VALUES (%s, %s, %s)
+                        ON DUPLICATE KEY UPDATE operador_asignado = VALUES(operador_asignado)
+                    """, data_to_insert)
+                    break
+                except Exception as e:
+                    if "deadlock" in str(e).lower() and intento < 2:
+                        time.sleep(0.5)
+                        continue
+                    raise e
             
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Asignación guardada correctamente.'})
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
 
 @bp_bodegas.route('/bodegas/asignar_puerta', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def asignar_puerta():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
     d = request.json
     empresa_id = session.get('empresa_id')
     orden = d.get('numero_orden')
@@ -1136,11 +1157,12 @@ def asignar_puerta():
         cur.close()
         return jsonify({'message': 'Muelle asignado y novedades repartidas equitativamente.'})
     except Exception as e: 
+        mysql.connection.rollback()
         return jsonify({'error': str(e)}), 500
 
 @bp_bodegas.route('/bodegas/api/items_orden/<orden>')
+@login_required_custom
 def get_items_orden(orden):
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -1163,8 +1185,8 @@ def get_items_orden(orden):
         return jsonify([])
     
 @bp_bodegas.route('/bodegas/api/get_empleados')
+@login_required_custom
 def get_empleados():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -1176,8 +1198,8 @@ def get_empleados():
     except: return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/stats')
+@login_required_custom
 def bodegas_stats():
-    if 'usuario_id' not in session: return jsonify({})
     empresa_id = session.get('empresa_id')
     cur = mysql.connection.cursor()
     cur.execute("SELECT COUNT(DISTINCT numero_orden_origen), SUM(CASE WHEN estado_actividad='PENDIENTE' OR estado_actividad IS NULL THEN 1 ELSE 0 END), SUM(CASE WHEN estado_actividad IN ('VERIFICADO','DESPACHADO') THEN 1 ELSE 0 END) FROM picking_importacion_raw WHERE id_empresa = %s AND (estado_actividad != 'TERMINADO' OR estado_actividad IS NULL)", (empresa_id,))
@@ -1186,10 +1208,8 @@ def bodegas_stats():
     return jsonify({'ordenes_activas': row[0] or 0, 'items_pendientes': int(row[1] or 0), 'items_finalizados': int(row[2] or 0)})
 
 @bp_bodegas.route('/api/bodegas/productos/crear', methods=['POST']) 
-@csrf.exempt
+@login_required_custom
 def crear_producto_manual():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
-    
     data = request.json
     nit_empresa = str(session.get('empresa_id', ''))
     nombre_empresa = str(session.get('nombre_empresa', session.get('empresa', 'Empresa')))
@@ -1204,24 +1224,33 @@ def crear_producto_manual():
         res = cur.fetchone()
         tipo_empresa = res[0] if res else 'general'
 
-        cur.execute("""
-            INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE 
-            producto = VALUES(producto), 
-            fabricante = VALUES(fabricante), 
-            unidad_embalaje = VALUES(unidad_embalaje)
-        """, (nit_empresa, nombre_empresa, tipo_empresa, data.get('ean'), data.get('ean'), data.get('producto'), data.get('fabricante'), embalaje))
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE 
+                    producto = VALUES(producto), 
+                    fabricante = VALUES(fabricante), 
+                    unidad_embalaje = VALUES(unidad_embalaje)
+                """, (nit_empresa, nombre_empresa, tipo_empresa, data.get('ean'), data.get('ean'), data.get('producto'), data.get('fabricante'), embalaje))
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                raise e
         
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success'})
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
         
 @bp_bodegas.route('/bodegas/descargar_plantilla')
+@login_required_custom
 def descargar_plantilla_productos():
-    if 'usuario_id' not in session: return redirect('/')
     nit_sesion = str(session.get('empresa_id', ''))
     
     try:
@@ -1264,9 +1293,8 @@ def descargar_plantilla_productos():
                      as_attachment=True, download_name='Plantilla_Productos.xlsx')
     
 @bp_bodegas.route('/bodegas/upload_productos_masivo', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def upload_productos_masivo():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
     file = request.files.get('file')
     if not file: return jsonify({'error': 'No hay archivo'}), 400
 
@@ -1312,27 +1340,36 @@ def upload_productos_masivo():
             ))
 
         if data_to_upsert:
-            cur.executemany("""
-                INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE 
-                empresa=VALUES(empresa), 
-                tipo_empresa=VALUES(tipo_empresa), 
-                producto=VALUES(producto),
-                fabricante=VALUES(fabricante),
-                unidad_embalaje=VALUES(unidad_embalaje)
-            """, data_to_upsert)
-            mysql.connection.commit()
+            for intento in range(3):
+                try:
+                    cur.executemany("""
+                        INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE 
+                        empresa=VALUES(empresa), 
+                        tipo_empresa=VALUES(tipo_empresa), 
+                        producto=VALUES(producto),
+                        fabricante=VALUES(fabricante),
+                        unidad_embalaje=VALUES(unidad_embalaje)
+                    """, data_to_upsert)
+                    mysql.connection.commit()
+                    break
+                except Exception as e:
+                    if "deadlock" in str(e).lower() and intento < 2:
+                        time.sleep(0.5)
+                        continue
+                    raise e
         
         cur.close()
         return jsonify({'message': f'✅ {len(data_to_upsert)} productos procesados y guardados correctamente.'})
     
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'error': f'Error en el archivo: {str(e)}'}), 500
 
 @bp_bodegas.route('/api/bodegas/marcas', methods=['GET'])
+@login_required_custom
 def get_marcas():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         empresa_id = session.get('empresa_id')
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -1348,8 +1385,8 @@ def get_marcas():
     except Exception as e: return jsonify([])
     
 @bp_bodegas.route('/api/bodegas/productos_por_marca/<marca>', methods=['GET'])
+@login_required_custom
 def get_productos_por_marca(marca):
-    if 'usuario_id' not in session: return jsonify([])
     try:
         empresa_id = session.get('empresa_id')
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -1375,10 +1412,8 @@ def get_productos_por_marca(marca):
     except Exception as e: return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/editar_producto', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def editar_producto():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
-        
     try:
         empresa_id = session.get('empresa_id')
         data = request.get_json()
@@ -1408,10 +1443,8 @@ def editar_producto():
         return jsonify({'status': 'error', 'message': 'Error interno'})
 
 @bp_bodegas.route('/api/bodegas/eliminar_producto', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def eliminar_producto():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
-        
     try:
         empresa_id = session.get('empresa_id')
         data = request.get_json()
@@ -1433,10 +1466,8 @@ def eliminar_producto():
         return jsonify({'status': 'error', 'message': 'Error interno'})
 
 @bp_bodegas.route('/api/bodegas/eliminar_marca', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def eliminar_marca():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
-        
     try:
         empresa_id = session.get('empresa_id')
         data = request.get_json()
@@ -1460,8 +1491,8 @@ def eliminar_marca():
         return jsonify({'status': 'error', 'message': 'Error interno'})
 
 @bp_bodegas.route('/api/promociones/listar', methods=['GET'])
+@login_required_custom
 def listar_promociones():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -1479,8 +1510,8 @@ def listar_promociones():
         return jsonify([])
 
 @bp_bodegas.route('/api/promociones/detalle/<ean_promo>', methods=['GET'])
+@login_required_custom
 def detalle_promocion(ean_promo):
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -1498,9 +1529,8 @@ def detalle_promocion(ean_promo):
         return jsonify([])
 
 @bp_bodegas.route('/api/promociones/guardar', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def guardar_promocion():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
     try:
         data = request.json
         empresa_id = session.get('empresa_id')
@@ -1537,9 +1567,8 @@ def guardar_promocion():
         return jsonify({'status': 'error', 'message': 'Error al guardar'})
 
 @bp_bodegas.route('/api/promociones/estado', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def cambiar_estado_promocion():
-    if 'usuario_id' not in session: return jsonify({'status': 'error'})
     try:
         data = request.json
         cur = mysql.connection.cursor()
@@ -1552,9 +1581,8 @@ def cambiar_estado_promocion():
         return jsonify({'status': 'error'})
 
 @bp_bodegas.route('/api/promociones/eliminar', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def eliminar_promocion():
-    if 'usuario_id' not in session: return jsonify({'status': 'error'})
     try:
         data = request.json
         cur = mysql.connection.cursor()
@@ -1567,8 +1595,8 @@ def eliminar_promocion():
         return jsonify({'status': 'error'})
 
 @bp_bodegas.route('/api/bodegas/vehiculos')
+@login_required_custom
 def get_vehiculos():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("SELECT id, placa FROM vehiculos WHERE id_empresa = %s", (session.get('empresa_id'),))
@@ -1579,9 +1607,8 @@ def get_vehiculos():
         return jsonify([])
     
 @bp_bodegas.route('/bodegas/despachar_orden', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def despachar_orden():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión'}), 401
     d = request.json
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -1616,11 +1643,13 @@ def despachar_orden():
         mysql.connection.commit()
         cur.close()
         return jsonify({'message': 'Orden despachada y acta generada correctamente.'})
-    except Exception as e: return jsonify({'error': str(e)}), 500
+    except Exception as e: 
+        mysql.connection.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @bp_bodegas.route('/bodegas/imprimir_acta/<orden>')
+@login_required_custom
 def imprimir_acta(orden):
-    if 'usuario_id' not in session: return redirect('/')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -1743,8 +1772,8 @@ def imprimir_acta(orden):
         return str(e), 500
 
 @bp_bodegas.route('/bodegas/api/ordenes_sin_secuencia')
+@login_required_custom
 def ordenes_sin_secuencia():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -1766,9 +1795,8 @@ def ordenes_sin_secuencia():
         return jsonify([])
     
 @bp_bodegas.route('/bodegas/guardar_secuencia_zona', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def guardar_secuencia_zona():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
     d = request.json
     try:
         cur = mysql.connection.cursor()
@@ -1780,11 +1808,13 @@ def guardar_secuencia_zona():
         mysql.connection.commit()
         cur.close()
         return jsonify({'message': 'Zona y orden de secuencia actualizados correctamente.'})
-    except Exception as e: return jsonify({'error': str(e)}), 500
+    except Exception as e: 
+        mysql.connection.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @bp_bodegas.route('/api/bodegas/reportes/kpis_historico')
+@login_required_custom
 def kpis_historico():
-    if 'usuario_id' not in session: return jsonify([])
     empresa_id = session.get('empresa_id')
     lapso = request.args.get('lapso', 'hoy')
     
@@ -1947,8 +1977,8 @@ def match_keyword(celda_val, keywords):
     return False
 
 @bp_bodegas.route('/bodegas/upload_excel', methods=['POST'])
+@login_required_custom
 def upload_excel():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
     empresa_id = str(session.get('empresa_id'))
     
     archivos = request.files.getlist('file')
@@ -2296,8 +2326,8 @@ def upload_excel():
         return jsonify({'error': f'Error crítico procesando carga: {str(e)}'}), 500
     
 @bp_bodegas.route('/api/bodegas/reportes/importacion')
+@login_required_custom
 def reporte_importacion():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
@@ -2325,9 +2355,8 @@ def reporte_importacion():
         return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/offline', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def set_offline():
-    if 'usuario_id' not in session: return jsonify({'status': 'error'})
     try:
         cur = mysql.connection.cursor()
         cur.execute("""
@@ -2342,8 +2371,8 @@ def set_offline():
         return jsonify({'status': 'error', 'message': str(e)})
 
 @bp_bodegas.route('/api/bodegas/rutas_picking', methods=['GET'])
+@login_required_custom
 def get_rutas_picking():
-    if 'usuario_id' not in session: return jsonify([])
     empresa_id = session.get('empresa_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -2366,9 +2395,8 @@ def get_rutas_picking():
         return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/guardar_rutas_picking', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def guardar_rutas_picking():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
     empresa_id = session.get('empresa_id')
     d = request.json
     rutas = d.get('rutas', [])
@@ -2377,23 +2405,32 @@ def guardar_rutas_picking():
         cur = mysql.connection.cursor()
         if rutas:
             data_to_insert = [(empresa_id, str(r['marca']).upper(), int(r['secuencia'])) for r in rutas]
-            cur.executemany("""
-                INSERT INTO configuracion_rutas_picking (id_empresa, marca, secuencia_picking)
-                VALUES (%s, %s, %s)
-                ON DUPLICATE KEY UPDATE secuencia_picking = VALUES(secuencia_picking)
-            """, data_to_insert)
-            mysql.connection.commit()
+            for intento in range(3):
+                try:
+                    cur.executemany("""
+                        INSERT INTO configuracion_rutas_picking (id_empresa, marca, secuencia_picking)
+                        VALUES (%s, %s, %s)
+                        ON DUPLICATE KEY UPDATE secuencia_picking = VALUES(secuencia_picking)
+                    """, data_to_insert)
+                    mysql.connection.commit()
+                    break
+                except Exception as e:
+                    if "deadlock" in str(e).lower() and intento < 2:
+                        time.sleep(0.5)
+                        continue
+                    raise e
         cur.close()
         return jsonify({'status': 'success', 'message': 'Rutas de picking guardadas correctamente.'})
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
 
 # ==============================================================================
 # NUEVO: CRUD DE USUARIOS PARA CONTROLADOR (LÍMITE DE 8, SOLO WMS)
 # ==============================================================================
 @bp_bodegas.route('/api/bodegas/usuarios', methods=['GET'])
+@login_required_custom
 def listar_usuarios():
-    if 'usuario_id' not in session: return jsonify([])
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         # Mostrar solo los usuarios del mismo inquilino Y que sean perfiles WMS
@@ -2411,9 +2448,8 @@ def listar_usuarios():
         return jsonify([])
 
 @bp_bodegas.route('/api/bodegas/usuarios', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def crear_usuario():
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
     empresa_id = session.get('empresa_id')
     empresa_nombre = session.get('nombre_empresa', session.get('empresa', 'Empresa'))
     
@@ -2451,21 +2487,30 @@ def crear_usuario():
         hash_pw = bcrypt.generate_password_hash(password).decode('utf-8')
         
         # Crear usuario
-        cur.execute("""
-            INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa)
-            VALUES (%s, %s, %s, 'cliente', 'op', %s, %s, %s)
-        """, (cedula, nombre, hash_pw, perfil, empresa_id, empresa_nombre))
-        mysql.connection.commit()
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa)
+                    VALUES (%s, %s, %s, 'cliente', 'op', %s, %s, %s)
+                """, (cedula, nombre, hash_pw, perfil, empresa_id, empresa_nombre))
+                mysql.connection.commit()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                raise e
+        
         cur.close()
         
         return jsonify({'status': 'success', 'message': 'Usuario creado correctamente.'})
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
 
 @bp_bodegas.route('/api/bodegas/usuarios/<int:id_user>', methods=['PUT'])
-@csrf.exempt
+@login_required_custom
 def editar_usuario_crud(id_user):
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
     data = request.json
     empresa_id = session.get('empresa_id')
     
@@ -2492,13 +2537,12 @@ def editar_usuario_crud(id_user):
         cur.close()
         return jsonify({'status': 'success', 'message': 'Usuario actualizado correctamente.'})
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
 
 @bp_bodegas.route('/api/bodegas/usuarios/<int:id_user>', methods=['DELETE'])
-@csrf.exempt
+@login_required_custom
 def eliminar_usuario_crud(id_user):
-    if 'usuario_id' not in session: return jsonify({'status': 'error', 'message': 'Sesión expirada'})
-    
     try:
         cur = mysql.connection.cursor()
         # El AND empresa_id garantiza la seguridad multiempresa
@@ -2507,4 +2551,5 @@ def eliminar_usuario_crud(id_user):
         cur.close()
         return jsonify({'status': 'success', 'message': 'Usuario eliminado del sistema.'})
     except Exception as e:
+        mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})

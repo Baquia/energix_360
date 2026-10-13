@@ -21,6 +21,7 @@ from functools import wraps
 import MySQLdb.cursors
 from datetime import datetime, timedelta, date
 import base64
+from PIL import Image
 
 # Librerías PDF (Reportes Platypus)
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
@@ -37,7 +38,7 @@ def controlador_flotaespecial_required(f):
         perfil = str(session.get('perfil', '')).strip().lower()
         tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
         
-        if perfil not in ['controlador_flotaespecial', 'webmaster'] and 'webmaster' not in tipo_empresa:
+        if perfil not in ['controlador_flotaespecial', 'controlador_pesv', 'webmaster'] and 'webmaster' not in tipo_empresa:
             flash('Acceso denegado: Se requiere perfil de Controlador de Transporte Especial para ingresar a este módulo.', 'danger')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
@@ -56,7 +57,9 @@ def asegurar_tablas_flota(cur):
         ("nivel_servicio", "VARCHAR(100)"), ("radio_accion", "VARCHAR(100)"), ("fecha_expedicion_tarjeta_operacion", "DATE"),
         ("fecha_inicio_tarjeta_operacion", "DATE"), ("ruta_pdf_tarjeta_operacion", "VARCHAR(255)"),
         ("fecha_inicio_rcc_rce", "DATE"), ("ruta_pdf_rcc_rce", "VARCHAR(255)"), ("empresa_transporte", "VARCHAR(150)"),
-        ("conductor_asignado", "VARCHAR(150)"), ("departamento_base", "VARCHAR(100)"), ("municipio_base", "VARCHAR(100)")
+        ("conductor_asignado", "VARCHAR(150)"), ("departamento_base", "VARCHAR(100)"), ("municipio_base", "VARCHAR(100)"),
+        ("estado_soat", "VARCHAR(20) DEFAULT 'Actualizado'"), ("estado_rtm", "VARCHAR(20) DEFAULT 'Actualizado'"), 
+        ("estado_rcc_rce", "VARCHAR(20) DEFAULT 'Actualizado'")
     ]
     for col, tipo in columnas_vehiculos:
         try: cur.execute(f"ALTER TABLE vehiculos_especial ADD COLUMN {col} {tipo}")
@@ -83,6 +86,8 @@ def asegurar_tablas_flota(cur):
             ruta_pdf_cedula VARCHAR(255) DEFAULT NULL,
             ruta_pdf_licencia VARCHAR(255) DEFAULT NULL,
             ruta_pdf_seguridad_social VARCHAR(255) DEFAULT NULL,
+            estado_licencia VARCHAR(20) DEFAULT 'Actualizado',
+            estado_seguridad_social VARCHAR(20) DEFAULT 'Actualizado',
             estatus VARCHAR(50) DEFAULT 'No Logueado',
             ultima_latitud VARCHAR(100) DEFAULT NULL,
             ultima_longitud VARCHAR(100) DEFAULT NULL,
@@ -107,6 +112,10 @@ def asegurar_tablas_flota(cur):
     try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN vehiculo_asignado VARCHAR(20) DEFAULT NULL")
     except: pass
     try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN es_relevo BOOLEAN DEFAULT FALSE")
+    except: pass
+    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN estado_licencia VARCHAR(20) DEFAULT 'Actualizado'")
+    except: pass
+    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN estado_seguridad_social VARCHAR(20) DEFAULT 'Actualizado'")
     except: pass
     try: cur.execute("ALTER TABLE usuarios ADD COLUMN email VARCHAR(150) DEFAULT NULL")
     except: pass
@@ -147,13 +156,35 @@ def asegurar_tablas_flota(cur):
 # HELPER: GUARDAR PDF MANUAL (Soporta Vehículos y Conductores)
 # =========================================================
 def guardar_pdf_manual(file_obj, prefix, subfolder='vehiculos'):
-    if file_obj and file_obj.filename.endswith('.pdf'):
-        filename = secure_filename(f"{prefix}_{uuid.uuid4().hex[:8]}.pdf")
-        ruta_base = os.path.join(current_app.static_folder, 'uploads', 'flotaespecial', subfolder)
-        os.makedirs(ruta_base, exist_ok=True)
-        file_obj.save(os.path.join(ruta_base, filename))
-        return f"uploads/flotaespecial/{subfolder}/{filename}"
-    return None
+    """
+    Convierte imágenes a PDF o guarda directo si es PDF.
+    """
+    if not file_obj or file_obj.filename == '':
+        return None
+        
+    filename = secure_filename(file_obj.filename)
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    
+    nuevo_nombre = f"{prefix}_{uuid.uuid4().hex[:8]}.pdf"
+    ruta_base = os.path.join(current_app.static_folder, 'uploads', 'flotaespecial', subfolder)
+    os.makedirs(ruta_base, exist_ok=True)
+    ruta_fisica = os.path.join(ruta_base, nuevo_nombre)
+    ruta_bd = f"uploads/flotaespecial/{subfolder}/{nuevo_nombre}"
+    
+    try:
+        if ext == 'pdf':
+            file_obj.save(ruta_fisica)
+        elif ext in ['jpg', 'jpeg', 'png', 'webp']:
+            image = Image.open(file_obj)
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            image.save(ruta_fisica, 'PDF', resolution=100.0)
+        else:
+            return None
+        return ruta_bd
+    except Exception as e:
+        print(f"Error procesando archivo a PDF: {e}")
+        return None
 
 # =========================================================
 # HELPER: NOTIFICACIONES TELEGRAM Y EMAIL
@@ -273,7 +304,8 @@ def _obtener_alertas_empresa(empresa_id, cur):
     hoy = datetime.now().date()
     limite_alerta = hoy + timedelta(days=30)
     
-    cur.execute("SELECT placa, fecha_matricula, vencimiento_soat, vencimiento_rcc_rce, vencimiento_rtm FROM vehiculos_especial WHERE id_empresa = %s", (empresa_id,))
+    # Se ajusta la consulta para extraer también los estados de auditoría (PESV)
+    cur.execute("SELECT placa, fecha_matricula, vencimiento_soat, vencimiento_rcc_rce, vencimiento_rtm, estado_soat, estado_rcc_rce, estado_rtm FROM vehiculos_especial WHERE id_empresa = %s", (empresa_id,))
     vehiculos = cur.fetchall()
     alertas_vehiculos = []
     
@@ -291,12 +323,17 @@ def _obtener_alertas_empresa(empresa_id, cur):
                 if hoy <= f_limite: rtm_requerida = False
         
         docs = [
-            ('SOAT', v.get('vencimiento_soat'), True),
-            ('Póliza RCC', v.get('vencimiento_rcc_rce'), True),
-            ('Tecnomecánica (RTM)', v.get('vencimiento_rtm'), rtm_requerida)
+            ('SOAT', v.get('vencimiento_soat'), v.get('estado_soat', 'Actualizado'), True),
+            ('Póliza RCC', v.get('vencimiento_rcc_rce'), v.get('estado_rcc_rce', 'Actualizado'), True),
+            ('Tecnomecánica (RTM)', v.get('vencimiento_rtm'), v.get('estado_rtm', 'Actualizado'), rtm_requerida)
         ]
-        for doc_nombre, fecha_vence, requerido in docs:
+        for doc_nombre, fecha_vence, estado, requerido in docs:
             if not requerido: continue
+            
+            if estado == 'No Conforme':
+                alertas_vehiculos.append((placa, doc_nombre, "NO CONFORME", str(fecha_vence) if fecha_vence else "N/A"))
+                continue
+                
             if not fecha_vence: alertas_vehiculos.append((placa, doc_nombre, "FALTANTE", "N/A"))
             elif isinstance(fecha_vence, str): 
                 try: fecha_vence = datetime.strptime(fecha_vence, '%Y-%m-%d').date()
@@ -305,17 +342,21 @@ def _obtener_alertas_empresa(empresa_id, cur):
                 if fecha_vence <= hoy: alertas_vehiculos.append((placa, doc_nombre, "VENCIDO", str(fecha_vence)))
                 elif fecha_vence <= limite_alerta: alertas_vehiculos.append((placa, doc_nombre, "PROXIMO_VENCER", str(fecha_vence)))
 
-    cur.execute("SELECT cedula, nombre, vencimiento_licencia_conduccion, vencimiento_seguridad_social FROM conductores_flotaespecial WHERE id_empresa = %s", (empresa_id,))
+    cur.execute("SELECT cedula, nombre, vencimiento_licencia_conduccion, vencimiento_seguridad_social, estado_licencia, estado_seguridad_social FROM conductores_flotaespecial WHERE id_empresa = %s", (empresa_id,))
     conductores = cur.fetchall()
     alertas_conductores = []
     
     for c in conductores:
         cedula, nombre = c['cedula'], c['nombre']
         docs = [
-            ('Licencia de Conducción', c.get('vencimiento_licencia_conduccion')),
-            ('Seguridad Social (Planilla)', c.get('vencimiento_seguridad_social'))
+            ('Licencia de Conducción', c.get('vencimiento_licencia_conduccion'), c.get('estado_licencia', 'Actualizado')),
+            ('Seguridad Social (Planilla)', c.get('vencimiento_seguridad_social'), c.get('estado_seguridad_social', 'Actualizado'))
         ]
-        for doc_nombre, fecha_vence in docs:
+        for doc_nombre, fecha_vence, estado in docs:
+            if estado == 'No Conforme':
+                alertas_conductores.append((f"{nombre} ({cedula})", doc_nombre, "NO CONFORME", str(fecha_vence) if fecha_vence else "N/A"))
+                continue
+                
             if not fecha_vence: alertas_conductores.append((f"{nombre} ({cedula})", doc_nombre, "FALTANTE", "N/A"))
             elif isinstance(fecha_vence, str):
                 try: fecha_vence = datetime.strptime(fecha_vence, '%Y-%m-%d').date()
@@ -489,6 +530,11 @@ def gestion_flota():
             r_soat = guardar_pdf_manual(request.files.get('file_pdf_soat'), 'soat')
             r_rtm = guardar_pdf_manual(request.files.get('file_pdf_rtm'), 'rtm')
             
+            # Asignación de estado inicial 'Actualizado' al subir el soporte en creación o edición
+            est_soat = 'Actualizado' if r_soat else 'Actualizado'
+            est_rtm = 'Actualizado' if r_rtm else 'Actualizado'
+            est_rcc = 'Actualizado' if r_rcc else 'Actualizado'
+
             if placa and clase:
                 try:
                     if accion == 'crear_vehiculo':
@@ -502,15 +548,15 @@ def gestion_flota():
                              modalidad_servicio, nivel_servicio, radio_accion, empresa_vinculadora,
                              nit_empresa_vinculadora, empresa_transporte, fecha_expedicion_tarjeta_operacion,
                              fecha_inicio_tarjeta_operacion, vencimiento_tarjeta_operacion,
-                             numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
-                             numero_poliza_soat, aseguradora_soat, vencimiento_soat,
-                             numero_certificado_rtm, vencimiento_rtm,
+                             numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce, estado_rcc_rce,
+                             numero_poliza_soat, aseguradora_soat, vencimiento_soat, estado_soat,
+                             numero_certificado_rtm, vencimiento_rtm, estado_rtm,
                              ruta_pdf_tarjeta_propiedad, ruta_pdf_tarjeta_operacion, ruta_pdf_rcc_rce, ruta_pdf_soat, ruta_pdf_tecnomecanica,
                              conductor_asignado, departamento_base, municipio_base) 
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                                    %s, %s, %s)
+                                    %s, %s, %s, %s, %s, %s)
                         """, (
                             empresa_id, placa, clase, carroceria, marca, linea, modelo, color, combustible,
                             cilindraje, capacidad, potencia_hp, puertas, vin, chasis, motor, numero_serie,
@@ -520,9 +566,9 @@ def gestion_flota():
                             modalidad_servicio, nivel_servicio, radio_accion, empresa_vinculadora,
                             nit_empresa_vinculadora, empresa_transporte, fecha_expedicion_tarjeta_operacion,
                             fecha_inicio_tarjeta_operacion, vencimiento_tarjeta_operacion,
-                            numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
-                            numero_poliza_soat, aseguradora_soat, vencimiento_soat,
-                            numero_certificado_rtm, vencimiento_rtm,
+                            numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce, est_rcc,
+                            numero_poliza_soat, aseguradora_soat, vencimiento_soat, est_soat,
+                            numero_certificado_rtm, vencimiento_rtm, est_rtm,
                             r_prop or '', r_ope or '', r_rcc or '', r_soat or '', r_rtm or '',
                             conductor_asignado_nombres, departamento_base, municipio_base
                         ))
@@ -537,6 +583,13 @@ def gestion_flota():
                         flash(f"Vehículo especial {placa} registrado manualmente con éxito.", "success")
                         
                     elif accion == 'editar_vehiculo' and v_id:
+                        cur.execute("SELECT * FROM vehiculos_especial WHERE id=%s AND id_empresa=%s", (v_id, empresa_id))
+                        old_v = cur.fetchone()
+                        
+                        est_soat = 'Actualizado' if r_soat else old_v.get('estado_soat', 'Actualizado')
+                        est_rtm = 'Actualizado' if r_rtm else old_v.get('estado_rtm', 'Actualizado')
+                        est_rcc = 'Actualizado' if r_rcc else old_v.get('estado_rcc_rce', 'Actualizado')
+
                         cur.execute("""
                             UPDATE vehiculos_especial 
                             SET placa=%s, clase=%s, carroceria=%s, marca=%s, linea=%s, modelo=%s, color=%s, 
@@ -548,9 +601,9 @@ def gestion_flota():
                                 modalidad_servicio=%s, nivel_servicio=%s, radio_accion=%s, empresa_vinculadora=%s,
                                 nit_empresa_vinculadora=%s, empresa_transporte=%s, fecha_expedicion_tarjeta_operacion=%s,
                                 fecha_inicio_tarjeta_operacion=%s, vencimiento_tarjeta_operacion=%s,
-                                numero_poliza_rcc_rce=%s, aseguradora_rcc_rce=%s, fecha_inicio_rcc_rce=%s, vencimiento_rcc_rce=%s,
-                                numero_poliza_soat=%s, aseguradora_soat=%s, vencimiento_soat=%s,
-                                numero_certificado_rtm=%s, vencimiento_rtm=%s,
+                                numero_poliza_rcc_rce=%s, aseguradora_rcc_rce=%s, fecha_inicio_rcc_rce=%s, vencimiento_rcc_rce=%s, estado_rcc_rce=%s,
+                                numero_poliza_soat=%s, aseguradora_soat=%s, vencimiento_soat=%s, estado_soat=%s,
+                                numero_certificado_rtm=%s, vencimiento_rtm=%s, estado_rtm=%s,
                                 conductor_asignado=%s, departamento_base=%s, municipio_base=%s
                             WHERE id=%s AND id_empresa=%s
                         """, (
@@ -562,9 +615,9 @@ def gestion_flota():
                             modalidad_servicio, nivel_servicio, radio_accion, empresa_vinculadora,
                             nit_empresa_vinculadora, empresa_transporte, fecha_expedicion_tarjeta_operacion,
                             fecha_inicio_tarjeta_operacion, vencimiento_tarjeta_operacion,
-                            numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce,
-                            numero_poliza_soat, aseguradora_soat, vencimiento_soat,
-                            numero_certificado_rtm, vencimiento_rtm,
+                            numero_poliza_rcc_rce, aseguradora_rcc_rce, fecha_inicio_rcc_rce, vencimiento_rcc_rce, est_rcc,
+                            numero_poliza_soat, aseguradora_soat, vencimiento_soat, est_soat,
+                            numero_certificado_rtm, vencimiento_rtm, est_rtm,
                             conductor_asignado_nombres, departamento_base, municipio_base,
                             v_id, empresa_id
                         ))
@@ -626,7 +679,6 @@ def gestion_flota():
             ultimo_pago_ss = request.form.get('ultimo_pago_seguridad_social') or None
             es_relevo = 1 if request.form.get('es_relevo') else 0
 
-            # Cálculo exacto de vencimiento de seguridad social (+30 días)
             vencimiento_ss = None
             if ultimo_pago_ss:
                 try:
@@ -635,7 +687,6 @@ def gestion_flota():
                 except ValueError:
                     vencimiento_ss = None
 
-            # Archivos PDF usando subcarpeta 'conductores'
             r_ced = guardar_pdf_manual(request.files.get('file_pdf_cedula'), 'ced', 'conductores')
             r_lic = guardar_pdf_manual(request.files.get('file_pdf_licencia'), 'lic', 'conductores')
             r_ss = guardar_pdf_manual(request.files.get('file_pdf_seguridad_social'), 'ss', 'conductores')
@@ -643,7 +694,6 @@ def gestion_flota():
             if nombre and cedula:
                 try:
                     if accion == 'crear_conductor':
-                        # 1. Crear en tabla usuarios
                         cur.execute("SELECT id FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula, nit_empresa))
                         if cur.fetchone():
                             flash(f"La cédula {cedula} ya está registrada como usuario.", "danger")
@@ -659,7 +709,6 @@ def gestion_flota():
                             VALUES (%s, %s, %s, 'cliente', 'op', 'operador_flotaespecial', %s, %s, NULL, %s, %s)
                         """, (nombre, cedula, hashed_pw, empresa_nombre, nit_empresa, telefono or None, email or None))
                         
-                        # 2. Insertar en tabla conductores
                         cur.execute("""
                             INSERT INTO conductores_flotaespecial 
                             (id_empresa, nombre, cedula, departamento_base, municipio_base, numero_licencia_conduccion, 
@@ -674,16 +723,22 @@ def gestion_flota():
                         flash(f"Conductor {nombre} registrado exitosamente.", "success")
                         
                     elif accion == 'editar_conductor' and conductor_id:
+                        cur.execute("SELECT * FROM conductores_flotaespecial WHERE id=%s AND id_empresa=%s", (conductor_id, empresa_id))
+                        old_c = cur.fetchone()
+                        
+                        est_lic = 'Actualizado' if r_lic else old_c.get('estado_licencia', 'Actualizado')
+                        est_ss = 'Actualizado' if r_ss else old_c.get('estado_seguridad_social', 'Actualizado')
+
                         cur.execute("""
                             UPDATE conductores_flotaespecial 
                             SET nombre=%s, cedula=%s, departamento_base=%s, municipio_base=%s, numero_licencia_conduccion=%s, 
                                 vencimiento_licencia_conduccion=%s, eps=%s, fondo_pensiones=%s, arl=%s, 
                                 ultimo_pago_seguridad_social=%s, vencimiento_seguridad_social=%s, telefono=%s, email=%s,
-                                es_relevo=%s
+                                es_relevo=%s, estado_licencia=%s, estado_seguridad_social=%s
                             WHERE id=%s AND id_empresa=%s
                         """, (nombre, cedula, departamento_base, municipio_base, numero_licencia,
                               vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
-                              vencimiento_ss, telefono or None, email or None, es_relevo, conductor_id, empresa_id))
+                              vencimiento_ss, telefono or None, email or None, es_relevo, est_lic, est_ss, conductor_id, empresa_id))
                         
                         if r_ced: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_cedula=%s WHERE id=%s AND id_empresa=%s", (r_ced, conductor_id, empresa_id))
                         if r_lic: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_licencia=%s WHERE id=%s AND id_empresa=%s", (r_lic, conductor_id, empresa_id))
@@ -726,7 +781,102 @@ def gestion_flota():
                 flash("Error al eliminar conductor.", "danger")
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='conductores'))
 
-        # Fallback de seguridad
+        # ====================================================
+        # AUDITORÍA Y REFRENDACIÓN DOCUMENTAL LOCAL
+        # ====================================================
+        elif accion == 'actualizar_documento_vencido':
+            entidad_tipo = request.form.get('entidad_tipo')
+            entidad_id = request.form.get('entidad_id')
+            documento_clave = request.form.get('documento_clave')
+            nueva_fecha = request.form.get('nueva_fecha')
+            archivo = request.files.get('archivo_soporte')
+            
+            if not all([entidad_tipo, entidad_id, documento_clave, nueva_fecha, archivo]):
+                flash("Todos los campos son obligatorios para actualizar el documento.", "danger")
+                return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='documentos_vencidos'))
+                
+            try:
+                if entidad_tipo == 'vehiculo':
+                    cur.execute("SELECT placa FROM vehiculos_especial WHERE id = %s AND id_empresa = %s", (entidad_id, empresa_id))
+                    v = cur.fetchone()
+                    if not v:
+                        flash("Vehículo no encontrado.", "danger")
+                        return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='documentos_vencidos'))
+                        
+                    placa = v['placa']
+                    
+                    if documento_clave == 'vencimiento_soat':
+                        col_fecha, col_ruta, col_estado = 'vencimiento_soat', 'ruta_pdf_soat', 'estado_soat'
+                    elif documento_clave == 'vencimiento_rtm':
+                        col_fecha, col_ruta, col_estado = 'vencimiento_rtm', 'ruta_pdf_tecnomecanica', 'estado_rtm'
+                    elif documento_clave == 'vencimiento_rcc_rce':
+                        col_fecha, col_ruta, col_estado = 'vencimiento_rcc_rce', 'ruta_pdf_rcc_rce', 'estado_rcc_rce'
+                    else:
+                        flash("Tipo de documento de vehículo inválido.", "danger")
+                        return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='documentos_vencidos'))
+                        
+                    ruta_pdf = guardar_pdf_manual(archivo, documento_clave)
+                    
+                    cur.execute(f"UPDATE vehiculos_especial SET {col_fecha} = %s, {col_ruta} = %s, {col_estado} = 'Actualizado' WHERE id = %s", (nueva_fecha, ruta_pdf, entidad_id))
+                    mysql.connection.commit()
+                    flash(f"Documento actualizado correctamente para el vehículo {placa}.", "success")
+                    
+                elif entidad_tipo == 'conductor':
+                    cur.execute("SELECT cedula, nombre FROM conductores_flotaespecial WHERE id = %s AND id_empresa = %s", (entidad_id, empresa_id))
+                    c = cur.fetchone()
+                    if not c:
+                        flash("Conductor no encontrado.", "danger")
+                        return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='documentos_vencidos'))
+                        
+                    cedula = c['cedula']
+                    nombre = c['nombre']
+                    
+                    if documento_clave == 'vencimiento_licencia_conduccion':
+                        col_fecha, col_ruta, col_estado = 'vencimiento_licencia_conduccion', 'ruta_pdf_licencia', 'estado_licencia'
+                    elif documento_clave == 'vencimiento_seguridad_social':
+                        col_fecha, col_ruta, col_estado = 'ultimo_pago_seguridad_social', 'ruta_pdf_seguridad_social', 'estado_seguridad_social'
+                    else:
+                        flash("Tipo de documento de conductor inválido.", "danger")
+                        return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='documentos_vencidos'))
+                        
+                    ruta_pdf = guardar_pdf_manual(archivo, documento_clave, 'conductores')
+                    
+                    cur.execute(f"UPDATE conductores_flotaespecial SET {col_fecha} = %s, {col_ruta} = %s, {col_estado} = 'Actualizado' WHERE id = %s", (nueva_fecha, ruta_pdf, entidad_id))
+                    mysql.connection.commit()
+                    flash(f"Documento actualizado correctamente para {nombre}.", "success")
+                    
+            except Exception as e:
+                mysql.connection.rollback()
+                flash(f"Error al actualizar documento: {str(e)}", "danger")
+
+            return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='documentos_vencidos'))
+
+        elif accion == 'verificar_documento':
+            # Esta ruta queda como fallback en caso de verificación directa desde este submódulo
+            entidad_tipo = request.form.get('entidad_tipo')
+            entidad_id = request.form.get('entidad_id')
+            documento_clave = request.form.get('documento_clave')
+
+            try:
+                if entidad_tipo == 'vehiculo':
+                    if documento_clave == 'vencimiento_soat': col_estado = 'estado_soat'
+                    elif documento_clave == 'vencimiento_rtm': col_estado = 'estado_rtm'
+                    elif documento_clave == 'vencimiento_rcc_rce': col_estado = 'estado_rcc_rce'
+                    cur.execute(f"UPDATE vehiculos_especial SET {col_estado} = 'Verificado' WHERE id = %s AND id_empresa = %s", (entidad_id, empresa_id))
+                
+                elif entidad_tipo == 'conductor':
+                    if documento_clave == 'vencimiento_licencia_conduccion': col_estado = 'estado_licencia'
+                    elif documento_clave == 'vencimiento_seguridad_social': col_estado = 'estado_seguridad_social'
+                    cur.execute(f"UPDATE conductores_flotaespecial SET {col_estado} = 'Verificado' WHERE id = %s AND id_empresa = %s", (entidad_id, empresa_id))
+                
+                mysql.connection.commit()
+                flash("Documento marcado como verificado y autorizado.", "success")
+            except Exception as e:
+                mysql.connection.rollback()
+                flash(f"Error al verificar documento: {str(e)}", "danger")
+
+            return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='documentos_vencidos'))
+
         return redirect(url_for('flotaespecial_flota.gestion_flota', active_module=active_module))
 
     # =========================================================
@@ -765,6 +915,89 @@ def gestion_flota():
             active_module='preoperacionales', inspecciones=inspecciones,
             vehiculos_historicos=vehiculos_historicos,
             filtros={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin, 'placa': placa_filtro}
+        )
+
+    elif active_module == 'documentos_vencidos':
+        hoy = datetime.now().date()
+        
+        cur.execute("SELECT * FROM vehiculos_especial WHERE id_empresa = %s", (empresa_id,))
+        vehiculos = cur.fetchall()
+        
+        cur.execute("SELECT * FROM conductores_flotaespecial WHERE id_empresa = %s", (empresa_id,))
+        conductores = cur.fetchall()
+        cur.close()
+        
+        novedades = []
+        
+        def parse_date(date_val):
+            if not date_val: return None
+            if isinstance(date_val, datetime): return date_val.date()
+            if isinstance(date_val, str):
+                try: return datetime.strptime(date_val, "%Y-%m-%d").date()
+                except: return None
+            return date_val
+            
+        # Motor de Verificación de Vehículos
+        for v in vehiculos:
+            rtm_requerida = True
+            if v.get('fecha_matricula'):
+                f_mat = parse_date(v.get('fecha_matricula'))
+                if f_mat:
+                    try: f_limite = f_mat.replace(year=f_mat.year + 5)
+                    except ValueError: f_limite = f_mat.replace(year=f_mat.year + 5, day=28)
+                    if hoy <= f_limite: rtm_requerida = False
+
+            docs_v = [
+                ("SOAT", "vencimiento_soat", parse_date(v.get('vencimiento_soat')), v.get('ruta_pdf_soat'), v.get('estado_soat', 'Actualizado'), True),
+                ("Tecnomecánica", "vencimiento_rtm", parse_date(v.get('vencimiento_rtm')), v.get('ruta_pdf_tecnomecanica'), v.get('estado_rtm', 'Actualizado'), rtm_requerida),
+                ("Póliza RCE", "vencimiento_rcc_rce", parse_date(v.get('vencimiento_rcc_rce')), v.get('ruta_pdf_rcc_rce'), v.get('estado_rcc_rce', 'Actualizado'), True)
+            ]
+
+            for nombre_doc, clave, fecha, ruta, estado, req in docs_v:
+                if not req: continue
+                
+                if estado == 'No Conforme':
+                    novedades.append({"entidad_tipo": "vehiculo", "entidad_id": v['id'], "identificador": v['placa'], "nombre": "Vehículo " + v['placa'], "documento": nombre_doc, "clave": clave, "estado": "No Conforme", "dias": "BLOQUEO", "ruta": ruta})
+                    continue
+                    
+                if not fecha:
+                    novedades.append({"entidad_tipo": "vehiculo", "entidad_id": v['id'], "identificador": v['placa'], "nombre": "Vehículo " + v['placa'], "documento": nombre_doc, "clave": clave, "estado": "Faltante", "dias": "N/A", "ruta": ruta})
+                else:
+                    dias = (fecha - hoy).days
+                    if dias <= 0:
+                        novedades.append({"entidad_tipo": "vehiculo", "entidad_id": v['id'], "identificador": v['placa'], "nombre": "Vehículo " + v['placa'], "documento": nombre_doc, "clave": clave, "estado": "Vencido" if estado != 'Actualizado' else 'Actualizado', "dias": abs(dias), "ruta": ruta})
+                    elif dias <= 15:
+                        novedades.append({"entidad_tipo": "vehiculo", "entidad_id": v['id'], "identificador": v['placa'], "nombre": "Vehículo " + v['placa'], "documento": nombre_doc, "clave": clave, "estado": "Por Vencer" if estado != 'Actualizado' else 'Actualizado', "dias": dias, "ruta": ruta})
+                    elif estado == 'Actualizado':
+                        novedades.append({"entidad_tipo": "vehiculo", "entidad_id": v['id'], "identificador": v['placa'], "nombre": "Vehículo " + v['placa'], "documento": nombre_doc, "clave": clave, "estado": "Actualizado", "dias": dias, "ruta": ruta})
+
+        # Motor de Verificación de Conductores
+        for c in conductores:
+            docs_c = [
+                ("Licencia de Conducción", "vencimiento_licencia_conduccion", parse_date(c.get('vencimiento_licencia_conduccion')), c.get('ruta_pdf_licencia'), c.get('estado_licencia', 'Actualizado')),
+                ("Seguridad Social", "vencimiento_seguridad_social", parse_date(c.get('vencimiento_seguridad_social')), c.get('ruta_pdf_seguridad_social'), c.get('estado_seguridad_social', 'Actualizado'))
+            ]
+
+            for nombre_doc, clave, fecha, ruta, estado in docs_c:
+                if estado == 'No Conforme':
+                    novedades.append({"entidad_tipo": "conductor", "entidad_id": c['id'], "identificador": c['cedula'], "nombre": c['nombre'], "documento": nombre_doc, "clave": clave, "estado": "No Conforme", "dias": "BLOQUEO", "ruta": ruta})
+                    continue
+                    
+                if not fecha:
+                    novedades.append({"entidad_tipo": "conductor", "entidad_id": c['id'], "identificador": c['cedula'], "nombre": c['nombre'], "documento": nombre_doc, "clave": clave, "estado": "Faltante", "dias": "N/A", "ruta": ruta})
+                else:
+                    dias = (fecha - hoy).days
+                    if dias <= 0:
+                        novedades.append({"entidad_tipo": "conductor", "entidad_id": c['id'], "identificador": c['cedula'], "nombre": c['nombre'], "documento": nombre_doc, "clave": clave, "estado": "Vencido" if estado != 'Actualizado' else 'Actualizado', "dias": abs(dias), "ruta": ruta})
+                    elif dias <= 15:
+                        novedades.append({"entidad_tipo": "conductor", "entidad_id": c['id'], "identificador": c['cedula'], "nombre": c['nombre'], "documento": nombre_doc, "clave": clave, "estado": "Por Vencer" if estado != 'Actualizado' else 'Actualizado', "dias": dias, "ruta": ruta})
+                    elif estado == 'Actualizado':
+                         novedades.append({"entidad_tipo": "conductor", "entidad_id": c['id'], "identificador": c['cedula'], "nombre": c['nombre'], "documento": nombre_doc, "clave": clave, "estado": "Actualizado", "dias": dias, "ruta": ruta})
+
+        return render_template(
+            'B_modulo_flotaespecial_flota.html',
+            nit=session.get('nit'), empresa=session.get('empresa'), nombre=session.get('nombre'),
+            active_module='documentos_vencidos', novedades=novedades
         )
         
     elif active_module == 'terceros':
@@ -965,25 +1198,25 @@ def cron_auditoria_vencimientos():
             
             for a in alertas_vehiculos:
                 cur.execute("INSERT INTO historial_verificaciones_flotaespecial (id_empresa, tipo_entidad, identificador, documento_verificado, estado_documento) VALUES (%s, %s, %s, %s, %s)", (empresa_id, 'VEHICULO', a[0], a[1], a[2]))
-                if a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE']:
+                if a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE', 'NO CONFORME']:
                     cur.execute("SELECT u.telegram_id FROM vehiculos_especial v LEFT JOIN usuarios u ON v.conductor_asignado = u.nombre AND v.id_empresa = u.empresa_id WHERE v.placa = %s AND v.id_empresa = %s LIMIT 1", (a[0], empresa_id))
                     usr = cur.fetchone()
                     if usr and usr.get('telegram_id'):
-                        msg = f"⚠️ *Alerta Documental - Vehículo {a[0]}*\nTienes documentos por renovar:\n- {a[1]}: {a[2]} ({a[3]})"
+                        msg = f"⚠️ *Alerta Documental - Vehículo {a[0]}*\nTienes documentos por renovar o con No Conformidad:\n- {a[1]}: {a[2]} ({a[3]})"
                         _enviar_mensajes_telegram_hilo([usr['telegram_id']], msg)
                         
             for a in alertas_conductores:
                 cedula_match = re.search(r'\((.*?)\)', a[0])
                 cedula_str = cedula_match.group(1) if cedula_match else a[0]
                 cur.execute("INSERT INTO historial_verificaciones_flotaespecial (id_empresa, tipo_entidad, identificador, documento_verificado, estado_documento) VALUES (%s, %s, %s, %s, %s)", (empresa_id, 'CONDUCTOR', cedula_str, a[1], a[2]))
-                if a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE']:
+                if a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE', 'NO CONFORME']:
                     cur.execute("SELECT telegram_id FROM usuarios WHERE cedula = %s AND empresa_id = %s LIMIT 1", (cedula_str, empresa_id))
                     usr = cur.fetchone()
                     if usr and usr.get('telegram_id'):
-                        msg = f"⚠️ *Alerta Documental - Personal*\nTus documentos están por renovar:\n- {a[1]}: {a[2]} ({a[3]})"
+                        msg = f"⚠️ *Alerta Documental - Personal*\nTus documentos están por renovar o con No Conformidad:\n- {a[1]}: {a[2]} ({a[3]})"
                         _enviar_mensajes_telegram_hilo([usr['telegram_id']], msg)
 
-            hay_alertas = any(a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE'] for a in alertas_vehiculos) or any(a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE'] for a in alertas_conductores)
+            hay_alertas = any(a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE', 'NO CONFORME'] for a in alertas_vehiculos) or any(a[2] in ['VENCIDO', 'PROXIMO_VENCER', 'FALTANTE', 'NO CONFORME'] for a in alertas_conductores)
 
             if hay_alertas:
                 cur.execute("SELECT telegram_id, email FROM usuarios WHERE empresa_id = %s AND perfil = 'controlador_flotaespecial'", (empresa_id,))

@@ -1,4 +1,4 @@
-# MÓDULO: WEBMASTER_ADMIN | ARCHIVO: bp_901811727_admin.py
+# MÓDULO: WEBMASTER_ADMIN | ARCHIVO: bp_901811727_admin.py | CONDICIÓN: OBLIGATORIO | TIPO: 1
 # app/blueprints/bp_901811727_admin.py
 import json
 from flask import Blueprint, request, jsonify, session
@@ -44,6 +44,8 @@ def gestionar_empresa():
     finally: 
         cur.close()
 
+# --- EMPRESAS DE TRANSPORTE ESPECIAL ---
+
 @csrf.exempt
 @bp_admin.route('/gestionar_empresa_transporte_especial', methods=['POST'])
 @login_required_custom
@@ -73,13 +75,9 @@ def gestionar_empresa_transporte_especial():
                 WHERE nit=%s
             """, (nombre_comercial, submodulos_json, nit))
                        
-        # Sincronización en modulos_empresas_autorizadas
         cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
-        
-        # Módulo base fijo
         cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, 'flotaespecial', 'activo')", (nit,))
         
-        # Submódulos seleccionados
         for submod in submodulos_seleccionados:
             cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, submod))
             
@@ -121,11 +119,11 @@ def obtener_empresas_transporte_especial():
 @login_required_custom
 def api_submodulos_transporte_especial():
     submodulos_directos = [
-        {"clave": "controlador_flota", "nombre": "Submódulo B: Controladores de Flota", "desc": "Acceso al panel administrativo, monitoreo satelital, vehículos y QRs."},
-        {"clave": "operador_flota", "nombre": "Submódulo B: Operadores en Ruta", "desc": "Acceso a la PWA móvil para conductores (Pre-logueo, inicio/fin de viaje)."},
-        {"clave": "eps_gestion", "nombre": "Submódulo B: Gestión Operativa EPS", "desc": "Flujo de captura, desglose, programación y kanban de pacientes."},
-        {"clave": "eps_facturacion", "nombre": "Sub-submódulo C: Pre-Facturación EPS", "desc": "Generación de RIPS JSON y CUV (Depende de Gestión Operativa)."},
-        {"clave": "preoperacional", "nombre": "Sub-submódulo C: Preoperacionales", "desc": "Auditoría diaria PESV y registro de novedades de vehículos."}
+        {"clave": "controlador_flota", "nombre": "B_Controlador Flota Especial", "desc": "Acceso al panel administrativo, monitoreo satelital, vehículos y QRs."},
+        {"clave": "operador_flota", "nombre": "B_Operador en Ruta", "desc": "Acceso a la PWA móvil para conductores (Pre-logueo, inicio/fin de viaje)."},
+        {"clave": "eps_gestion", "nombre": "B_Gestión Operativa EPS", "desc": "Flujo de captura, desglose, programación y kanban de pacientes."},
+        {"clave": "eps_facturacion", "nombre": "C_Pre-Facturación EPS", "desc": "Generación de RIPS JSON y CUV (Depende de Gestión Operativa)."},
+        {"clave": "preoperacional", "nombre": "C_Preoperacionales", "desc": "Auditoría diaria PESV y registro de novedades de vehículos."}
     ]
     modulos_universales = [
         {"clave": "mantenimiento", "nombre": "Mantenimiento Preventivo (Proyectado)", "desc": "Módulo Universal de Mantenimiento"},
@@ -135,7 +133,7 @@ def api_submodulos_transporte_especial():
     ]
     return jsonify(success=True, directos=submodulos_directos, universales=modulos_universales)
 
-# --- NUEVOS CONTROLADORES: TRANSPORTE DE CARGA ---
+# --- EMPRESAS DE TRANSPORTE DE CARGA ---
 
 @csrf.exempt
 @bp_admin.route('/gestionar_empresa_transporte_carga', methods=['POST'])
@@ -166,10 +164,10 @@ def gestionar_empresa_transporte_carga():
                 WHERE nit=%s
             """, (nombre_comercial, submodulos_json, nit))
                        
-        # Sincronización en modulos_empresas_autorizadas
         cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
+        # HOMOLOGACIÓN ESTRICTA CON TRANSPORTE ESPECIAL: Inserción automática del módulo base 'flota'
+        cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, 'flota', 'activo')", (nit,))
         
-        # Submódulos seleccionados inyectados directamente
         for submod in submodulos_seleccionados:
             cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, submod))
             
@@ -211,15 +209,103 @@ def obtener_empresas_transporte_carga():
 @login_required_custom
 def api_submodulos_transporte_carga():
     submodulos_directos = [
-        {"clave": "controlador_flota", "nombre": "Submódulo B: Controladores de Flota", "desc": "Acceso al panel administrativo, monitoreo satelital en tiempo real, gestión de vehículos y creación de códigos QR."},
-        {"clave": "operador_flota", "nombre": "Submódulo B: Operadores en Ruta", "desc": "Acceso a la PWA móvil para conductores (Pre-logueo QR, inicio/fin de viaje y reporte de paradas)."},
-        {"clave": "carga", "nombre": "Submódulo B: Gestión de Carga (Báscula)", "desc": "Módulo transversal para la operación de báscula, remisiones y pesaje."},
-        {"clave": "preoperacional", "nombre": "Sub-submódulo C: Preoperacionales", "desc": "Diligenciamiento y auditoría de seguridad vial diaria (PESV)."}
+        {"clave": "controlador_flota", "nombre": "B_Controlador Flota Carga", "desc": "Acceso al panel administrativo, monitoreo satelital en tiempo real, gestión de vehículos y creación de códigos QR."},
+        {"clave": "operador_flota", "nombre": "B_Operador en Ruta (Carga)", "desc": "Acceso a la PWA móvil para conductores (Pre-logueo QR, inicio/fin de viaje y reporte de paradas)."},
+        {"clave": "carga", "nombre": "B_Gestión de Báscula (Pesaje)", "desc": "Módulo transversal para la operación de báscula, remisiones y pesaje."},
+        {"clave": "preoperacional", "nombre": "C_Preoperacionales", "desc": "Diligenciamiento y auditoría de seguridad vial diaria (PESV)."}
     ]
     modulos_universales = [
         {"clave": "combustible", "nombre": "Control de Combustibles", "desc": "Módulo Universal de Gestión, monitoreo de consumo y eficiencia de combustible."},
         {"clave": "mantenimiento", "nombre": "Mantenimiento Preventivo (Proyectado)", "desc": "Módulo Universal de Mantenimiento"},
         {"clave": "pesv", "nombre": "PESV - Seguridad Vial Institucional (Proyectado)", "desc": "Plan Estratégico de Seguridad Vial corporativo"},
+        {"clave": "contabilidad", "nombre": "Contabilidad (Proyectado)", "desc": "Módulo Contable General"}
+    ]
+    return jsonify(success=True, directos=submodulos_directos, universales=modulos_universales)
+
+# --- EMPRESAS DE VENTAS Y DISTRIBUCIÓN ---
+
+@csrf.exempt
+@bp_admin.route('/gestionar_empresa_ventas_distribucion', methods=['POST'])
+@login_required_custom
+def gestionar_empresa_ventas_distribucion():
+    d = request.form
+    submodulos_seleccionados = request.form.getlist('submodulos[]')
+    if not submodulos_seleccionados:
+        submodulos_seleccionados = request.form.getlist('submodulos')
+        
+    nit = d.get('nit')
+    nombre_comercial = d.get('nombre_comercial')
+    accion = d.get('accion', 'crear')
+    
+    cur = mysql.connection.cursor()
+    try:
+        submodulos_json = json.dumps(submodulos_seleccionados, ensure_ascii=False)
+        
+        if accion == 'crear':
+            cur.execute("""
+                INSERT INTO empresas (nit, nombre_comercial, tipo_empresa, submodulos_activos) 
+                VALUES (%s, %s, 'ventas_distribucion', %s)
+            """, (nit, nombre_comercial, submodulos_json))
+        else:
+            cur.execute("""
+                UPDATE empresas 
+                SET nombre_comercial=%s, tipo_empresa='ventas_distribucion', submodulos_activos=%s 
+                WHERE nit=%s
+            """, (nombre_comercial, submodulos_json, nit))
+                       
+        cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
+        
+        for submod in submodulos_seleccionados:
+            cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, submod))
+            
+        mysql.connection.commit()
+        return jsonify(success=True, message="Empresa de Ventas y Distribución y submódulos procesados correctamente.")
+    except Exception as e: 
+        mysql.connection.rollback()
+        return jsonify(success=False, message=str(e))
+    finally: 
+        cur.close()
+
+@bp_admin.route('/obtener_empresas_ventas_distribucion')
+@login_required_custom
+def obtener_empresas_ventas_distribucion():
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("SELECT id, nit, nombre_comercial, tipo_empresa, submodulos_activos FROM empresas WHERE tipo_empresa = 'ventas_distribucion'")
+        rows = cur.fetchall()
+        empresas = []
+        cols = ['id', 'nit', 'nombre_comercial', 'tipo_empresa', 'submodulos_activos']
+        for r in rows:
+            row_dict = dict(zip(cols, r)) if not isinstance(r, dict) else r
+            sub_raw = row_dict.get('submodulos_activos')
+            if sub_raw:
+                try:
+                    row_dict['submodulos_activos'] = json.loads(sub_raw) if isinstance(sub_raw, str) else sub_raw
+                except:
+                    row_dict['submodulos_activos'] = []
+            else:
+                row_dict['submodulos_activos'] = []
+            empresas.append(row_dict)
+        return jsonify(success=True, empresas=empresas)
+    except Exception as e:
+        return jsonify(success=False, message=str(e))
+    finally:
+        cur.close()
+
+@bp_admin.route('/api/submodulos_ventas_distribucion', methods=['GET'])
+@login_required_custom
+def api_submodulos_ventas_distribucion():
+    submodulos_directos = [
+        {"clave": "aws", "nombre": "B_Controlador Bodegas WMS", "desc": "Panel administrativo para supervisión logística, despachos y andon."},
+        {"clave": "operador_bodegas", "nombre": "B_Operador Bodegas (Picking)", "desc": "PWA Móvil para alistamiento y picking en piso."},
+        {"clave": "verificador_bodegas", "nombre": "B_Verificador Bodegas (Auditor)", "desc": "Auditoría de despachos y sellado de actas."},
+        {"clave": "gestion_mermas", "nombre": "B_Gestión de Mermas", "desc": "Control y registro de mermas, averías y bajas de inventario."},
+        {"clave": "facturacion", "nombre": "C_Facturación (Proyectado)", "desc": "Facturación electrónica y control de remisiones."}
+    ]
+    modulos_universales = [
+        {"clave": "flota", "nombre": "Módulo Universal: Flota", "desc": "Gestión de vehículos propios o tercerizados para la distribución."},
+        {"clave": "combustible", "nombre": "Control de Combustibles", "desc": "Módulo Universal de Gestión, monitoreo de consumo y eficiencia de combustible."},
+        {"clave": "mantenimiento", "nombre": "Mantenimiento Preventivo (Proyectado)", "desc": "Módulo Universal de Mantenimiento"},
         {"clave": "contabilidad", "nombre": "Contabilidad (Proyectado)", "desc": "Módulo Contable General"}
     ]
     return jsonify(success=True, directos=submodulos_directos, universales=modulos_universales)
@@ -585,16 +671,13 @@ def api_obtener_rutas_modulo():
         if os.path.exists(tpl_dir):
             for f in os.listdir(tpl_dir):
                 if f.endswith('.html'):
-                    # 1. Búsqueda por coincidencia en el nombre físico
                     if modulo and modulo in f.lower():
                         rutas.add(f)
                         continue
                         
-                    # 2. Búsqueda profunda por Etiqueta Arquitectónica (MÓDULO / SUBMÓDULO)
                     ruta_completa = os.path.join(tpl_dir, f)
                     try:
                         with open(ruta_completa, 'r', encoding='utf-8') as archivo:
-                            # Leer solo las primeras 5 líneas por eficiencia de memoria
                             for _ in range(5):
                                 linea = archivo.readline()
                                 if not linea:
@@ -606,7 +689,6 @@ def api_obtener_rutas_modulo():
                     except Exception:
                         pass
                         
-        # Rutas universales garantizadas de Base / Default
         rutas.add('panel_principal.html')
         rutas.add('A_dashboard_universal.html')
         

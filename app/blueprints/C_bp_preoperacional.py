@@ -74,6 +74,8 @@ def preoperacional_tc():
             cur.close()
             flash("El vehículo ya cuenta con una inspección aprobada el día de hoy.", "info")
             if placa_carga:
+                if session.get('es_tercero') or session.get('usuario_id') == -1:
+                    return redirect(url_for('validacion_terceros_carga.ingreso_terceros', nit_empresa=session.get('nit')))
                 try: return redirect(url_for('router_universal', modulo='flota'))
                 except: return redirect(url_for('flotacarga.dashboard_operador'))
             else:
@@ -186,7 +188,18 @@ def validar_qr():
     mysql.connection.commit()
     cur.close()
 
-    return jsonify(success=True, message="Vehículo verificado.")
+    # ENRUTAMIENTO DINÁMICO SEGÚN ESTADO DE PREOPERACIONAL (ESQUEMA M2)
+    if inspeccion_hoy:
+        if v["flota_tipo"] == 'carga':
+            try: redir = url_for('router_universal', modulo='carga')
+            except: redir = url_for('flotacarga.dashboard_operador')
+        else:
+            try: redir = url_for('router_universal', modulo='flotaespecial')
+            except: redir = url_for('operador_flotaespecial.dashboard_operador_especial')
+    else:
+        redir = url_for('preoperacional.preoperacional_tc')
+
+    return jsonify(success=True, message="Vehículo verificado.", redirect_url=redir)
 
 
 @bp_preoperacional.route('/preoperacional/guardar', methods=['POST'])
@@ -364,16 +377,39 @@ def guardar_inspeccion():
         cur.execute(query, params)
         
         if tipo_flota == 'carga':
+            cur.execute("SELECT propiedad FROM vehiculos WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, empresa_id))
+            veh_info = cur.fetchone()
+            es_vehiculo_tercero = (
+                session.get('es_tercero') is True or 
+                session.get('usuario_id') == -1 or 
+                (veh_info and str(veh_info.get('propiedad', '')).strip().lower() == 'tercero')
+            )
+
             cur.execute("UPDATE vehiculos SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
-            cur.execute("""
-                INSERT INTO historial_sesiones_flota (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion, latitud, longitud)
-                VALUES (%s, %s, %s, NOW(), 'ACTIVA', %s, %s)
-            """, (empresa_id, usuario_id, placa, latitud, longitud))
-            mysql.connection.commit()
-            flash(f"La inspección se ha registrado y auditado (Selfie + Firma). Consecutivo: {consecutivo}", "success")
-            try: return redirect(url_for('router_universal', modulo='flota'))
-            except: return redirect(url_for('flotacarga.dashboard_operador'))
+            
+            if es_vehiculo_tercero:
+                mysql.connection.commit()
+                cur.close()
+
+                # Limpieza de credenciales temporales para salida segura por fuera del sistema
+                session.pop('placa_prelogueada', None)
+                session.pop('es_tercero', None)
+                session.pop('usuario_id', None)
+                session.pop('nombre', None)
+                session.pop('perfil', None)
+
+                return redirect(url_for('validacion_terceros_carga.exito_preoperacional', consecutivo=consecutivo, placa=placa))
+            else:
+                cur.execute("""
+                    INSERT INTO historial_sesiones_flota (id_empresa, id_usuario, placa_vehiculo, fecha_login, estado_sesion, latitud, longitud)
+                    VALUES (%s, %s, %s, NOW(), 'ACTIVA', %s, %s)
+                """, (empresa_id, usuario_id, placa, latitud, longitud))
+                mysql.connection.commit()
+                flash(f"La inspección se ha registrado y auditado (Selfie + Firma). Consecutivo: {consecutivo}", "success")
+                try: return redirect(url_for('router_universal', modulo='flota'))
+                except: return redirect(url_for('flotacarga.dashboard_operador'))
         else:
+            # TRANSPORTE ESPECIAL: Independiente de ser propio o tercero, redirige a su consola operativa
             cur.execute("UPDATE vehiculos_especial SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
             mysql.connection.commit()
             flash(f"La inspección se ha registrado y auditado exitosamente. Consecutivo: {consecutivo}", "success")
@@ -657,7 +693,6 @@ def cron_limpieza_datos():
 
     cur = mysql.connection.cursor()
     try:
-        # Ejecuta el borrado masivo de registros con más de 1 año (12 meses) en tabla unificada
         cur.execute("""
             DELETE FROM inspeccion_preoperacional 
             WHERE fecha_inspeccion < DATE_SUB(CURDATE(), INTERVAL 12 MONTH)

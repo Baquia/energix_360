@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, session, redirect, url_for, flash
 from app import mysql
 from app.utils import login_required_custom
 from functools import wraps
+import MySQLdb.cursors
 
 bp_controlador_flotaespecial = Blueprint('controlador_flotaespecial', __name__, url_prefix='/gestor_flotaespecial')
 
@@ -30,12 +31,12 @@ def dashboard_controlador():
     nit = session.get('nit')
     if nit:
         try:
-            cur = mysql.connection.cursor()
+            cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
             cur.execute("SELECT submodulos_activos FROM empresas WHERE nit = %s", (nit,))
             row = cur.fetchone()
             cur.close()
             if row:
-                raw_sub = row[0] if isinstance(row, (tuple, list)) else row.get('submodulos_activos')
+                raw_sub = row.get('submodulos_activos')
                 if raw_sub:
                     try:
                         session['submodulos_activos'] = json.loads(raw_sub) if isinstance(raw_sub, str) else raw_sub
@@ -46,11 +47,13 @@ def dashboard_controlador():
         except Exception as e:
             print(f"Error actualizando submodulos_activos en sesión: {e}")
 
+    # Inyección explícita de submodulos_activos para habilitar la vista de RIPS y tarjetas Tipo 2
     return render_template(
         'B_modulo_controlador_flotaespecial.html',
         nit=session.get('nit'),
         empresa=session.get('empresa'),
         usuario=session.get('nombre'),
         modulos_activos=session.get('modulos_activos', []),
+        submodulos_activos=session.get('submodulos_activos', []),
         perfil=session.get('perfil')
     )

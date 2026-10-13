@@ -316,13 +316,19 @@
                         <div class="form-group">
                             <label>Clase de Vehículo *</label>
                             <select name="clase" id="v_clase" required>
-                                <option value="">Seleccione...</option>
-                                <option value="AUTOMOVIL">Automóvil</option>
-                                <option value="BUS">Bus</option>
-                                <option value="BUSETA">Buseta</option>
-                                <option value="CAMIONETA">Camioneta</option>
-                                <option value="CAMPERO">Campero</option>
-                                <option value="MICROBUS">Microbús</option>
+                                <option value="" disabled selected>Seleccione la clasificación...</option>
+                                <option value="Automóvil">Automóvil: Vehículo diseñado para el transporte de pasajeros con capacidad reducida.</option>
+                                <option value="Camioneta y Campero">Camioneta y Campero: Vehículos de uso mixto o todoterreno para pasajeros y carga liviana.</option>
+                                <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Automotores destinados al transporte colectivo de pasajeros.</option>
+                                <option value="Camión C2 (Llanta Trasera Sencilla)">Camión C2 ( 2 ejes sencillo - Llanta Trasera Sencilla )</option>
+                                <option value="Camión C2 (Pacha Trasera)">Camión C2 ( 2 ejes sencillo - Pacha Trasera )</option>
+                                <option value="Camión C3">Camión C3 ( 3 ejes doble troque)</option>
+                                <option value="Camión C4">Camión C4 ( 4 ejes-2 ejes direccionales)</option>
+                                <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote de 3 ejes con un semirremolque de 2 ejes)</option>
+                                <option value="Tractocamión C3-S3">Tractocamión C3-S3: E (6 ejes en total: cabezote doble troque con un tráiler de tres ejes)</option>
+                                <option value="Motocicleta, Motocarro y Mototriciclo">Motocicleta, Motocarro y Mototriciclo: Vehículos de dos o tres ruedas con motor.</option>
+                                <option value="Cuatrimoto">Cuatrimoto: Vehículo de cuatro ruedas para recreación o trabajo en terrenos difíciles.</option>
+                                <option value="Volqueta">Volqueta: Vehículo destinado al transporte de materiales de construcción.</option>
                             </select>
                         </div>
                         <div class="form-group"><label>Marca</label><input type="text" name="marca" id="v_marca"></div>
@@ -769,7 +775,7 @@
                             <td>{{ t.municipio_sede or 'N/D' }} ({{ t.departamento_sede or 'N/D' }})</td>
                             <td>{{ t.telefono_contacto or 'N/D' }}<br><small>{{ t.email_contacto or 'N/D' }}</small></td>
                             <td style="white-space: nowrap;">
-                                <button class="btn-icon edit" title="Editar Tercero" onclick="abrirEditarTercero('{{ t.id }}', '{{ t.nombre }}', '{{ t.nit }}', '{{ t.departamento_sede }}', '{{ t.municipio_sede }}', '{{ t.telefono_contacto }}', '{{ t.email_contacto }}')">✏️️</button>
+                                <button class="btn-icon edit" title="Editar Tercero" onclick="abrirEditarTercero('{{ t.id }}', '{{ t.nombre }}', '{{ t.nit }}', '{{ t.departamento_sede }}', '{{ t.municipio_sede }}', '{{ t.telefono_contacto }}', '{{ t.email_contacto }}')">✏</button>
                                 <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarTercero('{{ t.id }}', '{{ t.nombre }}')">🗑️</button>
                             </td>
                         </tr>

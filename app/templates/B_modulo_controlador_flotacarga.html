@@ -1,1147 +1,356 @@
-<!-- MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: CONTROLADOR_FLOTA | CONDICIÓN: OBLIGATORIO -->
+<!-- MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: CONTROLADOR_FLOTA | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
+<!-- app/templates/B_modulo_controlador_flotacarga.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Gestión de Flota | {{ empresa }}</title>
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#015249">
+  <meta charset="UTF-8" />
+  <title>Hub: Transporte de Carga | BQA-ONE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#015249">
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
 
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    
-    <!-- Chart.js para Analítica en Tiempo Real -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    .navbar {
+      background-color: #015249;
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
 
-    <style>
-        /* PALETA CORPORATIVA BQA-ONE */
-        :root {
-            --verde: #015249;        
-            --verde-osc: #003b35;    
-            --bg-grad-start: #d7f2ec; 
-            --surface: #ffffff;
-            --text: #111827;
-            --text-muted: #6b7280;
-            --border: #e5e7eb;
-            --radius: 10px;
-            --sidebar-width: 260px;
-            --topbar-height: 70px;
-        }
+    .navbar-user { display: flex; align-items: center; gap: 12px; }
+    .navbar-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background-color: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .navbar-info { display: flex; flex-direction: column; }
+    .user-name { font-weight: 700; font-size: 14px; }
+    .company-name { font-size: 11px; opacity: 0.85; }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+    .btn-logout {
+      background-color: rgba(255,255,255,0.15);
+      color: white; text-decoration: none; padding: 6px 16px;
+      border-radius: 8px; font-size: 13px; font-weight: 600;
+      transition: all 0.2s ease; backdrop-filter: blur(4px);
+    }
+    .btn-logout:hover { background-color: rgba(255,255,255,0.3); }
 
-        body {
-            font-family: Verdana, Geneva, Tahoma, sans-serif;
-            background-color: #f3f4f6; 
-            color: var(--text);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
+    .dashboard-container {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 20px;
+      text-align: center;
+    }
 
-        a { text-decoration: none; color: inherit; }
+    .dashboard-title {
+      color: #015249;
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
 
-        /* ================= SIDEBAR ================= */
-        .sidebar {
-            width: var(--sidebar-width); background: var(--surface);
-            border-right: 1px solid var(--border); display: flex;
-            flex-direction: column; transition: transform 0.3s ease;
-            z-index: 1000;
-        }
-        .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
-        .logo-app { max-height: 35px; width: auto; }
-        .nav-menu { flex-grow: 1; padding: 20px 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
-        
-        .nav-item {
-            display: flex; align-items: center; gap: 12px; padding: 12px 15px;
-            border-radius: var(--radius); color: var(--text-muted);
-            font-size: 14px; font-weight: 600; transition: all 0.2s;
-        }
-        .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
-        .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
-        .nav-item.disabled {
-         color: #6c757d !important;      
-         pointer-events: none;           
-         cursor: not-allowed;            
-         opacity: 0.65;                  
-         text-decoration: none;          
-        }
+    .dashboard-subtitle {
+      color: #64748b;
+      font-size: 15px;
+      margin-top: 0;
+      margin-bottom: 40px;
+      font-weight: 500;
+    }
 
-        .nav-icon { font-size: 18px; }
-        
-        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
-        .logout-btn {
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444;
-            font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2;
-        }
+    /* ALINEACIÓN HORIZONTAL ESTRICTA EN UN SOLO CONTENEDOR PARA PC Y PORTÁTILES */
+    .cards-grid {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      justify-content: center !important;
+      align-items: stretch !important;
+      gap: 30px !important;
+      margin: 0 auto;
+    }
 
-        /* ================= MAIN CONTENT ================= */
-        .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; flex-shrink: 0; }
-        .topbar-left { display: flex; align-items: center; gap: 15px; }
-        .menu-toggle { display: none; background: none; border: none; font-size: 24px; color: var(--verde); cursor: pointer; }
-        .logo-cliente { max-height: 40px; width: auto; object-fit: contain; }
-        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
-        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
-        .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 2px 8px; border-radius: 10px; margin-top: 2px; }
+    .card-link {
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex: 0 1 340px !important;
+      min-width: 280px !important;
+    }
 
-        .content-area { flex-grow: 1; padding: 25px; overflow-y: auto; background: radial-gradient(circle at top left, var(--bg-grad-start) 0, #f3f4f6 60%, #f3f4f6 100%); }
+    .card {
+      background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+      border-radius: 22px;
+      padding: 35px 25px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+      border: 1px solid #e2e8f0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
 
-        /* Alertas Flash */
-        .flash-messages { width: 100%; max-width: 1000px; margin-bottom: 20px; }
-        .flash-alert { padding: 12px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; border: 1px solid currentColor; margin-bottom: 10px; }
-        .flash-success { background-color: #d1fae5; color: #065f46; }
-        .flash-danger { background-color: #fee2e2; color: #991b1b; }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 4px;
+      background: #015249;
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+      transform-origin: left;
+    }
 
-        /* Panel Superior Acción */
-        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin-bottom: 20px; }
-        .action-title-group { display: flex; align-items: center; gap: 15px; }
-        .action-header h2 { color: var(--verde); font-size: 20px; margin: 0;}
-        .btn-close-view { background: #e5e7eb; color: #4b5563; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; font-weight: bold;}
-        .btn-close-view:hover { background: #d1d5db; color: #111827; }
-        
-        .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 6px;}
-        .btn-primary:hover { background: var(--verde-osc); }
-        #monitor_operadores_enlinea{display:none;}
-        #tablero_monitor_operadores_enlinea{display:none;}
+    .card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 25px -5px rgba(1, 82, 73, 0.12), 0 10px 10px -5px rgba(1, 82, 73, 0.04);
+      border-color: #cbd5e1;
+    }
+    .card:hover::before { transform: scaleX(1); }
 
-        /* Tablas */
-        .table-card { background: var(--surface); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); max-width: 1000px; overflow-x: auto; }
-        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;}
-        .data-table th { background: #f9fafb; padding: 15px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
-        .data-table td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: var(--text); }
-        .data-table tr:hover { background-color: #fdfdfd; }
-        
-        .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
-        .badge-gray { background: #f3f4f6; color: #4b5563; }
-        .badge-success { background: #d1fae5; color: #065f46; }
-        .badge-danger { background: #fee2e2; color: #991b1b; }
-        
-        .btn-icon { background: none; border: none; cursor: pointer; font-size: 16px; margin-left: 10px; transition: 0.2s; }
-        .btn-icon.edit:hover { color: #f59e0b; transform: scale(1.1); }
-        .btn-icon.delete:hover { color: #ef4444; transform: scale(1.1); }
+    .icon-wrapper {
+      width: 85px;
+      height: 85px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #eefcf9 0%, #d7f2ec 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      margin-bottom: 22px;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.02), 0 4px 10px rgba(1, 82, 73, 0.1);
+      transform: rotate(-3deg);
+      transition: transform 0.3s ease;
+    }
 
-        /* Filter Bar de Auditoría */
-        .filter-bar { background: var(--surface); padding: 15px; border-radius: 12px; margin-bottom: 20px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); max-width: 1000px;}
-        .filter-bar .form-group { margin-bottom: 0; min-width: 150px; flex: 1; }
-        .filter-btn { background: var(--verde); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; height: 38px; }
+    .card:hover .icon-wrapper {
+      transform: rotate(0deg) scale(1.06);
+    }
 
-        /* ================= MODALES ================= */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
-        .modal-box { background: var(--surface); width: 90%; max-width: 450px; border-radius: 12px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-        .modal-header h3 { color: var(--verde); font-size: 18px; }
-        .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
-        
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: bold;}
-        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none;}
-        .form-group input:focus, .form-group select:focus { border-color: var(--verde); }
-        
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .btn-cancel { padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); background: #f9fafb; cursor: pointer; font-weight: bold; color: var(--text);}
-        
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .card-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #1e293b;
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
 
-        @media (max-width: 768px) {
-            .sidebar { position: fixed; height: 100vh; left: 0; top: 0; transform: translateX(-100%); box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
-            .sidebar.open { transform: translateX(0); }
-            .menu-toggle { display: block; }
-            .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 999; }
-            .sidebar-overlay.active { display: block; }
-        }
-    </style>
+    .card-desc {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .table-card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+      margin-top: 50px;
+      overflow: hidden;
+      text-align: left;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .data-table th {
+      background: #f8fafc;
+      padding: 14px 18px;
+      color: #475569;
+      font-weight: 700;
+      border-bottom: 2px solid #e2e8f0;
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+
+    .data-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 70px;
+      font-weight: 500;
+    }
+
+    @media (max-width: 768px) {
+      .cards-grid { flex-direction: column !important; align-items: center !important; }
+      .card-link { flex: 1 1 auto !important; width: 100% !important; max-width: 400px !important; }
+    }
+  </style>
 </head>
 <body>
 
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <!-- BARRA SUPERIOR -->
+  <div class="navbar">
+    <div class="navbar-user">
+      <div class="navbar-avatar">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo" style="height: 22px;" onerror="this.style.display='none'">
+      </div>
+      <div class="navbar-info">
+        <span class="user-name">{{ nombre or usuario }}</span>
+        <span class="company-name">{{ empresa }}</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a href="/panel_principal.html" class="btn-logout" style="background-color: #334155;">⬅ Volver</a>
+        <a href="/logout" class="btn-logout">Salir</a>
+    </div>
+  </div>
 
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+  <!-- CONTENIDO PRINCIPAL -->
+  <div class="dashboard-container">
+    <h1 class="dashboard-title">Transporte de Carga</h1>
+    <p class="dashboard-subtitle">Hub Operativo del Controlador</p>
+
+    <!-- FILA UNIFICADA HORIZONTALMENTE EN PC Y PORTÁTILES -->
+    <div class="cards-grid">
+      
+      <!-- 1. GESTIÓN OPERATIVA GENERAL (TIPO 1 - OBLIGATORIO Y ACTIVO) -->
+      <a href="/gestor_flota/operativa_bp/" class="card-link">
+        <div class="card">
+          <div class="icon-wrapper">🏭</div>
+          <div class="card-title">Gestión Operativa General</div>
+          <div class="card-desc">Configuración de rutas de transporte, seguimiento satelital en mapa y emisión de códigos QR para cabinas y portería.</div>
         </div>
-        
-        <nav class="nav-menu">
-            <!-- MÓDULOS OBLIGATORIOS (CORE FLOTA) -->
-            <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="nav-item {% if active_module == 'dashboard' or not active_module %}active{% endif %}">
-                <span class="nav-icon">📊</span> Panel Central
-            </a>
-            <a href="{{ url_for('gestorflota.mapa_rutas') }}" class="nav-item {% if active_module == 'mapa_rutas' %}active{% endif %}">
-                <span class="nav-icon">📍</span> Mapa de Rutas
-            </a>
-            <a href="{{ url_for('gestorflota.gestion_rutas') }}" class="nav-item {% if active_module == 'rutas' %}active{% endif %}">
-                <span class="nav-icon">🗺️</span> Configurar Rutas
-            </a>
-            <a href="{{ url_for('gestorflota.gestion_vehiculos') }}" class="nav-item {% if active_module == 'vehiculos' %}active{% endif %}">
-                <span class="nav-icon">🚚</span> Vehículos
-            </a>
-             <a href="{{ url_for('gestorflota.gestion_operadores') }}" class="nav-item {% if active_module == 'operadores' %}active{% endif %}">
-                <span class="nav-icon">👷</span> Personal (Conductores)
-            </a>
-            <a href="{{ url_for('gestorflota.generacion_qrs') }}" class="nav-item {% if active_module == 'qrs' %}active{% endif %}">
-                <span class="nav-icon">🖨️</span> Códigos QR
-            </a>
-            
-            <!-- SUB-SUBMÓDULO PREOPERACIONAL (OBLIGATORIO) -->
-            <a href="{{ url_for('preoperacional.historial_preoperacionales') }}" class="nav-item">
-                <span class="nav-icon">📋</span> Preoperacionales PESV
-            </a>
+      </a>
 
-            <!-- GESTIÓN DE CARGA / BÁSCULA (OPCIONAL P&P) -->
-            {% if 'carga' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
-            <a href="{{ url_for('bp_gestion_carga.panel_bascula') }}" class="nav-item">
-                <span class="nav-icon">⚖️</span> Gestión de Báscula
-            </a>
-            {% endif %}
-
-            <!-- COMBUSTIBLE (OPCIONAL P&P) -->
-            {% if 'combustible' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
-            <a href="{{ url_for('combustible_flota.monitoreo_combustible') }}" class="nav-item">
-                <span class="nav-icon">⛽</span> Combustible
-            </a>
-            {% endif %}
-
-            <!-- MÓDULOS PROYECTADOS P&P -->
-            {% if 'mantenimiento' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
-            <a href="#" class="nav-item disabled" aria-disabled="true">
-                <span class="nav-icon">🔧</span> Mantenimiento
-            </a>
-            {% endif %}
-            
-            {% if 'contabilidad' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
-            <a href="#" class="nav-item disabled" aria-disabled="true">
-                <span class="nav-icon">🧾</span> Contabilidad
-            </a>
-            {% endif %}
-        </nav>
-
-        <div class="sidebar-footer">
-            <a href="{{ url_for('logout') }}" class="logout-btn">
-                <span>🚪</span> Cerrar Sesión
-            </a>
+      <!-- 2. GESTIÓN DE FLOTA (HERRAMIENTAS DE FLOTA - SUB-HUB TIPO 1) -->
+      <a href="/gestor_flota/hub_herramientas/" class="card-link">
+        <div class="card">
+          <div class="icon-wrapper">🚛</div>
+          <div class="card-title">Gestión de Flota</div>
+          <div class="card-desc">Acceso al registro de parque automotor, conductores, auxiliares, mantenimiento y módulos suplementarios.</div>
         </div>
-    </aside>
+      </a>
 
-    <main class="main-wrapper">
-        <header class="topbar">
-            <div class="topbar-left">
-                <button class="menu-toggle" id="menuToggle">☰</button>
-                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
-            </div>
-            
-            <div class="user-info">
-                <span class="user-name">{{ nombre }}</span>
-                <span class="user-role">Controlador de Flota</span>
-            </div>
-        </header>
+      <!-- 3. GESTIÓN DE BÁSCULA (TIPO 2 - OPCIONAL PLUG & PLAY) -->
+      {% if 'carga' in session.get('submodulos_activos', session.get('modulos_activos', [])) %}
+      <a href="{{ url_for('bp_gestion_carga.panel_bascula') }}" class="card-link">
+        <div class="card">
+          <div class="icon-wrapper">⚖️</div>
+          <div class="card-title">Gestión de Báscula</div>
+          <div class="card-desc">Control de pesaje de producto agrícola y avícola, registro de remisiones y pesaje de entrada/salida de vehículos.</div>
+        </div>
+      </a>
+      {% endif %}
 
-        <div class="content-area">
-            <div class="flash-messages">
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="flash-alert {% if category == 'success' %}flash-success{% else %}flash-danger{% endif %}">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-            </div>
+    </div>
 
-            {% if active_module == 'vehiculos' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Gestión de Vehículos</h2>
-                    </div>
-                    <button class="btn-primary" onclick="openModal('modalVehiculo')"><span>➕</span> Nuevo Vehículo</button>
-                </div>
-
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Placa</th>
-                                <th>Tipo de Vehículo</th>
-                                <th>Caja de Carga</th>
-                                <th>Referencia / Ejes</th>
-                                <th>Peso Vacío (kg)</th>
-                                <th>Capacidad</th>
-                                <th>Propiedad</th>
-                                <th>Estatus (App)</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for v in vehiculos %}
-                            <tr>
-                                <td style="font-weight: bold; color: var(--verde);">{{ v.placa }}</td>
-                                <td style="text-transform: capitalize;">{{ v.tipo }}</td>
-                                <td style="text-transform: capitalize;">{{ v.caja_de_carga }}</td>
-                                <td style="text-transform: capitalize;">{{ v.referencia }}</td>
-                                <td>{{ v.peso_vacio }} kg</td>
-                                <td>{{ v['capacidad (kg)'] }} kg</td>
-                                <td><span class="badge {% if v.propiedad == 'Propio' %}badge-success{% else %}badge-gray{% endif %}">{{ v.propiedad }}</span></td>
-                                <td><span class="badge badge-gray">{{ v.estatus }}</span></td>
-                                <td>
-                                    <button class="btn-icon edit" title="Editar" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.caja_de_carga }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}', '{{ v.propiedad }}')">✏️</button>
-                                    <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminar('{{ v.id }}', '{{ v.placa }}')">🗑️</button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay vehículos registrados para esta empresa.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-            {% elif active_module == 'rutas' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Gestión de Rutas</h2>
-                    </div>
-                    <button class="btn-primary" onclick="openModal('modalRuta')"><span>➕</span> Nueva Ruta</button>
-                </div>
-
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Nombre de la Ruta</th>
-                                <th>Tipo de Ruta</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for r in rutas %}
-                            <tr>
-                                <td style="font-weight: bold; color: var(--verde);">{{ r.nombre_ruta }}</td>
-                                <td style="text-transform: capitalize;">{{ r.tipo_ruta }}</td>
-                                <td>
-                                    <button class="btn-icon edit" title="Editar" onclick="abrirEditarRuta('{{ r.id }}', '{{ r.nombre_ruta }}', '{{ r.tipo_ruta }}')">✏️</button>
-                                    <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarRuta('{{ r.id }}', '{{ r.nombre_ruta }}')">🗑️</button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="3" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay rutas registradas para esta empresa.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-            {% elif active_module == 'mapa_rutas' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Mapa y Analítica de Rutas</h2>
-                    </div>
-                </div>
-                
-                <form class="filter-bar" method="GET" action="{{ url_for('gestorflota.mapa_rutas') }}">
-                    <div class="form-group">
-                        <label>Fecha del Recorrido</label>
-                        <input type="date" name="fecha" value="{{ filtros.fecha }}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Vehículo (Placa)</label>
-                        <select name="placa" required>
-                            <option value="">Seleccione vehículo...</option>
-                            {% for vh in vehiculos %}
-                                <option value="{{ vh.placa }}" {% if filtros.placa == vh.placa %}selected{% endif %}>{{ vh.placa }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="submit" class="filter-btn">🗺️ Trazar Ruta</button>
-                </form>
-
-                <div class="table-card" style="padding: 20px;">
-                    {% if filtros.placa %}
-                        <div id="map" style="height: 550px; width: 100%; border-radius: 12px; z-index: 1;"></div>
-                        
-                        <div style="margin-top: 15px; display: flex; gap: 20px; font-size: 13px; color: var(--text-muted); justify-content: center; flex-wrap: wrap;">
-                            <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:green; border-radius:50%;"></div> Inicio Ruta</span>
-                            <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:#015249;"></div> Trayecto</span>
-                            <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:blue; border-radius:50%; border:2px solid white;"></div> Parada Manual</span>
-                            <span style="display: flex; align-items: center; gap: 5px;"><div style="width:12px; height:12px; background:red; border-radius:50%; border:2px solid white;"></div> Parada Automática</span>
-                        </div>
-                    {% else %}
-                        <p style="text-align: center; color: var(--text-muted); padding: 40px 0;">Seleccione un vehículo y una fecha para visualizar el trazado de la ruta y las paradas registradas.</p>
-                    {% endif %}
-                </div>
-
-            {% elif active_module == 'qrs' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Códigos QR de Cabina</h2>
-                    </div>
-                    <a href="{{ url_for('gestorflota.imprimir_todos_qrs') }}" target="_blank" class="btn-primary" style="background-color: #f59e0b; color: white;">
-                        <span>🖨️</span> Imprimir Todos
-                    </a>
-                </div>
-                
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Placa</th>
-                                <th>Clasificación</th>
-                                <th>Capacidad</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for v in vehiculos %}
-                            <tr>
-                                <td style="font-weight: bold; color: var(--verde);">{{ v.placa }}</td>
-                                <td style="text-transform: capitalize;">{{ v.tipo }} / {{ v.caja_de_carga }}</td>
-                                <td>{{ v['capacidad (kg)'] }} kg</td>
-                                <td>
-                                    <a href="{{ url_for('gestorflota.imprimir_qr_individual', vehiculo_id=v.id) }}" target="_blank" class="btn-icon edit" title="Imprimir QR Individual">🖨 PDF</a>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay vehículos registrados para generar QR.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                
-            {% elif active_module == 'operadores' %}
-                <div class="action-header">
-                    <div class="action-title-group">
-                        <a href="{{ url_for('gestorflota.dashboard_gestor') }}" class="btn-close-view" title="Cerrar vista">&times;</a>
-                        <h2>Gestión de Conductores y Auxiliares</h2>
-                    </div>
-                    <button class="btn-primary" onclick="openModal('modalOperador')"><span>➕</span> Nuevo Registro</button>
-                </div>
-
-                <div class="table-card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Nombre Completo</th>
-                                <th>Identificación</th>
-                                <th>Perfil Asignado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for op in operadores %}
-                            <tr>
-                                <td style="font-weight: bold; color: var(--verde);">{{ op.nombre }}</td>
-                                <td>{{ op.cedula }}</td>
-                                <td>
-                                    {% if op.perfil == 'operador_flotacarga' %}
-                                        <span class="badge badge-success">Conductor</span>
-                                    {% else %}
-                                        <span class="badge badge-gray">Auxiliar</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <button class="btn-icon edit" title="Editar" onclick="abrirEditarOperador('{{ op.id }}', '{{ op.nombre }}', '{{ op.cedula }}', '{{ op.perfil }}')">✏️</button>
-                                    <button class="btn-icon delete" title="Eliminar" onclick="confirmarEliminarOperador('{{ op.id }}', '{{ op.nombre }}')">🗑️</button>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay conductores ni auxiliares registrados para esta empresa.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
+    <!-- TABLA DE MONITOREO DE OPERADORES EN TIEMPO REAL -->
+    {% if operadores_en_linea is defined and operadores_en_linea %}
+    <div class="table-card">
+      <div style="padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #015249; font-size: 14px;">
+        📡 Operadores en Línea (Monitoreo en Vivo)
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="text-align: center;">Estado</th>
+              <th>Conductor</th>
+              <th>Vehículo</th>
+              <th>Lugar de Logueo</th>
+              <th>Hora Inicio</th>
+            </tr>
+          </thead>
+          <tbody id="tabla_monitoreo_body">
+            {% for op in operadores_en_linea %}
+            <tr>
+              <td style="text-align: center;">
+                {% if op.en_linea == 1 %}
+                  <span style="display: inline-block; width: 10px; height: 10px; background: #059669; border-radius: 50%; box-shadow: 0 0 6px #059669;" title="En línea"></span>
+                {% else %}
+                  <span style="display: inline-block; width: 10px; height: 10px; background: #94a3b8; border-radius: 50%;" title="Desconectado"></span>
+                {% endif %}
+              </td>
+              <td style="font-weight: 700; color: #1e293b;">{{ op.nombre_operador }}</td>
+              <td><span style="background: #d1fae5; color: #059669; font-weight: 800; padding: 3px 8px; border-radius: 6px;">{{ op.placa_vehiculo or 'N/A' }}</span></td>
+              <td>{{ op.sitio_logueo }}</td>
+              <td>{{ op.fecha_login_str }}</td>
+            </tr>
             {% else %}
-                <div class="action-header" id="monitor_operadores_enlinea">
-                    <div class="action-title-group">
-                        <h2>Monitor de Operadores en Línea</h2>
-                    </div>
-                </div>
-                
-                <!-- NUEVA GRÁFICA DE HEARTBEAT (Chart.js) -->
-                <div class="table-card" style="margin-bottom: 25px; padding: 20px; height: 350px;" id="tablero_monitor_operadores_enlinea">
-                    <canvas id="heartbeatChart"></canvas>
-                </div>
-
-                <div class="table-card" style="margin-bottom: 25px;">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th style="text-align: center;">Estado</th>
-                                <th>Operador</th>
-                                <th>Vehículo Asignado</th>
-                                <th>Sitio de Logueo</th>
-                                <th>Hora de Logueo</th>
-                                <th>Hora Deslogueo (Manual)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-operadores-body">
-                            {% for op in operadores_en_linea %}
-                            <tr>
-                                <td style="text-align: center;">
-                                    {% if op.en_linea == 1 %}
-                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="En línea"></div>
-                                    {% else %}
-                                        <div style="width: 14px; height: 14px; border-radius: 50%; background-color: #9ca3af; margin: 0 auto;" title="Fuera de línea"></div>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div style="font-weight: bold; color: var(--verde);">{{ op.nombre_operador }}</div>
-                                    <div style="font-size: 11px; color: var(--text-muted);">{{ op.perfil.replace('_', ' ').title() }}</div>
-                                </td>
-                                <td>
-                                    {% if op.placa_vehiculo %}
-                                        <span class="badge badge-success" style="font-size: 13px;">{{ op.placa_vehiculo }}</span>
-                                    {% else %}
-                                        <span class="badge badge-gray">Sin asignar</span>
-                                    {% endif %}
-                                </td>
-                                <td style="font-size: 12px; font-weight: bold; color: var(--verde-osc);">{{ op.sitio_logueo }}</td>
-                                <td>{{ op.fecha_login_str }}</td>
-                                <td>{{ op.fecha_logout_str }}</td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="table-card" style="padding: 30px; border-left: 5px solid var(--verde);">
-                    <h2 style="color: var(--verde); font-size: 20px; margin-bottom: 10px;">Bienvenido, {{ nombre }}</h2>
-                    <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6;">
-                        Estás en el <b>Centro de Control de Flota</b> de {{ empresa }}. Utiliza el menú lateral para administrar la base de datos de vehículos, gestionar las rutas de distribución urbana o viajera, controlar los conductores autorizados, emitir las credenciales QR para la cabina, visualizar los trazados satelitales o auditar el historial de inspecciones preoperacionales y registros de combustible.
-                    </p>
-                </div>
-            {% endif %}
-            
-            <div style="margin-top: 30px; font-size: 11px; color: #9ca3af; border-top: 1px solid var(--border); padding-top: 15px;">
-                <p>&copy; 2026 BQA ONE Technology. Sistema Multiusuario Seguro.</p>
-            </div>
-        </div>
-    </main>
-
-    <!-- Modales -->
-    <div id="modalVehiculo" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Registrar Vehículo</h3>
-                <button class="close-btn" onclick="closeModal('modalVehiculo')">&times;</button>
-            </div>
-            <form action="{{ url_for('gestorflota.gestion_vehiculos') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="crear">
-                
-                <div class="form-group">
-                    <label>Placa</label>
-                    <input type="text" name="placa" placeholder="Ej. TGU321" required style="text-transform: uppercase;">
-                </div>
-
-                <div class="form-group">
-                    <label>Tipo de Vehículo</label>
-                    <select name="tipo" required>
-                        <option value="">Seleccione...</option>
-                        <option value="camion ligero">Camión Ligero</option>
-                        <option value="camion sencillo">Camión Sencillo</option>
-                        <option value="dobletroque">Dobletroque</option>
-                        <option value="tractomula">Tractomula</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Caja de Carga</label>
-                    <select name="caja_de_carga" required>
-                        <option value="">Seleccione...</option>
-                        <option value="furgon">Furgón</option>
-                        <option value="estacas">Estacas</option>
-                        <option value="furgon refrigerado">Furgón Refrigerado</option>
-                        <option value="planchon">Planchón</option>
-                        <option value="planchon y dolly">Planchón y Dolly</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Referencia / Marca (Opcional)</label>
-                    <select name="referencia">
-                        <option value="">Seleccione...</option>
-                        <option value="chevrolet NHR">Chevrolet NHR</option>
-                        <option value="chevrolet NPR">Chevrolet NPR</option>
-                        <option value="NPR / Turbo">NPR / Turbo</option>
-                        <option value="sencillo">Sencillo Genérico</option>
-                        <option value="dobletroque">Dobletroque Genérico</option>
-                        <option value="Tractomula">Tractomula Genérica</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Propiedad</label>
-                    <select name="propiedad" required>
-                        <option value="Propio" selected>Propio</option>
-                        <option value="Tercero">Tercero</option>
-                    </select>
-                </div>
-
-                <div class="form-group" style="display: flex; gap: 10px;">
-                    <div style="flex: 1;">
-                        <label>Peso Vacío (Kg)</label>
-                        <input type="number" name="peso_vacio" placeholder="Ej. 2500" required>
-                    </div>
-                    <div style="flex: 1;">
-                        <label>Capacidad (Kg)</label>
-                        <input type="number" name="capacidad" placeholder="Ej. 5000" required>
-                    </div>
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalVehiculo')">Cancelar</button>
-                    <button type="submit" class="btn-primary">Guardar Registro</button>
-                </div>
-            </form>
-        </div>
+            <tr>
+              <td colspan="5" style="text-align: center; color: #64748b; padding: 20px;">No hay operadores con sesión activa en este momento.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+    {% endif %}
 
-    <div id="modalEditarVehiculo" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Editar Vehículo</h3>
-                <button class="close-btn" onclick="closeModal('modalEditarVehiculo')">&times;</button>
-            </div>
-            <form action="{{ url_for('gestorflota.gestion_vehiculos') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="editar">
-                <input type="hidden" name="vehiculo_id" id="edit_id">
-                
-                <div class="form-group">
-                    <label>Placa</label>
-                    <input type="text" name="placa" id="edit_placa" required style="text-transform: uppercase;">
-                </div>
+  </div>
 
-                <div class="form-group">
-                    <label>Tipo de Vehículo</label>
-                    <select name="tipo" id="edit_tipo" required>
-                        <option value="">Seleccione...</option>
-                        <option value="camion ligero">Camión Ligero</option>
-                        <option value="camion sencillo">Camión Sencillo</option>
-                        <option value="dobletroque">Dobletroque</option>
-                        <option value="tractomula">Tractomula</option>
-                    </select>
-                </div>
+  <div class="footer">
+    BQA-ONE © 2026 | Módulo Controlador Transporte de Carga
+  </div>
 
-                <div class="form-group">
-                    <label>Caja de Carga</label>
-                    <select name="caja_de_carga" id="edit_caja_de_carga" required>
-                        <option value="">Seleccione...</option>
-                        <option value="furgon">Furgón</option>
-                        <option value="estacas">Estacas</option>
-                        <option value="furgon refrigerado">Furgón Refrigerado</option>
-                        <option value="planchon">Planchón</option>
-                        <option value="planchon y dolly">Planchón y Dolly</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Referencia / Marca (Opcional)</label>
-                    <select name="referencia" id="edit_referencia">
-                        <option value="">Seleccione...</option>
-                        <option value="chevrolet NHR">Chevrolet NHR</option>
-                        <option value="chevrolet NPR">Chevrolet NPR</option>
-                        <option value="NPR / Turbo">NPR / Turbo</option>
-                        <option value="sencillo">Sencillo Genérico</option>
-                        <option value="dobletroque">Dobletroque Genérico</option>
-                        <option value="Tractomula">Tractomula Genérica</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Propiedad</label>
-                    <select name="propiedad" id="edit_propiedad" required>
-                        <option value="Propio">Propio</option>
-                        <option value="Tercero">Tercero</option>
-                    </select>
-                </div>
-
-                <div class="form-group" style="display: flex; gap: 10px;">
-                    <div style="flex: 1;">
-                        <label>Peso Vacío (Kg)</label>
-                        <input type="number" name="peso_vacio" id="edit_peso_vacio" required>
-                    </div>
-                    <div style="flex: 1;">
-                        <label>Capacidad (Kg)</label>
-                        <input type="number" name="capacidad" id="edit_capacidad" required>
-                    </div>
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalEditarVehiculo')">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="background: #f59e0b;">Guardar Cambios</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modalEliminar" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3 style="color: #ef4444;">⚠️ Eliminar Vehículo</h3>
-                <button class="close-btn" onclick="closeModal('modalEliminar')">&times;</button>
-            </div>
-            <form action="{{ url_for('gestorflota.gestion_vehiculos') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="eliminar">
-                <input type="hidden" name="vehiculo_id" id="delete_id">
-                
-                <p style="font-size: 14px; color: var(--text); margin-bottom: 20px;">
-                    ¿Estás seguro que deseas eliminar el vehículo placa <b id="delete_placa"></b>? Esta acción no se puede deshacer.
-                </p>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeModal('modalEliminar')">Cancelar</button>
-                    <button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modalRuta" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Registrar Nueva Ruta</h3>
-                <button class="close-btn" onclick="closeModal('modalRuta')">&times;</button>
-            </div>
-            <form action="{{ url_for('gestorflota.gestion_rutas') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="crear">
-                <div class="form-group"><label>Nombre de la Ruta</label><input type="text" name="nombre_ruta" required></div>
-                <div class="form-group"><label>Tipo de Ruta</label>
-                    <select name="tipo_ruta" required><option value="urbana">Urbana</option><option value="viajera">Viajera</option></select>
-                </div>
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalRuta')">Cancelar</button><button type="submit" class="btn-primary">Guardar Ruta</button></div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modalEditarRuta" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Editar Ruta</h3>
-                <button class="close-btn" onclick="closeModal('modalEditarRuta')">&times;</button>
-            </div>
-            <form action="{{ url_for('gestorflota.gestion_rutas') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="editar">
-                <input type="hidden" name="ruta_id" id="edit_ruta_id">
-                <div class="form-group"><label>Nombre de la Ruta</label><input type="text" name="nombre_ruta" id="edit_nombre_ruta" required></div>
-                <div class="form-group"><label>Tipo de Ruta</label>
-                    <select name="tipo_ruta" id="edit_tipo_ruta" required><option value="urbana">Urbana</option><option value="viajera">Viajera</option></select>
-                </div>
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarRuta')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b;">Guardar Cambios</button></div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modalEliminarRuta" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3 style="color: #ef4444;">⚠️ Eliminar Ruta</h3>
-                <button class="close-btn" onclick="closeModal('modalEliminarRuta')">&times;</button>
-            </div>
-            <form action="{{ url_for('gestorflota.gestion_rutas') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="eliminar">
-                <input type="hidden" name="ruta_id" id="delete_ruta_id">
-                <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro que deseas eliminar la ruta <b id="delete_nombre_ruta"></b>?</p>
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarRuta')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modalOperador" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Registrar Personal</h3>
-                <button class="close-btn" onclick="closeModal('modalOperador')">&times;</button>
-            </div>
-            <form action="{{ url_for('gestorflota.gestion_operadores') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="crear">
-                <div class="form-group">
-                    <label>Perfil Asignado</label>
-                    <select name="perfil" id="crear_perfil" required onchange="togglePassword('crear_perfil', 'crear_password_group')">
-                        <option value="">Seleccione...</option>
-                        <option value="operador_flotacarga">Conductor (Operador Flota)</option>
-                        <option value="auxiliar_transportecarga">Auxiliar</option>
-                    </select>
-                </div>
-                <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" required></div>
-                <div class="form-group"><label>Identificación</label><input type="text" name="cedula" required></div>
-                <div class="form-group" id="crear_password_group" style="display: none;"><label>Contraseña</label><input type="password" name="password" id="crear_password"></div>
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalOperador')">Cancelar</button><button type="submit" class="btn-primary">Guardar</button></div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modalEditarOperador" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Editar Personal</h3>
-                <button class="close-btn" onclick="closeModal('modalEditarOperador')">&times;</button>
-            </div>
-            <form action="{{ url_for('gestorflota.gestion_operadores') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="editar">
-                <input type="hidden" name="operador_id" id="edit_operador_id">
-                <div class="form-group">
-                    <label>Perfil Asignado</label>
-                    <select name="perfil" id="edit_perfil" required onchange="togglePassword('edit_perfil', 'edit_password_group')">
-                        <option value="operador_flotacarga">Conductor (Operador Flota)</option>
-                        <option value="auxiliar_transportecarga">Auxiliar</option>
-                    </select>
-                </div>
-                <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" id="edit_nombre" required></div>
-                <div class="form-group"><label>Identificación</label><input type="text" name="cedula" id="edit_cedula" required></div>
-                <div class="form-group" id="edit_password_group" style="display: none;"><label>Nueva Contraseña (Opcional)</label><input type="password" name="password" id="edit_password"></div>
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarOperador')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b;">Guardar Cambios</button></div>
-            </form>
-        </div>
-    </div>
-
-    <div id="modalEliminarOperador" class="modal-overlay">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3 style="color: #ef4444;">⚠️ Eliminar Registro</h3>
-                <button class="close-btn" onclick="closeModal('modalEliminarOperador')">&times;</button>
-            </div>
-            <form action="{{ url_for('gestorflota.gestion_operadores') }}" method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="accion" value="eliminar">
-                <input type="hidden" name="operador_id" id="delete_operador_id">
-                <p style="font-size: 14px; margin-bottom: 20px;">¿Estás seguro que deseas eliminar a <b id="delete_nombre_operador"></b>?</p>
-                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarOperador')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444;">Sí, Eliminar</button></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Script General y Modales -->
-    <script>
-        const menuToggle = document.getElementById('menuToggle');
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebarOverlay');
-
-        function toggleSidebar() {
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('active');
-        }
-        menuToggle.addEventListener('click', toggleSidebar);
-        overlay.addEventListener('click', toggleSidebar);
-
-        function openModal(id) { document.getElementById(id).classList.add('active'); }
-        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
-        // Scripts Vehículos
-        function abrirEditarVehiculo(id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad) {
-            document.getElementById('edit_id').value = id;
-            document.getElementById('edit_placa').value = placa;
-            document.getElementById('edit_tipo').value = tipo.toLowerCase();
-            document.getElementById('edit_caja_de_carga').value = caja_de_carga.toLowerCase();
-            document.getElementById('edit_referencia').value = referencia.toLowerCase();
-            document.getElementById('edit_peso_vacio').value = peso_vacio;
-            document.getElementById('edit_capacidad').value = capacidad;
-            document.getElementById('edit_propiedad').value = propiedad;
-            openModal('modalEditarVehiculo');
-        }
-        function confirmarEliminar(id, placa) {
-            document.getElementById('delete_id').value = id;
-            document.getElementById('delete_placa').innerText = placa;
-            openModal('modalEliminar');
-        }
-
-        // Scripts Rutas
-        function abrirEditarRuta(id, nombre, tipo) {
-            document.getElementById('edit_ruta_id').value = id;
-            document.getElementById('edit_nombre_ruta').value = nombre;
-            document.getElementById('edit_tipo_ruta').value = tipo.toLowerCase();
-            openModal('modalEditarRuta');
-        }
-        function confirmarEliminarRuta(id, nombre) {
-            document.getElementById('delete_ruta_id').value = id;
-            document.getElementById('delete_nombre_ruta').innerText = nombre;
-            openModal('modalEliminarRuta');
-        }
-
-        // Scripts Operadores
-        function togglePassword(selectId, groupId) {
-            const select = document.getElementById(selectId);
-            const group = document.getElementById(groupId);
-            const passwordInput = group.querySelector('input');
-            if (select.value === 'operador_flotacarga') {
-                group.style.display = 'block';
-                if (selectId === 'crear_perfil') passwordInput.setAttribute('required', 'required');
-            } else {
-                group.style.display = 'none';
-                passwordInput.removeAttribute('required');
-                passwordInput.value = '';
+  <script>
+    // Lógica AJAX para el refresco del monitoreo en vivo sin recargar la página
+    function actualizarMonitoreo() {
+        fetch('/gestor_flota/api/flota/monitoreo_realtime', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
             }
-        }
-        function abrirEditarOperador(id, nombre, cedula, perfil) {
-            document.getElementById('edit_operador_id').value = id;
-            document.getElementById('edit_nombre').value = nombre;
-            document.getElementById('edit_cedula').value = cedula;
-            document.getElementById('edit_perfil').value = perfil;
-            togglePassword('edit_perfil', 'edit_password_group');
-            openModal('modalEditarOperador');
-        }
-        function confirmarEliminarOperador(id, nombre) {
-            document.getElementById('delete_operador_id').value = id;
-            document.getElementById('delete_nombre_operador').innerText = nombre;
-            openModal('modalEliminarOperador');
-        }
-    </script>
-
-    <!-- Leaflet.js para renderizar el mapa solo cuando estemos en el módulo de rutas -->
-    {% if active_module == 'mapa_rutas' and filtros.placa %}
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var map = L.map('map').setView([4.5709, -74.2973], 5); 
-            
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap BQA-One'
-            }).addTo(map);
-
-            var puntos = {{ puntos_ruta | tojson | safe }};
-            
-            if (puntos && puntos.length > 0) {
-                var latlngs = [];
-                var bounds = L.latLngBounds();
-                let contadorParadas = 1;
-
-                puntos.forEach(function(punto) {
-                    var pos = [punto.latitud, punto.longitud];
-                    latlngs.push(pos);
-                    bounds.extend(pos);
-
-                    // Si es una parada, colocamos un marcador visible
-                    if (punto.tipo_registro && punto.tipo_registro.includes("Parada")) {
-                        var color = punto.tipo_registro.includes("Automático") ? "red" : "blue";
-                        var markerHtml = `
-                            <div style="background-color: ${color}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const tbody = document.getElementById('tabla_monitoreo_body');
+                if(!tbody) return;
+                
+                tbody.innerHTML = '';
+                
+                if (data.operadores && data.operadores.length > 0) {
+                    data.operadores.forEach(op => {
+                        const estadoHtml = op.en_linea === 1 
+                            ? '<span style="display: inline-block; width: 10px; height: 10px; background: #059669; border-radius: 50%; box-shadow: 0 0 6px #059669;" title="En línea"></span>'
+                            : '<span style="display: inline-block; width: 10px; height: 10px; background: #94a3b8; border-radius: 50%;" title="Desconectado"></span>';
+                            
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="text-align: center;">${estadoHtml}</td>
+                            <td style="font-weight: 700; color: #1e293b;">${op.nombre_operador}</td>
+                            <td><span style="background: #d1fae5; color: #059669; font-weight: 800; padding: 3px 8px; border-radius: 6px;">${op.placa_vehiculo || 'N/A'}</span></td>
+                            <td>${op.sitio_logueo}</td>
+                            <td>${op.fecha_login_str}</td>
                         `;
-                        var customIcon = L.divIcon({
-                            html: markerHtml,
-                            className: '',
-                            iconSize: [15, 15],
-                            iconAnchor: [7.5, 7.5]
-                        });
-
-                        var tituloParada = punto.nombre_punto && punto.nombre_punto !== "Punto Desconocido" ? punto.nombre_punto : "Punto Registrado";
-                        var tipoActividad = punto.tipo_actividad ? punto.tipo_actividad : "Sin clasificar";
-                        
-                        var popupText = `<div style="text-align:center; min-width: 150px;">
-                                            <b style="color: var(--verde); font-size: 14px;">🛑 Parada #${contadorParadas}</b><br>
-                                            <span style="font-size: 12px; color: #111827;">${tituloParada}</span><br>
-                                            <div style="margin: 6px 0;">
-                                                <span style="background: #eefcf9; color: #015249; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; border: 1px solid #015249;">
-                                                    ${tipoActividad}
-                                                </span>
-                                            </div>
-                                            <span style="font-size: 11px; color: #6b7280;">Origen: ${punto.tipo_registro}</span><br>
-                                            <span style="font-size: 12px; font-weight: bold; color: #4b5563;">⏱️ ${punto.fecha_hora}</span>
-                                         </div>`;
-                                         
-                        L.marker(pos, {icon: customIcon}).addTo(map).bindPopup(popupText);
-                        contadorParadas++;
-                    }
-                });
-
-                // Dibujar la línea de la ruta
-                var polyline = L.polyline(latlngs, {color: '#015249', weight: 4, opacity: 0.8}).addTo(map);
-                
-                // Ajustar mapa a los puntos
-                map.fitBounds(bounds, {padding: [30, 30]});
-                
-                // Marcador de inicio
-                L.circleMarker(latlngs[0], {color: 'green', radius: 7, fillOpacity: 1, weight: 2}).addTo(map).bindPopup("<b>📍 Inicio de Ruta</b><br>" + puntos[0].fecha_hora);
-                
-                // Marcador de fin (Última ubicación)
-                if(latlngs.length > 1) {
-                    L.circleMarker(latlngs[latlngs.length - 1], {color: '#f59e0b', radius: 7, fillOpacity: 1, weight: 2}).addTo(map).bindPopup("<b>🚩 Última Ubicación</b><br>" + puntos[puntos.length - 1].fecha_hora);
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b; padding: 20px;">No hay operadores con sesión activa en este momento.</td></tr>';
                 }
             }
-        });
-    </script>
-    {% endif %}
+        })
+        .catch(err => console.error("Error al actualizar monitoreo:", err));
+    }
 
-    <!-- SCRIPT AJAX PARA AUTOREFRESCAR EL PANEL DE OPERADORES Y CHART.JS (DASHBOARD) -->
-    {% if not active_module or active_module == 'dashboard' %}
-    <script>
-        // Función auxiliar para generar un color único basado en el nombre del operador
-        function stringToColor(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = str.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-            return '#' + '00000'.substring(0, 6 - c.length) + c;
-        }
-
-        document.addEventListener("DOMContentLoaded", function () {
-            const tablaBody = document.getElementById("tabla-operadores-body");
-            if (!tablaBody) return;
-
-            // Variables de Chart.js
-            let heartbeatChart = null;
-            const MAX_DATAPOINTS = 30; // 5 minutos de historial a 10s por ciclo
-
-            // Inicializar Gráfica
-            function initChart() {
-                const ctx = document.getElementById('heartbeatChart').getContext('2d');
-                heartbeatChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: []
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: 1.2,
-                                ticks: {
-                                    stepSize: 1,
-                                    callback: function(value) {
-                                        if (value === 1) return 'Transmitiendo';
-                                        if (value === 0) return 'Corte / Pausa';
-                                        return '';
-                                    }
-                                }
-                            }
-                        },
-                        plugins: {
-                            legend: { 
-                                position: 'bottom',
-                                labels: { boxWidth: 12 }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        return context.dataset.label + ': ' + (context.raw >= 1 ? 'En línea' : 'Sin señal');
-                                    }
-                                }
-                            }
-                        },
-                        animation: false, // Desactivar para evitar saltos visuales en tiempo real
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
-                        }
-                    }
-                });
-            }
-
-            initChart();
-
-            function actualizarOperadores() {
-                const timeStamp = new Date().getTime();
-                fetch(`{{ url_for('gestorflota.monitoreo_realtime') }}?t=${timeStamp}`, { cache: "no-store" })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            
-                            // 1. ACTUALIZAR TABLA HTML
-                            let html = "";
-                            if (data.operadores.length === 0) {
-                                html = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">No hay registros de operadores en este momento.</td></tr>`;
-                            } else {
-                                data.operadores.forEach(op => {
-                                    let circulo = op.en_linea === 1 
-                                        ? `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #10b981; margin: 0 auto; box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);" title="En línea"></div>`
-                                        : `<div style="width: 14px; height: 14px; border-radius: 50%; background-color: #ef4444; margin: 0 auto;" title="Corte de Señal"></div>`;
-                                        
-                                    let placa = op.placa_vehiculo 
-                                        ? `<span class="badge badge-success" style="font-size: 13px;">${op.placa_vehiculo}</span>`
-                                        : `<span class="badge badge-gray">Sin asignar</span>`;
-
-                                    html += `
-                                    <tr>
-                                        <td style="text-align: center;">${circulo}</td>
-                                        <td>
-                                            <div style="font-weight: bold; color: var(--verde);">${op.nombre_operador}</div>
-                                            <div style="font-size: 11px; color: var(--text-muted);">${op.perfil_str}</div>
-                                        </td>
-                                        <td>${placa}</td>
-                                        <td style="font-size: 12px; font-weight: bold; color: var(--verde-osc);">${op.sitio_logueo}</td>
-                                        <td>${op.fecha_login_str}</td>
-                                        <td>${op.fecha_logout_str}</td>
-                                    </tr>`;
-                                });
-                            }
-                            tablaBody.innerHTML = html;
-
-                            // 2. ACTUALIZAR GRÁFICA LINEAL (HEARTBEAT)
-                            if (heartbeatChart) {
-                                const now = new Date();
-                                const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
-                                                now.getMinutes().toString().padStart(2, '0') + ':' + 
-                                                now.getSeconds().toString().padStart(2, '0');
-                                
-                                heartbeatChart.data.labels.push(timeStr);
-                                if (heartbeatChart.data.labels.length > MAX_DATAPOINTS) {
-                                    heartbeatChart.data.labels.shift();
-                                }
-
-                                data.operadores.forEach(op => {
-                                    let dataset = heartbeatChart.data.datasets.find(ds => ds.label === op.nombre_operador);
-                                    
-                                    if (!dataset) {
-                                        dataset = {
-                                            label: op.nombre_operador,
-                                            data: new Array(heartbeatChart.data.labels.length - 1).fill(null), 
-                                            borderColor: stringToColor(op.nombre_operador),
-                                            borderWidth: 2,
-                                            stepped: true, 
-                                            tension: 0
-                                        };
-                                        heartbeatChart.data.datasets.push(dataset);
-                                    }
-                                    
-                                    let baseValue = op.en_linea;
-                                    let visualOffset = (Math.random() * 0.08) - 0.04; 
-                                    dataset.data.push(baseValue + visualOffset);
-                                    
-                                    if (dataset.data.length > MAX_DATAPOINTS) {
-                                        dataset.data.shift();
-                                    }
-                                });
-
-                                heartbeatChart.update();
-                            }
-                        }
-                    })
-                    .catch(err => console.error("Error actualizando panel:", err));
-            }
-
-            actualizarOperadores();
-            setInterval(actualizarOperadores, 10000);
-        });
-    </script>
-    {% endif %}
-
+    // Ejecutar el polling cada 30 segundos
+    setInterval(actualizarMonitoreo, 30000);
+  </script>
 </body>
 </html>

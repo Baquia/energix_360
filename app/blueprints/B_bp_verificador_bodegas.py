@@ -1,6 +1,9 @@
+# MÓDULO: VENTAS Y DISTRIBUCIÓN | SUBMÓDULO: VERIFICADOR BODEGAS | CONDICIÓN: OBLIGATORIO | TIPO: 1
 from flask import Blueprint, render_template, session, redirect, request, jsonify
-from app import mysql, csrf
+from app import mysql
 import MySQLdb.cursors
+from app.utils import login_required_custom
+import time
 
 bp_verificador_bodegas = Blueprint('verificador_bodegas', __name__)
 
@@ -8,8 +11,8 @@ bp_verificador_bodegas = Blueprint('verificador_bodegas', __name__)
 # VISTA PRINCIPAL (VERIFICADOR EN CAMPO)
 # ==============================================================================
 @bp_verificador_bodegas.route('/B_verificador_bodegas.html')
+@login_required_custom
 def bodega_verificador():
-    if 'usuario_id' not in session: return redirect('/')
     nit = str(session.get('empresa_id', ''))
     return render_template('B_verificador_bodegas.html', 
                            usuario=session.get('nombre'),
@@ -20,21 +23,29 @@ def bodega_verificador():
 # APIs DE VERIFICACIÓN (ÓRDENES LISTAS PARA AUDITAR)
 # ==============================================================================
 @bp_verificador_bodegas.route('/api/verificador/ordenes')
+@login_required_custom
 def verificador_ordenes():
-    if 'usuario_id' not in session: return jsonify([])
     empresa_id = session.get('empresa_id')
     usuario_id = session.get('usuario_id')
     
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # --- HEARTBEAT VERIFICADOR ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (usuario_id,))
-        mysql.connection.commit()
+        # --- HEARTBEAT VERIFICADOR (Manejo de Fricciones / Deadlocks) ---
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                    VALUES (%s, NOW())
+                    ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+                """, (usuario_id,))
+                mysql.connection.commit()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                break
         # -----------------------------
 
         # Selecciona las órdenes que tienen ítems en estado ALISTADO
@@ -61,20 +72,28 @@ def verificador_ordenes():
         return jsonify([])
 
 @bp_verificador_bodegas.route('/api/verificador/items_orden/<orden>')
+@login_required_custom
 def verificador_items_orden(orden):
-    if 'usuario_id' not in session: return jsonify([])
     usuario_id = session.get('usuario_id')
     
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
         # --- HEARTBEAT VERIFICADOR ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (usuario_id,))
-        mysql.connection.commit()
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                    VALUES (%s, NOW())
+                    ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+                """, (usuario_id,))
+                mysql.connection.commit()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                break
         # -----------------------------
 
         cur.execute("""
@@ -116,112 +135,132 @@ def verificador_items_orden(orden):
         return jsonify([])
 
 @bp_verificador_bodegas.route('/api/verificador/confirmar_item', methods=['POST'])
-@csrf.exempt 
+@login_required_custom
 def verificador_confirmar_item():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
-    
     d = request.json
     id_row = d.get('id_row')
     verif_cajas = d.get('cajas_verificadas', 0)
     verif_unidades = d.get('unidades_verificadas', 0)
     usuario_id = session.get('usuario_id')
+    empresa_id = session.get('empresa_id')
     
     if not id_row: return jsonify({'error': 'Datos incompletos'}), 400
 
-    try:
-        cur = mysql.connection.cursor()
-        
-        # --- HEARTBEAT VERIFICADOR (Al confirmar una acción de trabajo) ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (usuario_id,))
-        # -----------------------------
+    for intento in range(3):
+        try:
+            cur = mysql.connection.cursor()
+            
+            # --- HEARTBEAT VERIFICADOR ---
+            cur.execute("""
+                INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                VALUES (%s, NOW())
+                ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+            """, (usuario_id,))
 
-        cur.execute("""
-            UPDATE picking_importacion_raw 
-            SET 
-                estado_actividad='VERIFICADO', 
-                cajas_verificadas=%s,
-                unidades_verificadas=%s,
-                id_verificador=%s,
-                fecha_verificacion=NOW()
-            WHERE id=%s AND id_empresa=%s
-        """, (verif_cajas, verif_unidades, usuario_id, id_row, session.get('empresa_id')))
-        mysql.connection.commit()
-        cur.close()
-        return jsonify({'status': 'ok', 'message': 'Item verificado con éxito'})
-    except Exception as e: 
-        return jsonify({'error': str(e)}), 500
+            # Bloqueo Pesimista (FOR UPDATE)
+            cur.execute("""
+                SELECT id FROM picking_importacion_raw 
+                WHERE id=%s AND id_empresa=%s FOR UPDATE
+            """, (id_row, empresa_id))
+
+            cur.execute("""
+                UPDATE picking_importacion_raw 
+                SET 
+                    estado_actividad='VERIFICADO', 
+                    cajas_verificadas=%s,
+                    unidades_verificadas=%s,
+                    id_verificador=%s,
+                    fecha_verificacion=NOW()
+                WHERE id=%s AND id_empresa=%s
+            """, (verif_cajas, verif_unidades, usuario_id, id_row, empresa_id))
+            
+            mysql.connection.commit()
+            cur.close()
+            return jsonify({'status': 'ok', 'message': 'Item verificado con éxito'})
+        except Exception as e: 
+            mysql.connection.rollback()
+            if "deadlock" in str(e).lower() and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify({'error': str(e)}), 500
 
 # ==============================================================================
 # ENDPOINT DE LATIDO (HEARTBEAT) PARA VISTA DE MENÚ
 # ==============================================================================
 @bp_verificador_bodegas.route('/api/verificador/ping', methods=['POST', 'GET'])
-@csrf.exempt
+@login_required_custom
 def verificador_ping():
-    if 'usuario_id' not in session: return jsonify({'status': 'error'})
-    
     usuario_id = session.get('usuario_id')
-    try:
-        cur = mysql.connection.cursor()
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (usuario_id,))
-        mysql.connection.commit()
-        cur.close()
-        return jsonify({'status': 'ok'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+    for intento in range(3):
+        try:
+            cur = mysql.connection.cursor()
+            cur.execute("""
+                INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                VALUES (%s, NOW())
+                ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+            """, (usuario_id,))
+            mysql.connection.commit()
+            cur.close()
+            return jsonify({'status': 'ok'})
+        except Exception as e:
+            mysql.connection.rollback()
+            if "deadlock" in str(e).lower() and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify({'status': 'error', 'message': str(e)})
     
 # ==============================================================================
 # CIERRE Y SELLO DE AUDITORÍA DE LA ORDEN
 # ==============================================================================
 @bp_verificador_bodegas.route('/api/verificador/sellar_orden', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def sellar_orden():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
-    
     d = request.json
     orden = d.get('orden')
     firma_verificador = d.get('firma_verificador')
     empresa_id = session.get('empresa_id')
+    usuario_id = session.get('usuario_id')
     
     if not orden or not firma_verificador:
         return jsonify({'error': 'Datos incompletos para sellar la orden'}), 400
 
-    try:
-        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
-        # --- HEARTBEAT VERIFICADOR ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (session.get('usuario_id'),))
-        
-        # Verificamos si ya existe el acta (creada previamente o por otro proceso)
-        cur.execute("SELECT id FROM actas_despacho_flotacarga WHERE numero_orden = %s AND id_empresa = %s", (orden, empresa_id))
-        acta_existente = cur.fetchone()
-        
-        if acta_existente:
-            cur.execute("""
-                UPDATE actas_despacho_flotacarga 
-                SET firma_verificador = %s 
-                WHERE numero_orden = %s AND id_empresa = %s
-            """, (firma_verificador, orden, empresa_id))
-        else:
-            cur.execute("""
-                INSERT INTO actas_despacho_flotacarga (id_empresa, numero_orden, firma_verificador)
-                VALUES (%s, %s, %s)
-            """, (empresa_id, orden, firma_verificador))
+    for intento in range(3):
+        try:
+            cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
             
-        mysql.connection.commit()
-        cur.close()
-        
-        return jsonify({'status': 'ok', 'message': 'Auditoría sellada y firma guardada con éxito.'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+            # --- HEARTBEAT VERIFICADOR ---
+            cur.execute("""
+                INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                VALUES (%s, NOW())
+                ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+            """, (usuario_id,))
+            
+            # Bloqueo Pesimista
+            cur.execute("""
+                SELECT id FROM actas_despacho_flotacarga 
+                WHERE numero_orden = %s AND id_empresa = %s FOR UPDATE
+            """, (orden, empresa_id))
+            acta_existente = cur.fetchone()
+            
+            if acta_existente:
+                cur.execute("""
+                    UPDATE actas_despacho_flotacarga 
+                    SET firma_verificador = %s 
+                    WHERE numero_orden = %s AND id_empresa = %s
+                """, (firma_verificador, orden, empresa_id))
+            else:
+                cur.execute("""
+                    INSERT INTO actas_despacho_flotacarga (id_empresa, numero_orden, firma_verificador)
+                    VALUES (%s, %s, %s)
+                """, (empresa_id, orden, firma_verificador))
+                
+            mysql.connection.commit()
+            cur.close()
+            
+            return jsonify({'status': 'ok', 'message': 'Auditoría sellada y firma guardada con éxito.'})
+        except Exception as e:
+            mysql.connection.rollback()
+            if "deadlock" in str(e).lower() and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify({'error': str(e)}), 500

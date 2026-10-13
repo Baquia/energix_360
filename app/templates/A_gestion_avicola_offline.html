@@ -1,3 +1,4 @@
+<!-- MÓDULO: AVICOLA | SUBMÓDULO: HUB AVICOLA OFFLINE | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
 <!DOCTYPE html>
 <html lang="es">
 
@@ -228,21 +229,21 @@
         <div class="menu-grid">
 
             {% if 'gas' in session.get('modulos_activos', []) %}
-            <a href="{{ url_for('gestionavicola_bp.router_universal', modulo='gas') }}" class="card">
+            <a href="{{ url_for('router_universal', modulo='gas') }}" class="card">
                 <div class="card-icon">🔥</div>
                 <div class="card-title">Gestión de GLP</div>
             </a>
             {% endif %}
 
             {% if 'mermas' in session.get('modulos_activos', []) %}
-            <a href="{{ url_for('gestionavicola_bp.router_universal', modulo='mermas') }}" class="card">
+            <a href="{{ url_for('router_universal', modulo='mermas') }}" class="card">
                 <div class="card-icon">📉</div>
                 <div class="card-title">Control de Mermas</div>
             </a>
             {% endif %}
 
             {% if 'flota' in session.get('modulos_activos', []) %}
-            <a href="{{ url_for('gestionavicola_bp.router_universal', modulo='flota') }}" class="card">
+            <a href="{{ url_for('router_universal', modulo='flota') }}" class="card">
                 <div class="card-icon">🚚</div>
                 <div class="card-title">Gestión de Flota</div>
             </a>

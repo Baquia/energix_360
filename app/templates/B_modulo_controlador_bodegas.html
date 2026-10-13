@@ -1,3 +1,4 @@
+<!-- MÓDULO: COMERCIALIZADORAS Y DISTRIBUIDORAS | SUBMÓDULO: GESTIÓN BODEGAS CONTROLADOR | CONDICIÓN: OBLIGATORIO (TOGGLEABLE) -->
 <!DOCTYPE html>
 <html lang="es">
 
@@ -625,7 +626,7 @@
                 <button onclick="openAlistamientoModal(); if(window.innerWidth<=768) toggleSidebar();" class="menu-item" style="background: #eef2ff; color: #4338ca;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 11l3 3L22 4"></path>
-                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1 2-2V5a2 2 0 0 1 2-2h11"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                     </svg>
                     Alistamiento en Vivo
                 </button>
@@ -1187,6 +1188,7 @@
                     <h4 style="margin-top: 0; color:var(--color-text);">Carga Masiva (Excel/CSV)</h4>
                     <button class="btn-cancel" onclick="window.location.href='/bodegas/descargar_plantilla'" style="width:100%; margin-bottom:20px; border-color: #c026d3; color: #c026d3;">📥 Descargar Plantilla</button>
                     <form id="frmUploadProductos">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="drop-area" onclick="document.getElementById('fiProductos').click()">
                             <span id="fnProductos" style="font-weight:600; color:#475569;">Toca para seleccionar Excel o CSV</span>
                             <input type="file" id="fiProductos" name="file" style="display:none;" accept=".xlsx, .csv" onchange="document.getElementById('fnProductos').textContent = this.files[0] ? '📄 ' + this.files[0].name : 'Toca para seleccionar Excel o CSV'">

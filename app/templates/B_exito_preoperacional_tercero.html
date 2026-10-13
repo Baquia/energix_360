@@ -1,0 +1,188 @@
+<!-- MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: VALIDACION_TERCEROS | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
+<!-- app/templates/B_exito_preoperacional_tercero.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Inspección Preoperacional Exitosa | BQA-ONE</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <meta name="theme-color" content="#015249">
+  <style>
+    :root {
+      --verde: #015249;
+      --verde-osc: #003b35;
+      --surface: #ffffff;
+      --bg-dark: #1e293b;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: #334155;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .success-card {
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 40px 25px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.35);
+      text-align: center;
+      animation: slideUp 0.4s ease-out;
+    }
+
+    .icon-badge {
+      width: 80px;
+      height: 80px;
+      background-color: #d1fae5;
+      color: #059669;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      margin: 0 auto 20px auto;
+      box-shadow: 0 4px 10px rgba(5, 150, 105, 0.15);
+    }
+
+    .consecutivo-box {
+      background: #f8fafc;
+      border: 2px dashed var(--verde);
+      color: var(--verde);
+      font-weight: 800;
+      font-size: 15px;
+      padding: 10px 18px;
+      border-radius: 12px;
+      display: inline-block;
+      margin: 15px 0;
+      letter-spacing: 0.5px;
+    }
+
+    .info-panel {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: left;
+      font-size: 13px;
+      margin-bottom: 25px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .info-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .btn-close-session {
+      background: var(--verde);
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-weight: 700;
+      width: 100%;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-close-session:hover {
+      background: var(--verde-osc);
+    }
+
+    .btn-close-session:active {
+      transform: scale(0.98);
+    }
+
+    .footer-text {
+      text-align: center;
+      margin-top: 25px;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="success-card">
+    <div class="icon-badge">
+      <i class="bi bi-shield-check"></i>
+    </div>
+
+    <h3 class="fw-bold text-dark mb-1">¡Registro Completado!</h3>
+    <p class="text-muted small mb-2">Inspección Preoperacional PESV Registrada Exitosamente</p>
+
+    <div class="consecutivo-box">
+      Consecutivo: {{ consecutivo }}
+    </div>
+
+    <div class="info-panel">
+      <div class="info-row">
+        <span class="text-muted">Vehículo:</span>
+        <strong class="text-dark">{{ placa }}</strong>
+      </div>
+      <div class="info-row">
+        <span class="text-muted">Dictamen Técnico:</span>
+        <strong class="text-success">APROBADO (OPERATIVO)</strong>
+      </div>
+      <div class="info-row">
+        <span class="text-muted">Validación Portería:</span>
+        <strong class="text-primary">AUTORIZADO PARA INGRESO</strong>
+      </div>
+      <hr style="margin: 10px 0; border-color: #cbd5e1;">
+      <p class="mb-0 text-muted" style="font-size: 12px; line-height: 1.4;">
+        Su reporte se encuentra registrado y firmado digitalmente en el centro de control. Puede avanzar al puesto de control o báscula de cargue.
+      </p>
+    </div>
+
+    <button type="button" class="btn-close-session" onclick="cerrarVentana()">
+      <i class="bi bi-check-circle"></i> Finalizar y Salir
+    </button>
+  </div>
+
+  <div class="footer-text">
+    BQA-ONE Technology © 2026 | Seguridad y Control de Flota
+  </div>
+
+  <script>
+    function cerrarVentana() {
+      window.close();
+      setTimeout(function() {
+        document.body.innerHTML = `
+          <div style="color: white; text-align: center; padding: 40px; font-family: sans-serif;">
+            <h4 style="font-weight: bold; margin-bottom: 10px;">Proceso terminado</h4>
+            <p style="color: #94a3b8; font-size: 14px;">Ya puede cerrar esta pestaña del navegador de forma segura.</p>
+          </div>
+        `;
+      }, 300);
+    }
+  </script>
+
+</body>
+</html>

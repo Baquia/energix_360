@@ -1,6 +1,8 @@
+# MÓDULO: VENTAS Y DISTRIBUCIÓN | SUBMÓDULO: OPERADOR BODEGAS | CONDICIÓN: OBLIGATORIO | TIPO: 1
 from flask import Blueprint, render_template, session, redirect, request, jsonify
 from app import mysql, csrf
 import MySQLdb.cursors
+from app.utils import login_required_custom
 
 bp_oper_bodegas = Blueprint('oper_bodegas', __name__)
 
@@ -8,9 +10,8 @@ bp_oper_bodegas = Blueprint('oper_bodegas', __name__)
 # VISTA PRINCIPAL (OPERADOR EN CAMPO)
 # ==============================================================================
 @bp_oper_bodegas.route('/B_modulo_operador_bodegas.html')
+@login_required_custom
 def bodega_operativa():
-    if 'usuario_id' not in session: return redirect('/')
-    
     uid = session.get('usuario_id')
     empresa_id = str(session.get('empresa_id', ''))
     
@@ -66,8 +67,8 @@ def bodega_operativa():
 # APIs DE OPERACIÓN (MIS ÓRDENES Y LOTES)
 # ==============================================================================
 @bp_oper_bodegas.route('/api/operario/mis_ordenes')
+@login_required_custom
 def operario_mis_ordenes():
-    if 'usuario_id' not in session: return jsonify([])
     uid = session.get('usuario_id')
     empresa_id = session.get('empresa_id')
     try:
@@ -106,8 +107,8 @@ def operario_mis_ordenes():
         return jsonify([])
     
 @bp_oper_bodegas.route('/api/operario/items_orden/<orden>')
+@login_required_custom
 def operario_items_orden(orden):
-    if 'usuario_id' not in session: return jsonify([])
     uid = session.get('usuario_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -159,10 +160,8 @@ def operario_items_orden(orden):
     except Exception as e: return jsonify([])
     
 @bp_oper_bodegas.route('/api/operario/confirmar_item', methods=['POST'])
-@csrf.exempt 
+@login_required_custom
 def operario_confirmar_item():
-    if 'usuario_id' not in session: return jsonify({'error': 'Sesión expirada'}), 401
-    
     uid = session.get('usuario_id')
     d = request.json
     id_row = d.get('id_row')
@@ -223,8 +222,8 @@ def operario_confirmar_item():
         return jsonify({'error': str(e)}), 500
            
 @bp_oper_bodegas.route('/api/operario/mis_marcas')
+@login_required_custom
 def operario_mis_marcas():
-    if 'usuario_id' not in session: return jsonify([])
     uid = session.get('usuario_id')
     empresa_id = session.get('empresa_id')
     try:
@@ -264,8 +263,8 @@ def operario_mis_marcas():
     except: return jsonify([])
 
 @bp_oper_bodegas.route('/api/operario/items_lote/<marca>')
+@login_required_custom
 def operario_items_lote(marca):
-    if 'usuario_id' not in session: return jsonify([])
     uid = session.get('usuario_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -320,11 +319,8 @@ def operario_items_lote(marca):
 # VALIDACIÓN DE SEGURIDAD (SUPERVISOR)
 # ==============================================================================
 @bp_oper_bodegas.route('/api/operario/validar_supervisor', methods=['POST'])
-@csrf.exempt
+@login_required_custom
 def validar_supervisor():
-    if 'usuario_id' not in session: 
-        return jsonify({'error': 'Sesión expirada'}), 401
-    
     d = request.json
     cedula = d.get('cedula')
     clave = d.get('clave')
@@ -357,9 +353,8 @@ def validar_supervisor():
 # NUEVO ENDPOINT: KPIS OPERADOR EN TIEMPO REAL
 # ==============================================================================
 @bp_oper_bodegas.route('/api/operario/mis_kpis')
+@login_required_custom
 def operario_mis_kpis():
-    if 'usuario_id' not in session: return jsonify({})
-    
     uid = session.get('usuario_id')
     empresa_id = str(session.get('empresa_id', ''))
     

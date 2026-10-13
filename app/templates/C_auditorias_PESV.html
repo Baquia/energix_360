@@ -1,0 +1,390 @@
+<!-- MÓDULO: TRANSPORTE CARGA Y ESPECIAL | SUBMÓDULO: PESV AUDITORIAS | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
+<!-- app/templates/C_auditorias_PESV.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Auditorías PESV | {{ empresa }}</title>
+    <meta name="theme-color" content="#015249">
+    <style>
+        :root {
+            --verde: #015249;        
+            --verde-osc: #003b35;    
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --radius: 10px;
+            --sidebar-width: 260px;
+            --topbar-height: 70px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; font-family: Verdana, sans-serif; background-color: #f8fafc; color: var(--text); display: flex; overflow: hidden; }
+        a { text-decoration: none; color: inherit; }
+        
+        .sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; height: 100vh; z-index: 1000; }
+        .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
+        .logo-app { max-height: 35px; width: auto; }
+        .nav-menu { flex-grow: 1; padding: 20px 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: var(--radius); color: var(--text-muted); font-size: 14px; font-weight: 600; transition: all 0.2s; }
+        .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
+        .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
+        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
+        .logout-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444; font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2; }
+        
+        .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
+        .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 3px 10px; border-radius: 12px; margin-top: 3px; font-weight: 600; }
+        
+        .content-area { flex-grow: 1; padding: 30px; overflow-y: auto; }
+        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto 25px auto; }
+        .action-header h2 { color: var(--verde); font-size: 22px; font-weight: 800; }
+        
+        .btn-close-view { background: #e2e8f0; color: #475569; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 18px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px rgba(1, 82, 73, 0.2);}
+        
+        .flash-messages { max-width: 1100px; margin: 0 auto 20px auto; }
+        .alert { padding: 12px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
+        .alert-success { background-color: #d1fae5; color: #065f46; border: 1px solid #059669; }
+        .alert-danger { background-color: #fee2e2; color: #991b1b; border: 1px solid #dc2626; }
+        .alert-warning { background-color: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+
+        .table-card { background: var(--surface); border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid var(--border); max-width: 1100px; margin: 0 auto; overflow: hidden; }
+        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        .data-table th { background: #f8fafc; padding: 16px 20px; color: #475569; font-weight: 700; border-bottom: 2px solid var(--border); text-transform: uppercase; font-size: 11px; }
+        .data-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+        
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .badge-success { background: #d1fae5; color: #059669; }
+        .badge-danger { background: #fee2e2; color: #dc2626; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-gray { background: #f3f4f6; color: #475569; }
+
+        .btn-icon { background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; font-weight: bold; padding: 6px 12px; border-radius: 6px; font-size: 12px; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s; }
+        .btn-icon:hover { background: var(--verde); color: white; border-color: var(--verde); }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: var(--surface); width: 90%; max-width: 600px; border-radius: 16px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        .modal-header h3 { font-size: 18px; font-weight: 800; color: var(--text); }
+        .close-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 5px; text-transform: uppercase; }
+        .form-group select, .form-group textarea, .form-group input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; font-family: inherit; }
+        .form-group select:focus, .form-group textarea:focus, .form-group input:focus { border-color: var(--verde); outline: none; }
+        
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-cancel { padding: 10px 20px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; font-weight: 700; cursor: pointer; color: #475569; }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+        </div>
+        <nav class="nav-menu">
+            <a href="/gestor_flota/pesv_bp/" class="nav-item">
+                <span class="nav-icon">⬅️</span> Volver a PESV
+            </a>
+            <div style="margin: 15px 0 5px 15px; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Gestión PESV</div>
+            
+            <a href="{{ url_for('auditorias_pesv.index_auditorias') }}" class="nav-item {% if active_module == 'auditorias' or not active_module %}active{% endif %}">
+                <span class="nav-icon">📋</span> Auditorías Flota
+            </a>
+            
+            <a href="{{ url_for('auditorias_pesv.verificacion_documentos') }}" class="nav-item {% if active_module == 'verificacion' %}active{% endif %}">
+                <span class="nav-icon">✅</span> Verificación Docs
+            </a>
+            
+            <a href="{{ url_for('auditorias_pesv.consulta_preoperacionales') }}" class="nav-item {% if active_module == 'preoperacionales' %}active{% endif %}">
+                <span class="nav-icon">🔍</span> Preoperacionales
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="logout-btn"><span>🚪</span> Cerrar Sesión</a>
+        </div>
+    </aside>
+
+    <main class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ nombre }}</span>
+                <span class="user-role">Controlador PESV</span>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div class="flash-messages">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- ========================================== -->
+            <!-- MÓDULO: AUDITORÍAS DE FLOTA                -->
+            <!-- ========================================== -->
+            {% if active_module == 'auditorias' or not active_module %}
+            <div class="action-header">
+                <div class="action-title-group" style="display: flex; align-items: center; gap: 15px;">
+                    <a href="/gestor_flota/pesv_bp/" class="btn-close-view">&times;</a>
+                    <h2>Historial de Auditorías de Flota</h2>
+                </div>
+                <button class="btn-primary" onclick="abrirModal()"><span>➕</span> Nueva Inspección</button>
+            </div>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Placa Vehículo</th>
+                            <th>Conductor</th>
+                            <th>Resultado General</th>
+                            <th>Auditor</th>
+                            <th style="text-align: right;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for aud in auditorias %}
+                        <tr>
+                            <td>{{ aud.fecha_auditoria.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td style="font-weight: 800; color: var(--verde);">{{ aud.placa_vehiculo }}</td>
+                            <td>{{ aud.nombre_conductor }}</td>
+                            <td>
+                                {% if aud.resultado_general == 'APROBADO' %}
+                                    <span class="badge badge-success">APROBADO</span>
+                                {% else %}
+                                    <span class="badge badge-danger">RECHAZADO</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ aud.auditor }}</td>
+                            <td style="text-align: right;">
+                                <a href="{{ url_for('auditorias_pesv.descargar_pdf', id_auditoria=aud.id) }}" target="_blank" class="btn-icon">📄 Descargar PDF</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No se han registrado auditorías de flota.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- MÓDULO: VERIFICACIÓN DE DOCUMENTOS         -->
+            <!-- ========================================== -->
+            {% elif active_module == 'verificacion' %}
+            <div class="action-header">
+                <div class="action-title-group" style="display: flex; align-items: center; gap: 15px;">
+                    <a href="/gestor_flota/pesv_bp/" class="btn-close-view">&times;</a>
+                    <h2>Verificación de Documentos Legales (Multi-Flota)</h2>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 15px; color: var(--text-muted); font-size: 13px;">
+                Panel consolidado de auditoría PESV. Los documentos con estado <b>'Actualizado'</b> deben ser revisados. Dictaminar como <b>'No Conforme'</b> bloqueará la operatividad de la entidad hasta su corrección.
+            </div>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Entidad / Identificador</th>
+                            <th>Documento Subido</th>
+                            <th>Estado Actual</th>
+                            <th style="text-align: right;">Acciones de Auditoría</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for doc in documentos_pendientes %}
+                        <tr>
+                            <td>
+                                <span class="badge badge-gray" style="text-transform: uppercase;">{{ doc.tipo | replace('_', ' ') }}</span><br>
+                                <strong style="color: var(--verde); font-size: 14px;">{{ doc.identificador }}</strong>
+                            </td>
+                            <td style="font-weight: bold; color: #334155;">{{ doc.doc_nombre }}</td>
+                            <td>
+                                <span class="badge badge-warning">Pendiente de Revisión</span>
+                            </td>
+                            <td style="text-align: right; display: flex; justify-content: flex-end; gap: 8px; align-items: center;">
+                                <a href="/static/{{ doc.ruta }}" target="_blank" class="btn-icon">👁️ Ver Soporte</a>
+                                <form action="{{ url_for('auditorias_pesv.dictaminar_documento') }}" method="POST" style="margin: 0; display: inline-flex; gap: 5px;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="tipo_entidad" value="{{ doc.tipo }}">
+                                    <input type="hidden" name="entidad_id" value="{{ doc.id }}">
+                                    <input type="hidden" name="clave_estado" value="{{ doc.clave }}">
+                                    
+                                    <button type="submit" name="dictamen" value="Verificado" class="btn-primary" style="padding: 6px 12px; font-size: 12px; background: #10b981;" onclick="return confirm('¿Confirma que el documento es auténtico y cumple con la normativa?')">Aprobar</button>
+                                    <button type="submit" name="dictamen" value="No Conforme" class="btn-primary" style="padding: 6px 12px; font-size: 12px; background: #ef4444;" onclick="return confirm('¿Confirma que el documento es INCONFORME? Esto inhabilitará a la entidad de la operación.')">Rechazar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 40px; color: var(--text-muted);">Toda la documentación operativa se encuentra auditada. No hay pendientes.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- MÓDULO: CONSULTA PREOPERACIONALES          -->
+            <!-- ========================================== -->
+            {% elif active_module == 'preoperacionales' %}
+            <div class="action-header">
+                <div class="action-title-group" style="display: flex; align-items: center; gap: 15px;">
+                    <a href="/gestor_flota/pesv_bp/" class="btn-close-view">&times;</a>
+                    <h2>Consulta de Preoperacionales (Multi-Flota)</h2>
+                </div>
+            </div>
+
+            <form class="table-card" style="padding: 20px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;" method="GET" action="{{ url_for('auditorias_pesv.consulta_preoperacionales') }}">
+                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;">
+                    <label>Fecha Inicio</label>
+                    <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;">
+                    <label>Fecha Fin</label>
+                    <input type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;">
+                    <label>Vehículo (Flota Carga/Especial)</label>
+                    <select name="placa">
+                        <option value="todas" {% if filtros.placa == 'todas' %}selected{% endif %}>Todos los vehículos</option>
+                        {% for v in vehiculos_historicos %}
+                            <option value="{{ v.placa }}" {% if filtros.placa == v.placa %}selected{% endif %}>{{ v.placa }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary" style="height: 42px;">🔍 Consultar Reportes</button>
+            </form>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Consecutivo Oficial</th>
+                            <th>Fecha y Hora</th>
+                            <th>Placa Inspeccionada</th>
+                            <th>Conductor Responsable</th>
+                            <th>Dictamen de Sistema</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for i in inspecciones %}
+                        <tr>
+                            <td><span style="font-family: monospace; font-weight: bold; color: var(--verde); font-size: 14px;">{{ i.consecutivo_anual }}</span></td>
+                            <td>{{ i.fecha_inspeccion }}<br><small style="color: var(--text-muted);">{{ i.hora_inspeccion }}</small></td>
+                            <td><b style="color: #334155;">{{ i.placa_vehiculo }}</b></td>
+                            <td>{{ i.nombre_conductor }}</td>
+                            <td>
+                                {% if i.vehiculo_aprobado == 1 %}
+                                    <span class="badge badge-success">✅ APROBADO (Operativo)</span>
+                                {% else %}
+                                    <span class="badge badge-danger">🚨 ALERTA CRÍTICA</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">No se hallaron inspecciones preoperacionales para los criterios seleccionados.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+        </div>
+    </main>
+
+    <!-- Modal Nueva Auditoría -->
+    <div id="modalAuditoria" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Nueva Auditoría PESV (En Campo)</h3>
+                <button class="close-btn" onclick="cerrarModal()">&times;</button>
+            </div>
+            <form action="{{ url_for('auditorias_pesv.guardar_auditoria') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="form-group">
+                    <label>Vehículo a Inspeccionar</label>
+                    <select name="placa_vehiculo" required>
+                        <option value="">Seleccione una placa...</option>
+                        {% for v in vehiculos %}
+                            <option value="{{ v.placa }}">{{ v.placa }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Conductor Evaluado</label>
+                    <select name="nombre_conductor" required>
+                        <option value="">Seleccione un conductor...</option>
+                        {% for c in conductores %}
+                            <option value="{{ c.nombre }}">{{ c.nombre }} ({{ c.cedula }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>¿Documentos Obligatorios Vigentes? (SOAT, RTM, Licencia)</label>
+                    <select name="documentos_vigentes" required>
+                        <option value="SI">SI - Cumple</option>
+                        <option value="NO">NO - Documentos Vencidos o Faltantes</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>¿Estado Mecánico y Preoperacional al día?</label>
+                    <select name="estado_mecanico" required>
+                        <option value="SI">SI - Vehículo Apto</option>
+                        <option value="NO">NO - Presenta Fallas Críticas</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>¿Aptitud Operativa Validada? (Seg. Social, Capacitaciones)</label>
+                    <select name="aptitud_operativa" required>
+                        <option value="SI">SI - Apto</option>
+                        <option value="NO">NO - No Apto</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Observaciones y Hallazgos</label>
+                    <textarea name="observaciones" rows="4" placeholder="Detalle los hallazgos de la inspección..."></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar y Generar PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function abrirModal() {
+            document.getElementById('modalAuditoria').classList.add('active');
+        }
+        function cerrarModal() {
+            document.getElementById('modalAuditoria').classList.remove('active');
+        }
+    </script>
+</body>
+</html>

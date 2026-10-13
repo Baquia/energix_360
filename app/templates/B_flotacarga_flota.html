@@ -1,0 +1,1020 @@
+<!-- MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: GESTION_FLOTA | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
+<!-- app/templates/B_flotacarga_flota.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gestión de Vehículos y Personal | {{ empresa }}</title>
+    <meta name="theme-color" content="#015249">
+    <style>
+        :root {
+            --verde: #015249;        
+            --verde-osc: #003b35;    
+            --bg-grad-start: #d7f2ec; 
+            --surface: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --radius: 10px;
+            --sidebar-width: 260px;
+            --topbar-height: 70px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body { 
+            font-family: Verdana, Geneva, Tahoma, sans-serif; 
+            background-color: #f8fafc; 
+            color: var(--text); 
+            display: flex; 
+            flex-direction: row;
+            height: 100vh; 
+            width: 100vw;
+            overflow: hidden; 
+        }
+
+        a { text-decoration: none; color: inherit; }
+
+        .sidebar { 
+            width: var(--sidebar-width); 
+            min-width: var(--sidebar-width);
+            background: var(--surface); 
+            border-right: 1px solid var(--border); 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh;
+            flex-shrink: 0;
+            transition: transform 0.3s ease; 
+            z-index: 1000; 
+        }
+
+        .sidebar-header { height: var(--topbar-height); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
+        .logo-app { max-height: 35px; width: auto; }
+        .nav-menu { flex-grow: 1; padding: 20px 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+        
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: var(--radius); color: var(--text-muted); font-size: 14px; font-weight: 600; transition: all 0.2s; }
+        .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
+        .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
+        .nav-icon { font-size: 18px; }
+        
+        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
+        .logout-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444; font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2; transition: 0.2s; }
+        .logout-btn:hover { background: #fee2e2; }
+
+        .main-wrapper { 
+            flex-grow: 1; 
+            width: calc(100vw - var(--sidebar-width));
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+
+        .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .topbar-left { display: flex; align-items: center; gap: 15px; }
+        .menu-toggle { display: none; background: none; border: none; font-size: 24px; color: var(--verde); cursor: pointer; }
+        .logo-cliente { max-height: 40px; width: auto; object-fit: contain; }
+        .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
+        .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 3px 10px; border-radius: 12px; margin-top: 3px; font-weight: 600; }
+
+        .content-area { flex-grow: 1; padding: 30px; overflow-y: auto; background: #f8fafc; }
+
+        .flash-messages { width: 100%; max-width: 1100px; margin: 0 auto 20px auto; }
+        .flash-alert { padding: 12px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; border: 1px solid currentColor; margin-bottom: 10px; }
+        .flash-success { background-color: #d1fae5; color: #065f46; }
+        .flash-danger { background-color: #fee2e2; color: #991b1b; }
+
+        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto 25px auto; }
+        .action-title-group { display: flex; align-items: center; gap: 15px; }
+        .action-header h2 { color: var(--verde); font-size: 22px; margin: 0; font-weight: 800;}
+        .btn-close-view { background: #e2e8f0; color: #475569; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; font-weight: bold;}
+        .btn-close-view:hover { background: #cbd5e1; color: #0f172a; }
+        
+        .btn-primary { background: var(--verde); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px rgba(1, 82, 73, 0.2);}
+        .btn-primary:hover { background: var(--verde-osc); transform: translateY(-1px); box-shadow: 0 6px 8px rgba(1, 82, 73, 0.3);}
+
+        .table-card { background: var(--surface); border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; max-width: 1100px; margin: 0 auto; overflow: hidden; }
+        .table-responsive { width: 100%; overflow-x: auto; }
+        .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;}
+        .data-table th { background: #f8fafc; padding: 16px 20px; color: #475569; font-weight: 700; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;}
+        .data-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle;}
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table tr:hover { background-color: #f8fafc; }
+        
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-block;}
+        .badge-gray { background: #f1f5f9; color: #475569; }
+        .badge-success { background: #d1fae5; color: #059669; }
+        
+        .btn-icon { background: none; border: none; cursor: pointer; font-size: 18px; margin-left: 10px; transition: 0.2s; padding: 5px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;}
+        .btn-icon:hover { background: #f1f5f9; }
+        .btn-icon.edit:hover { color: #f59e0b; transform: scale(1.1); background: #fef3c7;}
+        .btn-icon.delete:hover { color: #ef4444; transform: scale(1.1); background: #fee2e2;}
+
+        .filter-bar { background: var(--surface); padding: 20px; border-radius: 16px; margin: 0 auto 25px auto; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; max-width: 1100px;}
+        .filter-bar .form-group { margin-bottom: 0; min-width: 180px; flex: 1; }
+        .filter-btn { background: var(--verde); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 700; cursor: pointer; height: 44px; transition: 0.2s; box-shadow: 0 4px 6px rgba(1, 82, 73, 0.2);}
+        .filter-btn:hover { background: var(--verde-osc); transform: translateY(-1px); }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
+        .modal-box { background: var(--surface); width: 90%; max-width: 600px; border-radius: 16px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 85vh; overflow-y: auto;}
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        .modal-header h3 { color: #0f172a; font-size: 18px; font-weight: 800; margin: 0;}
+        .close-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; color: #64748b; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
+        .close-btn:hover { background: #e2e8f0; color: #0f172a; }
+        
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-size: 12px; color: #475569; margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;}
+        .form-group input, .form-group select { width: 100%; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; transition: 0.2s; color: #1e293b; background: #fff;}
+        .form-group input:focus, .form-group select:focus { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(1, 82, 73, 0.1); }
+        .form-group input[type="file"] { padding: 9px 15px; }
+        
+        .modal-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 30px; }
+        .btn-cancel { padding: 10px 20px; border-radius: 8px; border: 1px solid #cbd5e1; background: #ffffff; cursor: pointer; font-weight: 700; color: #475569; transition: 0.2s;}
+        .btn-cancel:hover { background: #f1f5f9; }
+        
+        .section-title { margin: 25px 0 15px; color: var(--verde); font-size: 14px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; text-transform: uppercase; font-weight: 800;}
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { position: fixed; height: 100vh; left: 0; top: 0; transform: translateX(-100%); box-shadow: 4px 0 25px rgba(0,0,0,0.15); }
+            .sidebar.open { transform: translateX(0); }
+            .main-wrapper { width: 100vw; }
+            .menu-toggle { display: block; }
+            .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(2px); z-index: 999; }
+            .sidebar-overlay.active { display: block; }
+            .action-header { flex-direction: column; align-items: stretch; gap: 15px; }
+            .btn-primary { justify-content: center; }
+            .form-group[style*="display: flex"] { flex-direction: column; gap: 0 !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+        </div>
+        <nav class="nav-menu">
+            <a href="/gestor_flota/hub_herramientas/" class="nav-item">
+                <span class="nav-icon">⬅️</span> Volver a Herramientas
+            </a>
+            <div style="margin: 15px 0 5px 15px; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Gestión Interna</div>
+            <a href="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" class="nav-item {% if active_module == 'vehiculos' %}active{% endif %}">
+                <span class="nav-icon">🚛</span> Vehículos
+            </a>
+            <a href="{{ url_for('flotacarga_flota.gestion_operadores') }}" class="nav-item {% if active_module == 'operadores' %}active{% endif %}">
+                <span class="nav-icon">👷</span> Conductores / Auxiliares
+            </a>
+            <a href="{{ url_for('flotacarga_flota.gestion_preoperacionales') }}" class="nav-item {% if active_module == 'preoperacionales' %}active{% endif %}">
+                <span class="nav-icon">📋</span> Preoperacionales
+            </a>
+            <a href="{{ url_for('flotacarga_flota.gestion_documentos_vencidos') }}" class="nav-item {% if active_module == 'documentos_vencidos' %}active{% endif %}">
+                <span class="nav-icon">⚠️</span> Documentos Vencidos
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="logout-btn"><span>🚪</span> Cerrar Sesión</a>
+        </div>
+    </aside>
+
+    <main class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="menu-toggle" id="menuToggle">☰</button>
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            </div>
+            <div class="user-info">
+                <span class="user-name">{{ nombre }}</span>
+                <span class="user-role">Controlador de Flota</span>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div class="flash-messages">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash-alert {% if category == 'success' %}flash-success{% else %}flash-danger{% endif %}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            {% if active_module == 'vehiculos' %}
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="/gestor_flota/hub_herramientas/" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Gestión de Vehículos</h2>
+                    </div>
+                    <button class="btn-primary" onclick="openModal('modalVehiculo')"><span>➕</span> Registrar Vehículo</button>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Placa</th>
+                                    <th>Clasificación RUNT</th>
+                                    <th>Caja de Carga</th>
+                                    <th>Referencia / Ejes</th>
+                                    <th>Peso Vacío</th>
+                                    <th>Capacidad</th>
+                                    <th>Propiedad</th>
+                                    <th style="text-align: right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in vehiculos %}
+                                <tr>
+                                    <td style="font-weight: 800; color: var(--verde);">{{ v.placa }}</td>
+                                    <td style="text-transform: capitalize;">{{ v.tipo }}</td>
+                                    <td style="text-transform: capitalize;">{{ v.caja_de_carga }}</td>
+                                    <td style="text-transform: capitalize;">{{ v.referencia }}</td>
+                                    <td>{{ v.peso_vacio }} kg</td>
+                                    <td>{{ v['capacidad (kg)'] }} kg</td>
+                                    <td><span class="badge {% if v.propiedad == 'Propio' %}badge-success{% else %}badge-gray{% endif %}">{{ v.propiedad }}</span></td>
+                                    <td style="text-align: right; white-space: nowrap;">
+                                        <button class="btn-icon edit" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.caja_de_carga }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}', '{{ v.propiedad }}', '{{ v.id_tarjeta_propiedad or '' }}', '{{ v.id_soat or '' }}', '{{ v.vencimiento_soat or '' }}', '{{ v.id_tecnomecanica or '' }}', '{{ v.vencimiento_tecnomecanica or '' }}', '{{ v.id_poliza_rce or '' }}', '{{ v.aseguradora_rce or '' }}', '{{ v.vencimiento_poliza_rce or '' }}')" title="Editar">✏️</button>
+                                        <button class="btn-icon delete" onclick="confirmarEliminar('{{ v.id }}', '{{ v.placa }}')" title="Eliminar">🗑️</button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted); font-weight: 500;">No hay vehículos registrados en la base de datos.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            {% elif active_module == 'operadores' %}
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="/gestor_flota/hub_herramientas/" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Personal Operativo</h2>
+                    </div>
+                    <button class="btn-primary" onclick="openModal('modalOperador')"><span>➕</span> Nuevo Registro</button>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre Completo</th>
+                                    <th>Identificación</th>
+                                    <th>Tipo</th>
+                                    <th>Perfil Operativo</th>
+                                    <th style="text-align: right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for op in operadores %}
+                                <tr>
+                                    <td style="font-weight: 800; color: #1e293b;">{{ op.nombre }}</td>
+                                    <td style="font-family: monospace; font-size: 14px;">{{ op.cedula }}</td>
+                                    <td><span class="badge {% if op.tipo_conductor == 'Propio' %}badge-success{% else %}badge-gray{% endif %}">{{ op.tipo_conductor }}</span></td>
+                                    <td><span class="badge {% if op.perfil == 'operador_flotacarga' %}badge-success{% else %}badge-gray{% endif %}">{% if op.perfil == 'operador_flotacarga' %}Conductor{% else %}Auxiliar{% endif %}</span></td>
+                                    <td style="text-align: right; white-space: nowrap;">
+                                        <button class="btn-icon edit" onclick="abrirEditarOperador('{{ op.id }}', '{{ op.nombre }}', '{{ op.cedula }}', '{{ op.perfil }}', '{{ op.tipo_conductor }}', '{{ op.email }}', '{{ op.vehiculo_asignado }}', '{{ op.fecha_nacimiento }}', '{{ op.edad }}', '{{ op.eps }}', '{{ op.arl }}', '{{ op.fondo_pensiones }}', '{{ op.numero_licencia_conduccion }}', '{{ op.vencimiento_licencia_conduccion }}', '{{ op.ultimo_pago_seguridad_social }}', '{{ op.vencimiento_seguridad_social }}', '{{ op.password_visible }}')" title="Editar">✏️</button>
+                                        <button class="btn-icon delete" onclick="confirmarEliminarOperador('{{ op.id }}', '{{ op.nombre }}')" title="Eliminar">🗑️</button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted); font-weight: 500;">No hay personal operativo registrado.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            
+            {% elif active_module == 'preoperacionales' %}
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="/gestor_flota/hub_herramientas/" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Auditoría de Preoperacionales</h2>
+                    </div>
+                </div>
+
+                <form class="filter-bar" method="GET" action="{{ url_for('flotacarga_flota.gestion_preoperacionales') }}">
+                    <div class="form-group">
+                        <label>Desde</label>
+                        <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Hasta</label>
+                        <input type="date" name="fecha_fin" value="{{ filtros.fecha_fin }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Vehículo (Placa)</label>
+                        <select name="placa">
+                            <option value="todas">Todas las placas</option>
+                            {% for vh in vehiculos_historicos %}
+                                <option value="{{ vh.placa }}" {% if filtros.placa == vh.placa %}selected{% endif %}>{{ vh.placa }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="filter-btn">🔍 Filtrar Resultados</button>
+                </form>
+
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha / Hora</th>
+                                    <th>Consecutivo</th>
+                                    <th>Placa</th>
+                                    <th>Conductor</th>
+                                    <th>Dictamen General</th>
+                                    <th style="text-align: right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for insp in inspecciones %}
+                                <tr>
+                                    <td>{{ insp.fecha_inspeccion }} <br><span style="color:var(--text-muted); font-size:11px;">{{ insp.hora_inspeccion }}</span></td>
+                                    <td style="font-weight: 800; color: var(--verde);">{{ insp.consecutivo_anual }}</td>
+                                    <td style="font-weight: 700;">{{ insp.placa_vehiculo }}</td>
+                                    <td>{{ insp.nombre_conductor }}</td>
+                                    <td>
+                                        {% if insp.vehiculo_aprobado == 1 %}
+                                            <span class="badge badge-success">✅ Operativo</span>
+                                        {% else %}
+                                            <span class="badge" style="background:#fee2e2; color:#991b1b;">⚠️ Alerta Crítica</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <a href="{{ url_for('flotacarga_flota.descargar_preoperacional_pdf', consecutivo=insp.consecutivo_anual) }}" target="_blank" class="btn-icon" title="Descargar PDF">📄 PDF</a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted); font-weight: 500;">No se encontraron inspecciones en el rango seleccionado.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            {% elif active_module == 'documentos_vencidos' %}
+                <div class="action-header">
+                    <div class="action-title-group">
+                        <a href="/gestor_flota/hub_herramientas/" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <h2>Documentos Vencidos / Faltantes</h2>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Entidad</th>
+                                    <th>Identificador</th>
+                                    <th>Documento Requerido</th>
+                                    <th>Estado</th>
+                                    <th>Días Vencimiento</th>
+                                    <th style="text-align: right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for nov in novedades %}
+                                <tr>
+                                    <td style="text-transform: capitalize; font-weight: 600;">{{ nov.entidad_tipo }}</td>
+                                    <td style="font-weight: 800; color: var(--verde);">{{ nov.identificador }}<br><small style="color:var(--text-muted); font-weight: normal;">{{ nov.nombre }}</small></td>
+                                    <td>{{ nov.documento }}</td>
+                                    <td>
+                                        {% if nov.estado == 'Vencido' or nov.estado == 'Faltante' %}
+                                            <span class="badge" style="background:#fee2e2; color:#991b1b;">{{ nov.estado }}</span>
+                                        {% elif nov.estado == 'Verificado' %}
+                                            <span class="badge badge-success">Verificado</span>
+                                        {% else %}
+                                            <span class="badge" style="background:#fef3c7; color:#b45309;">{{ nov.estado }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if nov.estado == 'Vencido' %}
+                                            Hace {{ nov.dias }} días
+                                        {% elif nov.estado == 'Faltante' %}
+                                            N/A
+                                        {% else %}
+                                            En {{ nov.dias }} días
+                                        {% endif %}
+                                    </td>
+                                    <td style="text-align: right;">
+                                        {% if nov.estado == 'Actualizado' %}
+                                            <form action="{{ url_for('flotacarga_flota.gestion_documentos_vencidos') }}" method="POST" style="display: inline-block;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <input type="hidden" name="accion" value="verificar_documento">
+                                                <input type="hidden" name="entidad_tipo" value="{{ nov.entidad_tipo }}">
+                                                <input type="hidden" name="entidad_id" value="{{ nov.entidad_id }}">
+                                                <input type="hidden" name="documento_clave" value="{{ nov.clave }}">
+                                                <a href="/static/{{ nov.ruta }}" target="_blank" class="btn-icon" style="margin-right: 5px;" title="Ver Soporte">👁️</a>
+                                                <button type="submit" class="btn-primary" style="background: #10b981; padding: 6px 12px; font-size: 12px; display: inline-flex;" onclick="return confirm('¿Confirma la validez de este documento?')">Verificar</button>
+                                            </form>
+                                        {% elif nov.estado != 'Verificado' %}
+                                            <button class="btn-primary" style="padding: 6px 12px; font-size: 12px; display: inline-flex;" onclick="abrirRefrendar('{{ nov.entidad_tipo }}', '{{ nov.entidad_id }}', '{{ nov.clave }}', '{{ nov.documento }}', '{{ nov.identificador }}')">Refrendar</button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted); font-weight: 500;">Todos los documentos de la flota y el personal están al día. ✅</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- MODALES VEHÍCULOS -->
+    <div id="modalVehiculo" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header"><h3>Registrar Vehículo</h3><button class="close-btn" type="button" onclick="closeModal('modalVehiculo')">&times;</button></div>
+            <form action="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="crear">
+                
+                <h4 class="section-title">Datos Básicos</h4>
+                <div class="form-group"><label>Placa</label><input type="text" name="placa" required style="text-transform: uppercase;" placeholder="Ej. TGU321"></div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    
+                    <div class="form-group mb-3" style="flex: 1;">
+                        <label>Clasificación RUNT del Vehículo <span style="color:#ef4444;">*</span></label>
+                        <select name="clasificacion_runt_vehiculo" id="clasificacion_runt_vehiculo" class="form-control" required onchange="aplicarFiltroVehiculo()">
+                            <option value="" disabled selected>Seleccione la clasificación...</option>
+                            <option value="Automóvil">Automóvil: Vehículo diseñado para el transporte de pasajeros con capacidad reducida.</option>
+                            <option value="Camioneta y Campero">Camioneta y Campero: Vehículos de uso mixto o todoterreno para pasajeros y carga liviana.</option>
+                            <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Automotores destinados al transporte colectivo de pasajeros.</option>
+                            <option value="Camión C2 (Llanta Trasera Sencilla)">Camión C2 ( 2 ejes sencillo - Llanta Trasera Sencilla )</option>
+                            <option value="Camión C2 (Pacha Trasera)">Camión C2 ( 2 ejes sencillo - Pacha Trasera )</option>
+                            <option value="Camión C3">Camión C3 ( 3 ejes doble troque)</option>
+                            <option value="Camión C4">Camión C4 ( 4 ejes-2 ejes direccionales)</option>
+                            <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote de 3 ejes con un semirremolque de 2 ejes)</option>
+                            <option value="Tractocamión C3-S3">Tractocamión C3-S3: E (6 ejes en total: cabezote doble troque con un tráiler de tres ejes)</option>
+                            <option value="Motocicleta, Motocarro y Mototriciclo">Motocicleta, Motocarro y Mototriciclo: Vehículos de dos o tres ruedas con motor.</option>
+                            <option value="Cuatrimoto">Cuatrimoto: Vehículo de cuatro ruedas para recreación o trabajo en terrenos difíciles.</option>
+                            <option value="Volqueta">Volqueta: Vehículo destinado al transporte de materiales de construcción.</option>
+                        </select>
+                    </div>
+
+                    <div style="flex: 1;"><label>Caja de Carga</label>
+                        <select name="caja_de_carga" required>
+                            <option value="">Seleccione...</option>
+                            <option value="van">Van de Carga</option>
+                            <option value="furgon">Furgón</option>
+                            <option value="estacas">Estacas</option>
+                            <option value="furgon refrigerado">Furgón Refrigerado</option>
+                            <option value="planchon">Planchón</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Referencia / Ejes (Opcional)</label><input type="text" name="referencia" placeholder="Ej. NHR, NPR, Doble Eje"></div>
+                    <div style="flex: 1;"><label>Propiedad</label>
+                        <select name="propiedad" required>
+                            <option value="Propio">Propio de la Empresa</option>
+                            <option value="Tercero">Vehículo Tercero</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Peso Vacío (Kg)</label><input type="number" name="peso_vacio" required placeholder="0"></div>
+                    <div style="flex: 1;"><label>Capacidad (Kg)</label><input type="number" name="capacidad" required placeholder="0"></div>
+                </div>
+
+                <h4 class="section-title">Documentación Obligatoria</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>ID Licencia Tránsito (Propiedad)</label><input type="text" name="id_tarjeta_propiedad" placeholder="Nro. Tarjeta"></div>
+                    <div style="flex: 1;"><label>Archivo Licencia (Imagen o PDF)</label><input type="file" name="archivo_tarjeta_propiedad" accept=".pdf, .jpg, .jpeg, .png"></div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>ID SOAT</label><input type="text" name="id_soat" placeholder="Nro. Póliza"></div>
+                    <div style="flex: 1;"><label>Vencimiento SOAT</label><input type="date" name="vencimiento_soat"></div>
+                </div>
+                <div class="form-group"><label>Archivo SOAT (Imagen o PDF)</label><input type="file" name="archivo_soat" accept=".pdf, .jpg, .jpeg, .png"></div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>ID Tecnomecánica</label><input type="text" name="id_tecnomecanica" placeholder="Nro. Certificado"></div>
+                    <div style="flex: 1;"><label>Vencimiento Tecnomecánica</label><input type="date" name="vencimiento_tecnomecanica"></div>
+                </div>
+                <div class="form-group"><label>Archivo Tecnomecánica (Imagen o PDF)</label><input type="file" name="archivo_tecnomecanica" accept=".pdf, .jpg, .jpeg, .png"></div>
+
+                <h4 class="section-title">Documentación Opcional</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Aseguradora RCE</label><input type="text" name="aseguradora_rce" placeholder="Ej. Suramericana"></div>
+                    <div style="flex: 1;"><label>ID Póliza RCE</label><input type="text" name="id_poliza_rce" placeholder="Nro. Póliza RCE"></div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Vencimiento RCE</label><input type="date" name="vencimiento_poliza_rce"></div>
+                    <div style="flex: 1;"><label>Archivo Póliza RCE</label><input type="file" name="archivo_poliza_rce" accept=".pdf, .jpg, .jpeg, .png"></div>
+                </div>
+
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalVehiculo')">Cancelar</button><button type="submit" class="btn-primary">Guardar Registro</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEditarVehiculo" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header"><h3>Editar Vehículo</h3><button class="close-btn" type="button" onclick="closeModal('modalEditarVehiculo')">&times;</button></div>
+            <form action="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="editar">
+                <input type="hidden" name="vehiculo_id" id="edit_id">
+                
+                <h4 class="section-title">Datos Básicos</h4>
+                <div class="form-group"><label>Placa</label><input type="text" name="placa" id="edit_placa" required style="text-transform: uppercase;"></div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    
+                    <div class="form-group mb-3" style="flex: 1;">
+                        <label>Clasificación RUNT <span style="color:#ef4444;">*</span></label>
+                        <select name="clasificacion_runt_vehiculo" id="edit_clasificacion_runt_vehiculo" class="form-control" required onchange="aplicarFiltroVehiculo()">
+                            <option value="" disabled selected>Seleccione la clasificación...</option>
+                            <option value="Automóvil">Automóvil: Vehículo diseñado para el transporte de pasajeros con capacidad reducida.</option>
+                            <option value="Camioneta y Campero">Camioneta y Campero: Vehículos de uso mixto o todoterreno para pasajeros y carga liviana.</option>
+                            <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Automotores destinados al transporte colectivo de pasajeros.</option>
+                            <option value="Camión C2 (Llanta Trasera Sencilla)">Camión C2 ( 2 ejes sencillo - Llanta Trasera Sencilla )</option>
+                            <option value="Camión C2 (Pacha Trasera)">Camión C2 ( 2 ejes sencillo - Pacha Trasera )</option>
+                            <option value="Camión C3">Camión C3 ( 3 ejes doble troque)</option>
+                            <option value="Camión C4">Camión C4 ( 4 ejes-2 ejes direccionales)</option>
+                            <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote de 3 ejes con un semirremolque de 2 ejes)</option>
+                            <option value="Tractocamión C3-S3">Tractocamión C3-S3: E (6 ejes en total: cabezote doble troque con un tráiler de tres ejes)</option>
+                            <option value="Motocicleta, Motocarro y Mototriciclo">Motocicleta, Motocarro y Mototriciclo: Vehículos de dos o tres ruedas con motor.</option>
+                            <option value="Cuatrimoto">Cuatrimoto: Vehículo de cuatro ruedas para recreación o trabajo en terrenos difíciles.</option>
+                            <option value="Volqueta">Volqueta: Vehículo destinado al transporte de materiales de construcción.</option>
+                        </select>
+                    </div>
+
+                    <div style="flex: 1;"><label>Caja de carga</label>
+                        <select name="caja_de_carga" id="edit_caja_de_carga" required>                             
+                            <option value="">Seleccione...</option>
+                            <option value="van">Van de Carga</option>
+                            <option value="furgon">Furgón</option>
+                            <option value="estacas">Estacas</option>
+                            <option value="furgon refrigerado">Furgón Refrigerado</option>
+                            <option value="planchon">Planchón</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Referencia / Ejes</label><input type="text" name="referencia" id="edit_referencia"></div>
+                    <div style="flex: 1;"><label>Propiedad</label><select name="propiedad" id="edit_propiedad" required><option value="Propio">Propio de la Empresa</option><option value="Tercero">Vehículo Tercero</option></select></div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Peso Vacío (Kg)</label><input type="number" name="peso_vacio" id="edit_peso_vacio" required></div>
+                    <div style="flex: 1;"><label>Capacidad (Kg)</label><input type="number" name="capacidad" id="edit_capacidad" required></div>
+                </div>
+
+                <h4 class="section-title">Documentación Obligatoria</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>ID Licencia Tránsito</label><input type="text" name="id_tarjeta_propiedad" id="edit_id_tarjeta_propiedad"></div>
+                    <div style="flex: 1;"><label>Reemplazar Archivo</label><input type="file" name="archivo_tarjeta_propiedad" accept=".pdf, .jpg, .jpeg, .png"></div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>ID SOAT</label><input type="text" name="id_soat" id="edit_id_soat"></div>
+                    <div style="flex: 1;"><label>Vencimiento SOAT</label><input type="date" name="vencimiento_soat" id="edit_vencimiento_soat"></div>
+                </div>
+                <div class="form-group"><label>Reemplazar Archivo SOAT</label><input type="file" name="archivo_soat" accept=".pdf, .jpg, .jpeg, .png"></div>
+                
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>ID Tecnomecánica</label><input type="text" name="id_tecnomecanica" id="edit_id_tecnomecanica"></div>
+                    <div style="flex: 1;"><label>Vencimiento Tecnomecánica</label><input type="date" name="vencimiento_tecnomecanica" id="edit_vencimiento_tecnomecanica"></div>
+                </div>
+                <div class="form-group"><label>Reemplazar Archivo Tecnomecánica</label><input type="file" name="archivo_tecnomecanica" accept=".pdf, .jpg, .jpeg, .png"></div>
+
+                <h4 class="section-title">Documentación Opcional</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Aseguradora RCE</label><input type="text" name="aseguradora_rce" id="edit_aseguradora_rce"></div>
+                    <div style="flex: 1;"><label>ID Póliza RCE</label><input type="text" name="id_poliza_rce" id="edit_id_poliza_rce"></div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Vencimiento RCE</label><input type="date" name="vencimiento_poliza_rce" id="edit_vencimiento_poliza_rce"></div>
+                    <div style="flex: 1;"><label>Reemplazar Archivo RCE</label><input type="file" name="archivo_poliza_rce" accept=".pdf, .jpg, .jpeg, .png"></div>
+                </div>
+
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarVehiculo')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">Actualizar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEliminar" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header"><h3 style="color: #ef4444;">Eliminar Vehículo</h3><button class="close-btn" type="button" onclick="closeModal('modalEliminar')">&times;</button></div>
+            <form action="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="eliminar">
+                <input type="hidden" name="vehiculo_id" id="delete_id">
+                <p style="color: #475569; font-size: 14px; line-height: 1.5;">¿Estás seguro que deseas eliminar permanentemente el vehículo con placa <b id="delete_placa" style="color: #0f172a;"></b> del sistema?</p>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminar')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);">Sí, Eliminar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODALES OPERADORES -->
+    <div id="modalOperador" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header"><h3>Registrar Personal</h3><button class="close-btn" type="button" onclick="closeModal('modalOperador')">&times;</button></div>
+            <form action="{{ url_for('flotacarga_flota.gestion_operadores') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="crear">
+                
+                <h4 class="section-title">Información Base</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;">
+                        <label>Tipo de Conductor</label>
+                        <select name="tipo_conductor" id="crear_tipo_conductor" required onchange="toggleTipoConductor('crear')">
+                            <option value="Propio">Propio</option>
+                            <option value="Tercero">Tercero</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Perfil Asignado</label>
+                        <select name="perfil" id="crear_perfil" required>
+                            <option value="operador_flotacarga">Conductor Autorizado</option>
+                            <option value="auxiliar_transportecarga">Auxiliar de Carga</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" required placeholder="Nombres y Apellidos"></div>
+                <div class="form-group"><label>Identificación</label><input type="text" name="cedula" required placeholder="Número de Cédula"></div>
+                
+                <div id="crear_credenciales_group">
+                    <div class="form-group">
+                        <label>Correo Electrónico</label>
+                        <input type="email" name="email" id="crear_email" placeholder="correo@ejemplo.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña de Acceso (App Conductor)</label>
+                        <input type="password" name="password" id="crear_password" placeholder="Asignar contraseña inicial" required>
+                        <small style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">Requerida para que el conductor pueda iniciar sesión.</small>
+                    </div>
+                </div>
+
+                <div class="form-group" id="crear_vehiculo_group" style="display: none;">
+                    <label>Vehículo Asignado (Solo Terceros)</label>
+                    <select name="vehiculo_asignado" id="crear_vehiculo_asignado">
+                        <option value="">Seleccione vehículo...</option>
+                        {% for v in vehiculos %}
+                            {% if v.propiedad == 'Tercero' %}
+                            <option value="{{ v.placa }}">{{ v.placa }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <h4 class="section-title">Datos Personales y de Salud</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;">
+                        <label>Fecha de Nacimiento</label>
+                        <input type="date" name="fecha_nacimiento" id="crear_fecha_nacimiento" onchange="calcularEdad('crear')">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Edad</label>
+                        <input type="number" name="edad" id="crear_edad" readonly>
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>EPS</label><input type="text" name="eps"></div>
+                    <div style="flex: 1;"><label>ARL</label><input type="text" name="arl"></div>
+                    <div style="flex: 1;"><label>Fondo de Pensiones</label><input type="text" name="fondo_pensiones"></div>
+                </div>
+
+                <h4 class="section-title">Licencia y Documentos</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>N° Licencia Conducción</label><input type="text" name="numero_licencia_conduccion"></div>
+                    <div style="flex: 1;"><label>Vencimiento Licencia</label><input type="date" name="vencimiento_licencia_conduccion"></div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social"></div>
+                    <div style="flex: 1;"><label>Vencimiento Seg. Social</label><input type="date" name="vencimiento_seguridad_social"></div>
+                </div>
+
+                <div class="form-group"><label>PDF Licencia</label><input type="file" name="archivo_licencia" accept=".pdf"></div>
+                <div class="form-group"><label>PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
+                <div class="form-group"><label>PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
+                <div class="form-group"><label>Foto Facial (Reconocimiento)</label><input type="file" name="archivo_foto_facial" accept=".jpg, .jpeg, .png" required></div>
+
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalOperador')">Cancelar</button><button type="submit" class="btn-primary">Guardar Registro</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEditarOperador" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header"><h3>Editar Personal</h3><button class="close-btn" type="button" onclick="closeModal('modalEditarOperador')">&times;</button></div>
+            <form action="{{ url_for('flotacarga_flota.gestion_operadores') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="editar">
+                <input type="hidden" name="operador_id" id="edit_operador_id">
+                
+                <h4 class="section-title">Información Base</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;">
+                        <label>Tipo de Conductor</label>
+                        <select name="tipo_conductor" id="edit_tipo_conductor" required onchange="toggleTipoConductor('edit')">
+                            <option value="Propio">Propio</option>
+                            <option value="Tercero">Tercero</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Perfil Asignado</label>
+                        <select name="perfil" id="edit_perfil" required>
+                            <option value="operador_flotacarga">Conductor Autorizado</option>
+                            <option value="auxiliar_transportecarga">Auxiliar de Carga</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" id="edit_nombre" required></div>
+                <div class="form-group"><label>Identificación</label><input type="text" name="cedula" id="edit_cedula" required></div>
+                
+                <div id="edit_credenciales_group">
+                    <div class="form-group">
+                        <label>Correo Electrónico</label>
+                        <input type="email" name="email" id="edit_email" placeholder="correo@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña Actual</label>
+                        <div style="background: #f1f5f9; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 14px; margin-bottom: 10px;" id="edit_password_visible_text">No registrada</div>
+                        <label>Actualizar Contraseña (Opcional)</label>
+                        <input type="password" name="password" id="edit_password" placeholder="Dejar en blanco para mantener la actual">
+                    </div>
+                </div>
+
+                <div class="form-group" id="edit_vehiculo_group" style="display: none;">
+                    <label>Vehículo Asignado (Solo Terceros)</label>
+                    <select name="vehiculo_asignado" id="edit_vehiculo_asignado">
+                        <option value="">Seleccione vehículo...</option>
+                        {% for v in vehiculos %}
+                            {% if v.propiedad == 'Tercero' %}
+                            <option value="{{ v.placa }}">{{ v.placa }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <h4 class="section-title">Datos Personales y de Salud</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;">
+                        <label>Fecha de Nacimiento</label>
+                        <input type="date" name="fecha_nacimiento" id="edit_fecha_nacimiento" onchange="calcularEdad('edit')">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>Edad</label>
+                        <input type="number" name="edad" id="edit_edad" readonly>
+                    </div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>EPS</label><input type="text" name="eps" id="edit_eps"></div>
+                    <div style="flex: 1;"><label>ARL</label><input type="text" name="arl" id="edit_arl"></div>
+                    <div style="flex: 1;"><label>Fondo de Pensiones</label><input type="text" name="fondo_pensiones" id="edit_fondo_pensiones"></div>
+                </div>
+
+                <h4 class="section-title">Licencia y Documentos</h4>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>N° Licencia Conducción</label><input type="text" name="numero_licencia_conduccion" id="edit_numero_licencia_conduccion"></div>
+                    <div style="flex: 1;"><label>Vencimiento Licencia</label><input type="date" name="vencimiento_licencia_conduccion" id="edit_vencimiento_licencia_conduccion"></div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 15px;">
+                    <div style="flex: 1;"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social" id="edit_ultimo_pago_seguridad_social"></div>
+                    <div style="flex: 1;"><label>Vencimiento Seg. Social</label><input type="date" name="vencimiento_seguridad_social" id="edit_vencimiento_seguridad_social"></div>
+                </div>
+
+                <div class="form-group"><label>Reemplazar PDF Licencia</label><input type="file" name="archivo_licencia" accept=".pdf"></div>
+                <div class="form-group"><label>Reemplazar PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
+                <div class="form-group"><label>Reemplazar PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
+                <div class="form-group"><label>Reemplazar Foto Facial</label><input type="file" name="archivo_foto_facial" accept=".jpg, .jpeg, .png"></div>
+
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarOperador')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">Actualizar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEliminarOperador" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header"><h3 style="color: #ef4444;">Eliminar Registro</h3><button class="close-btn" type="button" onclick="closeModal('modalEliminarOperador')">&times;</button></div>
+            <form action="{{ url_for('flotacarga_flota.gestion_operadores') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="accion" value="eliminar">
+                <input type="hidden" name="operador_id" id="delete_operador_id">
+                <p style="color: #475569; font-size: 14px; line-height: 1.5;">¿Estás seguro que deseas desvincular a <b id="delete_nombre_operador" style="color: #0f172a;"></b> del sistema de flota?</p>
+                <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEliminarOperador')">Cancelar</button><button type="submit" class="btn-primary" style="background: #ef4444; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);">Sí, Eliminar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL REFRENDAR DOCUMENTO VENCIDO -->
+    <div id="modalRefrendar" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Refrendar Documento</h3>
+                <button class="close-btn" type="button" onclick="closeModal('modalRefrendar')">&times;</button>
+            </div>
+            <form action="{{ url_for('flotacarga_flota.actualizar_documento_vencido') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="entidad_tipo" id="refrendar_entidad_tipo">
+                <input type="hidden" name="entidad_id" id="refrendar_entidad_id">
+                <input type="hidden" name="documento_clave" id="refrendar_documento_clave">
+                
+                <p class="small text-muted mb-4" style="font-size: 13px; margin-bottom: 20px;">
+                    Subiendo soporte para: <b id="refrendar_doc_nombre" style="color: var(--verde);"></b> <br>
+                    Entidad: <b id="refrendar_entidad_identificador"></b>
+                </p>
+
+                <div class="form-group">
+                    <label>Nueva Fecha de Vencimiento <span style="color:#ef4444;">*</span></label>
+                    <input type="date" name="nueva_fecha" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Soporte Digital (PDF o Imagen) <span style="color:#ef4444;">*</span></label>
+                    <input type="file" name="archivo_soporte" accept=".pdf, .jpg, .jpeg, .png" required>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" onclick="closeModal('modalRefrendar')">Cancelar</button>
+                    <button type="submit" class="btn-primary" style="background: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">Actualizar Documento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+
+        function toggleSidebar() { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); }
+        menuToggle.addEventListener('click', toggleSidebar);
+        overlay.addEventListener('click', toggleSidebar);
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        function aplicarFiltroVehiculo() {
+            console.log('Filtro de vehículo actualizado');
+        }
+
+        function abrirEditarVehiculo(id, placa, tipo, caja, ref, peso, cap, prop, id_tp, id_soat, v_soat, id_tecno, v_tecno, id_rce, aseg_rce, v_rce) {
+            document.getElementById('edit_id').value = id; 
+            document.getElementById('edit_placa').value = placa;
+            
+            // Asignación segura y dinámica de Clasificación RUNT
+            let tipoSelect = document.getElementById('edit_clasificacion_runt_vehiculo');
+            if (tipo) {
+                let optTipoExiste = Array.from(tipoSelect.options).find(opt => opt.value.toLowerCase() === tipo.toLowerCase());
+                if (optTipoExiste) {
+                    tipoSelect.value = optTipoExiste.value;
+                } else {
+                    let nuevaOpt = new Option(tipo, tipo, true, true);
+                    tipoSelect.add(nuevaOpt);
+                    tipoSelect.value = tipo;
+                }
+            } else {
+                tipoSelect.value = '';
+            }
+            
+            // Asignación segura y dinámica de Caja de Carga
+            let cajaSelect = document.getElementById('edit_caja_de_carga');
+            if (caja) {
+                let optCajaExiste = Array.from(cajaSelect.options).find(opt => opt.value.toLowerCase() === caja.toLowerCase());
+                if (optCajaExiste) {
+                    cajaSelect.value = optCajaExiste.value;
+                } else {
+                    let nuevaOptCaja = new Option(caja, caja, true, true);
+                    cajaSelect.add(nuevaOptCaja);
+                    cajaSelect.value = caja;
+                }
+            } else {
+                cajaSelect.value = '';
+            }
+            
+            document.getElementById('edit_referencia').value = ref || ''; 
+            document.getElementById('edit_peso_vacio').value = peso || 0;
+            document.getElementById('edit_capacidad').value = cap || 0; 
+            document.getElementById('edit_propiedad').value = prop || 'Propio';
+            
+            document.getElementById('edit_id_tarjeta_propiedad').value = id_tp || '';
+            document.getElementById('edit_id_soat').value = id_soat || '';
+            document.getElementById('edit_vencimiento_soat').value = v_soat || '';
+            document.getElementById('edit_id_tecnomecanica').value = id_tecno || '';
+            document.getElementById('edit_vencimiento_tecnomecanica').value = v_tecno || '';
+            document.getElementById('edit_id_poliza_rce').value = id_rce || '';
+            document.getElementById('edit_aseguradora_rce').value = aseg_rce || '';
+            document.getElementById('edit_vencimiento_poliza_rce').value = v_rce || '';
+
+            openModal('modalEditarVehiculo');
+        }
+
+        function confirmarEliminar(id, placa) {
+            document.getElementById('delete_id').value = id; 
+            document.getElementById('delete_placa').innerText = placa; 
+            openModal('modalEliminar');
+        }
+
+        function toggleTipoConductor(prefix) {
+            const tipo = document.getElementById(prefix + '_tipo_conductor').value;
+            const credGroup = document.getElementById(prefix + '_credenciales_group');
+            const vehGroup = document.getElementById(prefix + '_vehiculo_group');
+            const passInput = document.getElementById(prefix + '_password');
+            const emailInput = document.getElementById(prefix + '_email');
+            const vehInput = document.getElementById(prefix + '_vehiculo_asignado');
+
+            if (tipo === 'Propio') {
+                credGroup.style.display = 'block';
+                vehGroup.style.display = 'none';
+                if(prefix === 'crear') {
+                    passInput.setAttribute('required', 'required');
+                    emailInput.setAttribute('required', 'required');
+                }
+                vehInput.removeAttribute('required');
+                vehInput.value = '';
+            } else {
+                credGroup.style.display = 'none';
+                vehGroup.style.display = 'block';
+                passInput.removeAttribute('required');
+                emailInput.removeAttribute('required');
+                vehInput.setAttribute('required', 'required');
+            }
+        }
+
+        function calcularEdad(prefix) {
+            const fechaInput = document.getElementById(prefix + '_fecha_nacimiento').value;
+            if (fechaInput) {
+                const fechaNac = new Date(fechaInput);
+                const hoy = new Date();
+                let edad = hoy.getFullYear() - fechaNac.getFullYear();
+                const m = hoy.getMonth() - fechaNac.getMonth();
+                if (m < 0 || (m === 0 && hoy.getDate() < fechaNac.getDate())) {
+                    edad--;
+                }
+                document.getElementById(prefix + '_edad').value = edad;
+            }
+        }
+
+        function abrirEditarOperador(id, nombre, cedula, perfil, tipo_conductor, email, vehiculo, f_nac, edad, eps, arl, pension, n_licencia, v_licencia, ult_pago, v_seg_soc, pass_visible) {
+            document.getElementById('edit_operador_id').value = id; 
+            document.getElementById('edit_nombre').value = nombre;
+            document.getElementById('edit_cedula').value = cedula; 
+            document.getElementById('edit_perfil').value = perfil;
+            
+            document.getElementById('edit_tipo_conductor').value = tipo_conductor || 'Propio';
+            document.getElementById('edit_email').value = email || '';
+            document.getElementById('edit_vehiculo_asignado').value = vehiculo || '';
+            
+            document.getElementById('edit_fecha_nacimiento').value = f_nac || '';
+            document.getElementById('edit_edad').value = edad || '';
+            document.getElementById('edit_eps').value = eps || '';
+            document.getElementById('edit_arl').value = arl || '';
+            document.getElementById('edit_fondo_pensiones').value = pension || '';
+            
+            document.getElementById('edit_numero_licencia_conduccion').value = n_licencia || '';
+            document.getElementById('edit_vencimiento_licencia_conduccion').value = v_licencia || '';
+            document.getElementById('edit_ultimo_pago_seguridad_social').value = ult_pago || '';
+            document.getElementById('edit_vencimiento_seguridad_social').value = v_seg_soc || '';
+            
+            document.getElementById('edit_password_visible_text').innerText = pass_visible ? pass_visible : 'No registrada';
+
+            toggleTipoConductor('edit');
+            openModal('modalEditarOperador');
+        }
+        
+        function confirmarEliminarOperador(id, nombre) {
+            document.getElementById('delete_operador_id').value = id; 
+            document.getElementById('delete_nombre_operador').innerText = nombre; 
+            openModal('modalEliminarOperador');
+        }
+
+        function abrirRefrendar(tipo, id, clave, docNombre, identificador) {
+            document.getElementById('refrendar_entidad_tipo').value = tipo;
+            document.getElementById('refrendar_entidad_id').value = id;
+            document.getElementById('refrendar_documento_clave').value = clave;
+            
+            document.getElementById('refrendar_doc_nombre').innerText = docNombre;
+            document.getElementById('refrendar_entidad_identificador').innerText = identificador;
+            
+            openModal('modalRefrendar');
+        }
+    </script>
+</body>
+</html>

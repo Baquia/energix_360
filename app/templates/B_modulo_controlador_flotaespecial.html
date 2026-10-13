@@ -1,12 +1,14 @@
+<!-- MÓDULO: TRANSPORTE ESPECIAL | SUBMÓDULO: CONTROLADOR FLOTA ESPECIAL | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
 <!-- app/templates/B_modulo_controlador_flotaespecial.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Submenú Transporte Especial | BQA-ONE</title>
+  <title>Hub: Transporte Especial | BQA-ONE</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#015249">
   
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
   <style>
     body {
       margin: 0;
@@ -93,19 +95,24 @@
       margin-bottom: 35px;
     }
 
+    /* REGLA FORZADA DE DISTRIBUCIÓN HORIZONTAL */
     .cards-grid {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 20px;
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      justify-content: center !important;
+      align-items: stretch !important;
+      gap: 20px !important;
+      margin: 0 auto;
     }
 
     .card-link {
       text-decoration: none;
       color: inherit;
-      flex: 1 1 260px;
-      max-width: 320px;
-      min-width: 250px;
+      flex: 1 1 calc(33.333% - 20px) !important;
+      max-width: 320px !important;
+      min-width: 250px !important;
+      display: flex;
     }
 
     .card {
@@ -120,6 +127,8 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      width: 100%;
+      text-align: center;
     }
 
     .card:hover {
@@ -138,23 +147,6 @@
       color: #2c3e50;
     }
 
-    .back-link {
-      display: inline-block;
-      margin-top: 40px;
-      color: #f59e0b;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 14px;
-      border-bottom: 1px solid #f59e0b;
-      padding-bottom: 2px;
-      transition: 0.2s;
-    }
-
-    .back-link:hover {
-      color: #d97706;
-      border-color: #d97706;
-    }
-
     .footer {
       text-align: center;
       padding: 20px;
@@ -169,37 +161,39 @@
   <!-- BARRA SUPERIOR -->
   <div class="navbar">
     <div class="navbar-user">
-      <div style="display: flex; align-items: center; gap: 10px; margin-right: 5px;">
-        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="BQA-ONE" style="height: 28px; width: auto;" onerror="this.style.display='none'">
-        <span style="border-left: 1px solid #ffffff44; height: 25px;"></span>
-        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" alt="Cliente" style="height: 28px; width: auto; object-fit: contain;" onerror="this.style.display='none'">
+      <div class="navbar-avatar">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo" style="height: 24px;" onerror="this.style.display='none'">
       </div>
       <div class="navbar-info">
-        <span class="user-name">{{ nombre }}</span>
+        <span class="user-name">{{ usuario }}</span>
         <span class="company-name">{{ empresa }}</span>
       </div>
     </div>
-    <a href="{{ url_for('logout') }}" class="btn-logout">Salir</a>
+    <div style="display: flex; gap: 10px;">
+        <a href="/panel_principal.html" class="btn-logout" style="background-color: #475569;">⬅ Volver</a>
+        <a href="/logout" class="btn-logout">Salir</a>
+    </div>
   </div>
 
   <!-- CONTENIDO PRINCIPAL -->
   <div class="dashboard-container">
-    <h1 class="dashboard-title">Módulo de Transporte Especial</h1>
-    <p class="dashboard-subtitle">Seleccione el área operativa a gestionar</p>
+    <h1 class="dashboard-title">Transporte Especial</h1>
+    <p class="dashboard-subtitle">Hub Operativo del Controlador</p>
 
+    <!-- FILA PRINCIPAL: MÓDULOS DE GESTIÓN Y AUDITORÍA -->
     <div class="cards-grid">
-
-      <!-- TARJETA 1: GESTIÓN DE FLOTA (Módulo Fijo Base) -->
-      <a href="{{ url_for('flotaespecial_flota.gestion_flota') }}" class="card-link">
-        <div class="card">
-          <div class="card-icon">🚐</div>
-          <div class="card-title">Gestión de Flota</div>
+      
+      <!-- 1. Gestión Operativa General (Tipo 1 - Obligatorio pero en desarrollo) -->
+      <a href="#" class="card-link" style="cursor: not-allowed; opacity: 0.6;" onclick="return false;">
+        <div class="card" style="background: #e2e8f0;">
+          <div class="card-icon" style="filter: grayscale(100%);">🏭</div>
+          <div class="card-title" style="color: #64748b;">Gestión Operativa General<br><small>(Próximamente)</small></div>
         </div>
       </a>
 
-      <!-- TARJETA 2: OPERATIVIDAD EPS (Submódulo Opcional Plug & Play) -->
+      <!-- 2. Gestión Operativa EPS (Tipo 2 - Opcional) -->
       {% if 'eps_gestion' in session.get('submodulos_activos', []) %}
-      <a href="{{ url_for('flotaespecial_eps.dashboard_operativo') }}" class="card-link">
+      <a href="/gestor_flotaespecial/eps_bp/" class="card-link">
         <div class="card">
           <div class="card-icon">🏥</div>
           <div class="card-title">Gestión Operativa EPS</div>
@@ -207,25 +201,39 @@
       </a>
       {% endif %}
 
-      <!-- TARJETA 3: PRE-FACTURACIÓN Y RIPS (Submódulo Opcional Plug & Play) -->
+      <!-- 3. Pre-Facturación EPS / RIPS (Tipo 2 - Opcional) -->
       {% if 'eps_facturacion' in session.get('submodulos_activos', []) %}
-      <a href="{{ url_for('procesofacturacion_eps.index_facturacion') }}" class="card-link">
+      <a href="/gestor_flotaespecial/facturacion_eps_bp/" class="card-link">
         <div class="card">
-          <div class="card-icon">💵</div>
-          <div class="card-title">Pre-Facturación y RIPS</div>
+          <div class="card-icon">🧾</div>
+          <div class="card-title">Pre-Facturación EPS (RIPS)</div>
         </div>
       </a>
       {% endif %}
 
     </div>
 
-    <!-- BOTÓN DE RETROCESO -->
-    <a href="{{ url_for('panel_principal') }}" class="back-link">⬅️ Volver al Menú Principal BQA</a>
+    <!-- SUB-CONTENEDOR: HUB FLOTERO -->
+    <div style="margin-top: 50px; text-align: left; border-top: 1px solid #cbd5e1; padding-top: 20px;">
+      <h3 style="color: #015249; font-size: 1.25rem; font-weight: 700; margin-bottom: 20px; text-align: center;">Herramientas de Flota</h3>
+      
+      <div class="cards-grid">
+        
+        <!-- 1. Gestión de Flota (Redirección a Sub-Hub Tipo 1) -->
+        <a href="/gestor_flotaespecial/hub_herramientas" class="card-link">
+          <div class="card">
+            <div class="card-icon">🚐</div>
+            <div class="card-title">Gestión de Flota</div>
+          </div>
+        </a>
+
+      </div>
+    </div>
 
   </div>
 
   <div class="footer">
-    BQA ONE - © 2026
+    BQA-ONE © 2026 | Módulo Controlador Flota Especial
   </div>
 
 </body>

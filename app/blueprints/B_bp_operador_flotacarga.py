@@ -1,11 +1,13 @@
 # MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: OPERADOR_FLOTA | CONDICIÓN: OPCIONAL
 # app/blueprints/B_bp_operador_flotacarga.py
+import os
 import math
 import time
 from functools import wraps
-from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash
+from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash, current_app
+from werkzeug.utils import secure_filename
 from app import mysql
-from app.utils import login_required_custom
+from app.utils import login_required_custom, validar_aptitud_operativa
 from datetime import datetime
 import MySQLdb.cursors
 
@@ -33,6 +35,25 @@ def operador_flota_required(f):
 @login_required_custom
 @operador_flota_required
 def dashboard_operador():
+    placa = session.get('placa_prelogueada')
+    empresa_id = session.get('empresa_id')
+
+    # CANDADO DE SEGURIDAD VIAL: Redirección forzada al preoperacional
+    if placa:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT 1 FROM inspeccion_preoperacional 
+            WHERE id_empresa = %s AND placa_vehiculo = %s 
+            AND fecha_inspeccion = CURDATE() AND vehiculo_aprobado = 1
+            LIMIT 1
+        """, (empresa_id, placa))
+        tiene_preop = cur.fetchone()
+        cur.close()
+
+        if not tiene_preop:
+            flash("Para iniciar operaciones, debe diligenciar y aprobar el preoperacional del día.", "warning")
+            return redirect(url_for('preoperacional.preoperacional_tc'))
+
     return render_template(
         'B_modulo_operador_flotacarga.html',
         nit=session.get('nit'),
@@ -47,7 +68,6 @@ def dashboard_operador():
 @login_required_custom
 @operador_flota_required
 def prelogin_flota():
-    # A. CANDADO COMERCIAL: Verificar que la empresa tiene activo el submódulo
     autorizados = session.get('submodulos_activos', [])
     if not autorizados:
         autorizados = session.get('modulos_activos', [])
@@ -55,7 +75,6 @@ def prelogin_flota():
     if 'operador_flota' not in autorizados and 'flota' not in autorizados:
         return jsonify(success=False, message="Acceso denegado: Tu empresa no tiene activo el submódulo de Operador en Ruta."), 403
 
-    # B. CAPTURA DE DATOS
     data = request.get_json(silent=True) or {}
     placa = (data.get("placa") or "").upper().strip()
     
@@ -68,27 +87,57 @@ def prelogin_flota():
     if not empresa or not usuario_id:
         return jsonify(success=False, message="Sesión inválida."), 403
 
-    # C. VERIFICACIÓN EN BASE DE DATOS
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT id, empresa FROM vehiculos WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, empresa_id))
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("SELECT * FROM vehiculos WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, empresa_id))
     v = cur.fetchone()
 
     if not v:
         cur.close()
         return jsonify(success=False, message="Vehículo no encontrado o no pertenece a su empresa."), 404
     
-    v_id = v.get("id") if isinstance(v, dict) else v[0]
+    v_id = v.get("id")
 
-    # D. ACTUALIZACIÓN DE ESTADO Y REGISTRO DE SESIÓN DE OPERADOR
+    # --- MOTOR DE VISIÓN OPERATIVA PESV (BLOQUEO POR NOVEDADES Y DOCUMENTOS) ---
+    cur.execute("SELECT cedula FROM usuarios WHERE id = %s", (usuario_id,))
+    usr = cur.fetchone()
+    cedula_op = usr.get('cedula') if usr else ''
+
+    cur.execute("SELECT * FROM conductores_carga WHERE cedula = %s AND id_empresa = %s LIMIT 1", (cedula_op, empresa_id))
+    conductor = cur.fetchone() or {}
+
+    # Módulo PESV - Bloqueo Dinámico (Validación del estado de la documentación)
+    estados_bloqueo = ['Faltante', 'Vencido']
+    errores_documentos = []
+
+    # Validar documentos del Vehículo
+    if v.get('estado_soat') in estados_bloqueo: errores_documentos.append("SOAT")
+    if v.get('estado_tecnomecanica') in estados_bloqueo: errores_documentos.append("Tecnomecánica")
+    if v.get('estado_rce') in estados_bloqueo: errores_documentos.append("Póliza RCE")
+    
+    # Validar documentos del Conductor
+    if conductor.get('estado_licencia') in estados_bloqueo: errores_documentos.append("Licencia de Conducción")
+    if conductor.get('estado_seguridad_social') in estados_bloqueo: errores_documentos.append("Seguridad Social")
+
+    if errores_documentos:
+        cur.close()
+        mensaje_bloqueo = f"NO PUEDES INICIAR RUTA POR IRREGULARIDADES EN: {', '.join(errores_documentos)}. Valida con el controlador de tu flota."
+        return jsonify(success=False, message=mensaje_bloqueo), 403
+    # -------------------------------------------------------------
+
+    cur.execute("""
+        SELECT 1 FROM inspeccion_preoperacional 
+        WHERE id_empresa = %s AND placa_vehiculo = %s 
+        AND fecha_inspeccion = CURDATE() AND vehiculo_aprobado = 1
+        LIMIT 1
+    """, (empresa_id, placa))
+    tiene_preoperacional = cur.fetchone()
+
     try:
         cur.execute("UPDATE vehiculos SET estatus='Prelogueado' WHERE id=%s AND id_empresa=%s", (v_id, empresa_id))
-        
-        # Guardar en el historial de sesiones el logueo para el tablero del controlador
         cur.execute("""
             INSERT INTO historial_sesiones_flota (id_empresa, id_usuario, placa_vehiculo, fecha_login)
             VALUES (%s, %s, %s, NOW())
         """, (empresa_id, usuario_id, placa))
-        
         mysql.connection.commit()
     except Exception as e:
         mysql.connection.rollback()
@@ -96,13 +145,12 @@ def prelogin_flota():
     finally:
         cur.close()
 
+    session.permanent = True
     session["placa_prelogueada"] = placa
     
-    return jsonify(
-        success=True, 
-        message="Vehículo prelogueado correctamente.", 
-        redirect_url="/router/flota"
-    )
+    redir_url = "/router/flota" if tiene_preoperacional else "/preoperacional"
+    
+    return jsonify(success=True, message="Vehículo enlazado.", redirect_url=redir_url)
 
 @bp_flotacarga.route('/api/viaje/iniciar', methods=['POST'])
 @login_required_custom
@@ -117,7 +165,6 @@ def iniciar_viaje():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        # Aseguramos la existencia de la tabla
         cur.execute("""
             CREATE TABLE IF NOT EXISTS viajes_flotacarga (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -132,7 +179,6 @@ def iniciar_viaje():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
         
-        # BLOQUEO PESIMISTA (FOR UPDATE) para prevenir Race Conditions en asignación de consecutivos
         cur.execute("""
             SELECT COUNT(*) as total 
             FROM viajes_flotacarga 
@@ -144,7 +190,6 @@ def iniciar_viaje():
         
         consecutivo = f"VIAJE-{placa}-{str(contador).zfill(3)}"
 
-        # Registrar el inicio del viaje
         cur.execute("""
             INSERT INTO viajes_flotacarga (id_empresa, id_usuario_operador, placa_vehiculo, consecutivo_viaje, fecha_hora_inicio, estado)
             VALUES (%s, %s, %s, %s, NOW(), 'Activo')
@@ -153,7 +198,7 @@ def iniciar_viaje():
         id_viaje = cur.lastrowid
         mysql.connection.commit()
 
-        # Inyectar variables de control a la sesión
+        session.permanent = True
         session['viaje_activo'] = True
         session['consecutivo_viaje'] = consecutivo
         session['id_viaje'] = id_viaje
@@ -184,7 +229,6 @@ def finalizar_viaje():
         """, (id_viaje, empresa_id))
         mysql.connection.commit()
 
-        # Limpiamos los flags de viaje activo de la sesión
         session.pop('viaje_activo', None)
         session.pop('consecutivo_viaje', None)
         session.pop('id_viaje', None)
@@ -200,7 +244,6 @@ def finalizar_viaje():
 @login_required_custom
 @operador_flota_required
 def recuperar_viaje():
-    """Recupera la sesión del servidor si el dispositivo perdió conexión pero tiene viaje activo"""
     datos = request.get_json(silent=True) or {}
     placa = datos.get('placa')
     empresa_id = session.get('empresa_id')
@@ -220,6 +263,7 @@ def recuperar_viaje():
         viaje = cur.fetchone()
 
         if viaje:
+            session.permanent = True
             session['placa_prelogueada'] = placa
             session['viaje_activo'] = True
             session['consecutivo_viaje'] = viaje['consecutivo_viaje']
@@ -248,13 +292,11 @@ def recuperar_viaje():
 @bp_flotacarga.route('/api/flota/heartbeat', methods=['POST'])
 @login_required_custom
 def heartbeat_flota():
-    """Endpoint llamado por la PWA del operador para mantener su estado en línea"""
     if 'usuario_id' not in session:
         return jsonify({"status": "error", "message": "No autenticado"}), 401
         
     usuario_id = session.get('usuario_id')
     
-    # Manejo Silencioso de Deadlocks mediante Retry/Backoff (Máx 3 intentos)
     for intento in range(3):
         try:
             cur = mysql.connection.cursor()
@@ -270,11 +312,11 @@ def heartbeat_flota():
             mysql.connection.rollback()
             error_msg = str(e).lower()
             if "deadlock" in error_msg or "lock wait timeout" in error_msg:
-                time.sleep(0.5)  # Backoff de 500ms
+                time.sleep(0.5)
                 continue
             return jsonify({"status": "error", "message": str(e)}), 500
             
-    return jsonify({"status": "error", "message": "Fricción de base de datos persistente (Deadlock)."}), 500
+    return jsonify({"status": "error", "message": "Fricción de base de datos persistente."}), 500
 
 @bp_flotacarga.route('/api/flota/logout_manual', methods=['POST'])
 @login_required_custom
@@ -332,7 +374,6 @@ def actualizar_ubicacion():
     if not ubicaciones:
         return jsonify({"status": "error", "message": "Faltan coordenadas"}), 400
 
-    # Manejo Silencioso de Deadlocks (Retry/Backoff) para inserciones masivas de GPS
     for intento in range(3):
         try:
             cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -396,7 +437,6 @@ def registrar_parada():
             fecha_p = p.get('fecha', datetime.now().strftime('%Y-%m-%d'))
             hora_p = p.get('hora_inicio', datetime.now().strftime('%H:%M:%S'))
             
-            # PREVENCIÓN DE DUPLICADOS
             cur.execute("""
                 SELECT id FROM historial_paradas_flota 
                 WHERE id_empresa = %s AND placa = %s AND fecha = %s AND hora_inicio = %s
@@ -509,3 +549,60 @@ def cron_deslogueo_geocerca():
         
     cur.close()
     return jsonify({"status": "success", "total_deslogueados": len(vehiculos_a_desloguear)})
+
+# ==============================================================================
+# 5. REGISTRO DE NOVEDADES EN RUTA (FUNCIONALIDAD FIJA)
+# ==============================================================================
+@bp_flotacarga.route('/api/flota/registrar_novedad', methods=['POST'])
+@login_required_custom
+@operador_flota_required
+def registrar_novedad():
+    if 'usuario_id' not in session or 'placa_prelogueada' not in session:
+        return jsonify({"status": "error", "message": "Sesión inválida o vehículo no logueado"}), 401
+
+    empresa_id = session.get('empresa_id')
+    placa = session.get('placa_prelogueada')
+    usuario_id = session.get('usuario_id')
+    
+    tipo_novedad = request.form.get('tipo_novedad', 'Incidente Vial')
+    descripcion = request.form.get('descripcion', '')
+    latitud = request.form.get('lat', '')
+    longitud = request.form.get('lng', '')
+    direccion_google = request.form.get('direccion_google', 'Ubicación Desconocida')
+    
+    archivo_foto = request.files.get('foto')
+    ruta_foto = None
+    
+    if archivo_foto and archivo_foto.filename:
+        # Creación de directorio dinámico
+        base_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'flotacarga', 'novedades', str(empresa_id), placa)
+        os.makedirs(base_dir, exist_ok=True)
+        
+        filename = secure_filename(archivo_foto.filename)
+        timestamp = int(time.time())
+        ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'jpg'
+        nuevo_nombre = f"NOVEDAD_{timestamp}.{ext}"
+        ruta_fisica = os.path.join(base_dir, nuevo_nombre)
+        ruta_bd = f"uploads/flotacarga/novedades/{empresa_id}/{placa}/{nuevo_nombre}"
+        
+        try:
+            archivo_foto.save(ruta_fisica)
+            ruta_foto = ruta_bd
+        except Exception as e:
+            print(f"Error guardando foto de novedad: {e}")
+
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO novedades_viales_flotacarga 
+            (id_empresa, placa, id_usuario, latitud, longitud, direccion_google, tipo_novedad, descripcion, ruta_foto, fecha_hora)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """, (empresa_id, placa, usuario_id, latitud if latitud else None, longitud if longitud else None, direccion_google, tipo_novedad, descripcion, ruta_foto))
+        
+        mysql.connection.commit()
+        return jsonify({"status": "success", "message": "Novedad registrada exitosamente"}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()

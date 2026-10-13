@@ -1,4 +1,4 @@
-<!-- MÓDULO: WEBMASTER_ADMIN | ARCHIVO: 901811727_admin.html -->
+<!-- MÓDULO: WEBMASTER_ADMIN | ARCHIVO: 901811727_admin.html | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
 <!-- app/templates/901811727_admin.html -->
 <!DOCTYPE html>
 <html lang="es">
@@ -147,6 +147,9 @@
       <button class="nav-item" onclick="mostrarSeccion('gestionEmpresasTransporteCarga'); cargarTablaEmpresasCarga();">
         <span class="icon-spacer">🚛</span> Empresas Transporte Carga
       </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionEmpresasVentasDistribucion'); cargarTablaEmpresasVentas();">
+        <span class="icon-spacer">📦</span> Empresas Ventas y Distribución
+      </button>
       <button class="nav-item" onclick="mostrarSeccion('gestionTiposEmpresa'); cargarTablaTiposEmpresa();">
         <span class="icon-spacer">🏷️</span> Tipos de Empresa
       </button>
@@ -242,6 +245,30 @@
                     </tr>
                   </thead>
                   <tbody id="bodyEmpresasCarga"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 1D. GESTIÓN DE EMPRESAS VENTAS Y DISTRIBUCIÓN -->
+          <div id="gestionEmpresasVentasDistribucion" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Empresas de Ventas y Distribución</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('EmpresaVentas')">+ Nueva Empresa Ventas</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>NIT</th>
+                      <th>Nombre Comercial</th>
+                      <th>Submódulos Activos</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyEmpresasVentas"></tbody>
                 </table>
               </div>
           </div>
@@ -493,6 +520,28 @@
           });
       }
 
+      window.cargarTablaEmpresasVentas = function() {
+          fetch('/obtener_empresas_ventas_distribucion').then(r => r.json()).then(d => {
+              const b = document.getElementById('bodyEmpresasVentas');
+              b.innerHTML = '';
+              if (d.success && d.empresas) {
+                  d.empresas.forEach(e => {
+                      const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(e))));
+                      const submodulosText = (e.submodulos_activos && e.submodulos_activos.length > 0)
+                          ? e.submodulos_activos.map(s => `<span class="badge bg-warning text-dark me-1">${s}</span>`).join('')
+                          : '<span class="text-muted small">Ninguno</span>';
+                      
+                      b.innerHTML += `<tr>
+                          <td class="text-muted small">${e.nit}</td>
+                          <td class="fw-bold">${e.nombre_comercial}</td>
+                          <td>${submodulosText}</td>
+                          <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('EmpresaVentas', '${dataStr}')">✏️ Editar</button></td>
+                      </tr>`;
+                  });
+              }
+          });
+      }
+
       window.cargarTablaTiposEmpresa = function() {
           fetch('/obtener_todos_tipos_empresa').then(r => r.json()).then(d => {
               const b = document.getElementById('bodyTiposEmpresa'); b.innerHTML = '';
@@ -727,6 +776,18 @@
                       <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando submódulos dinámicos...</span>
                   </div>`;
           }
+          else if (tipo === 'EmpresaVentas') {
+              currentUrl = "/gestionar_empresa_ventas_distribucion";
+              html += `
+                  <label class="fw-bold small mt-2 text-primary">NIT</label>
+                  <input type="text" id="f_nit_ventas" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
+                  <label class="fw-bold small mt-2">Nombre Comercial</label>
+                  <input type="text" id="f_nom_ventas" class="form-control" value="${data.nombre_comercial || ''}">
+                  <label class="fw-bold small mt-3 mb-2 text-success">Submódulos y Módulos Universales Habilitados (Descubrimiento Dinámico Plug & Play)</label>
+                  <div id="contenedor_switches_ventas_distribucion" class="row g-2">
+                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando submódulos dinámicos...</span>
+                  </div>`;
+          }
           else if (tipo === 'TipoEmpresa') {
               currentUrl = "/gestionar_tipo_empresa";
               html += `
@@ -913,6 +974,44 @@
                   const contenedor = document.getElementById('contenedor_switches_transporte_carga');
                   if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error consultando submódulos del sistema.</span>';
               });
+          } else if (tipo === 'EmpresaVentas') {
+              fetch('/api/submodulos_ventas_distribucion').then(r => r.json()).then(res => {
+                  const contenedor = document.getElementById('contenedor_switches_ventas_distribucion');
+                  if (contenedor && res.success) {
+                      const subActivos = data.submodulos_activos || [];
+                      let htmlSwitches = '<div class="col-12"><h6 class="fw-bold text-primary mt-2 mb-1">Submódulos Directos de Ventas y Distribución</h6></div>';
+                      
+                      res.directos.forEach(s => {
+                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
+                          htmlSwitches += `
+                              <div class="col-md-6 mb-2">
+                                  <div class="form-check form-switch p-3 border rounded bg-light">
+                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
+                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
+                                      <div class="text-muted small ms-1">${s.desc}</div>
+                                  </div>
+                              </div>`;
+                      });
+
+                      htmlSwitches += '<div class="col-12"><h6 class="fw-bold text-success mt-3 mb-1">Módulos Universales / Proyectados</h6></div>';
+                      res.universales.forEach(s => {
+                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
+                          htmlSwitches += `
+                              <div class="col-md-6 mb-2">
+                                  <div class="form-check form-switch p-3 border rounded bg-light">
+                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
+                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
+                                      <div class="text-muted small ms-1">${s.desc}</div>
+                                  </div>
+                              </div>`;
+                      });
+
+                      contenedor.innerHTML = htmlSwitches;
+                  }
+              }).catch(err => {
+                  const contenedor = document.getElementById('contenedor_switches_ventas_distribucion');
+                  if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error consultando submódulos del sistema.</span>';
+              });
           } else if (tipo === 'Perfil') {
               // Pre-carga automática de módulos y rutas al estar en modo edición
               let selEmpresa = document.getElementById('f_enom_p');
@@ -940,6 +1039,11 @@
           else if (currentMode === 'EmpresaCarga') {
               fd.append('nit', document.getElementById('f_nit_carga').value);
               fd.append('nombre_comercial', document.getElementById('f_nom_carga').value);
+              document.querySelectorAll('.chk-submodulo:checked').forEach(chk => { fd.append('submodulos[]', chk.value); });
+          }
+          else if (currentMode === 'EmpresaVentas') {
+              fd.append('nit', document.getElementById('f_nit_ventas').value);
+              fd.append('nombre_comercial', document.getElementById('f_nom_ventas').value);
               document.querySelectorAll('.chk-submodulo:checked').forEach(chk => { fd.append('submodulos[]', chk.value); });
           }
           else if (currentMode === 'TipoEmpresa') {
@@ -993,7 +1097,7 @@
               alert(d.message);
               if (d.success) {
                   bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
-                  if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa' || currentMode === 'EmpresaEspecial' || currentMode === 'EmpresaCarga') location.reload();
+                  if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa' || currentMode === 'EmpresaEspecial' || currentMode === 'EmpresaCarga' || currentMode === 'EmpresaVentas') location.reload();
                   else if (currentMode === 'Usuario') window.cargarTablaUsuarios();
                   else if (currentMode === 'Proveedor') window.cargarTablaProveedores();
                   else if (currentMode === 'Perfil') window.cargarTablaPerfiles();

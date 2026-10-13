@@ -1,3 +1,4 @@
+# MÓDULO: UNIVERSAL | ARCHIVO: __init__.py | CONDICIÓN: OBLIGATORIO
 # app/__init__.py
 from flask import Flask
 from flask_mysqldb import MySQL
@@ -12,7 +13,6 @@ mysql = MySQL()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
 csrf = CSRFProtect()
-
 
 def create_app():
     """
@@ -70,12 +70,17 @@ def create_app():
     from app.blueprints.bp_901811727_energia_glp import bp_energia_glp
     from app.blueprints.bp_901811727_audit import bp_audit
 
+    # --- NUEVO HUB NATIVO: VENTAS Y DISTRIBUCIÓN (M3) ---
+    from app.blueprints.B_bp_hub_ventas_distribucion import bp_hub_ventas_distribucion
+
     app.register_blueprint(gestionavicola_bp)
     
     app.register_blueprint(bp_main)
     app.register_blueprint(bp_admin)
     app.register_blueprint(bp_energia_glp)
     app.register_blueprint(bp_audit)
+    
+    app.register_blueprint(bp_hub_ventas_distribucion)
 
     # ---------------------------------------------------------
     #  GRUPO B: MÓDULOS FUNCIONALES / SERVICIOS
@@ -87,13 +92,24 @@ def create_app():
     from app.blueprints.B_bp_controlador_flotacarga import bp_gestorflota
     from app.blueprints.B_bp_pesaje_carga_avicola import bp_gestion_carga               
     from app.blueprints.B_bp_comercializador_glp import bp_comercializador_glp
+    from app.blueprints.B_bp_validacion_terceros_carga import bp_validacion_terceros_carga
     
-    # --- TRANSPORTE ESPECIAL (4 Blueprints Oficiales) ---
+    # --- TRANSPORTE ESPECIAL (Blueprints Oficiales) ---
     from app.blueprints.B_bp_controlador_flotaespecial import bp_controlador_flotaespecial
     from app.blueprints.B_bp_flotaespecial_flota import bp_flotaespecial_flota
     from app.blueprints.B_bp_flotaespecial_eps import bp_flotaespecial_eps
     from app.blueprints.B_bp_procesofacturacion_eps_transporteespecial import bp_procesofacturacion_eps
-   
+    from app.blueprints.C_bp_hub_herramientas_flotaespecial import bp_hub_herramientas_flota
+
+    # --- TRANSPORTE CARGA (Blueprints Refactorizados Plug & Play) ---
+    from app.blueprints.C_bp_hub_herramientas_flotacarga import bp_hub_herramientas_flota as bp_hub_herramientas_flotacarga
+    from app.blueprints.B_bp_flotacarga_flota import bp_flotacarga_flota
+    from app.blueprints.B_bp_flotacarga_operativa import bp_flotacarga_operativa
+    
+    # --- SUBMÓDULOS PESV (Tipo 2) ---
+    from app.blueprints.B_bp_controlador_pesv import bp_controlador_pesv
+    from app.blueprints.C_bp_auditorias_PESV import bp_auditorias_pesv
+
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
     app.register_blueprint(bp_supervisorgas)                               
@@ -101,12 +117,23 @@ def create_app():
     app.register_blueprint(bp_gestorflota)
     app.register_blueprint(bp_gestion_carga)
     app.register_blueprint(bp_comercializador_glp)
+    app.register_blueprint(bp_validacion_terceros_carga) 
     
     # Registro Módulo Transporte Especial
     app.register_blueprint(bp_controlador_flotaespecial)
     app.register_blueprint(bp_flotaespecial_flota)
     app.register_blueprint(bp_flotaespecial_eps)
     app.register_blueprint(bp_procesofacturacion_eps)
+    app.register_blueprint(bp_hub_herramientas_flota)
+
+    # Registro Submódulos Transporte de Carga P&P
+    app.register_blueprint(bp_hub_herramientas_flotacarga)
+    app.register_blueprint(bp_flotacarga_flota)
+    app.register_blueprint(bp_flotacarga_operativa)
+    
+    # Registro PESV P&P
+    app.register_blueprint(bp_controlador_pesv)
+    app.register_blueprint(bp_auditorias_pesv)
 
     # ---------------------------------------------------------
     #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
@@ -128,7 +155,6 @@ def create_app():
     app.register_blueprint(bp_operador_flotaespecial)
 
     return app
-
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -158,8 +184,8 @@ def load_user(user_id):
         return None
 
     if user_data:
-        from app.models import User
-        user_obj = User(
+        from app.models import Usuario
+        user_obj = Usuario(
             user_data[0],  # id
             user_data[1],  # nombre
             user_data[2],  # cedula

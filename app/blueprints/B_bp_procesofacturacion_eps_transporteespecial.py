@@ -14,7 +14,8 @@ from functools import wraps
 import MySQLdb.cursors
 import pytz
 
-bp_procesofacturacion_eps = Blueprint('procesofacturacion_eps', __name__, url_prefix='/gestor_flotaespecial/facturacion_eps')
+
+bp_procesofacturacion_eps = Blueprint('procesofacturacion_eps', __name__, url_prefix='/gestor_flotaespecial/facturacion_eps_bp')
 
 BOGOTA_TZ = pytz.timezone('America/Bogota')
 
