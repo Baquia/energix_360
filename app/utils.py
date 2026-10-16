@@ -1,10 +1,11 @@
-# MÓDULO: UNIVERSAL | ARCHIVO: utils.py
+# MÓDULO: UNIVERSAL | ARCHIVO: utils.py | CONDICIÓN: OBLIGATORIO | TIPO: 1
 from flask import session, flash, redirect, url_for
 from functools import wraps
 from app import mysql
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 import os
+import json
 import smtplib
 from email.mime.text import MIMEText
 from email.utils import make_msgid, formatdate
@@ -36,16 +37,27 @@ def login_required_custom(f):
         
         # --- LÓGICA DE CONTROL DE SESIONES ÚNICAS ---
         perfil = str(session.get('perfil', '')).strip().lower()
-        perfiles_multi_sesion = ['operador_logistica', 'webmaster_admin', 'supervisor_gas', 'gestor_flotacarga']
+        perfiles_multi_sesion = [
+            'operador_logistica', 
+            'webmaster_admin', 
+            'supervisor_gas', 
+            'gestor_flotacarga',
+            'verificador_bodegas',
+            'operador_ventas',
+            'operador_recursohumano',
+            'operador_contable',
+            'operador_facturacion'
+        ]
         
         if perfil not in perfiles_multi_sesion:
             token_sesion_actual = session.get('token_sesion')
             usuario_id = session.get('usuario_id')
+            empresa_id = session.get('empresa_id')
             
-            if token_sesion_actual and usuario_id:
+            if token_sesion_actual and usuario_id and empresa_id:
                 try:
                     cur = mysql.connection.cursor()
-                    cur.execute("SELECT token_sesion FROM usuarios WHERE id = %s", (usuario_id,))
+                    cur.execute("SELECT token_sesion FROM usuarios WHERE id = %s AND empresa_id = %s", (usuario_id, empresa_id))
                     row = cur.fetchone()
                     cur.close()
                     
@@ -70,8 +82,15 @@ def submodulo_required(submodulo_nombre):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             submodulos_activos = session.get('submodulos_activos', [])
+            
+            if isinstance(submodulos_activos, str):
+                try:
+                    submodulos_activos = json.loads(submodulos_activos)
+                except Exception:
+                    submodulos_activos = []
+                    
             if submodulo_nombre not in submodulos_activos:
-                flash('Acceso denegado: Su empresa no tiene habilitado este submódulo.', 'danger')
+                flash(f'Acceso denegado: Su empresa no tiene habilitado el submódulo de {submodulo_nombre}.', 'danger')
                 return redirect(url_for('index'))
             return f(*args, **kwargs)
         return decorated_function
@@ -276,7 +295,6 @@ def enviar_alerta_novedad_tercero(empresa_id, empresa_nombre, placa, conductor_n
 
         items_html = ""
         for nov in novedades_lista:
-            # Tolerancia al nuevo formato estructurado (diccionario)
             mensaje_novedad = nov.get('mensaje', str(nov)) if isinstance(nov, dict) else str(nov)
             items_html += f"<li>{mensaje_novedad}</li>"
 

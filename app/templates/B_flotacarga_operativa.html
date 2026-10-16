@@ -120,7 +120,7 @@
         .badge-gray { background: #f1f5f9; color: #475569; }
         .badge-success { background: #d1fae5; color: #059669; }
         
-        .btn-icon { background: none; border: none; cursor: pointer; font-size: 18px; margin-left: 10px; transition: 0.2s; padding: 5px; border-radius: 6px;}
+        .btn-icon { background: none; border: none; cursor: pointer; font-size: 18px; margin-left: 10px; transition: 0.2s; padding: 5px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;}
         .btn-icon:hover { background: #f1f5f9; }
         .btn-icon.edit:hover { color: #f59e0b; transform: scale(1.1); background: #fef3c7;}
         .btn-icon.delete:hover { color: #ef4444; transform: scale(1.1); background: #fee2e2;}
@@ -323,6 +323,7 @@
                 </div>
                 
                 <form class="filter-bar" method="GET" action="{{ url_for('flotacarga_operativa.mapa_rutas') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="form-group">
                         <label>Fecha de Recorrido</label>
                         <input type="date" name="fecha" value="{{ filtros.fecha }}" required>

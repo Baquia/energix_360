@@ -1,13 +1,12 @@
 # MÓDULO: TRANSPORTE_CARGA | SUBMÓDULO: VALIDACION_TERCEROS | CONDICIÓN: OBLIGATORIO | TIPO: 1
 # app/blueprints/B_bp_validacion_terceros_carga.py
 import os
-import json
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session
 from app import mysql, csrf
+from app.utils import login_required_custom
 import MySQLdb.cursors
 from datetime import datetime
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-from werkzeug.utils import secure_filename
 
 bp_validacion_terceros_carga = Blueprint('validacion_terceros_carga', __name__, url_prefix='/terceros_carga')
 
@@ -54,7 +53,7 @@ def ingreso_terceros(nit_empresa):
             flash("Por favor, ingrese la placa del vehículo.", "warning")
             return redirect(url_for('validacion_terceros_carga.ingreso_terceros', nit_empresa=nit_empresa))
 
-        # Verificar vehículo en BD
+        # Verificar vehículo en BD aislando al inquilino
         cur.execute("SELECT * FROM vehiculos WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, nit_empresa))
         vehiculo = cur.fetchone()
 
@@ -120,7 +119,6 @@ def ingreso_terceros(nit_empresa):
 # PASO 2: DILIGENCIAMIENTO PREOPERACIONAL EXTERNO
 # ==============================================================================
 @bp_validacion_terceros_carga.route('/preoperacional/<token>', methods=['GET'])
-@csrf.exempt
 def preoperacional_publico(token):
     """
     Redirige al formulario preoperacional inyectando las variables requeridas (Tras validación de aptitud).
@@ -176,75 +174,3 @@ def exito_preoperacional(consecutivo, placa):
         consecutivo=consecutivo,
         placa=placa
     )
-
-# ==============================================================================
-# REFRENDACIÓN DE NOVEDADES OPERATIVAS E INTEGRACIÓN PESV
-# ==============================================================================
-@bp_validacion_terceros_carga.route('/refrendar_novedades/<nit_empresa>/<placa>', methods=['POST'])
-@csrf.exempt
-def refrendar_novedades(nit_empresa, placa):
-    """
-    Recibe dinámicamente los soportes documentales subidos por el aliado.
-    Guarda los archivos físicos y los enruta a la cola del Controlador PESV.
-    """
-    from app.utils import notificar_pesv_soportes_pendientes
-    
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT id, nit, nombre_comercial FROM empresas WHERE nit = %s", (nit_empresa,))
-    empresa = cur.fetchone()
-    
-    if not empresa:
-        cur.close()
-        return "Empresa no encontrada", 404
-        
-    empresa_nombre = empresa['nombre_comercial']
-    
-    # 1. Crear directorio base para la empresa y placa
-    upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'terceros_pesv', str(nit_empresa), str(placa).upper())
-    os.makedirs(upload_folder, exist_ok=True)
-    
-    archivos_guardados = []
-    
-    # 2. Capturar dinámicamente los archivos iterando sobre request.files
-    for field_name, file in request.files.items():
-        if file and file.filename != '':
-            if file.filename.lower().endswith(('.pdf', '.png', '.jpg', '.jpeg')):
-                ext = os.path.splitext(file.filename)[1]
-                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                # Nombre seguro unificado con la clave técnica dictada por el motor
-                safe_name = secure_filename(f"{field_name}_{placa}_{timestamp}{ext}")
-                file_path = os.path.join(upload_folder, safe_name)
-                
-                file.save(file_path)
-                
-                ruta_relativa = f"/static/uploads/terceros_pesv/{nit_empresa}/{str(placa).upper()}/{safe_name}"
-                archivos_guardados.append({
-                    "clave": field_name,
-                    "ruta": ruta_relativa
-                })
-    
-    # 3. Lógica Transaccional hacia Cola PESV (Estructura base preparada)
-    if archivos_guardados:
-        soportes_json = json.dumps(archivos_guardados)
-        
-        # Inserción en tabla puente (cola_revision_pesv). Tolera si la tabla aún no existe.
-        try:
-            cur.execute("""
-                INSERT INTO cola_revision_pesv (id_empresa, placa, soportes_json, estatus, fecha_carga)
-                VALUES (%s, %s, %s, 'pendiente', NOW())
-            """, (nit_empresa, placa, soportes_json))
-            mysql.connection.commit()
-        except Exception as e:
-            print(f"⚠️ Tabla cola_revision_pesv no existe aún. Soportes guardados físicamente en cola. {e}")
-            pass
-        
-        # 4. Notificación Específica al Controlador PESV
-        try:
-            notificar_pesv_soportes_pendientes(nit_empresa, empresa_nombre, placa)
-        except Exception as e:
-            print(f"Aviso notificación PESV soportes pendientes: {e}")
-
-    cur.close()
-
-    flash("Los soportes de refrendación han sido enviados. El área de control PESV los revisará para habilitar su ingreso.", "success")
-    return redirect(url_for('validacion_terceros_carga.ingreso_terceros', nit_empresa=nit_empresa))

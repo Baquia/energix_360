@@ -1,3 +1,4 @@
+<!-- MÓDULO: UNIVERSAL | ARCHIVO: login_energix360.html -->
 <!DOCTYPE html>
 <html lang="es">
 
@@ -8,9 +9,7 @@
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#015249">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#015249">
   <script src="/static/js/html5-qrcode.min.js"></script>
-
 
   <title>Login | BQA ONE</title>
   <style>
@@ -183,7 +182,7 @@
       transform: translateY(-50%) scale(1.1) !important;
     }
 
-    /* --- NUEVOS ESTILOS PARA MODALES DE INSTALACIÓN PWA --- */
+    /* MODALES DE INSTALACIÓN PWA */
     .pwa-overlay {
       position: fixed;
       top: 0;
@@ -191,7 +190,7 @@
       width: 100%;
       height: 100%;
       background: rgba(17, 24, 39, 0.6);
-      display: none; /* Oculto por defecto */
+      display: none;
       align-items: center;
       justify-content: center;
       z-index: 9999;
@@ -272,7 +271,6 @@
     .ios-icon {
       font-size: 1.6rem;
     }
-    /* ----------------------------------------------------- */
   </style>
 </head>
 <script>
@@ -284,7 +282,7 @@
 </script>
 
 <body>
-  <!-- --- MODAL PWA PARA ANDROID --- -->
+  <!-- MODAL PWA PARA ANDROID -->
   <div id="pwaAndroidOverlay" class="pwa-overlay">
     <div class="pwa-modal">
       <img src="{{ url_for('static', filename='icon-192.png') }}" alt="App Icon" onerror="this.src='/static/logo_energix360.png'">
@@ -295,7 +293,7 @@
     </div>
   </div>
 
-  <!-- --- MODAL PWA PARA IOS --- -->
+  <!-- MODAL PWA PARA IOS -->
   <div id="pwaiOSOverlay" class="pwa-overlay">
     <div class="pwa-modal">
       <img src="{{ url_for('static', filename='icon-192.png') }}" alt="App Icon" onerror="this.src='/static/logo_energix360.png'">
@@ -342,36 +340,31 @@
       <datalist id="lista_empresas">
         {% for id, nombre in form.empresa.choices %}
         <option value="{{ nombre }}">
-          {% endfor %}
+        {% endfor %}
       </datalist>
-
 
       <button type="submit">Ingresar</button>
     </form>
   </div>
 
   <script>
-    // FUNCIÓN PARA VER/OCULTAR CONTRASEÑA
     function togglePasswordVisibility() {
       const passwordInput = document.getElementById('password');
       const toggleBtn = document.getElementById('toggleBtn');
 
       if (passwordInput.type === 'password') {
         passwordInput.type = 'text';
-        toggleBtn.textContent = '🙈'; // Icono de "Ocultar"
+        toggleBtn.textContent = '🙈';
       } else {
         passwordInput.type = 'password';
-        toggleBtn.textContent = '👁️'; // Icono de "Ver"
+        toggleBtn.textContent = '👁️';
       }
     }
 
     const form = document.getElementById('loginForm');
     const flashEl = document.getElementById('flash');
 
-    // Modo seguro (B): siempre pedir login, incluso offline.
-    // Solo borramos la sesión offline, NO las credenciales offline guardadas.
     localStorage.removeItem("bqa_offline_session");
-
 
     function setFlash(msg) {
       flashEl.textContent = msg || "";
@@ -402,7 +395,6 @@
         return;
       }
 
-      // sesión offline local
       localStorage.setItem("bqa_offline_session", JSON.stringify({
         cedula: pack.cedula,
         nombre: pack.nombre,
@@ -414,7 +406,6 @@
         ts: Date.now()
       }));
 
-      // redirige al panel cacheado por SW
       window.location.href = "/" + pack.html;
     }
 
@@ -425,27 +416,34 @@
       const cedula = document.getElementById('cedula').value.trim();
       const password = document.getElementById('password').value;
       const empresa = document.getElementById('empresa').value;
+      const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
 
-      // Si no hay internet → login offline directo
       if (!navigator.onLine) {
         await offlineLogin(cedula, password);
         return;
       }
 
-      // Online login normal
       fetch('/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
         body: JSON.stringify({ cedula, password, empresa })
       })
-        .then(r => r.json())
+        .then(async r => {
+          if (!r.ok) {
+            const errData = await r.json().catch(() => null);
+            throw new Error(errData?.message || `Error del servidor (${r.status})`);
+          }
+          return r.json();
+        })
         .then(async data => {
           if (!data.success) {
             setFlash(data.message);
             return;
           }
 
-          // Guardar credenciales offline SOLO después de login online exitoso
           if (data.offline_enabled && data.offline_salt) {
             const verifier = await sha256(password + data.offline_salt);
 
@@ -465,41 +463,39 @@
             localStorage.setItem("bqa_last_user", cedula);
           }
 
-          // login online → sigue igual
           window.location.href = "/" + data.html;
         })
         .catch(async err => {
-          console.error("Login online falló, intento offline:", err);
-          await offlineLogin(cedula, password);
+          if (!navigator.onLine) {
+            await offlineLogin(cedula, password);
+          } else {
+            console.error("Login online falló:", err);
+            setFlash(err.message || "Error al procesar la autenticación con el servidor.");
+          }
         });
     });
   </script>
 
-  <!-- --- LÓGICA DE INSTALACIÓN PWA (Android & iOS) --- -->
+  <!-- LÓGICA DE INSTALACIÓN PWA -->
   <script>
     let deferredPrompt;
 
-    // 1. Android (Chrome/Edge): Capturar evento de instalación nativo
     window.addEventListener('beforeinstallprompt', (e) => {
-      // Prevenir el aviso automático del navegador
       e.preventDefault();
       deferredPrompt = e;
-      // Mostrar nuestro modal de Android
       document.getElementById('pwaAndroidOverlay').style.display = 'flex';
     });
 
-    // Acción al dar click en Instalar (Android)
     document.getElementById('btnInstallPwa').addEventListener('click', async () => {
       document.getElementById('pwaAndroidOverlay').style.display = 'none';
       if (deferredPrompt) {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
-        console.log(`Respuesta del usuario al prompt: ${outcome}`);
+        console.log(`Respuesta de instalación: ${outcome}`);
         deferredPrompt = null;
       }
     });
 
-    // 2. iOS (Safari): Detectar dispositivo y estado "standalone"
     function isIos() {
       const userAgent = window.navigator.userAgent.toLowerCase();
       return /iphone|ipad|ipod/.test(userAgent);
@@ -510,7 +506,6 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      // Si es iOS, y NO se está ejecutando como app instalada (standalone)
       if (isIos() && !isIosStandalone()) {
         document.getElementById('pwaiOSOverlay').style.display = 'flex';
       }
@@ -518,5 +513,4 @@
   </script>
 
 </body>
-
 </html>

@@ -1,0 +1,667 @@
+<!-- MÓDULO: VENTAS Y DISTRIBUCIÓN | SUBMÓDULO: OPERADOR VENTAS | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Ventas en Campo | BQA-ONE</title>
+  <meta name="theme-color" content="#015249">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
+  <style>
+    :root {
+      --primary: #015249;
+      --primary-dark: #013d36;
+      --secondary: #ff6b00;
+      --success: #10b981;
+      --danger: #ef4444;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 600px;
+      background: var(--surface);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    /* HEADER CO-BRANDING */
+    .navbar {
+      background-color: var(--primary);
+      color: white;
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .navbar-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .navbar-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .navbar-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-name {
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .company-name {
+      font-size: 11px;
+      opacity: 0.85;
+    }
+
+    .btn-logout {
+      background-color: rgba(255, 255, 255, 0.15);
+      color: white;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-logout:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* CONTENEDOR DE CONTENIDO MÓVIL */
+    .content-area {
+      flex: 1;
+      padding: 16px;
+      padding-bottom: max(80px, env(safe-area-inset-bottom));
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    /* ESTADO ONLINE Y KPIS */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .online-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--success);
+    }
+
+    .online-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--success);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+      animation: pulseDot 2s infinite;
+    }
+
+    @keyframes pulseDot {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .kpi-card {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+
+    .kpi-val {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--primary);
+      display: block;
+    }
+
+    .kpi-lbl {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* NAVEGACIÓN POR PESTAÑAS (TABS) */
+    .tabs-nav {
+      display: flex;
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+    }
+
+    /* FORMULARIOS Y TARJETAS OPERATIVAS */
+    .card-box {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      background: #f8fafc;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus, .form-select:focus {
+      border-color: var(--primary);
+      background: white;
+    }
+
+    /* CARRITO DE PEDIDO */
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .cart-item:last-child {
+      border-bottom: none;
+    }
+
+    .cart-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .cart-desc {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .btn-remove {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    /* BOTONES PRIMARIOS Y ACCIONES */
+    .btn-action-main {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(1, 82, 73, 0.2);
+      transition: transform 0.1s, opacity 0.2s;
+    }
+
+    .btn-action-main:active {
+      transform: scale(0.98);
+    }
+
+    .btn-add-item {
+      width: 100%;
+      background: #eefcf9;
+      color: var(--primary);
+      border: 2px dashed var(--primary);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 14px;
+    }
+
+    /* CATÁLOGO RÁPIDO */
+    .catalog-item {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-container">
+
+    <!-- BARRA SUPERIOR CON CO-BRANDING -->
+    <div class="navbar">
+      <div class="navbar-user">
+        <div class="navbar-avatar">
+          <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo BQA-ONE" style="height: 20px;" onerror="this.style.display='none'">
+        </div>
+        <div class="navbar-info">
+          <span class="user-name">{{ usuario }}</span>
+          <span class="company-name">{{ empresa }}</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        {% if nit %}
+        <img src="{{ url_for('static', filename='logo_' ~ session.empresa_id ~ '.png') }}" alt="Logo Empresa" style="height: 26px; max-width: 80px; object-fit: contain;" onerror="this.style.display='none'">
+        {% endif %}
+        <a href="/logout" class="btn-logout">Salir</a>
+      </div>
+    </div>
+
+    <!-- ÁREA DE CONTENIDO -->
+    <div class="content-area">
+
+      <!-- BARRA DE ESTADO / HEARTBEAT EN TIEMPO REAL -->
+      <div class="status-bar">
+        <span>Estado en Campo:</span>
+        <div class="online-indicator">
+          <span class="online-dot"></span>
+          <span>En Línea (GPS Activo)</span>
+        </div>
+      </div>
+
+      <!-- KPIS OPERATIVOS DEL ASESOR -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-val" id="kpi-pedidos">{{ kpis.pedidos_hoy }}</span>
+          <span class="kpi-lbl">Pedidos Hoy</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-val" id="kpi-clientes">{{ kpis.clientes_visitados }}</span>
+          <span class="kpi-lbl">Clientes Vis.</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-val" id="kpi-monto" style="font-size: 1rem; color: #0f766e;">${{ "{:,.0f}".format(kpis.monto_acumulado_hoy) }}</span>
+          <span class="kpi-lbl">Total Acum.</span>
+        </div>
+      </div>
+
+      <!-- TABS DE NAVEGACIÓN -->
+      <div class="tabs-nav">
+        <button class="tab-btn active" onclick="cambiarTab('tab-pedido', this)">Toma de Pedido</button>
+        <button class="tab-btn" onclick="cambiarTab('tab-catalogo', this)">Catálogo</button>
+        <button class="tab-btn" onclick="cambiarTab('tab-visitas', this)">Visitas</button>
+      </div>
+
+      <!-- TAB 1: TOMA DE PEDIDO -->
+      <div id="tab-pedido">
+        <div class="card-box">
+          <h3 style="margin-top:0; color:var(--primary); font-size:1.05rem;">1. Seleccionar Cliente</h3>
+          <div class="form-group">
+            <label class="form-label">Cliente Asignado</label>
+            <select id="sel-cliente" class="form-select">
+              <option value="">-- Toca para seleccionar cliente --</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card-box">
+          <h3 style="margin-top:0; color:var(--primary); font-size:1.05rem;">2. Agregar Productos</h3>
+          <div class="form-group">
+            <label class="form-label">Buscar Producto (EAN o Nombre)</label>
+            <select id="sel-producto" class="form-select" onchange="seleccionarProducto()">
+              <option value="">-- Selecciona producto --</option>
+            </select>
+          </div>
+
+          <div style="display:flex; gap:10px;" class="form-group">
+            <div style="flex:1;">
+              <label class="form-label">Cantidad (Cajas)</label>
+              <input type="number" id="inp-cajas" class="form-input" value="0" min="0">
+            </div>
+            <div style="flex:1;">
+              <label class="form-label">Cantidad (Unidades)</label>
+              <input type="number" id="inp-unidades" class="form-input" value="0" min="0">
+            </div>
+          </div>
+
+          <button class="btn-add-item" onclick="agregarAlPedido()">➕ Agregar al Pedido</button>
+
+          <!-- LISTA DE ARTÍCULOS EN PEDIDO -->
+          <h4 style="margin: 12px 0 8px 0; font-size: 0.85rem; color: var(--muted); text-transform: uppercase;">Resumen de Artículos</h4>
+          <div id="cart-container" style="min-height: 50px;">
+            <p id="empty-cart-msg" style="text-align: center; color: var(--muted); font-size: 0.85rem; margin: 15px 0;">No has agregado ítems aún.</p>
+          </div>
+        </div>
+
+        <!-- BOTÓN FINAL DE GUARDAR -->
+        <button class="btn-action-main" onclick="guardarPedidoFinal()">🚀 Confirmar y Transmitir Pedido</button>
+      </div>
+
+      <!-- TAB 2: CATÁLOGO DE PRODUCTOS -->
+      <div id="tab-catalogo" class="hidden">
+        <div class="card-box">
+          <input type="text" id="busqueda-catalogo" class="form-input" placeholder="🔍 Filtrar catálogo por nombre o EAN..." onkeyup="filtrarCatalogo()">
+        </div>
+        <div id="catalog-list">
+          <p style="text-align:center; color:var(--muted);">Cargando catálogo...</p>
+        </div>
+      </div>
+
+      <!-- TAB 3: VISITAS Y RUTERO -->
+      <div id="tab-visitas" class="hidden">
+        <div class="card-box" style="text-align: center; padding: 30px 15px;">
+          <div style="font-size: 3rem; margin-bottom: 10px;">📍</div>
+          <h3 style="margin: 0; color: var(--primary);">Rutero y Georreferenciación</h3>
+          <p style="color: var(--muted); font-size: 0.9rem; margin-top: 6px;">
+            Módulo de control de visitas programadas en ruta.
+          </p>
+          <button class="btn-action-main" style="margin-top: 15px; background: #334155;" onclick="alert('Registro de visita georreferenciada guardado.')">Registrar Check-in en Punto</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let catalogoGlobal = [];
+    let clientesGlobal = [];
+    let pedidoActual = [];
+
+    // CAMBIAR PESTAÑAS (TABS)
+    function cambiarTab(tabId, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      ['tab-pedido', 'tab-catalogo', 'tab-visitas'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(tabId).classList.remove('hidden');
+    }
+
+    // CARGA INICIAL
+    document.addEventListener("DOMContentLoaded", function () {
+      cargarClientes();
+      cargarCatalogo();
+      iniciarHeartbeat();
+    });
+
+    // HEARTBEAT PING CADA 15 SEGUNDOS (REPORTA VENDEDOR ONLINE)
+    function iniciarHeartbeat() {
+      setInterval(() => {
+        fetch('/operador_ventas/api/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(err => console.log('Error ping:', err));
+      }, 15000);
+    }
+
+    // CARGAR CLIENTES ASIGNADOS
+    function cargarClientes() {
+      fetch('/operador_ventas/api/clientes_asignados')
+        .then(r => r.json())
+        .then(data => {
+          clientesGlobal = data;
+          const sel = document.getElementById('sel-cliente');
+          sel.innerHTML = '<option value="">-- Toca para seleccionar cliente --</option>';
+          data.forEach(c => {
+            sel.innerHTML += `<option value="${c.id_cliente}">${c.nombre} (ID: ${c.id_cliente})</option>`;
+          });
+        })
+        .catch(err => console.error(err));
+    }
+
+    // CARGAR CATÁLOGO
+    function cargarCatalogo() {
+      fetch('/operador_ventas/api/catalogo_productos')
+        .then(r => r.json())
+        .then(data => {
+          catalogoGlobal = data;
+          const sel = document.getElementById('sel-producto');
+          sel.innerHTML = '<option value="">-- Selecciona producto --</option>';
+          data.forEach(p => {
+            sel.innerHTML += `<option value="${p.ean}">${p.producto} [${p.marca}]</option>`;
+          });
+          renderizarListaCatalogo(data);
+        })
+        .catch(err => console.error(err));
+    }
+
+    function renderizarListaCatalogo(lista) {
+      const container = document.getElementById('catalog-list');
+      if (lista.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--muted);">No hay productos registrados.</p>';
+        return;
+      }
+      let html = '';
+      lista.forEach(p => {
+        html += `
+          <div class="catalog-item">
+            <div>
+              <div style="font-weight:700; font-size:0.9rem;">${p.producto}</div>
+              <div style="font-size:0.75rem; color:var(--muted);">Marca: ${p.marca} | EAN: ${p.ean || 'S/C'}</div>
+            </div>
+            <span style="font-size:0.75rem; background:#f1f5f9; padding:4px 8px; border-radius:6px; font-weight:700; color:var(--primary);">${p.unidad_embalaje || 'UND'}</span>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function filtrarCatalogo() {
+      const q = document.getElementById('busqueda-catalogo').value.toLowerCase();
+      const filtrados = catalogoGlobal.filter(p =>
+        (p.producto || '').toLowerCase().includes(q) ||
+        (p.ean || '').toLowerCase().includes(q) ||
+        (p.marca || '').toLowerCase().includes(q)
+      );
+      renderizarListaCatalogo(filtrados);
+    }
+
+    // AGREGAR ÍTEM AL PEDIDO
+    function agregarAlPedido() {
+      const ean = document.getElementById('sel-producto').value;
+      const cajas = parseInt(document.getElementById('inp-cajas').value) || 0;
+      const unidades = parseInt(document.getElementById('inp-unidades').value) || 0;
+
+      if (!ean) return alert("⚠️ Selecciona un producto.");
+      if (cajas === 0 && unidades === 0) return alert("⚠️ Ingresa una cantidad válida.");
+
+      const prod = catalogoGlobal.find(p => p.ean === ean);
+      if (!prod) return;
+
+      const existente = pedidoActual.find(i => i.ean === ean);
+      if (existente) {
+        existente.cajas += cajas;
+        existente.unidades += unidades;
+      } else {
+        pedidoActual.push({
+          ean: prod.ean,
+          producto: prod.producto,
+          marca: prod.marca,
+          cajas: cajas,
+          unidades: unidades
+        });
+      }
+
+      document.getElementById('inp-cajas').value = '0';
+      document.getElementById('inp-unidades').value = '0';
+      document.getElementById('sel-producto').value = '';
+
+      renderizarCarrito();
+    }
+
+    function renderizarCarrito() {
+      const container = document.getElementById('cart-container');
+      if (pedidoActual.length === 0) {
+        container.innerHTML = '<p id="empty-cart-msg" style="text-align: center; color: var(--muted); font-size: 0.85rem; margin: 15px 0;">No has agregado ítems aún.</p>';
+        return;
+      }
+      let html = '';
+      pedidoActual.forEach((item, index) => {
+        html += `
+          <div class="cart-item">
+            <div>
+              <div class="cart-name">${item.producto}</div>
+              <div class="cart-desc">Cajas: <b>${item.cajas}</b> | Unidades: <b>${item.unidades}</b></div>
+            </div>
+            <button class="btn-remove" onclick="eliminarDelCarrito(${index})">Eliminar</button>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function eliminarDelCarrito(idx) {
+      pedidoActual.splice(idx, 1);
+      renderizarCarrito();
+    }
+
+    // TRANSMITIR PEDIDO AL SERVIDOR
+    function guardarPedidoFinal() {
+      const clienteId = document.getElementById('sel-cliente').value;
+      if (!clienteId) return alert("⚠️ Selecciona el cliente para el pedido.");
+      if (pedidoActual.length === 0) return alert("⚠️ El pedido no contiene artículos.");
+
+      const btn = document.querySelector('.btn-action-main');
+      btn.disabled = true;
+      btn.textContent = 'Transmitiendo pedido...';
+
+      fetch('/operador_ventas/api/guardar_pedido', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente: clienteId,
+          items: pedidoActual
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === 'success') {
+          alert("✅ " + res.message);
+          pedidoActual = [];
+          renderizarCarrito();
+          document.getElementById('sel-cliente').value = '';
+          const kpiPed = document.getElementById('kpi-pedidos');
+          if (kpiPed) kpiPed.textContent = parseInt(kpiPed.textContent || 0) + 1;
+        } else {
+          alert("❌ Error: " + res.message);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("❌ Error de red al transmitir pedido.");
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = '🚀 Confirmar y Transmitir Pedido';
+      });
+    }
+  </script>
+</body>
+</html>

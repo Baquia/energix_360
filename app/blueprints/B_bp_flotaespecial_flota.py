@@ -99,6 +99,8 @@ def asegurar_tablas_flota(cur):
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     """)
     
+    try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN tipo_conductor ENUM('Propio', 'Tercero') DEFAULT 'Propio'")
+    except: pass
     try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN telefono VARCHAR(50) DEFAULT NULL")
     except: pass
     try: cur.execute("ALTER TABLE conductores_flotaespecial ADD COLUMN email VARCHAR(150) DEFAULT NULL")
@@ -342,16 +344,19 @@ def _obtener_alertas_empresa(empresa_id, cur):
                 if fecha_vence <= hoy: alertas_vehiculos.append((placa, doc_nombre, "VENCIDO", str(fecha_vence)))
                 elif fecha_vence <= limite_alerta: alertas_vehiculos.append((placa, doc_nombre, "PROXIMO_VENCER", str(fecha_vence)))
 
-    cur.execute("SELECT cedula, nombre, vencimiento_licencia_conduccion, vencimiento_seguridad_social, estado_licencia, estado_seguridad_social FROM conductores_flotaespecial WHERE id_empresa = %s", (empresa_id,))
+    cur.execute("SELECT cedula, nombre, vencimiento_licencia_conduccion, vencimiento_seguridad_social, estado_licencia, estado_seguridad_social, tipo_conductor FROM conductores_flotaespecial WHERE id_empresa = %s", (empresa_id,))
     conductores = cur.fetchall()
     alertas_conductores = []
     
     for c in conductores:
         cedula, nombre = c['cedula'], c['nombre']
         docs = [
-            ('Licencia de Conducción', c.get('vencimiento_licencia_conduccion'), c.get('estado_licencia', 'Actualizado')),
-            ('Seguridad Social (Planilla)', c.get('vencimiento_seguridad_social'), c.get('estado_seguridad_social', 'Actualizado'))
+            ('Licencia de Conducción', c.get('vencimiento_licencia_conduccion'), c.get('estado_licencia', 'Actualizado'))
         ]
+        
+        if c.get('tipo_conductor') == 'Tercero':
+            docs.append(('Seguridad Social (Planilla)', c.get('vencimiento_seguridad_social'), c.get('estado_seguridad_social', 'Actualizado')))
+            
         for doc_nombre, fecha_vence, estado in docs:
             if estado == 'No Conforme':
                 alertas_conductores.append((f"{nombre} ({cedula})", doc_nombre, "NO CONFORME", str(fecha_vence) if fecha_vence else "N/A"))
@@ -407,7 +412,10 @@ def gestion_flota():
                 flash("Empresa tercera registrada exitosamente.", "success")
             except Exception as e:
                 mysql.connection.rollback()
-                flash(f"Error al registrar tercero: {str(e)}", "danger")
+                if hasattr(e, 'args') and e.args[0] == 1062:
+                    flash("El NIT o Empresa ya se encuentra registrado en el sistema.", "warning")
+                else:
+                    flash("Ocurrió una interrupción temporal al procesar la solicitud. Por favor, inténtalo nuevamente.", "danger")
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='terceros'))
 
         elif accion == 'editar_tercero':
@@ -428,7 +436,10 @@ def gestion_flota():
                 flash("Información de empresa tercera actualizada.", "success")
             except Exception as e:
                 mysql.connection.rollback()
-                flash(f"Error al actualizar tercero: {str(e)}", "danger")
+                if hasattr(e, 'args') and e.args[0] == 1062:
+                    flash("El NIT o Empresa ya se encuentra registrado en el sistema.", "warning")
+                else:
+                    flash("Ocurrió una interrupción temporal al procesar la solicitud. Por favor, inténtalo nuevamente.", "danger")
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='terceros'))
             
         elif accion == 'eliminar_tercero':
@@ -439,7 +450,7 @@ def gestion_flota():
                 flash("Empresa tercera eliminada.", "success")
             except Exception as e:
                 mysql.connection.rollback()
-                flash(f"Error al eliminar tercero.", "danger")
+                flash("Ocurrió una interrupción al intentar eliminar el registro. Inténtalo nuevamente.", "danger")
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='terceros'))
 
         # ====================================================
@@ -639,7 +650,16 @@ def gestion_flota():
                         
                 except Exception as e:
                     mysql.connection.rollback()
-                    flash(f"Error en base de datos: {str(e)}", "danger")
+                    for ruta_relativa in filter(None, [r_prop, r_ope, r_rcc, r_soat, r_rtm]):
+                        ruta_fisica = os.path.join(current_app.static_folder, ruta_relativa)
+                        if os.path.exists(ruta_fisica):
+                            try: os.remove(ruta_fisica)
+                            except: pass
+                    
+                    if hasattr(e, 'args') and e.args[0] == 1062:
+                        flash("La placa del vehículo ya se encuentra registrada en el sistema.", "warning")
+                    else:
+                        flash("Ocurrió una interrupción temporal al procesar la solicitud. Por favor, verifica los datos e intenta nuevamente.", "danger")
             else:
                 flash("Faltan datos obligatorios (Placa y Clase).", "warning")
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='vehiculos'))
@@ -656,7 +676,8 @@ def gestion_flota():
                 mysql.connection.commit()
                 flash("Vehículo especial eliminado de la base de datos.", "success")
             except Exception as e:
-                flash("Error al eliminar vehículo.", "danger")
+                mysql.connection.rollback()
+                flash("Ocurrió una interrupción al intentar eliminar el registro. Inténtalo nuevamente.", "danger")
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='vehiculos'))
 
         # ====================================================
@@ -664,6 +685,7 @@ def gestion_flota():
         # ====================================================
         elif accion in ['crear_conductor', 'editar_conductor']:
             conductor_id = request.form.get('conductor_id')
+            tipo_conductor = request.form.get('tipo_conductor', 'Propio').strip()
             nombre = request.form.get('nombre', '').strip()
             cedula = request.form.get('cedula', '').strip()
             telefono = request.form.get('telefono', '').strip()
@@ -679,17 +701,22 @@ def gestion_flota():
             ultimo_pago_ss = request.form.get('ultimo_pago_seguridad_social') or None
             es_relevo = 1 if request.form.get('es_relevo') else 0
 
-            vencimiento_ss = None
-            if ultimo_pago_ss:
-                try:
-                    fecha_pago = datetime.strptime(ultimo_pago_ss, '%Y-%m-%d')
-                    vencimiento_ss = (fecha_pago + timedelta(days=30)).strftime('%Y-%m-%d')
-                except ValueError:
-                    vencimiento_ss = None
+            if tipo_conductor == 'Propio':
+                ultimo_pago_ss = None
+                vencimiento_ss = None
+                r_ss = None
+            else:
+                vencimiento_ss = None
+                if ultimo_pago_ss:
+                    try:
+                        fecha_pago = datetime.strptime(ultimo_pago_ss, '%Y-%m-%d')
+                        vencimiento_ss = (fecha_pago + timedelta(days=30)).strftime('%Y-%m-%d')
+                    except ValueError:
+                        vencimiento_ss = None
+                r_ss = guardar_pdf_manual(request.files.get('file_pdf_seguridad_social'), 'ss', 'conductores')
 
             r_ced = guardar_pdf_manual(request.files.get('file_pdf_cedula'), 'ced', 'conductores')
             r_lic = guardar_pdf_manual(request.files.get('file_pdf_licencia'), 'lic', 'conductores')
-            r_ss = guardar_pdf_manual(request.files.get('file_pdf_seguridad_social'), 'ss', 'conductores')
 
             if nombre and cedula:
                 try:
@@ -699,23 +726,24 @@ def gestion_flota():
                             flash(f"La cédula {cedula} ya está registrada como usuario.", "danger")
                             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='conductores'))
                         
-                        if not password:
-                            flash("La contraseña es obligatoria para registrar un nuevo conductor.", "warning")
+                        if tipo_conductor == 'Propio' and not password:
+                            flash("La contraseña es obligatoria para registrar un nuevo conductor propio.", "warning")
                             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='conductores'))
                         
-                        hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
-                        cur.execute("""
-                            INSERT INTO usuarios (nombre, cedula, password, tipo_usuario, clase, perfil, empresa, empresa_id, telegram_id, telefono, email) 
-                            VALUES (%s, %s, %s, 'cliente', 'op', 'operador_flotaespecial', %s, %s, NULL, %s, %s)
-                        """, (nombre, cedula, hashed_pw, empresa_nombre, nit_empresa, telefono or None, email or None))
+                        if tipo_conductor == 'Propio':
+                            hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+                            cur.execute("""
+                                INSERT INTO usuarios (nombre, cedula, password, tipo_usuario, clase, perfil, empresa, empresa_id, telegram_id, telefono, email) 
+                                VALUES (%s, %s, %s, 'cliente', 'op', 'operador_flotaespecial', %s, %s, NULL, %s, %s)
+                            """, (nombre, cedula, hashed_pw, empresa_nombre, nit_empresa, telefono or None, email or None))
                         
                         cur.execute("""
                             INSERT INTO conductores_flotaespecial 
-                            (id_empresa, nombre, cedula, departamento_base, municipio_base, numero_licencia_conduccion, 
+                            (id_empresa, tipo_conductor, nombre, cedula, departamento_base, municipio_base, numero_licencia_conduccion, 
                              vencimiento_licencia_conduccion, eps, fondo_pensiones, arl, ultimo_pago_seguridad_social, 
                              vencimiento_seguridad_social, ruta_pdf_cedula, ruta_pdf_licencia, ruta_pdf_seguridad_social, telefono, email, estatus, es_relevo) 
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'No Logueado', %s)
-                        """, (empresa_id, nombre, cedula, departamento_base, municipio_base, numero_licencia,
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'No Logueado', %s)
+                        """, (empresa_id, tipo_conductor, nombre, cedula, departamento_base, municipio_base, numero_licencia,
                               vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
                               vencimiento_ss, r_ced or '', r_lic or '', r_ss or '', telefono or None, email or None, es_relevo))
                         
@@ -731,39 +759,66 @@ def gestion_flota():
 
                         cur.execute("""
                             UPDATE conductores_flotaespecial 
-                            SET nombre=%s, cedula=%s, departamento_base=%s, municipio_base=%s, numero_licencia_conduccion=%s, 
+                            SET tipo_conductor=%s, nombre=%s, cedula=%s, departamento_base=%s, municipio_base=%s, numero_licencia_conduccion=%s, 
                                 vencimiento_licencia_conduccion=%s, eps=%s, fondo_pensiones=%s, arl=%s, 
                                 ultimo_pago_seguridad_social=%s, vencimiento_seguridad_social=%s, telefono=%s, email=%s,
                                 es_relevo=%s, estado_licencia=%s, estado_seguridad_social=%s
                             WHERE id=%s AND id_empresa=%s
-                        """, (nombre, cedula, departamento_base, municipio_base, numero_licencia,
+                        """, (tipo_conductor, nombre, cedula, departamento_base, municipio_base, numero_licencia,
                               vencimiento_licencia, eps, fondo_pensiones, arl, ultimo_pago_ss,
                               vencimiento_ss, telefono or None, email or None, es_relevo, est_lic, est_ss, conductor_id, empresa_id))
                         
                         if r_ced: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_cedula=%s WHERE id=%s AND id_empresa=%s", (r_ced, conductor_id, empresa_id))
                         if r_lic: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_licencia=%s WHERE id=%s AND id_empresa=%s", (r_lic, conductor_id, empresa_id))
-                        if r_ss: cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_seguridad_social=%s WHERE id=%s AND id_empresa=%s", (r_ss, conductor_id, empresa_id))
                         
-                        if password:
-                            hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
-                            cur.execute("""
-                                UPDATE usuarios 
-                                SET nombre=%s, telefono=%s, email=%s, password=%s, telegram_id=NULL 
-                                WHERE cedula=%s AND empresa_id=%s AND perfil='operador_flotaespecial'
-                            """, (nombre, telefono or None, email or None, hashed_pw, cedula, nit_empresa))
-                        else:
-                            cur.execute("""
-                                UPDATE usuarios 
-                                SET nombre=%s, telefono=%s, email=%s, telegram_id=NULL 
-                                WHERE cedula=%s AND empresa_id=%s AND perfil='operador_flotaespecial'
-                            """, (nombre, telefono or None, email or None, cedula, nit_empresa))
+                        if tipo_conductor == 'Propio':
+                            cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_seguridad_social=NULL, ultimo_pago_seguridad_social=NULL, vencimiento_seguridad_social=NULL WHERE id=%s AND id_empresa=%s", (conductor_id, empresa_id))
+                        elif r_ss: 
+                            cur.execute("UPDATE conductores_flotaespecial SET ruta_pdf_seguridad_social=%s WHERE id=%s AND id_empresa=%s", (r_ss, conductor_id, empresa_id))
+                        
+                        cur.execute("SELECT id FROM usuarios WHERE cedula = %s AND empresa_id = %s", (old_c['cedula'], nit_empresa))
+                        usr = cur.fetchone()
+
+                        if tipo_conductor == 'Propio':
+                            if usr:
+                                if password:
+                                    hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+                                    cur.execute("""
+                                        UPDATE usuarios 
+                                        SET nombre=%s, telefono=%s, email=%s, password=%s, telegram_id=NULL 
+                                        WHERE id=%s
+                                    """, (nombre, telefono or None, email or None, hashed_pw, usr['id']))
+                                else:
+                                    cur.execute("""
+                                        UPDATE usuarios 
+                                        SET nombre=%s, telefono=%s, email=%s, telegram_id=NULL 
+                                        WHERE id=%s
+                                    """, (nombre, telefono or None, email or None, usr['id']))
+                            else:
+                                if password:
+                                    hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+                                    cur.execute("""
+                                        INSERT INTO usuarios (nombre, cedula, password, tipo_usuario, clase, perfil, empresa, empresa_id, telefono, email) 
+                                        VALUES (%s, %s, %s, 'cliente', 'op', 'operador_flotaespecial', %s, %s, %s, %s)
+                                    """, (nombre, cedula, hashed_pw, empresa_nombre, nit_empresa, telefono or None, email or None))
+                        elif tipo_conductor == 'Tercero' and usr:
+                            cur.execute("DELETE FROM usuarios WHERE id = %s", (usr['id'],))
 
                         mysql.connection.commit()
                         flash(f"Expediente del conductor {nombre} actualizado.", "success")
 
                 except Exception as e:
                     mysql.connection.rollback()
-                    flash(f"Error en base de datos: {str(e)}", "danger")
+                    for ruta_relativa in filter(None, [r_ced, r_lic, r_ss]):
+                        ruta_fisica = os.path.join(current_app.static_folder, ruta_relativa)
+                        if os.path.exists(ruta_fisica):
+                            try: os.remove(ruta_fisica)
+                            except: pass
+                    
+                    if hasattr(e, 'args') and e.args[0] == 1062:
+                        flash("El número de identificación del conductor ya se encuentra registrado en el sistema.", "warning")
+                    else:
+                        flash("Ocurrió una interrupción temporal al procesar la solicitud. Por favor, verifica los datos e intenta nuevamente.", "danger")
             else:
                 flash("Faltan datos obligatorios (Nombre y Cédula).", "warning")
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='conductores'))
@@ -778,7 +833,7 @@ def gestion_flota():
                 flash("Conductor eliminado permanentemente de la flota y del sistema de usuarios.", "success")
             except Exception as e:
                 mysql.connection.rollback()
-                flash("Error al eliminar conductor.", "danger")
+                flash("Ocurrió una interrupción al intentar eliminar el registro. Inténtalo nuevamente.", "danger")
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='conductores'))
 
         # ====================================================
@@ -822,7 +877,7 @@ def gestion_flota():
                     flash(f"Documento actualizado correctamente para el vehículo {placa}.", "success")
                     
                 elif entidad_tipo == 'conductor':
-                    cur.execute("SELECT cedula, nombre FROM conductores_flotaespecial WHERE id = %s AND id_empresa = %s", (entidad_id, empresa_id))
+                    cur.execute("SELECT cedula, nombre, tipo_conductor FROM conductores_flotaespecial WHERE id = %s AND id_empresa = %s", (entidad_id, empresa_id))
                     c = cur.fetchone()
                     if not c:
                         flash("Conductor no encontrado.", "danger")
@@ -830,10 +885,11 @@ def gestion_flota():
                         
                     cedula = c['cedula']
                     nombre = c['nombre']
+                    tipo_conductor = c.get('tipo_conductor', 'Propio')
                     
                     if documento_clave == 'vencimiento_licencia_conduccion':
                         col_fecha, col_ruta, col_estado = 'vencimiento_licencia_conduccion', 'ruta_pdf_licencia', 'estado_licencia'
-                    elif documento_clave == 'vencimiento_seguridad_social':
+                    elif documento_clave == 'vencimiento_seguridad_social' and tipo_conductor == 'Tercero':
                         col_fecha, col_ruta, col_estado = 'ultimo_pago_seguridad_social', 'ruta_pdf_seguridad_social', 'estado_seguridad_social'
                     else:
                         flash("Tipo de documento de conductor inválido.", "danger")
@@ -847,7 +903,18 @@ def gestion_flota():
                     
             except Exception as e:
                 mysql.connection.rollback()
-                flash(f"Error al actualizar documento: {str(e)}", "danger")
+                if 'ruta_pdf' in locals() and ruta_pdf:
+                    ruta_fisica = os.path.join(current_app.static_folder, ruta_pdf)
+                    if os.path.exists(ruta_fisica):
+                        try: os.remove(ruta_fisica)
+                        except: pass
+                        
+                if hasattr(e, 'args') and e.args[0] == 1213:
+                    flash("Hay un alto volumen de registros en este instante. Por favor, espera 3 segundos y vuelve a intentarlo.", "warning")
+                elif hasattr(e, 'args') and e.args[0] == 1062:
+                    flash("El registro ya se encuentra procesado en el sistema.", "warning")
+                else:
+                    flash("Ocurrió una interrupción temporal al guardar el expediente. Por favor, verifica tu conexión y vuelve a intentarlo.", "danger")
 
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='documentos_vencidos'))
 
@@ -873,7 +940,7 @@ def gestion_flota():
                 flash("Documento marcado como verificado y autorizado.", "success")
             except Exception as e:
                 mysql.connection.rollback()
-                flash(f"Error al verificar documento: {str(e)}", "danger")
+                flash("Ocurrió una interrupción temporal al procesar la solicitud. Por favor, inténtalo nuevamente.", "danger")
 
             return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='documentos_vencidos'))
 
@@ -974,9 +1041,10 @@ def gestion_flota():
         # Motor de Verificación de Conductores
         for c in conductores:
             docs_c = [
-                ("Licencia de Conducción", "vencimiento_licencia_conduccion", parse_date(c.get('vencimiento_licencia_conduccion')), c.get('ruta_pdf_licencia'), c.get('estado_licencia', 'Actualizado')),
-                ("Seguridad Social", "vencimiento_seguridad_social", parse_date(c.get('vencimiento_seguridad_social')), c.get('ruta_pdf_seguridad_social'), c.get('estado_seguridad_social', 'Actualizado'))
+                ("Licencia de Conducción", "vencimiento_licencia_conduccion", parse_date(c.get('vencimiento_licencia_conduccion')), c.get('ruta_pdf_licencia'), c.get('estado_licencia', 'Actualizado'))
             ]
+            if c.get('tipo_conductor') == 'Tercero':
+                docs_c.append(("Seguridad Social", "vencimiento_seguridad_social", parse_date(c.get('vencimiento_seguridad_social')), c.get('ruta_pdf_seguridad_social'), c.get('estado_seguridad_social', 'Actualizado')))
 
             for nombre_doc, clave, fecha, ruta, estado in docs_c:
                 if estado == 'No Conforme':
@@ -1171,7 +1239,7 @@ def descargar_reporte_vencimientos_pdf():
         pdf_buffer = _generar_pdf_vencimientos_buffer(empresa_nombre, nit_empresa, alertas_vehiculos, alertas_conductores)
         return send_file(pdf_buffer, as_attachment=True, download_name=f"Reporte_Vencimientos_{nit_empresa}.pdf", mimetype='application/pdf')
     except Exception as e:
-        flash(f"Error generando el reporte PDF: {str(e)}", "danger")
+        flash("Ocurrió una interrupción temporal al generar el reporte. Por favor, inténtalo nuevamente.", "danger")
         return redirect(url_for('flotaespecial_flota.gestion_flota', active_module='vehiculos'))
     finally:
         cur.close()
@@ -1471,7 +1539,7 @@ def descargar_qr_vehiculo_pdf(placa):
         else:
             story.append(Paragraph("[Error generando QR]", subtitle_style))
     except Exception as e:
-        story.append(Paragraph(f"[Error de conexión QR: {str(e)}]", subtitle_style))
+        story.append(Paragraph(f"[Error de connection QR: {str(e)}]", subtitle_style))
 
     story.append(Paragraph(f"<b>{placa.upper()}</b>", placa_style))
     story.append(Paragraph(f"Propiedad de: {empresa_nombre}", footer_style))

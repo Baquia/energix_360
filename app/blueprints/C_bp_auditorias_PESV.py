@@ -291,15 +291,15 @@ def verificacion_documentos():
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     documentos_pendientes = []
     
-    # 1. Vehículos de Carga
+    # 1. Vehículos de Carga (Corrección de mapeo SQL y lógicas de estado)
     try:
-        cur.execute("SELECT id, placa, estado_soat, estado_rtm, estado_rcc_rce as estado_poliza_rce, ruta_soat, ruta_tecnomecanica, ruta_poliza_rce FROM vehiculos WHERE id_empresa = %s", (nit_empresa,))
+        cur.execute("SELECT id, placa, estado_soat, estado_tecnomecanica, estado_poliza_rce, ruta_soat, ruta_tecnomecanica, ruta_poliza_rce FROM vehiculos WHERE id_empresa = %s", (nit_empresa,))
         vehiculos_carga = cur.fetchall()
         for v in vehiculos_carga:
             if v.get('estado_soat') == 'Actualizado' and v.get('ruta_soat'):
                 documentos_pendientes.append({"tipo": "vehiculo_carga", "id": v['id'], "identificador": v['placa'], "doc_nombre": "SOAT", "clave": "estado_soat", "ruta": v['ruta_soat']})
-            if v.get('estado_rtm') == 'Actualizado' and v.get('ruta_tecnomecanica'):
-                documentos_pendientes.append({"tipo": "vehiculo_carga", "id": v['id'], "identificador": v['placa'], "doc_nombre": "Tecnomecánica", "clave": "estado_rtm", "ruta": v['ruta_tecnomecanica']})
+            if v.get('estado_tecnomecanica') == 'Actualizado' and v.get('ruta_tecnomecanica'):
+                documentos_pendientes.append({"tipo": "vehiculo_carga", "id": v['id'], "identificador": v['placa'], "doc_nombre": "Tecnomecánica", "clave": "estado_tecnomecanica", "ruta": v['ruta_tecnomecanica']})
             if v.get('estado_poliza_rce') == 'Actualizado' and v.get('ruta_poliza_rce'):
                 documentos_pendientes.append({"tipo": "vehiculo_carga", "id": v['id'], "identificador": v['placa'], "doc_nombre": "Póliza RCE", "clave": "estado_poliza_rce", "ruta": v['ruta_poliza_rce']})
     except Exception as e:
@@ -382,9 +382,8 @@ def dictaminar_documento():
         elif tipo_entidad == 'conductor_carga': tabla = "conductores_carga"
         elif tipo_entidad == 'conductor_especial': tabla = "conductores_flotaespecial"
         
-        if tabla == "vehiculos" and clave_estado == "estado_poliza_rce":
-            clave_estado = "estado_rcc_rce"
-            
+        # Corrección: Se elimina la reasignación forzada a "estado_rcc_rce" para Carga, 
+        # respetando la estructura Plug&Play para ambas flotas.
         query = f"UPDATE {tabla} SET {clave_estado} = %s WHERE id = %s AND id_empresa = %s"
         cur.execute(query, (dictamen, entidad_id, nit_empresa))
         mysql.connection.commit()

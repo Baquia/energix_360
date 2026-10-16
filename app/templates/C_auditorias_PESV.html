@@ -254,6 +254,7 @@
             </div>
 
             <form class="table-card" style="padding: 20px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;" method="GET" action="{{ url_for('auditorias_pesv.consulta_preoperacionales') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;">
                     <label>Fecha Inicio</label>
                     <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}" required>

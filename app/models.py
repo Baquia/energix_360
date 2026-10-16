@@ -1,5 +1,4 @@
-from flask_login import UserMixin
-
+# MÓDULO: UNIVERSAL | ARCHIVO: models.py | CONDICIÓN: OBLIGATORIO | TIPO: 1
 # app/models.py
 from flask_login import UserMixin
 

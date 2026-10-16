@@ -498,6 +498,7 @@
                             <td>
                                 <b style="color: var(--verde);">{{ c.nombre }}</b><br>
                                 <small>{{ c.cedula }}</small><br>
+                                <span class="badge {% if c.tipo_conductor == 'Propio' or not c.tipo_conductor %}badge-success{% else %}badge-gray{% endif %}" style="margin-top: 4px; display: inline-block;">{{ c.tipo_conductor or 'Propio' }}</span>
                                 {% if c.es_relevo %}
                                     <span class="badge badge-warning" style="margin-top: 4px; display: inline-block;">[UNIVERSAL / RELEVO]</span>
                                 {% endif %}
@@ -529,6 +530,7 @@
                             <td style="white-space: nowrap;">
                                 <button class="btn-icon edit" title="Editar" 
                                         data-id="{{ c.id }}"
+                                        data-tipo="{{ c.tipo_conductor }}"
                                         data-nombre="{{ c.nombre }}"
                                         data-cedula="{{ c.cedula }}"
                                         data-telefono="{{ c.telefono }}"
@@ -567,6 +569,15 @@
                         <input type="hidden" name="conductor_id" id="conductor_id">
 
                         <div class="section-divider"><h4>👤 Identificación y Contacto</h4></div>
+                        
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Tipo de Conductor *</label>
+                            <select name="tipo_conductor" id="c_tipo_conductor" required onchange="toggleTipoConductor('c')">
+                                <option value="Propio">Propio (Contratado por la empresa)</option>
+                                <option value="Tercero">Tercero (Propietario / Tercerizado)</option>
+                            </select>
+                        </div>
+                        
                         <div class="form-group"><label>Nombre Completo *</label><input type="text" name="nombre" id="c_nombre" required></div>
                         <div class="form-group">
                             <label>Número de Cédula *</label>
@@ -609,11 +620,12 @@
                         <div class="form-group"><label>Número de Licencia</label><input type="text" name="numero_licencia_conduccion" id="c_licencia"></div>
                         <div class="form-group"><label>Fecha Vencimiento Licencia</label><input type="date" name="vencimiento_licencia_conduccion" id="c_vlicencia"></div>
 
-                        <div class="section-divider"><h4>🏥 Seguridad Social Integral</h4></div>
-                        <div class="form-group"><label>EPS</label><input type="text" name="eps" id="c_eps"></div>
-                        <div class="form-group"><label>Fondo de Pensiones (AFP)</label><input type="text" name="fondo_pensiones" id="c_afp"></div>
-                        <div class="form-group"><label>ARL</label><input type="text" name="arl" id="c_arl"></div>
-                        <div class="form-group">
+                        <div class="section-divider" id="c_ss_section_title"><h4>🏥 Seguridad Social Integral</h4></div>
+                        <div class="form-group" id="c_ss_eps"><label>EPS</label><input type="text" name="eps" id="c_eps"></div>
+                        <div class="form-group" id="c_ss_afp"><label>Fondo de Pensiones (AFP)</label><input type="text" name="fondo_pensiones" id="c_afp"></div>
+                        <div class="form-group" id="c_ss_arl"><label>ARL</label><input type="text" name="arl" id="c_arl"></div>
+                        
+                        <div class="form-group" id="c_ss_fecha_group">
                             <label>Fecha de Último Pago (Seguridad Social)</label>
                             <input type="date" name="ultimo_pago_seguridad_social" id="c_pago_ss">
                             <small style="color: #10b981; font-size: 10px;">El sistema calculará automáticamente el vencimiento a 30 días.</small>
@@ -623,7 +635,7 @@
                         <p style="grid-column: 1 / -1; font-size: 11px; color: var(--text-muted); margin-bottom: 5px;">Solo archivos .pdf. En edición, dejar en blanco para mantener el archivo actual.</p>
                         <div class="form-group"><label>Cédula Ciudadanía</label><input type="file" name="file_pdf_cedula" accept=".pdf"></div>
                         <div class="form-group"><label>Licencia de Conducción</label><input type="file" name="file_pdf_licencia" accept=".pdf"></div>
-                        <div class="form-group"><label>Planilla Seguridad Social</label><input type="file" name="file_pdf_seguridad_social" accept=".pdf"></div>
+                        <div class="form-group" id="c_ss_pdf_group"><label>Planilla Seguridad Social</label><input type="file" name="file_pdf_seguridad_social" accept=".pdf"></div>
 
                         <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalConductor')">Cancelar</button><button type="submit" class="btn-primary" id="btnGuardarConductor">Guardar Conductor</button></div>
                     </form>
@@ -1081,6 +1093,48 @@
         }
 
         /* SCRIPTS ESPECÍFICOS: CONDUCTORES */
+        
+        function toggleTipoConductor(prefix) {
+            const tipo = document.getElementById(prefix + '_tipo_conductor').value;
+            const ssTitle = document.getElementById(prefix + '_ss_section_title');
+            const ssEps = document.getElementById(prefix + '_ss_eps');
+            const ssAfp = document.getElementById(prefix + '_ss_afp');
+            const ssArl = document.getElementById(prefix + '_ss_arl');
+            const ssFechaGroup = document.getElementById(prefix + '_ss_fecha_group');
+            const ssPdfGroup = document.getElementById(prefix + '_ss_pdf_group');
+            const ssFechaInput = document.getElementById(prefix + '_pago_ss');
+            const passInput = document.getElementById(prefix + '_password');
+            const accion = document.getElementById('accionConductor').value;
+
+            if (tipo === 'Propio') {
+                if(ssTitle) ssTitle.style.display = 'none';
+                if(ssEps) ssEps.style.display = 'none';
+                if(ssAfp) ssAfp.style.display = 'none';
+                if(ssArl) ssArl.style.display = 'none';
+                if(ssFechaGroup) ssFechaGroup.style.display = 'none';
+                if(ssPdfGroup) ssPdfGroup.style.display = 'none';
+                if(ssFechaInput) {
+                    ssFechaInput.removeAttribute('required');
+                }
+                if(passInput && accion === 'crear_conductor') {
+                    passInput.setAttribute('required', 'required');
+                }
+            } else {
+                if(ssTitle) ssTitle.style.display = 'block';
+                if(ssEps) ssEps.style.display = 'block';
+                if(ssAfp) ssAfp.style.display = 'block';
+                if(ssArl) ssArl.style.display = 'block';
+                if(ssFechaGroup) ssFechaGroup.style.display = 'block';
+                if(ssPdfGroup) ssPdfGroup.style.display = 'block';
+                if(ssFechaInput) {
+                    ssFechaInput.setAttribute('required', 'required');
+                }
+                if(passInput) {
+                    passInput.removeAttribute('required');
+                }
+            }
+        }
+
         function abrirCrearConductor() {
             const form = document.getElementById('formConductor');
             if(form) {
@@ -1090,7 +1144,9 @@
                 document.getElementById('c_cedula').readOnly = false;
                 document.getElementById('c_password').required = true;
                 document.getElementById('c_es_relevo').checked = false;
+                document.getElementById('c_tipo_conductor').value = 'Propio';
                 document.getElementById('btnGuardarConductor').innerText = 'Guardar Conductor';
+                toggleTipoConductor('c');
                 openModal('modalConductor');
             }
         }
@@ -1104,6 +1160,7 @@
             document.getElementById('btnGuardarConductor').innerText = 'Guardar Cambios';
             
             document.getElementById('conductor_id').value = d.id;
+            document.getElementById('c_tipo_conductor').value = (d.tipo && d.tipo !== 'None') ? d.tipo : 'Propio';
             document.getElementById('c_nombre').value = d.nombre;
             document.getElementById('c_cedula').value = d.cedula;
             document.getElementById('c_cedula').readOnly = true; 
@@ -1127,6 +1184,7 @@
             document.getElementById('c_arl').value = (d.arl !== 'None') ? d.arl : '';
             document.getElementById('c_pago_ss').value = (d.pago !== 'None') ? d.pago : '';
 
+            toggleTipoConductor('c');
             openModal('modalConductor');
         }
 

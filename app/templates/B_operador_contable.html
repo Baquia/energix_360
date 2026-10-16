@@ -1,0 +1,618 @@
+<!-- MÓDULO: VENTAS Y DISTRIBUCIÓN | SUBMÓDULO: OPERADOR CONTABLE | CONDICIÓN: OPCIONAL | TIPO: 2 -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Operaciones Contables | BQA-ONE</title>
+  <meta name="theme-color" content="#015249">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
+  <style>
+    :root {
+      --primary: #015249;
+      --primary-dark: #013d36;
+      --secondary: #0284c7;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 600px;
+      background: var(--surface);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    /* HEADER CO-BRANDING */
+    .navbar {
+      background-color: var(--primary);
+      color: white;
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .navbar-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .navbar-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .navbar-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-name {
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .company-name {
+      font-size: 11px;
+      opacity: 0.85;
+    }
+
+    .btn-logout {
+      background-color: rgba(255, 255, 255, 0.15);
+      color: white;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-logout:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* CONTENEDOR DE CONTENIDO MÓVIL */
+    .content-area {
+      flex: 1;
+      padding: 16px;
+      padding-bottom: max(80px, env(safe-area-inset-bottom));
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    /* ESTADO ONLINE Y KPIS */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .online-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--success);
+    }
+
+    .online-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--success);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+      animation: pulseDot 2s infinite;
+    }
+
+    @keyframes pulseDot {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .kpi-card {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+
+    .kpi-val {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--primary);
+      display: block;
+      word-break: break-all;
+    }
+
+    .kpi-lbl {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* TABS */
+    .tabs-nav {
+      display: flex;
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+    }
+
+    /* TARJETAS OPERATIVAS */
+    .card-box {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      background: #f8fafc;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      border-color: var(--primary);
+      background: white;
+    }
+
+    .btn-action-main {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(1, 82, 73, 0.2);
+      transition: transform 0.1s, opacity 0.2s;
+    }
+
+    .btn-action-main:active {
+      transform: scale(0.98);
+    }
+
+    .btn-action-danger {
+      width: 100%;
+      background: var(--danger);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2);
+      transition: transform 0.1s, opacity 0.2s;
+    }
+
+    .btn-action-danger:active {
+      transform: scale(0.98);
+    }
+
+    .client-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-container">
+
+    <!-- BARRA SUPERIOR CON CO-BRANDING -->
+    <div class="navbar">
+      <div class="navbar-user">
+        <div class="navbar-avatar">
+          <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo BQA-ONE" style="height: 20px;" onerror="this.style.display='none'">
+        </div>
+        <div class="navbar-info">
+          <span class="user-name">{{ usuario }}</span>
+          <span class="company-name">{{ empresa }}</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        {% if nit %}
+        <img src="{{ url_for('static', filename='logo_' ~ session.empresa_id ~ '.png') }}" alt="Logo Empresa" style="height: 26px; max-width: 80px; object-fit: contain;" onerror="this.style.display='none'">
+        {% endif %}
+        <a href="/logout" class="btn-logout">Salir</a>
+      </div>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="content-area">
+
+      <!-- ESTADO EN TIEMPO REAL -->
+      <div class="status-bar">
+        <span>Caja & Asientos:</span>
+        <div class="online-indicator">
+          <span class="online-dot"></span>
+          <span>Activo (Contabilidad Conectada)</span>
+        </div>
+      </div>
+
+      <!-- KPIS OPERATIVOS -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-val" id="kpi-recaudos" style="color: #059669;">${{ "{:,.0f}".format(kpis.recaudos_hoy) }}</span>
+          <span class="kpi-lbl">Recaudos Hoy</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-val" id="kpi-gastos" style="color: #dc2626;">${{ "{:,.0f}".format(kpis.gastos_hoy) }}</span>
+          <span class="kpi-lbl">Gastos Hoy</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-val" id="kpi-pendientes" style="color: #d97706;">{{ kpis.documentos_pendientes }}</span>
+          <span class="kpi-lbl">Por Conciliar</span>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="tabs-nav">
+        <button class="tab-btn active" onclick="cambiarTab('tab-recaudo', this)">Recaudo Cartera</button>
+        <button class="tab-btn" onclick="cambiarTab('tab-gasto', this)">Egreso / Gasto</button>
+        <button class="tab-btn" onclick="cambiarTab('tab-clientes', this)">Clientes CxC</button>
+      </div>
+
+      <!-- TAB 1: RECAUDO DE CARTERA -->
+      <div id="tab-recaudo">
+        <div class="card-box">
+          <h3 style="margin-top:0; color:var(--primary); font-size:1.05rem;">Asentar Recaudo de Cliente</h3>
+
+          <div class="form-group">
+            <label class="form-label">Cliente Deudor</label>
+            <select id="sel-cliente-recaudo" class="form-select">
+              <option value="">-- Seleccionar cliente --</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Valor Recaudado ($)</label>
+            <input type="number" id="inp-valor-recaudo" class="form-input" placeholder="0.00" min="0" step="100">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Método de Pago</label>
+            <select id="sel-metodo-pago" class="form-select">
+              <option value="Efectivo">Efectivo (Caja General)</option>
+              <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+              <option value="Consignación">Consignación Directa</option>
+              <option value="Cheque">Cheque al Día / Postfechado</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Número de Recibo / Referencia Bancaria</label>
+            <input type="text" id="inp-soporte-recaudo" class="form-input" placeholder="Ej: RC-10492 o Ref: 893248">
+          </div>
+
+          <button class="btn-action-main" onclick="enviarRecaudo()">💵 Asentar Recibo de Caja</button>
+        </div>
+      </div>
+
+      <!-- TAB 2: EGRESO O GASTO DE CAJA MENOR -->
+      <div id="tab-gasto" class="hidden">
+        <div class="card-box">
+          <h3 style="margin-top:0; color:var(--danger); font-size:1.05rem;">Registrar Egreso / Caja Menor</h3>
+
+          <div class="form-group">
+            <label class="form-label">Concepto del Gasto</label>
+            <input type="text" id="inp-concepto-gasto" class="form-input" placeholder="Ej: Viáticos, Combustible, Aseo y Papelería">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Categoría</label>
+            <select id="sel-categoria-gasto" class="form-select">
+              <option value="Operativo">Gasto Operativo</option>
+              <option value="Transporte">Transporte / Rodamiento / Fletes</option>
+              <option value="Caja Menor">Caja Menor / Imprevistos</option>
+              <option value="Servicios">Servicios Públicos / Mantenimiento</option>
+              <option value="Administrativo">Papelería y Útiles de Oficina</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Valor del Desembolso ($)</label>
+            <input type="number" id="inp-valor-gasto" class="form-input" placeholder="0.00" min="0" step="100">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Número de Comprobante / Factura</label>
+            <input type="text" id="inp-comprobante-gasto" class="form-input" placeholder="Ej: CE-0482 o Factura Proveedor">
+          </div>
+
+          <button class="btn-action-danger" onclick="enviarGasto()">🧾 Asentar Comprobante de Egreso</button>
+        </div>
+      </div>
+
+      <!-- TAB 3: CLIENTES PARA COBRO -->
+      <div id="tab-clientes" class="hidden">
+        <div class="card-box">
+          <input type="text" id="busqueda-clientes-cxc" class="form-input" placeholder="🔍 Buscar cliente por nombre o NIT..." onkeyup="filtrarClientesCxC()">
+        </div>
+        <div id="clientes-cxc-list">
+          <p style="text-align:center; color:var(--muted);">Cargando directorio de cartera...</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let clientesGlobal = [];
+
+    function cambiarTab(tabId, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      ['tab-recaudo', 'tab-gasto', 'tab-clientes'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(tabId).classList.remove('hidden');
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      cargarClientesCxC();
+      iniciarHeartbeat();
+    });
+
+    function iniciarHeartbeat() {
+      setInterval(() => {
+        fetch('/operador_contable/api/ping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(err => console.log('Error ping Contabilidad:', err));
+      }, 15000);
+    }
+
+    function cargarClientesCxC() {
+      fetch('/operador_contable/api/cuentas_por_cobrar')
+        .then(r => r.json())
+        .then(data => {
+          clientesGlobal = data;
+          const selRecaudo = document.getElementById('sel-cliente-recaudo');
+          selRecaudo.innerHTML = '<option value="">-- Seleccionar cliente --</option>';
+
+          data.forEach(c => {
+            selRecaudo.innerHTML += `<option value="${c.id_cliente}">${c.cliente} (ID: ${c.id_cliente})</option>`;
+          });
+
+          renderizarClientesCxC(data);
+        })
+        .catch(err => console.error(err));
+    }
+
+    function renderizarClientesCxC(lista) {
+      const container = document.getElementById('clientes-cxc-list');
+      if (lista.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--muted);">No hay clientes registrados en cartera.</p>';
+        return;
+      }
+      let html = '';
+      lista.forEach(c => {
+        html += `
+          <div class="client-card">
+            <div>
+              <div style="font-weight:700; font-size:0.9rem;">${c.cliente}</div>
+              <div style="font-size:0.75rem; color:var(--muted);">ID / NIT: ${c.id_cliente}</div>
+            </div>
+            <button onclick="seleccionarParaRecaudo('${c.id_cliente}')" style="background:#e0f2fe; color:#0369a1; border:none; padding:6px 12px; border-radius:6px; font-weight:700; font-size:0.8rem; cursor:pointer;">Cobrar</button>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function filtrarClientesCxC() {
+      const q = document.getElementById('busqueda-clientes-cxc').value.toLowerCase();
+      const filtrados = clientesGlobal.filter(c =>
+        (c.cliente || '').toLowerCase().includes(q) ||
+        (c.id_cliente || '').toLowerCase().includes(q)
+      );
+      renderizarClientesCxC(filtrados);
+    }
+
+    function seleccionarParaRecaudo(clienteId) {
+      document.getElementById('sel-cliente-recaudo').value = clienteId;
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      cambiarTab('tab-recaudo', tabBtns[0]);
+    }
+
+    function enviarRecaudo() {
+      const clienteId = document.getElementById('sel-cliente-recaudo').value;
+      const valor = parseFloat(document.getElementById('inp-valor-recaudo').value) || 0;
+      const metodo = document.getElementById('sel-metodo-pago').value;
+      const soporte = document.getElementById('inp-soporte-recaudo').value.trim();
+
+      if (!clienteId) return alert("⚠️ Selecciona el cliente a quien se le atribuye el recaudo.");
+      if (valor <= 0) return alert("⚠️ Ingresa un valor de recaudo válido mayor a cero.");
+
+      fetch('/operador_contable/api/registrar_recaudo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente_id: clienteId,
+          valor_recaudo: valor,
+          metodo_pago: metodo,
+          soporte_referencia: soporte
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === 'success') {
+          alert("✅ " + res.message);
+          document.getElementById('inp-valor-recaudo').value = '';
+          document.getElementById('inp-soporte-recaudo').value = '';
+          const kpi = document.getElementById('kpi-recaudos');
+          if (kpi) {
+            let actual = parseFloat(kpi.textContent.replace(/[^0-9.-]+/g,"")) || 0;
+            kpi.textContent = '$' + (actual + valor).toLocaleString();
+          }
+        } else {
+          alert("❌ Error: " + res.message);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("❌ Error al registrar recaudo.");
+      });
+    }
+
+    function enviarGasto() {
+      const concepto = document.getElementById('inp-concepto-gasto').value.trim();
+      const categoria = document.getElementById('sel-categoria-gasto').value;
+      const valor = parseFloat(document.getElementById('inp-valor-gasto').value) || 0;
+      const comprobante = document.getElementById('inp-comprobante-gasto').value.trim();
+
+      if (!concepto) return alert("⚠️ Ingresa el concepto o descripción del gasto.");
+      if (valor <= 0) return alert("⚠️ Ingresa un valor de egreso válido mayor a cero.");
+
+      fetch('/operador_contable/api/registrar_gasto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          concepto: concepto,
+          categoria: categoria,
+          valor_gasto: valor,
+          numero_comprobante: comprobante
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === 'success') {
+          alert("✅ " + res.message);
+          document.getElementById('inp-concepto-gasto').value = '';
+          document.getElementById('inp-valor-gasto').value = '';
+          document.getElementById('inp-comprobante-gasto').value = '';
+          const kpi = document.getElementById('kpi-gastos');
+          if (kpi) {
+            let actual = parseFloat(kpi.textContent.replace(/[^0-9.-]+/g,"")) || 0;
+            kpi.textContent = '$' + (actual + valor).toLocaleString();
+          }
+        } else {
+          alert("❌ Error: " + res.message);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("❌ Error al registrar gasto.");
+      });
+    }
+  </script>
+</body>
+
+</html>

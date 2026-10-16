@@ -161,6 +161,7 @@
     {% endwith %}
 
     <form class="filter-bar" method="GET" action="{{ url_for('preoperacional.historial_preoperacionales') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="form-group">
             <label>Desde</label>
             <input type="date" name="fecha_inicio" class="form-control" value="{{ filtros.fecha_inicio }}">

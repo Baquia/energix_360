@@ -1,0 +1,966 @@
+<!-- MÓDULO: VENTAS Y DISTRIBUCIÓN | SUBMÓDULO: OPERADOR FACTURACIÓN | CONDICIÓN: OPCIONAL | TIPO: 2 -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Operaciones de Facturación | BQA-ONE</title>
+  <meta name="theme-color" content="#015249">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
+  <style>
+    :root {
+      --primary: #015249;
+      --primary-dark: #013d36;
+      --secondary: #0284c7;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 600px;
+      background: var(--surface);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    /* HEADER CO-BRANDING */
+    .navbar {
+      background-color: var(--primary);
+      color: white;
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .navbar-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .navbar-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .navbar-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-name {
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .company-name {
+      font-size: 11px;
+      opacity: 0.85;
+    }
+
+    .btn-logout {
+      background-color: rgba(255, 255, 255, 0.15);
+      color: white;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-logout:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* CONTENEDOR DE CONTENIDO MÓVIL */
+    .content-area {
+      flex: 1;
+      padding: 16px;
+      padding-bottom: max(80px, env(safe-area-inset-bottom));
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    /* ESTADO ONLINE Y KPIS */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .online-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--success);
+    }
+
+    .online-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--success);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+      animation: pulseDot 2s infinite;
+    }
+
+    @keyframes pulseDot {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .kpi-card {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+
+    .kpi-val {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--primary);
+      display: block;
+      word-break: break-all;
+    }
+
+    .kpi-lbl {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* TABS */
+    .tabs-nav {
+      display: flex;
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+    }
+
+    /* TARJETAS OPERATIVAS */
+    .card-box {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      background: #f8fafc;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-input:focus, .form-select:focus {
+      border-color: var(--primary);
+      background: white;
+    }
+
+    .btn-action-main {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(1, 82, 73, 0.2);
+      transition: transform 0.1s, opacity 0.2s;
+    }
+
+    .btn-action-main:active {
+      transform: scale(0.98);
+    }
+
+    .order-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .client-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    /* MODAL DE GRÚPO DE FACTURACIÓN Y DETALLES */
+    .table-container {
+        width: 100%;
+        overflow-x: auto;
+        margin-bottom: 15px;
+    }
+    .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+    .detail-table th {
+        background: #f1f5f9;
+        text-align: left;
+        padding: 8px;
+        color: var(--muted);
+        font-weight: 700;
+        border-bottom: 1px solid var(--border);
+    }
+    .detail-table td {
+        padding: 8px;
+        border-bottom: 1px solid var(--border);
+    }
+    .detail-table input {
+        width: 100%;
+        padding: 6px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-container">
+
+    <!-- BARRA SUPERIOR CON CO-BRANDING -->
+    <div class="navbar">
+      <div class="navbar-user">
+        <div class="navbar-avatar">
+          <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo BQA-ONE" style="height: 20px;" onerror="this.style.display='none'">
+        </div>
+        <div class="navbar-info">
+          <span class="user-name">{{ usuario }}</span>
+          <span class="company-name">{{ empresa }}</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        {% if nit %}
+        <img src="{{ url_for('static', filename='logo_' ~ session.empresa_id ~ '.png') }}" alt="Logo Empresa" style="height: 26px; max-width: 80px; object-fit: contain;" onerror="this.style.display='none'">
+        {% endif %}
+        <a href="/logout" class="btn-logout">Salir</a>
+      </div>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="content-area">
+
+      <!-- ESTADO EN TIEMPO REAL -->
+      <div class="status-bar">
+        <span>Emisión & Cartera:</span>
+        <div class="online-indicator">
+          <span class="online-dot"></span>
+          <span>Activo (Facturación Conectada)</span>
+        </div>
+      </div>
+
+      <!-- KPIS OPERATIVOS -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <span class="kpi-val" id="kpi-facturas" style="color: #059669;">{{ kpis.facturas_hoy }}</span>
+          <span class="kpi-lbl">Facturas Hoy</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-val" id="kpi-monto-facturado" style="color: #0284c7;">${{ "{:,.0f}".format(kpis.monto_facturado_hoy) }}</span>
+          <span class="kpi-lbl">Total Facturado</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-val" id="kpi-pedidos-pendientes" style="color: #d97706;">{{ kpis.pedidos_pendientes_facturar }}</span>
+          <span class="kpi-lbl">Por Facturar</span>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="tabs-nav">
+        <button class="tab-btn active" onclick="cambiarTab('tab-emitir', this)">Emitir Factura</button>
+        <button class="tab-btn" onclick="cambiarTab('tab-ordenes', this)">Por Facturar</button>
+        <button class="tab-btn" onclick="cambiarTab('tab-clientes', this)">Directorio</button>
+      </div>
+
+      <!-- TAB 1: EMITIR FACTURA (CON DETALLE DINÁMICO) -->
+      <div id="tab-emitir">
+        <div class="card-box">
+          <h3 style="margin-top:0; color:var(--primary); font-size:1.05rem;">Expedición de Factura de Venta</h3>
+
+          <div class="form-group">
+            <label class="form-label">Cliente Receptor</label>
+            <select id="sel-cliente-factura" class="form-select">
+              <option value="">-- Seleccionar cliente --</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Número de Orden Origen (Despacho)</label>
+            <input type="text" id="inp-orden-factura" class="form-input" placeholder="Ej: ORD-90214 o dejar en blanco si es directa">
+          </div>
+
+          <div style="display:flex; gap:10px;" class="form-group">
+            <div style="flex:1;">
+              <label class="form-label">Prefijo</label>
+              <select id="sel-prefijo-factura" class="form-select">
+                <option value="FAC">FAC</option>
+                <option value="FEV">FEV</option>
+                <option value="POS">POS</option>
+              </select>
+            </div>
+            <div style="flex:1;">
+              <label class="form-label">Forma de Pago</label>
+              <select id="sel-metodo-pago-factura" class="form-select">
+                <option value="Crédito">Crédito 30 días</option>
+                <option value="Contado">Contado</option>
+                <option value="Transferencia">Transferencia</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- SECCIÓN MOTOR DETALLE DE FACTURA -->
+          <div style="border-top: 2px dashed var(--border); margin: 20px 0; padding-top: 15px;">
+            <h4 style="margin:0 0 10px 0; color:var(--text); font-size:0.95rem;">Detalle de Productos / Servicios</h4>
+            
+            <div style="display:flex; gap:10px; margin-bottom: 10px;">
+                <select id="sel-producto-maestro" class="form-select" style="flex:2;" onchange="cargarDatosProducto()">
+                    <option value="">-- Buscar producto --</option>
+                </select>
+                <button onclick="agregarLineaProducto()" style="flex:1; background:var(--secondary); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">+ Añadir</button>
+            </div>
+            
+            <div class="table-container">
+                <table class="detail-table" id="tabla-detalles">
+                    <thead>
+                        <tr>
+                            <th style="width: 35%;">Item</th>
+                            <th style="width: 15%;">Cant</th>
+                            <th style="width: 25%;">V. Unitario ($)</th>
+                            <th style="width: 10%;">Imp (%)</th>
+                            <th style="width: 15%;">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-detalles">
+                        <!-- Las filas dinámicas se insertarán aquí -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- TOTALIZADORES -->
+            <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 4px; font-size: 0.85rem;">
+                    <span>Subtotal (Antes de Impuestos):</span>
+                    <span id="txt-subtotal" style="font-weight:bold;">$0.00</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 4px; font-size: 0.85rem;">
+                    <span>Total Impuestos:</span>
+                    <span id="txt-impuestos" style="font-weight:bold; color: var(--danger);">$0.00</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size: 1.1rem; border-top: 1px solid #cbd5e1; padding-top: 6px; margin-top: 6px;">
+                    <strong>Total a Pagar:</strong>
+                    <strong id="txt-total" style="color: var(--primary);">$0.00</strong>
+                </div>
+            </div>
+          </div>
+
+          <button class="btn-action-main" id="btn-emitir" onclick="enviarFactura()" disabled>🧾 Expedir y Radicar Factura</button>
+        </div>
+      </div>
+
+      <!-- TAB 2: ÓRDENES PENDIENTES POR FACTURAR -->
+      <div id="tab-ordenes" class="hidden">
+        <div class="card-box">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h4 style="margin:0; color:var(--primary);">Órdenes Verificadas/Despachadas</h4>
+            <button onclick="cargarOrdenesPendientes()" style="background:none; border:none; cursor:pointer; font-weight:700; color:var(--secondary);">🔄 Refrescar</button>
+          </div>
+          <p style="font-size:0.8rem; color:var(--muted); margin-top:0; margin-bottom:12px;">
+            Selecciona una orden con alistamiento concluido para autocompletar la factura.
+          </p>
+        </div>
+        <div id="ordenes-pendientes-list">
+          <p style="text-align:center; color:var(--muted);">Cargando órdenes listas...</p>
+        </div>
+      </div>
+
+      <!-- TAB 3: DIRECTORIO DE CLIENTES / CREAR CLIENTE -->
+      <div id="tab-clientes" class="hidden">
+        
+        <!-- Formulario Crear Nuevo Cliente -->
+        <div class="card-box">
+            <h4 style="margin:0 0 10px 0; color:var(--primary);">+ Crear Nuevo Cliente</h4>
+            <form id="form-crear-cliente" onsubmit="event.preventDefault(); crearCliente();">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div style="display:flex; gap:10px;" class="form-group">
+                    <div style="flex:1;">
+                        <label class="form-label">Tipo Doc</label>
+                        <select name="tipo_documento" id="c-tipo-doc" class="form-select" required>
+                            <option value="NIT">NIT</option>
+                            <option value="CC">Cédula</option>
+                        </select>
+                    </div>
+                    <div style="flex:2;">
+                        <label class="form-label">Número Documento</label>
+                        <input type="text" name="numero_documento" id="c-num-doc" class="form-input" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Razón Social / Nombre</label>
+                    <input type="text" name="nombre_comercial" id="c-nombre" class="form-input" required>
+                </div>
+                
+                <div style="display:flex; gap:10px;" class="form-group">
+                    <div style="flex:1;">
+                        <label class="form-label">Departamento</label>
+                        <select name="departamento" id="c-departamento" class="form-select" onchange="cargarMunicipios()" required>
+                            <option value="">-- Seleccionar --</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;">
+                        <label class="form-label">Municipio</label>
+                        <select name="municipio" id="c-municipio" class="form-select" required>
+                            <option value="">-- Seleccionar --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Dirección</label>
+                    <input type="text" name="direccion" id="c-direccion" class="form-input" required>
+                </div>
+
+                <div style="display:flex; gap:10px;" class="form-group">
+                    <div style="flex:1;">
+                        <label class="form-label">Teléfono</label>
+                        <input type="text" name="telefono" id="c-telefono" class="form-input" required>
+                    </div>
+                    <div style="flex:1;">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" id="c-email" class="form-input" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Subir RUT (Opcional - PDF)</label>
+                    <input type="file" name="rut_pdf" id="c-rut" class="form-input" accept="application/pdf">
+                </div>
+
+                <button type="submit" id="btn-crear-cliente" class="btn-action-main" style="padding: 10px; font-size: 0.9rem;">Guardar Cliente</button>
+            </form>
+        </div>
+
+        <div class="card-box">
+            <h4 style="margin:0 0 10px 0; color:var(--text);">Directorio de Clientes</h4>
+            <input type="text" id="busqueda-clientes-factura" class="form-input" placeholder="🔍 Buscar cliente por nombre o NIT..." onkeyup="filtrarClientesFacturacion()">
+        </div>
+        <div id="clientes-facturacion-list">
+          <p style="text-align:center; color:var(--muted);">Cargando directorio fiscal...</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Variables Globales
+    let clientesGlobal = [];
+    let ordenesGlobal = [];
+    let productosGlobal = [];
+    let detalleFactura = []; // Array que alojará los items agregados
+    let diccionarioGeo = {};
+
+    function cambiarTab(tabId, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      ['tab-emitir', 'tab-ordenes', 'tab-clientes'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(tabId).classList.remove('hidden');
+
+      if (tabId === 'tab-ordenes') {
+        cargarOrdenesPendientes();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      cargarClientesFacturacion();
+      cargarProductosMaestros();
+      cargarDiccionarioGeo();
+      iniciarHeartbeat();
+    });
+
+    function iniciarHeartbeat() {
+      setInterval(() => {
+        fetch('/operador_facturacion/api/ping', {
+          method: 'POST',
+          headers: {
+             'Content-Type': 'application/json',
+             'X-CSRFToken': document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : ''
+          }
+        }).catch(err => console.log('Error ping Facturación:', err));
+      }, 15000);
+    }
+
+    // =========================================================================
+    // LÓGICA DE DIRECTORIO DE CLIENTES Y CREACIÓN
+    // =========================================================================
+    function cargarClientesFacturacion() {
+      // CACHE-BUSTER: Forzar la actualización sin caché del navegador
+      const nocache = new Date().getTime();
+      fetch(`/operador_facturacion/api/clientes_facturacion?_=${nocache}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+          clientesGlobal = data;
+          const selFactura = document.getElementById('sel-cliente-factura');
+          
+          // CONSTRUCCIÓN LIMPIA EN MEMORIA: Evita el bug de duplicación del DOM
+          let opcionesHTML = '<option value="">-- Seleccionar cliente --</option>';
+          data.forEach(c => {
+            opcionesHTML += `<option value="${c.id_cliente}">${c.cliente} (ID: ${c.id_cliente})</option>`;
+          });
+          
+          selFactura.innerHTML = opcionesHTML;
+          renderizarClientesFacturacion(data);
+        })
+        .catch(err => console.error(err));
+    }
+
+    function renderizarClientesFacturacion(lista) {
+      const container = document.getElementById('clientes-facturacion-list');
+      if (lista.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--muted);">No hay clientes registrados o no coinciden con la búsqueda.</p>';
+        return;
+      }
+      let html = '';
+      lista.forEach(c => {
+        html += `
+          <div class="client-card">
+            <div>
+              <div style="font-weight:700; font-size:0.9rem;">${c.cliente}</div>
+              <div style="font-size:0.75rem; color:var(--muted);">ID / NIT: ${c.id_cliente}</div>
+            </div>
+            <button onclick="seleccionarParaFacturar('${c.id_cliente}')" style="background:#eefcf9; color:var(--primary); border:1px solid var(--primary); padding:6px 12px; border-radius:6px; font-weight:700; font-size:0.8rem; cursor:pointer;">Facturar</button>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function filtrarClientesFacturacion() {
+      const q = document.getElementById('busqueda-clientes-factura').value.toLowerCase();
+      const filtrados = clientesGlobal.filter(c =>
+        (c.cliente || '').toLowerCase().includes(q) ||
+        (c.id_cliente || '').toLowerCase().includes(q)
+      );
+      renderizarClientesFacturacion(filtrados);
+    }
+
+    function seleccionarParaFacturar(clienteId) {
+      document.getElementById('sel-cliente-factura').value = clienteId;
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      cambiarTab('tab-emitir', tabBtns[0]);
+    }
+
+    function cargarDiccionarioGeo() {
+        const nocache = new Date().getTime();
+        fetch(`/operador_facturacion/api/departamentos_municipios?_=${nocache}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+            diccionarioGeo = data;
+            const selDepto = document.getElementById('c-departamento');
+            let opciones = '<option value="">-- Seleccionar --</option>';
+            for (let depto in data) {
+                opciones += `<option value="${depto}">${depto}</option>`;
+            }
+            selDepto.innerHTML = opciones;
+        }).catch(err => console.error("Error geo:", err));
+    }
+
+    function cargarMunicipios() {
+        const depto = document.getElementById('c-departamento').value;
+        const selMuni = document.getElementById('c-municipio');
+        let opciones = '<option value="">-- Seleccionar --</option>';
+        if(depto && diccionarioGeo[depto]) {
+            diccionarioGeo[depto].forEach(m => {
+                opciones += `<option value="${m}">${m}</option>`;
+            });
+        }
+        selMuni.innerHTML = opciones;
+    }
+
+    function crearCliente() {
+        const form = document.getElementById('form-crear-cliente');
+        const formData = new FormData(form);
+        const btn = document.getElementById('btn-crear-cliente');
+
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+
+        fetch('/operador_facturacion/api/crear_cliente', {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(res => {
+            if(res.status === 'success') {
+                alert("✅ " + res.message);
+                form.reset();
+                cargarClientesFacturacion(); // Recargar el directorio en vivo evadiendo caché
+            } else {
+                alert("❌ Error: " + res.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("❌ Error de comunicación con el servidor al crear cliente.");
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = 'Guardar Cliente';
+        });
+    }
+
+    // =========================================================================
+    // LÓGICA DEL MOTOR DINÁMICO DE DETALLES DE FACTURA
+    // =========================================================================
+    function cargarProductosMaestros() {
+        const nocache = new Date().getTime();
+        fetch(`/operador_facturacion/api/productos_facturacion?_=${nocache}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+            productosGlobal = data;
+            const sel = document.getElementById('sel-producto-maestro');
+            let opcionesHTML = '<option value="">-- Buscar producto --</option>';
+            data.forEach(p => {
+                opcionesHTML += `<option value="${p.id}" data-unidad="${p.unidad}" data-precio="${p.precio_venta}" data-imp="${p.tarifa_impuesto}">${p.producto} [${p.sku || 'N/A'}]</option>`;
+            });
+            sel.innerHTML = opcionesHTML;
+        })
+        .catch(err => console.error("Error cargando productos:", err));
+    }
+
+    function agregarLineaProducto() {
+        const sel = document.getElementById('sel-producto-maestro');
+        const prodId = sel.value;
+        if(!prodId) return alert("Selecciona un producto del catálogo primero.");
+
+        const idx = sel.selectedIndex;
+        const nombre = sel.options[idx].text;
+        const unidad = sel.options[idx].getAttribute('data-unidad');
+        const precio = parseFloat(sel.options[idx].getAttribute('data-precio')) || 0;
+        const impuesto = parseFloat(sel.options[idx].getAttribute('data-imp')) || 0;
+
+        const uid = Date.now().toString();
+        
+        detalleFactura.push({
+            uid: uid,
+            id_producto: prodId,
+            nombre: nombre,
+            unidad: unidad,
+            cantidad: 1,
+            precio_unitario: precio,
+            tarifa_impuesto: impuesto
+        });
+
+        sel.value = ""; // Limpiar select
+        renderizarTablaDetalles();
+    }
+
+    function actualizarLinea(uid, campo, valor) {
+        const linea = detalleFactura.find(d => d.uid === uid);
+        if(linea) {
+            linea[campo] = parseFloat(valor) || 0;
+            calcularTotales();
+        }
+    }
+
+    function eliminarLinea(uid) {
+        detalleFactura = detalleFactura.filter(d => d.uid !== uid);
+        renderizarTablaDetalles();
+    }
+
+    function renderizarTablaDetalles() {
+        const tbody = document.getElementById('tbody-detalles');
+        let htmlTabla = '';
+
+        if(detalleFactura.length === 0) {
+            htmlTabla = '<tr><td colspan="5" style="text-align:center; color:var(--muted); font-style:italic;">Sin ítems agregados</td></tr>';
+        } else {
+            detalleFactura.forEach(d => {
+                htmlTabla += `
+                    <tr>
+                        <td style="font-size:0.75rem; font-weight:600;">${d.nombre}<br><small style="color:var(--muted);">${d.unidad}</small></td>
+                        <td><input type="number" min="1" step="any" value="${d.cantidad}" oninput="actualizarLinea('${d.uid}', 'cantidad', this.value)"></td>
+                        <td><input type="number" min="0" step="any" value="${d.precio_unitario}" oninput="actualizarLinea('${d.uid}', 'precio_unitario', this.value)"></td>
+                        <td><input type="number" min="0" max="100" step="any" value="${d.tarifa_impuesto}" oninput="actualizarLinea('${d.uid}', 'tarifa_impuesto', this.value)"></td>
+                        <td style="text-align:center;"><button onclick="eliminarLinea('${d.uid}')" style="background:var(--danger); color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">X</button></td>
+                    </tr>
+                `;
+            });
+        }
+        tbody.innerHTML = htmlTabla;
+        calcularTotales();
+    }
+
+    function calcularTotales() {
+        let subtotalGlobal = 0;
+        let impuestosGlobal = 0;
+
+        detalleFactura.forEach(d => {
+            const subtotalLinea = d.cantidad * d.precio_unitario;
+            const impuestoLinea = subtotalLinea * (d.tarifa_impuesto / 100);
+            
+            subtotalGlobal += subtotalLinea;
+            impuestosGlobal += impuestoLinea;
+        });
+
+        const totalPagar = subtotalGlobal + impuestosGlobal;
+
+        document.getElementById('txt-subtotal').textContent = "$" + subtotalGlobal.toLocaleString(undefined, {minimumFractionDigits: 2});
+        document.getElementById('txt-impuestos').textContent = "$" + impuestosGlobal.toLocaleString(undefined, {minimumFractionDigits: 2});
+        document.getElementById('txt-total').textContent = "$" + totalPagar.toLocaleString(undefined, {minimumFractionDigits: 2});
+        
+        const btnEmitir = document.getElementById('btn-emitir');
+        if (detalleFactura.length > 0 && totalPagar > 0) {
+            btnEmitir.disabled = false;
+        } else {
+            btnEmitir.disabled = true;
+        }
+    }
+
+    // =========================================================================
+    // LÓGICA ÓRDENES PENDIENTES
+    // =========================================================================
+    function cargarOrdenesPendientes() {
+      const container = document.getElementById('ordenes-pendientes-list');
+      container.innerHTML = '<p style="text-align:center; color:var(--muted);">Consultando órdenes despachadas...</p>';
+
+      const nocache = new Date().getTime();
+      fetch(`/operador_facturacion/api/ordenes_pendientes_facturar?_=${nocache}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+          ordenesGlobal = data;
+          const kpiPend = document.getElementById('kpi-pedidos-pendientes');
+          if (kpiPend) kpiPend.textContent = data.length;
+
+          if (data.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:var(--muted); padding:20px;">No hay órdenes pendientes por facturar en este momento.</p>';
+            return;
+          }
+
+          let html = '';
+          data.forEach(o => {
+            html += `
+              <div class="order-card">
+                <div>
+                  <div style="font-weight:700; font-size:0.95rem; color:var(--primary);">Orden #${o.orden}</div>
+                  <div style="font-size:0.75rem; color:var(--muted);">Zona: ${o.zona || 'GENERAL'} | ${o.total_items} líneas</div>
+                </div>
+                <button onclick="cargarOrdenAFactura('${o.orden}')" style="background:var(--secondary); color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:700; font-size:0.8rem; cursor:pointer;">Facturar Orden</button>
+              </div>
+            `;
+          });
+          container.innerHTML = html;
+        })
+        .catch(err => {
+          console.error(err);
+          container.innerHTML = '<p style="text-align:center; color:red;">Error cargando órdenes.</p>';
+        });
+    }
+
+    function cargarOrdenAFactura(orden) {
+      document.getElementById('inp-orden-factura').value = orden;
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      cambiarTab('tab-emitir', tabBtns[0]);
+    }
+
+    // =========================================================================
+    // EMISIÓN Y ASENTAMIENTO DE LA FACTURA
+    // =========================================================================
+    function enviarFactura() {
+      const clienteId = document.getElementById('sel-cliente-factura').value;
+      const orden = document.getElementById('inp-orden-factura').value.trim();
+      const prefijo = document.getElementById('sel-prefijo-factura').value;
+      const metodo = document.getElementById('sel-metodo-pago-factura').value;
+      
+      // Recalcular montos de seguridad antes de enviar
+      let subtotalSeguridad = 0;
+      let impuestosSeguridad = 0;
+      detalleFactura.forEach(d => {
+          subtotalSeguridad += (d.cantidad * d.precio_unitario);
+          impuestosSeguridad += (d.cantidad * d.precio_unitario) * (d.tarifa_impuesto / 100);
+      });
+      const montoTotalSeguridad = subtotalSeguridad + impuestosSeguridad;
+
+      if (!clienteId) return alert("⚠️ Selecciona el cliente a quien se emitirá la factura.");
+      if (detalleFactura.length === 0) return alert("⚠️ Debes agregar al menos un producto o servicio al detalle.");
+
+      const btn = document.getElementById('btn-emitir');
+      btn.disabled = true;
+      btn.textContent = 'Procesando factura y PDF...';
+
+      fetch('/operador_facturacion/api/emitir_factura', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : ''
+        },
+        body: JSON.stringify({
+          cliente_id: clienteId,
+          numero_orden: orden,
+          prefijo_factura: prefijo,
+          metodo_pago: metodo,
+          subtotal: subtotalSeguridad,
+          total_impuestos: impuestosSeguridad,
+          monto_total: montoTotalSeguridad,
+          detalles: detalleFactura
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === 'success') {
+          alert("✅ " + res.message);
+          
+          // Resetear formulario
+          document.getElementById('inp-orden-factura').value = '';
+          detalleFactura = [];
+          renderizarTablaDetalles();
+          
+          // Actualizar KPIs visuales
+          const kpiFac = document.getElementById('kpi-facturas');
+          if (kpiFac) kpiFac.textContent = parseInt(kpiFac.textContent || 0) + 1;
+
+          const kpiMonto = document.getElementById('kpi-monto-facturado');
+          if (kpiMonto) {
+            let actual = parseFloat(kpiMonto.textContent.replace(/[^0-9.-]+/g,"")) || 0;
+            kpiMonto.textContent = '$' + (actual + montoTotalSeguridad).toLocaleString();
+          }
+        } else {
+          alert("❌ Error: " + res.message);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("❌ Error de comunicación al emitir la factura. Revisa el log de servidor.");
+      })
+      .finally(() => {
+        btn.textContent = '🧾 Expedir y Radicar Factura';
+        calcularTotales(); // Restaura el estado disabled si el array está vacío
+      });
+    }
+  </script>
+</body>
+
+</html>

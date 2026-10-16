@@ -1,8 +1,8 @@
-# MÓDULO: UNIVERSAL | ARCHIVO: energix_360.py
+# MÓDULO: UNIVERSAL | ARCHIVO: energix_360.py | CONDICIÓN: OBLIGATORIO | TIPO: 1
 import os
 import uuid
 import json
-from flask import render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory
+from flask import render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, current_app
 from app import create_app, mysql, csrf, bcrypt
 from app.forms import LoginForm
 from functools import wraps
@@ -58,16 +58,27 @@ def login_required_custom(f):
         
         # --- LÓGICA DE CONTROL DE SESIONES ÚNICAS ---
         perfil = str(session.get('perfil', '')).strip().lower()
-        perfiles_multi_sesion = ['operador_logistica', 'webmaster_admin', 'supervisor_gas', 'gestor_flotacarga']
+        perfiles_multi_sesion = [
+            'operador_logistica', 
+            'webmaster_admin', 
+            'supervisor_gas', 
+            'gestor_flotacarga',
+            'verificador_bodegas',
+            'operador_ventas',
+            'operador_recursohumano',
+            'operador_contable',
+            'operador_facturacion'
+        ]
         
         if perfil not in perfiles_multi_sesion:
             token_sesion_actual = session.get('token_sesion')
             usuario_id = session.get('usuario_id')
+            empresa_id = session.get('empresa_id')
             
-            if token_sesion_actual and usuario_id:
+            if token_sesion_actual and usuario_id and empresa_id:
                 try:
                     cur = mysql.connection.cursor()
-                    cur.execute("SELECT token_sesion FROM usuarios WHERE id = %s", (usuario_id,))
+                    cur.execute("SELECT token_sesion FROM usuarios WHERE id = %s AND empresa_id = %s", (usuario_id, empresa_id))
                     row = cur.fetchone()
                     cur.close()
                     
@@ -91,6 +102,12 @@ def submodulo_required(submodulo_nombre):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             submodulos_activos = session.get('submodulos_activos', [])
+            if isinstance(submodulos_activos, str):
+                try:
+                    submodulos_activos = json.loads(submodulos_activos)
+                except Exception:
+                    submodulos_activos = []
+                    
             if submodulo_nombre not in submodulos_activos:
                 flash(f'Acceso denegado: Su empresa no tiene activo el submódulo de {submodulo_nombre}.', 'danger')
                 return redirect(url_for('panel_principal'))
@@ -151,8 +168,14 @@ def panel_principal():
         return redirect(url_for('router_universal', modulo='operador_bodegas'))
     elif perfil_usuario == 'verificador_bodegas':
         return redirect(url_for('router_universal', modulo='verificador_bodegas'))
-    elif perfil_usuario == 'vendedor':
-        return redirect(url_for('router_universal', modulo='vendedor'))
+    elif perfil_usuario in ['vendedor', 'operador_ventas']:
+        return redirect(url_for('router_universal', modulo='operador_ventas'))
+    elif perfil_usuario in ['operador_recursohumano', 'operador_rrhh']:
+        return redirect(url_for('router_universal', modulo='operador_recursohumano'))
+    elif perfil_usuario == 'operador_contable':
+        return redirect(url_for('router_universal', modulo='operador_contable'))
+    elif perfil_usuario == 'operador_facturacion':
+        return redirect(url_for('router_universal', modulo='operador_facturacion'))
     elif perfil_usuario == 'controlador_pesv':
         return redirect('/gestor_flota/pesv_bp/')
 
@@ -163,6 +186,15 @@ def panel_principal():
     elif tipo_empresa == 'transporte_carga':
         return redirect('/gestor_flota/dashboard')
     elif tipo_empresa == 'ventas_distribucion':
+        # Enrutamiento jerárquico según perfil para la suite M3
+        if perfil_usuario in ['gerente_ventasdistribucion', 'gerente']:
+            return redirect('/gerencia_ventas/dashboard')
+        elif perfil_usuario in ['controlador_bodegas', 'controlador_logistica']:
+            return redirect('/hub_bodegas/dashboard')
+        elif perfil_usuario == 'controlador_ventas':
+            return redirect('/hub_ventas/dashboard')
+        elif perfil_usuario in ['controlador_administracion', 'controlador_recurso_humano', 'controlador_contabilidad', 'controlador_facturacion']:
+            return redirect('/hub_administracion/dashboard')
         return redirect('/hub_ventas_distribucion/dashboard')
     elif tipo_empresa == 'cria_beneficio_aves_corral':
         return redirect(url_for('router_universal', modulo='avicola'))
@@ -186,7 +218,6 @@ def panel_principal():
 # 7. PROCESADOR DE AUTENTICACIÓN (LOGIN VÍA JSON)
 # ==============================================================================
 @app.route('/login', methods=['GET', 'POST'])
-@csrf.exempt
 def login():
     if request.method == 'GET':
         return redirect(url_for('index'))
@@ -216,12 +247,12 @@ def login():
         if isinstance(submodulos_raw, str):
             try:
                 submodulos_activos_empresa = json.loads(submodulos_raw)
-            except:
+            except Exception:
                 submodulos_activos_empresa = []
         else:
             submodulos_activos_empresa = submodulos_raw
 
-    cur.execute("SELECT * FROM usuarios WHERE cedula = %s", (cedula,))
+    cur.execute("SELECT * FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula, nit_empresa))
     usuario = cur.fetchone()
 
     if not usuario or not bcrypt.check_password_hash(usuario['password'], password):
@@ -239,7 +270,7 @@ def login():
     login_timestamp = ahora_colombia.timestamp()
     
     try:
-        cur.execute("UPDATE usuarios SET token_sesion = %s WHERE id = %s", (token_sesion, usuario['id']))
+        cur.execute("UPDATE usuarios SET token_sesion = %s WHERE id = %s AND empresa_id = %s", (token_sesion, usuario['id'], nit_empresa))
         mysql.connection.commit()
     except Exception as e:
         print(f"Error al guardar token de sesión: {e}")
@@ -285,12 +316,9 @@ def login():
 import inspect
 import re
 
-_MAPA_RUTAS_AUTODESCUBIERTO = {}
-
 def ejecutar_escaneo_introspeccion():
-    global _MAPA_RUTAS_AUTODESCUBIERTO
-    if _MAPA_RUTAS_AUTODESCUBIERTO:
-        return _MAPA_RUTAS_AUTODESCUBIERTO
+    if 'MAPA_RUTAS_AUTODESCUBIERTO' in current_app.config:
+        return current_app.config['MAPA_RUTAS_AUTODESCUBIERTO']
 
     nuevo_mapa = {}
     from flask import current_app
@@ -309,8 +337,8 @@ def ejecutar_escaneo_introspeccion():
         except Exception:
             pass
 
-    _MAPA_RUTAS_AUTODESCUBIERTO = nuevo_mapa
-    return _MAPA_RUTAS_AUTODESCUBIERTO
+    current_app.config['MAPA_RUTAS_AUTODESCUBIERTO'] = nuevo_mapa
+    return current_app.config['MAPA_RUTAS_AUTODESCUBIERTO']
 
 @app.route('/router/<modulo>')
 @login_required_custom
@@ -329,7 +357,12 @@ def router_universal(modulo):
     elif modulo == 'avicola' and tipo_empresa == 'cria_beneficio_aves_corral': es_nativo = True
     
     # Módulos transversales universales permitidos (Evita bloqueos falsos)
-    modulos_transversales_permitidos = ['preoperacional', 'eps_gestion', 'eps_facturacion', 'operador_flotaespecial', 'operador_flotacarga', 'operador_bodegas', 'verificador_bodegas', 'vendedor', 'pesv']
+    modulos_transversales_permitidos = [
+        'preoperacional', 'eps_gestion', 'eps_facturacion', 
+        'operador_flotaespecial', 'operador_flotacarga', 'operador_bodegas', 
+        'verificador_bodegas', 'vendedor', 'operador_ventas', 
+        'operador_recursohumano', 'operador_contable', 'operador_facturacion', 'pesv'
+    ]
     
     if modulo not in modulos_comprados and modulo not in submodulos_activos and not es_nativo and modulo not in modulos_transversales_permitidos:
         flash(f"Tu empresa no tiene habilitado el módulo o submódulo de {modulo.upper()}.", "warning")
@@ -338,6 +371,14 @@ def router_universal(modulo):
     # FALLBACK ESTRUCTURAL PARA SUB-HUBS NATIVOS
     if es_nativo:
         if modulo == 'ventas':
+            if perfil_usuario in ['gerente_ventasdistribucion', 'gerente']:
+                return redirect('/gerencia_ventas/dashboard')
+            elif perfil_usuario in ['controlador_bodegas', 'controlador_logistica']:
+                return redirect('/hub_bodegas/dashboard')
+            elif perfil_usuario == 'controlador_ventas':
+                return redirect('/hub_ventas/dashboard')
+            elif perfil_usuario in ['controlador_administracion', 'controlador_recurso_humano', 'controlador_contabilidad', 'controlador_facturacion']:
+                return redirect('/hub_administracion/dashboard')
             return redirect('/hub_ventas_distribucion/dashboard')
         elif modulo == 'flotaespecial':
             # REGLA M1 ESTRICTA: Aislamiento estricto del Operador Flota Especial
@@ -406,8 +447,15 @@ def router_universal(modulo):
     elif modulo == 'verificador_bodegas':
         return redirect(url_for('verificador_bodegas.bodega_verificador'))
     elif modulo == 'vendedor':
-        flash("Módulo de ventas proyectado a futuro.", "info")
-        return redirect(url_for('index'))
+        return redirect(url_for('operador_ventas.dashboard_operador'))
+    elif modulo == 'operador_ventas':
+        return redirect(url_for('operador_ventas.dashboard_operador'))
+    elif modulo == 'operador_recursohumano':
+        return redirect(url_for('operador_recursohumano.dashboard_operador'))
+    elif modulo == 'operador_contable':
+        return redirect(url_for('operador_contable.dashboard_operador'))
+    elif modulo == 'operador_facturacion':
+        return redirect(url_for('operador_facturacion.dashboard_operador'))
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cur.execute("""
@@ -464,6 +512,10 @@ def api_modulos_sistema_disponibles():
         'bodegas': 'bodegas',
         'oper_bodegas': 'bodegas',
         'verificador_bodegas': 'bodegas',
+        'hub_bodegas': 'bodegas',
+        'hub_ventas': 'ventas',
+        'hub_administracion': 'administracion',
+        'gerencia_ventas': 'gerencia',
         'hub_ventas_distribucion': 'ventas',
         'controlador_pesv': 'pesv',
         'auditorias_pesv': 'pesv'

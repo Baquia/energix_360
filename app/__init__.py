@@ -1,4 +1,4 @@
-# MÓDULO: UNIVERSAL | ARCHIVO: __init__.py | CONDICIÓN: OBLIGATORIO
+# MÓDULO: UNIVERSAL | ARCHIVO: __init__.py | CONDICIÓN: OBLIGATORIO | TIPO: 1
 # app/__init__.py
 from flask import Flask
 from flask_mysqldb import MySQL
@@ -60,7 +60,7 @@ def create_app():
     # =========================================================
 
     # ---------------------------------------------------------
-    #  GRUPO A: CONTROLADORES PRINCIPALES / EMPRESAS
+    #  GRUPO A: CONTROLADORES PRINCIPALES / EMPRESAS Y HUBS
     # ---------------------------------------------------------
     from app.blueprints.A_bp_pwa_Avicola import gestionavicola_bp  
     
@@ -70,8 +70,10 @@ def create_app():
     from app.blueprints.bp_901811727_energia_glp import bp_energia_glp
     from app.blueprints.bp_901811727_audit import bp_audit
 
-    # --- NUEVO HUB NATIVO: VENTAS Y DISTRIBUCIÓN (M3) ---
-    from app.blueprints.B_bp_hub_ventas_distribucion import bp_hub_ventas_distribucion
+    # --- NUEVOS HUBS NATIVOS: VENTAS Y DISTRIBUCIÓN (M3) ---
+    from app.blueprints.B_bp_hub_bodegas import bp_hub_bodegas
+    from app.blueprints.B_bp_hub_ventas import bp_hub_ventas
+    from app.blueprints.B_bp_hub_administracion import bp_hub_administracion
 
     app.register_blueprint(gestionavicola_bp)
     
@@ -80,10 +82,12 @@ def create_app():
     app.register_blueprint(bp_energia_glp)
     app.register_blueprint(bp_audit)
     
-    app.register_blueprint(bp_hub_ventas_distribucion)
+    app.register_blueprint(bp_hub_bodegas)
+    app.register_blueprint(bp_hub_ventas)
+    app.register_blueprint(bp_hub_administracion)
 
     # ---------------------------------------------------------
-    #  GRUPO B: MÓDULOS FUNCIONALES / SERVICIOS
+    #  GRUPO B: MÓDULOS FUNCIONALES / SERVICIOS / CONTROLADORES
     # ---------------------------------------------------------
     from app.blueprints.bp_glp import bp_glp                               
     from app.blueprints.B_bp_gestion_mermas import bp_gestion_mermas         
@@ -110,6 +114,13 @@ def create_app():
     from app.blueprints.B_bp_controlador_pesv import bp_controlador_pesv
     from app.blueprints.C_bp_auditorias_PESV import bp_auditorias_pesv
 
+    # --- CONTROLADORES Y GERENCIA VENTAS Y DISTRIBUCIÓN (M3) ---
+    from app.blueprints.B_bp_gerente_ventasdistribucion import bp_gerente_ventasdistribucion
+    from app.blueprints.B_bp_controlador_ventas import bp_controlador_ventas
+    from app.blueprints.B_bp_controlador_recurso_humano import bp_controlador_recurso_humano
+    from app.blueprints.B_bp_controlador_contabilidad import bp_controlador_contabilidad
+    from app.blueprints.B_bp_controlador_facturacion import bp_controlador_facturacion
+
     app.register_blueprint(bp_glp)
     app.register_blueprint(bp_gestion_mermas)
     app.register_blueprint(bp_supervisorgas)                               
@@ -135,8 +146,15 @@ def create_app():
     app.register_blueprint(bp_controlador_pesv)
     app.register_blueprint(bp_auditorias_pesv)
 
+    # Registro Controladores Ventas y Distribución
+    app.register_blueprint(bp_gerente_ventasdistribucion)
+    app.register_blueprint(bp_controlador_ventas)
+    app.register_blueprint(bp_controlador_recurso_humano)
+    app.register_blueprint(bp_controlador_contabilidad)
+    app.register_blueprint(bp_controlador_facturacion)
+
     # ---------------------------------------------------------
-    #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL
+    #  GRUPO C: OPERACIONES EN CAMPO / MÓVIL / OPERADORES
     # ---------------------------------------------------------
     from app.blueprints.B_bp_operador_bodegas import bp_oper_bodegas
     from app.blueprints.B_bp_verificador_bodegas import bp_verificador_bodegas
@@ -145,6 +163,12 @@ def create_app():
     from app.blueprints.C_bp_preoperacional import bp_preoperacional
     from app.blueprints.C_bp_mecanico_glp import bp_mecanico_glp
     from app.blueprints.B_bp_operador_flotaespecial import bp_operador_flotaespecial
+
+    # --- OPERADORES VENTAS Y DISTRIBUCIÓN (M3) ---
+    from app.blueprints.B_bp_operador_ventas import bp_operador_ventas
+    from app.blueprints.B_bp_operador_recursohumano import bp_operador_recursohumano
+    from app.blueprints.B_bp_operador_contable import bp_operador_contable
+    from app.blueprints.B_bp_operador_facturacion import bp_operador_facturacion
     
     app.register_blueprint(bp_oper_bodegas)
     app.register_blueprint(bp_verificador_bodegas)
@@ -153,6 +177,12 @@ def create_app():
     app.register_blueprint(bp_preoperacional)
     app.register_blueprint(bp_mecanico_glp)
     app.register_blueprint(bp_operador_flotaespecial)
+    
+    # Registro Operadores Ventas y Distribución
+    app.register_blueprint(bp_operador_ventas)
+    app.register_blueprint(bp_operador_recursohumano)
+    app.register_blueprint(bp_operador_contable)
+    app.register_blueprint(bp_operador_facturacion)
 
     return app
 

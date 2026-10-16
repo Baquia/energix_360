@@ -1023,9 +1023,6 @@
     <!-- ============================================== -->
     <!-- MODAL CARGAR PICKING -->
     <!-- ============================================== -->
-    <!-- ============================================== -->
-    <!-- MODAL CARGAR PICKING -->
-    <!-- ============================================== -->
     <div id="modalUpload" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
@@ -1034,7 +1031,6 @@
             </div>
             <div class="modal-body">
                 <form id="frmUpload" enctype="multipart/form-data">
-                    <!-- Inyección de Token CSRF -->
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     
                     <div class="drop-area" onclick="document.getElementById('fi').click()">
@@ -1049,6 +1045,7 @@
             </div>
         </div>
     </div>
+
     <!-- ============================================== -->
     <!-- MODAL RUTAS PICKING (PASILLOS - REORDENABLE) -->
     <!-- ============================================== -->
@@ -2013,8 +2010,7 @@
             </div>
         </div>
     </div>
-
-    <script>
+<script>
         // VARIABLE GLOBAL PARA EL POLLING
         let intervaloDetalle = null;
         let monitoreoInterval = null;
@@ -2027,7 +2023,10 @@
 
         function cerrarSesionInstantanea(e) {
             if (e) e.preventDefault();
-            fetch('/api/bodegas/offline', { method: 'POST' })
+            fetch('/api/bodegas/offline', { 
+                method: 'POST', 
+                headers: { 'X-CSRFToken': '{{ csrf_token() }}' } 
+            })
             .then(() => { window.location.href = '/logout'; })
             .catch(() => { window.location.href = '/logout'; });
         }
@@ -2164,7 +2163,10 @@
 
             fetch(url, {
                 method: method,
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify(payload)
             })
             .then(r => r.json())
@@ -2184,7 +2186,10 @@
         function eliminarUsuario(id) {
             if(!confirm("⚠️ ¿Estás completamente seguro de que deseas eliminar este usuario del sistema? Esta acción no se puede deshacer.")) return;
             
-            fetch('/api/bodegas/usuarios/' + id, { method: 'DELETE' })
+            fetch('/api/bodegas/usuarios/' + id, { 
+                method: 'DELETE',
+                headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
+            })
             .then(r => r.json())
             .then(d => {
                 if(d.status === 'success') {
@@ -2579,7 +2584,10 @@
             
             fetch('/api/bodegas/resolver_novedad_vivo', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify(payload)
             })
             .then(r => r.json())
@@ -2770,7 +2778,10 @@
 
             fetch('/api/bodegas/guardar_rutas_picking', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({rutas: rutas})
             })
             .then(r => r.json())
@@ -2839,7 +2850,10 @@
 
             fetch('/api/bodegas/guardar_asignacion_marcas', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ id_operario: idOp, marcas: marcasSeleccionadas })
             })
             .then(r => r.json())
@@ -2868,7 +2882,10 @@
         function resolverPromoHuerfana(idRow, ean, nombre) {
             fetch('/api/bodegas/resolver_promo_huerfana', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ id_row: idRow })
             })
             .then(r => r.json())
@@ -3089,7 +3106,11 @@
 
             const fd = new FormData(document.getElementById('frmUpload'));
 
-            fetch('/bodegas/upload_excel', { method: 'POST', body: fd })
+            fetch('/bodegas/upload_excel', { 
+                method: 'POST', 
+                headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
+                body: fd 
+            })
                 .then(r => r.json())
                 .then(d => {
                     alert(d.message || d.error);
@@ -3129,7 +3150,10 @@
 
             fetch('/bodegas/asignar_puerta', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ numero_orden: curOrden, puerta: puertaVal, zona: zonaVal, secuencia: secuenciaVal })
             })
                 .then(r => r.json())
@@ -3313,7 +3337,10 @@
 
             fetch('/bodegas/despachar_orden', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ 
                     numero_orden: ordenParaDespacho, 
                     id_vehiculo: vehiculoId, 
@@ -3377,7 +3404,10 @@
 
             fetch('/api/bodegas/productos/crear', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ ean: ean, producto: desc, fabricante: marca, unidad_embalaje: embalaje })
             })
                 .then(r => r.json())
@@ -3402,7 +3432,11 @@
 
             const fd = new FormData(document.getElementById('frmUploadProductos'));
 
-            fetch('/bodegas/upload_productos_masivo', { method: 'POST', body: fd })
+            fetch('/bodegas/upload_productos_masivo', { 
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
+                body: fd 
+            })
                 .then(r => r.json())
                 .then(d => {
                     alert(d.message || d.error);
@@ -3514,7 +3548,10 @@
 
             fetch('/api/bodegas/editar_producto', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ ean_original: eanOrig, nuevo_ean: eanNuevo, producto: nombre, marca: marca, unidad_embalaje: embalaje })
             })
             .then(r => r.json())
@@ -3639,7 +3676,14 @@
             const url = tipo === 'single' ? '/api/bodegas/eliminar_producto' : '/api/bodegas/eliminar_marca';
             const payload = tipo === 'single' ? { ean: valor } : { fabricante: valor };
 
-            fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+            fetch(url, { 
+                method: 'POST', 
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                }, 
+                body: JSON.stringify(payload) 
+            })
                 .then(r => r.json())
                 .then(res => {
                     document.getElementById('modal-confirm-delete').style.display = 'none';
@@ -3797,7 +3841,10 @@
 
             fetch('/api/promociones/guardar', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ ean_promo: eanPromo, nombre_promo: nombrePromo, componentes: kitActual })
             })
             .then(r => r.json())
@@ -3816,7 +3863,10 @@
         function toggleEstadoPromo(ean_promo, nuevoEstado) {
             fetch('/api/promociones/estado', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ ean_promo, estado: nuevoEstado })
             })
             .then(r => r.json())
@@ -3835,7 +3885,10 @@
             if (pass === 'ELIMINAR') {
                 fetch('/api/promociones/eliminar', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    },
                     body: JSON.stringify({ ean_promo })
                 })
                 .then(r => r.json())
@@ -3997,7 +4050,10 @@
 
             fetch('/api/bodegas/alias/guardar', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ descripcion_origen: descOrigen, ean_correcto: eanSeleccionado })
             })
                 .then(r => r.json())
@@ -4013,7 +4069,10 @@
 
             fetch('/api/bodegas/alias/permitir', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ descripcion_origen: descOrigen })
             })
                 .then(r => r.json())
@@ -4070,5 +4129,3 @@
             html2pdf().set(opt).from(element).save();
         }
     </script>
-</body>
-</html>

@@ -28,6 +28,18 @@ def operador_flota_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def cron_token_required(f):
+    """
+    Middleware de seguridad para endpoints automatizados (Cron Jobs).
+    Exige la validación del token autorizado para prevenir ejecuciones expuestas (R-AUTH-001).
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if request.args.get('token') != 'BQA_CRON_2026':
+            return jsonify({"status": "error", "message": "No autorizado"}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
 # ==============================================================================
 # 1. RUTA: DASHBOARD PRINCIPAL DEL OPERADOR
 # ==============================================================================
@@ -97,30 +109,21 @@ def prelogin_flota():
     
     v_id = v.get("id")
 
-    # --- MOTOR DE VISIÓN OPERATIVA PESV (BLOQUEO POR NOVEDADES Y DOCUMENTOS) ---
-    cur.execute("SELECT cedula FROM usuarios WHERE id = %s", (usuario_id,))
+    # --- MOTOR DE VISIÓN OPERATIVA PESV (BLOQUEO DINÁMICO POR NOVEDADES Y DOCUMENTOS) ---
+    cur.execute("SELECT cedula FROM usuarios WHERE id = %s AND empresa_id = %s", (usuario_id, empresa_id))
     usr = cur.fetchone()
     cedula_op = usr.get('cedula') if usr else ''
 
     cur.execute("SELECT * FROM conductores_carga WHERE cedula = %s AND id_empresa = %s LIMIT 1", (cedula_op, empresa_id))
     conductor = cur.fetchone() or {}
 
-    # Módulo PESV - Bloqueo Dinámico (Validación del estado de la documentación)
-    estados_bloqueo = ['Faltante', 'Vencido']
-    errores_documentos = []
-
-    # Validar documentos del Vehículo
-    if v.get('estado_soat') in estados_bloqueo: errores_documentos.append("SOAT")
-    if v.get('estado_tecnomecanica') in estados_bloqueo: errores_documentos.append("Tecnomecánica")
-    if v.get('estado_rce') in estados_bloqueo: errores_documentos.append("Póliza RCE")
+    # Módulo PESV - Bloqueo Dinámico al Vuelo usando el motor utils.py
+    resultado_aptitud = validar_aptitud_operativa(conductor, v)
     
-    # Validar documentos del Conductor
-    if conductor.get('estado_licencia') in estados_bloqueo: errores_documentos.append("Licencia de Conducción")
-    if conductor.get('estado_seguridad_social') in estados_bloqueo: errores_documentos.append("Seguridad Social")
-
-    if errores_documentos:
+    if not resultado_aptitud.get('apto'):
         cur.close()
-        mensaje_bloqueo = f"NO PUEDES INICIAR RUTA POR IRREGULARIDADES EN: {', '.join(errores_documentos)}. Valida con el controlador de tu flota."
+        errores_documentos = [bloqueo['mensaje'] for bloqueo in resultado_aptitud.get('bloqueos', [])]
+        mensaje_bloqueo = f"NO PUEDES INICIAR RUTA POR IRREGULARIDADES: {'; '.join(errores_documentos)}. Valida con el controlador de tu flota."
         return jsonify(success=False, message=mensaje_bloqueo), 403
     # -------------------------------------------------------------
 
@@ -133,7 +136,7 @@ def prelogin_flota():
     tiene_preoperacional = cur.fetchone()
 
     try:
-        cur.execute("UPDATE vehiculos SET estatus='Prelogueado' WHERE id=%s AND id_empresa=%s", (v_id, empresa_id))
+        cur.execute("UPDATE vehiculos SET estatus = 'Prelogueado' WHERE id = %s AND id_empresa = %s", (v_id, empresa_id))
         cur.execute("""
             INSERT INTO historial_sesiones_flota (id_empresa, id_usuario, placa_vehiculo, fecha_login)
             VALUES (%s, %s, %s, NOW())
@@ -341,7 +344,7 @@ def logout_manual_flota():
         """, (usuario_id, empresa_id))
         
         if placa:
-            cur.execute("UPDATE vehiculos SET estatus='No logueado' WHERE placa=%s AND id_empresa=%s", (placa, empresa_id))
+            cur.execute("UPDATE vehiculos SET estatus = 'No logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
             
         mysql.connection.commit()
         cur.close()
@@ -521,13 +524,11 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
     return R * c
 
 @bp_flotacarga.route('/cron/deslogueo_geocerca', methods=['GET'])
+@cron_token_required
 def cron_deslogueo_geocerca():
-    token = request.args.get('token')
-    if token != 'BQA_CRON_2026': return jsonify({"status": "error"}), 403
-
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cur.execute("""
-        SELECT v.placa, v.ultima_latitud, v.ultima_longitud, 
+        SELECT v.placa, v.id_empresa, v.ultima_latitud, v.ultima_longitud, 
                e.base_latitud, e.base_longitud, e.radio_permitido_metros
         FROM vehiculos v
         JOIN empresas e ON v.id_empresa = e.id
@@ -535,20 +536,23 @@ def cron_deslogueo_geocerca():
           AND v.ultima_latitud IS NOT NULL AND e.base_latitud IS NOT NULL
     """)
     vehiculos = cur.fetchall()
-    vehiculos_a_desloguear = []
+    deslogueos = {}
+    total_deslogueados = 0
     
     for v in vehiculos:
         distancia = calcular_distancia(v['ultima_latitud'], v['ultima_longitud'], v['base_latitud'], v['base_longitud'])
         if distancia <= (v['radio_permitido_metros'] or 200):
-            vehiculos_a_desloguear.append(v['placa'])
+            deslogueos.setdefault(v['id_empresa'], []).append(v['placa'])
+            total_deslogueados += 1
             
-    if vehiculos_a_desloguear:
-        format_strings = ','.join(['%s'] * len(vehiculos_a_desloguear))
-        cur.execute(f"UPDATE vehiculos SET estatus = 'No logueado' WHERE placa IN ({format_strings})", tuple(vehiculos_a_desloguear))
-        mysql.connection.commit()
+    for emp_id, placas in deslogueos.items():
+        format_strings = ','.join(['%s'] * len(placas))
+        params = tuple(placas) + (emp_id,)
+        cur.execute(f"UPDATE vehiculos SET estatus = 'No logueado' WHERE placa IN ({format_strings}) AND id_empresa = %s", params)
         
+    mysql.connection.commit()
     cur.close()
-    return jsonify({"status": "success", "total_deslogueados": len(vehiculos_a_desloguear)})
+    return jsonify({"status": "success", "total_deslogueados": total_deslogueados})
 
 # ==============================================================================
 # 5. REGISTRO DE NOVEDADES EN RUTA (FUNCIONALIDAD FIJA)

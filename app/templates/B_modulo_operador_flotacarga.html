@@ -78,6 +78,7 @@
             display: flex; 
             align-items: center; 
             gap: 12px; 
+            text-decoration: none;
         }
 
         .logo-cliente { 
@@ -273,6 +274,25 @@
             font-size: 12px; 
             color: var(--text-muted); 
             line-height: 1.4; 
+        }
+
+        .btn-card { 
+            background: var(--verde); 
+            color: white; 
+            text-align: center; 
+            padding: 12px; 
+            border-radius: 10px; 
+            font-size: 14px; 
+            font-weight: 800; 
+            transition: background 0.2s; 
+            border: none; 
+            cursor: pointer; 
+            width: 100%;
+            margin-top: auto;
+        }
+
+        .module-card:active .btn-card { 
+            background: var(--verde-osc); 
         }
 
         /* ========================================================================= */
@@ -560,11 +580,14 @@
                 <p style="color: var(--text-muted); font-size: 14px; line-height: 1.5;">El rastreo satelital se habilitará al iniciar la ruta.</p>
             </div>
         {% else %}
-            <!-- MÓDULO PRE-LOGUEO -->
-            <div style="width: 100%; text-align: center; padding: 40px 10px; background: #fff; border-radius: 20px; border: 1px solid var(--border);">
-                <div style="font-size: 40px; margin-bottom: 10px;">📱</div>
-                <h3 style="color: var(--text); margin-bottom: 10px; font-weight: 800;">Cabina no enlazada</h3>
-                <p style="color: var(--text-muted); font-size: 14px; line-height: 1.5;">Escanee el código QR físico para iniciar su jornada.</p>
+            <!-- MÓDULO DE PRE-LOGUEO -->
+            <div class="modules-grid">
+                <a href="#" onclick="abrirScannerQR(event)" class="module-card">
+                    <div class="card-icon">📱</div>
+                    <h3 class="card-title">Pre-Logueo Cabina</h3>
+                    <p class="card-desc">Enlace su usuario con la unidad de transporte escaneando el código QR impreso en el vehículo.</p>
+                    <div class="btn-card">Escanear QR Cabina &rarr;</div>
+                </a>
             </div>
         {% endif %}
     </main>
@@ -582,24 +605,20 @@
     <!-- ======================================================= -->
     <!-- STICKY BOTTOM BAR (ZONA DEL PULGAR ERGONÓMICA)          -->
     <!-- ======================================================= -->
+    {% if session.get('placa_prelogueada') %}
     <div class="sticky-bottom-bar">
-        {% if session.get('placa_prelogueada') %}
-            {% if session.get('viaje_activo') %}
-                <!-- El botón de Pausar GPS ha sido retirado por seguridad operativa -->
-                <button onclick="finalizarViaje(event)" class="btn-action btn-danger" style="width: 100%;">
-                    ⏹ FINALIZAR RUTA
-                </button>
-            {% else %}
-                <button onclick="iniciarViaje(event)" class="btn-action btn-success" style="width: 100%;">
-                    ▶ INICIAR RUTA
-                </button>
-            {% endif %}
+        {% if session.get('viaje_activo') %}
+            <!-- El botón de Pausar GPS ha sido retirado por seguridad operativa -->
+            <button onclick="finalizarViaje(event)" class="btn-action btn-danger" style="width: 100%;">
+                ⏹ FINALIZAR RUTA
+            </button>
         {% else %}
-            <button onclick="abrirScannerQR(event)" class="btn-action btn-success" style="width: 100%;">
-                📷 ESCANEAR QR CABINA
+            <button onclick="iniciarViaje(event)" class="btn-action btn-success" style="width: 100%;">
+                ▶ INICIAR RUTA
             </button>
         {% endif %}
     </div>
+    {% endif %}
 
     <!-- ======================================================= -->
     <!-- MODALES                                                 -->
@@ -741,6 +760,18 @@
                 }
             })
             .catch(e => window.location.reload());
+        }
+
+        function ejecutarPreLoginManual() {
+            const input = document.getElementById('manual_placa');
+            if (input) {
+                const placa = input.value.trim().toUpperCase();
+                if (placa.length >= 5) {
+                    ejecutarPreLogin(placa);
+                } else {
+                    alert("Por favor, ingrese una placa válida (Ej: ABC123).");
+                }
+            }
         }
 
         // ============================================

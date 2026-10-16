@@ -290,7 +290,7 @@
                                     <td><span class="badge {% if op.tipo_conductor == 'Propio' %}badge-success{% else %}badge-gray{% endif %}">{{ op.tipo_conductor }}</span></td>
                                     <td><span class="badge {% if op.perfil == 'operador_flotacarga' %}badge-success{% else %}badge-gray{% endif %}">{% if op.perfil == 'operador_flotacarga' %}Conductor{% else %}Auxiliar{% endif %}</span></td>
                                     <td style="text-align: right; white-space: nowrap;">
-                                        <button class="btn-icon edit" onclick="abrirEditarOperador('{{ op.id }}', '{{ op.nombre }}', '{{ op.cedula }}', '{{ op.perfil }}', '{{ op.tipo_conductor }}', '{{ op.email }}', '{{ op.vehiculo_asignado }}', '{{ op.fecha_nacimiento }}', '{{ op.edad }}', '{{ op.eps }}', '{{ op.arl }}', '{{ op.fondo_pensiones }}', '{{ op.numero_licencia_conduccion }}', '{{ op.vencimiento_licencia_conduccion }}', '{{ op.ultimo_pago_seguridad_social }}', '{{ op.vencimiento_seguridad_social }}', '{{ op.password_visible }}')" title="Editar">✏️</button>
+                                        <button class="btn-icon edit" onclick="abrirEditarOperador('{{ op.id }}', '{{ op.nombre }}', '{{ op.cedula }}', '{{ op.perfil }}', '{{ op.tipo_conductor }}', '{{ op.email }}', '{{ op.vehiculo_asignado }}', '{{ op.fecha_nacimiento }}', '{{ op.edad }}', '{{ op.eps }}', '{{ op.arl }}', '{{ op.fondo_pensiones }}', '{{ op.numero_licencia_conduccion }}', '{{ op.fecha_expedicion_licencia }}', '{{ op.categoria_licencia }}', '{{ op.ultimo_pago_seguridad_social }}', '{{ op.password_visible }}')" title="Editar">✏️</button>
                                         <button class="btn-icon delete" onclick="confirmarEliminarOperador('{{ op.id }}', '{{ op.nombre }}')" title="Eliminar">🗑️</button>
                                     </td>
                                 </tr>
@@ -311,6 +311,7 @@
                 </div>
 
                 <form class="filter-bar" method="GET" action="{{ url_for('flotacarga_flota.gestion_preoperacionales') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="form-group">
                         <label>Desde</label>
                         <input type="date" name="fecha_inicio" value="{{ filtros.fecha_inicio }}" required>
@@ -702,16 +703,21 @@
                 <h4 class="section-title">Licencia y Documentos</h4>
                 <div class="form-group" style="display: flex; gap: 15px;">
                     <div style="flex: 1;"><label>N° Licencia Conducción</label><input type="text" name="numero_licencia_conduccion"></div>
-                    <div style="flex: 1;"><label>Vencimiento Licencia</label><input type="date" name="vencimiento_licencia_conduccion"></div>
+                    <div style="flex: 1;"><label>Categoría Licencia</label>
+                        <select name="categoria_licencia" required>
+                            <option value="Particular">Particular</option>
+                            <option value="Publico">Público</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group" style="display: flex; gap: 15px;">
-                    <div style="flex: 1;"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social"></div>
-                    <div style="flex: 1;"><label>Vencimiento Seg. Social</label><input type="date" name="vencimiento_seguridad_social"></div>
+                    <div style="flex: 1;"><label>Fecha Expedición Licencia</label><input type="date" name="fecha_expedicion_licencia" id="crear_fecha_expedicion_licencia" required></div>
+                    <div style="flex: 1;" id="crear_ss_fecha_group"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social" id="crear_ultimo_pago_seguridad_social" required></div>
                 </div>
 
                 <div class="form-group"><label>PDF Licencia</label><input type="file" name="archivo_licencia" accept=".pdf"></div>
-                <div class="form-group"><label>PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
-                <div class="form-group"><label>PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
+                <div class="form-group" id="crear_ss_pdf1_group"><label>PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
+                <div class="form-group" id="crear_ss_pdf2_group"><label>PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
                 <div class="form-group"><label>Foto Facial (Reconocimiento)</label><input type="file" name="archivo_foto_facial" accept=".jpg, .jpeg, .png" required></div>
 
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalOperador')">Cancelar</button><button type="submit" class="btn-primary">Guardar Registro</button></div>
@@ -793,16 +799,21 @@
                 <h4 class="section-title">Licencia y Documentos</h4>
                 <div class="form-group" style="display: flex; gap: 15px;">
                     <div style="flex: 1;"><label>N° Licencia Conducción</label><input type="text" name="numero_licencia_conduccion" id="edit_numero_licencia_conduccion"></div>
-                    <div style="flex: 1;"><label>Vencimiento Licencia</label><input type="date" name="vencimiento_licencia_conduccion" id="edit_vencimiento_licencia_conduccion"></div>
+                    <div style="flex: 1;"><label>Categoría Licencia</label>
+                        <select name="categoria_licencia" id="edit_categoria_licencia" required>
+                            <option value="Particular">Particular</option>
+                            <option value="Publico">Público</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group" style="display: flex; gap: 15px;">
-                    <div style="flex: 1;"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social" id="edit_ultimo_pago_seguridad_social"></div>
-                    <div style="flex: 1;"><label>Vencimiento Seg. Social</label><input type="date" name="vencimiento_seguridad_social" id="edit_vencimiento_seguridad_social"></div>
+                    <div style="flex: 1;"><label>Fecha Expedición Licencia</label><input type="date" name="fecha_expedicion_licencia" id="edit_fecha_expedicion_licencia" required></div>
+                    <div style="flex: 1;" id="edit_ss_fecha_group"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social" id="edit_ultimo_pago_seguridad_social" required></div>
                 </div>
 
                 <div class="form-group"><label>Reemplazar PDF Licencia</label><input type="file" name="archivo_licencia" accept=".pdf"></div>
-                <div class="form-group"><label>Reemplazar PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
-                <div class="form-group"><label>Reemplazar PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
+                <div class="form-group" id="edit_ss_pdf1_group"><label>Reemplazar PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
+                <div class="form-group" id="edit_ss_pdf2_group"><label>Reemplazar PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
                 <div class="form-group"><label>Reemplazar Foto Facial</label><input type="file" name="archivo_foto_facial" accept=".jpg, .jpeg, .png"></div>
 
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarOperador')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">Actualizar</button></div>
@@ -940,9 +951,25 @@
             const emailInput = document.getElementById(prefix + '_email');
             const vehInput = document.getElementById(prefix + '_vehiculo_asignado');
 
+            const ssFechaGroup = document.getElementById(prefix + '_ss_fecha_group');
+            const ssPdf1Group = document.getElementById(prefix + '_ss_pdf1_group');
+            const ssPdf2Group = document.getElementById(prefix + '_ss_pdf2_group');
+            const ssFechaInput = document.getElementById(prefix + '_ultimo_pago_seguridad_social');
+
             if (tipo === 'Propio') {
                 credGroup.style.display = 'block';
                 vehGroup.style.display = 'none';
+                
+                if(ssFechaGroup) ssFechaGroup.style.display = 'none';
+                if(ssPdf1Group) ssPdf1Group.style.display = 'none';
+                if(ssPdf2Group) ssPdf2Group.style.display = 'none';
+                if(ssFechaInput) {
+                    ssFechaInput.removeAttribute('required');
+                    if (prefix === 'crear') {
+                        ssFechaInput.value = '';
+                    }
+                }
+
                 if(prefix === 'crear') {
                     passInput.setAttribute('required', 'required');
                     emailInput.setAttribute('required', 'required');
@@ -952,6 +979,12 @@
             } else {
                 credGroup.style.display = 'none';
                 vehGroup.style.display = 'block';
+                
+                if(ssFechaGroup) ssFechaGroup.style.display = 'block';
+                if(ssPdf1Group) ssPdf1Group.style.display = 'block';
+                if(ssPdf2Group) ssPdf2Group.style.display = 'block';
+                if(ssFechaInput) ssFechaInput.setAttribute('required', 'required');
+
                 passInput.removeAttribute('required');
                 emailInput.removeAttribute('required');
                 vehInput.setAttribute('required', 'required');
@@ -972,7 +1005,7 @@
             }
         }
 
-        function abrirEditarOperador(id, nombre, cedula, perfil, tipo_conductor, email, vehiculo, f_nac, edad, eps, arl, pension, n_licencia, v_licencia, ult_pago, v_seg_soc, pass_visible) {
+        function abrirEditarOperador(id, nombre, cedula, perfil, tipo_conductor, email, vehiculo, f_nac, edad, eps, arl, pension, n_licencia, f_exp_licencia, cat_licencia, ult_pago, pass_visible) {
             document.getElementById('edit_operador_id').value = id; 
             document.getElementById('edit_nombre').value = nombre;
             document.getElementById('edit_cedula').value = cedula; 
@@ -989,9 +1022,9 @@
             document.getElementById('edit_fondo_pensiones').value = pension || '';
             
             document.getElementById('edit_numero_licencia_conduccion').value = n_licencia || '';
-            document.getElementById('edit_vencimiento_licencia_conduccion').value = v_licencia || '';
+            document.getElementById('edit_fecha_expedicion_licencia').value = f_exp_licencia || '';
+            document.getElementById('edit_categoria_licencia').value = cat_licencia || 'Publico';
             document.getElementById('edit_ultimo_pago_seguridad_social').value = ult_pago || '';
-            document.getElementById('edit_vencimiento_seguridad_social').value = v_seg_soc || '';
             
             document.getElementById('edit_password_visible_text').innerText = pass_visible ? pass_visible : 'No registrada';
 
