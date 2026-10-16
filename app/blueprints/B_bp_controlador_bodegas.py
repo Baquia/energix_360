@@ -1453,6 +1453,19 @@ def editar_producto():
         mysql.connection.rollback()
         # SE EXPONE EL ERROR SQL REAL AL FRONTEND
         return jsonify({'status': 'error', 'message': f'Error BD: {str(e)}'})
+    except Exception as e:
+        mysql.connection.rollback()
+        error_str = str(e)
+        
+        # Intercepción específica de colisión de EAN (Error 1062)
+        if "1062" in error_str and "Duplicate entry" in error_str:
+            return jsonify({
+                'status': 'error', 
+                'message': f'El EAN {nuevo_ean} ya está asignado a otro producto. Elimina el duplicado primero.'
+            })
+            
+        # Si es otro error de base de datos, lo muestra
+        return jsonify({'status': 'error', 'message': f'Error BD: {error_str}'})
 
 
 @bp_bodegas.route('/api/bodegas/eliminar_producto', methods=['POST'])
