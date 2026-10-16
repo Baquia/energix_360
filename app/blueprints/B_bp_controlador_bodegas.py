@@ -1426,21 +1426,34 @@ def editar_producto():
             nuevo_embalaje = 'UND'
         
         if not ean_original or not nuevo_ean or not nuevo_nombre: 
-            return jsonify({'status': 'error', 'message': 'Faltan datos'})
+            return jsonify({'status': 'error', 'message': 'Faltan datos obligatorios'})
 
         cur = mysql.connection.cursor()
-        cur.execute("""
-            UPDATE productos 
-            SET ean = %s, sku = %s, producto = %s, fabricante = %s, unidad_embalaje = %s 
-            WHERE ean = %s AND id_empresa = %s
-        """, (nuevo_ean, nuevo_ean, nuevo_nombre, nueva_marca, nuevo_embalaje, ean_original, empresa_id))
-        mysql.connection.commit()
-        cur.close()
         
-        return jsonify({'status': 'success', 'message': 'Producto actualizado'})
+        # REGLA 6: Manejo de fricción y Deadlocks (3 intentos)
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    UPDATE productos 
+                    SET ean = %s, sku = %s, producto = %s, fabricante = %s, unidad_embalaje = %s 
+                    WHERE ean = %s AND id_empresa = %s
+                """, (nuevo_ean, nuevo_ean, nuevo_nombre, nueva_marca, nuevo_embalaje, ean_original, empresa_id))
+                mysql.connection.commit()
+                break
+            except Exception as db_e:
+                if "deadlock" in str(db_e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                raise db_e
+                
+        cur.close()
+        return jsonify({'status': 'success', 'message': 'Producto actualizado correctamente'})
+        
     except Exception as e:
         mysql.connection.rollback()
-        return jsonify({'status': 'error', 'message': 'Error interno'})
+        # SE EXPONE EL ERROR SQL REAL AL FRONTEND
+        return jsonify({'status': 'error', 'message': f'Error BD: {str(e)}'})
+
 
 @bp_bodegas.route('/api/bodegas/eliminar_producto', methods=['POST'])
 @login_required_custom
@@ -1453,17 +1466,32 @@ def eliminar_producto():
         if not ean: return jsonify({'status': 'error', 'message': 'EAN obligatorio'})
 
         cur = mysql.connection.cursor()
-        cur.execute("DELETE FROM productos WHERE ean = %s AND id_empresa = %s", (ean, empresa_id))
         
-        filas_afectadas = cur.rowcount
-        mysql.connection.commit()
+        # REGLA 6: Manejo de fricción
+        for intento in range(3):
+            try:
+                cur.execute("DELETE FROM productos WHERE ean = %s AND id_empresa = %s", (ean, empresa_id))
+                filas_afectadas = cur.rowcount
+                mysql.connection.commit()
+                break
+            except Exception as db_e:
+                if "deadlock" in str(db_e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                raise db_e
+                
         cur.close()
         
-        if filas_afectadas > 0: return jsonify({'status': 'success', 'message': 'Producto eliminado'})
-        else: return jsonify({'status': 'error', 'message': 'No se encontró'})
+        if filas_afectadas > 0: 
+            return jsonify({'status': 'success', 'message': 'Producto eliminado'})
+        else: 
+            return jsonify({'status': 'error', 'message': 'No se encontró el registro'})
+            
     except Exception as e:
         mysql.connection.rollback()
-        return jsonify({'status': 'error', 'message': 'Error interno'})
+        # SE EXPONE EL ERROR SQL REAL AL FRONTEND
+        return jsonify({'status': 'error', 'message': f'Error BD: {str(e)}'})
+
 
 @bp_bodegas.route('/api/bodegas/eliminar_marca', methods=['POST'])
 @login_required_custom
@@ -1476,20 +1504,36 @@ def eliminar_marca():
         if not fabricante: return jsonify({'status': 'error', 'message': 'Marca obligatoria'})
 
         cur = mysql.connection.cursor()
-        if fabricante == 'SIN MARCA': cur.execute("DELETE FROM productos WHERE (fabricante IS NULL OR fabricante = '') AND id_empresa = %s", (empresa_id,))
-        else: cur.execute("DELETE FROM productos WHERE UPPER(fabricante) = UPPER(%s) AND id_empresa = %s", (fabricante, empresa_id))
         
-        filas_afectadas = cur.rowcount
-        mysql.connection.commit()
+        # REGLA 6: Manejo de fricción
+        for intento in range(3):
+            try:
+                if fabricante == 'SIN MARCA': 
+                    cur.execute("DELETE FROM productos WHERE (fabricante IS NULL OR fabricante = '') AND id_empresa = %s", (empresa_id,))
+                else: 
+                    cur.execute("DELETE FROM productos WHERE UPPER(fabricante) = UPPER(%s) AND id_empresa = %s", (fabricante, empresa_id))
+                
+                filas_afectadas = cur.rowcount
+                mysql.connection.commit()
+                break
+            except Exception as db_e:
+                if "deadlock" in str(db_e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                raise db_e
+                
         cur.close()
         
-        if filas_afectadas > 0: return jsonify({'status': 'success', 'message': f'Eliminados {filas_afectadas}'})
-        else: return jsonify({'status': 'error', 'message': 'No hay productos'})
+        if filas_afectadas > 0: 
+            return jsonify({'status': 'success', 'message': f'Eliminados {filas_afectadas}'})
+        else: 
+            return jsonify({'status': 'error', 'message': 'No hay productos asociados a esta marca'})
             
     except Exception as e:
         mysql.connection.rollback()
-        return jsonify({'status': 'error', 'message': 'Error interno'})
-
+        # SE EXPONE EL ERROR SQL REAL AL FRONTEND
+        return jsonify({'status': 'error', 'message': f'Error BD: {str(e)}'})
+    
 @bp_bodegas.route('/api/promociones/listar', methods=['GET'])
 @login_required_custom
 def listar_promociones():
