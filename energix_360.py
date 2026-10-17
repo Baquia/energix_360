@@ -321,7 +321,7 @@ def ejecutar_escaneo_introspeccion():
         return current_app.config['MAPA_RUTAS_AUTODESCUBIERTO']
 
     nuevo_mapa = {}
-    from flask import current_app
+    # Se elimina la línea "from flask import current_app" para heredar el objeto global importado en la línea 4
     for endpoint, func in current_app.view_functions.items():
         # REGLA ESTRICTA BQA-ONE: Ignorar router_universal para no crear un loop infinito 
         # en la asignación del mapa de introspección que causa el BuildError.
