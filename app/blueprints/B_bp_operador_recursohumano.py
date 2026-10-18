@@ -10,17 +10,56 @@ from datetime import datetime
 bp_operador_recursohumano = Blueprint('operador_recursohumano', __name__, url_prefix='/operador_recursohumano')
 
 # ==============================================================================
+# DECORADOR DE SUBMÓDULO MULTI-TENANT HOMOLOGADO (DIRECTO Y ROBUSTO)
+# ==============================================================================
+def submodulo_required(submodulo_nombre):
+    """
+    Decorador de autorización Plug & Play homologado:
+    Verifica explícitamente en session['submodulos_activos'] o en session['modulos_activos']
+    o autoriza de forma irrestricta si pertenece al tenant corporativo (NIT 901811727).
+    Debe invocarse SIEMPRE con el argumento: @submodulo_required('nombre_modulo')
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            submodulos_activos = session.get('submodulos_activos', [])
+            modulos_activos = session.get('modulos_activos', [])
+            empresa_id = str(session.get('empresa_id', '')).strip()
+
+            if isinstance(submodulos_activos, str):
+                try:
+                    submodulos_activos = json.loads(submodulos_activos)
+                except Exception:
+                    submodulos_activos = []
+
+            # Validación: inquilino corporativo Baquía o empresas con el módulo activo
+            if (
+                submodulo_nombre not in submodulos_activos 
+                and submodulo_nombre not in modulos_activos 
+                and 'operador_recursohumano' not in modulos_activos 
+                and 'controlador_recurso_humano' not in modulos_activos 
+                and empresa_id != '901811727'
+            ):
+                flash(f'Acceso denegado: Su empresa no tiene habilitado el submódulo de {submodulo_nombre}.', 'danger')
+                return redirect(url_for('panel_principal'))
+            return f(*args, **kwargs)
+        return decorated_function 
+    return decorator
+
+# ==============================================================================
 # MIDDLEWARE DE JERARQUÍA Y PERMISOS
 # ==============================================================================
 def operador_rrhh_required(f):
     """
     Middleware Plug & Play para proteger el acceso a la interfaz operativa
     del Operador de Recursos Humanos (Auxiliar/Asistente de Personal).
+    Autoriza perfiles de RRHH nativos y la jerarquía corporativa de Baquía-ems SAS.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         perfil = str(session.get('perfil', '')).strip().lower()
         tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
+        empresa_id = str(session.get('empresa_id', '')).strip()
         
         perfiles_permitidos = [
             'operador_recursohumano',
@@ -30,11 +69,18 @@ def operador_rrhh_required(f):
             'gerente_ventasdistribucion',
             'administrador',
             'webmaster_admin',
-            'webmaster'
+            'webmaster',
+            'gerente_bqa',
+            'admin_general',
+            'webmaster_administrador_baquia'
         ]
         
-        # Validación estricta de perfil
-        if perfil not in perfiles_permitidos and 'webmaster' not in tipo_empresa:
+        # Validación estricta de perfil y aislamiento Multi-Tenant
+        if (
+            perfil not in perfiles_permitidos 
+            and 'webmaster' not in tipo_empresa 
+            and empresa_id != '901811727'
+        ):
             flash('Acceso denegado: Se requiere perfil de Operador de Recursos Humanos para ingresar a este módulo.', 'danger')
             return redirect(url_for('panel_principal'))
             
@@ -44,8 +90,10 @@ def operador_rrhh_required(f):
 # ==============================================================================
 # VISTA PRINCIPAL (DASHBOARD OPERADOR DE RECURSOS HUMANOS)
 # ==============================================================================
-@bp_operador_recursohumano.route('/dashboard')
+@bp_operador_recursohumano.route('/dashboard', endpoint='dashboard')
+@bp_operador_recursohumano.route('/dashboard_operador', endpoint='dashboard_operador')
 @login_required_custom
+@submodulo_required('controlador_recurso_humano')
 @operador_rrhh_required
 def dashboard_operador():
     """
@@ -146,7 +194,7 @@ def api_registrar_asistencia():
     """
     Registra el control de asistencia o jornada laboral de un empleado.
     """
-    data = request.json
+    data = request.json or {}
     usuario_id = session.get('usuario_id')
     empleado_id = data.get('empleado_id')
     tipo_registro = data.get('tipo_registro')  # 'ingreso' o 'salida'
@@ -178,7 +226,7 @@ def api_registrar_novedad():
     """
     Registra una novedad de personal (permiso, incapacidad, sanción, horas extras).
     """
-    data = request.json
+    data = request.json or {}
     usuario_id = session.get('usuario_id')
     empleado_id = data.get('empleado_id')
     tipo_novedad = data.get('tipo_novedad')
@@ -203,3 +251,14 @@ def api_registrar_novedad():
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# ==============================================================================
+# COMPATIBILIDAD DE ENDPOINT CRUZADO FLASK
+# ==============================================================================
+@bp_operador_recursohumano.record_once
+def registrar_alias_endpoint(state):
+    """Garantiza la resolución fluida de los endpoints del Operador de Recursos Humanos."""
+    state.app.view_functions['operador_recursohumano.dashboard'] = dashboard_operador
+    state.app.view_functions['bp_operador_recursohumano.dashboard'] = dashboard_operador
+    state.app.view_functions['operador_recursohumano.dashboard_operador'] = dashboard_operador
+    state.app.view_functions['bp_operador_recursohumano.dashboard_operador'] = dashboard_operador

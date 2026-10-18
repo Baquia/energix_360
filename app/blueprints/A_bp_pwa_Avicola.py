@@ -1,18 +1,22 @@
-from flask import Blueprint, render_template
+# MÓDULO: UNIVERSAL | ARCHIVO: A_bp_pwa_Avicola.py | CONDICIÓN: OBLIGATORIO | TIPO: 1
+from flask import Blueprint, render_template, session, flash, redirect, url_for
+from app.utils import login_required_custom
 
-# Esta es la línea exacta que Flask está buscando y no encuentra:
-gestionavicola_bp = Blueprint('gestionavicola_bp', __name__)
+gestionavicola_bp = Blueprint('gestionavicola', __name__)
 
-# ==============================================================================
-# RUTAS OFFLINE (SERVICE WORKER / PWA)
-# Conservadas por retrocompatibilidad de caché en dispositivos móviles
-# ==============================================================================
-@gestionavicola_bp.route("/gestion_avicola_offline.html")
-def panel_avicola_offline():
-    # Renderiza la vista estática para cuando no hay internet
-    return render_template("gestion_avicola_offline.html")
+@gestionavicola_bp.route('/A_gestion_avicola.html')
+@login_required_custom
+def panel_avicola():
+    # 1. Validar Perfil por seguridad
+    perfil = str(session.get('perfil', '')).strip().lower()
+    
+    if perfil != 'webmaster':
+        flash("Acceso denegado: No tienes rol de Webmaster para Avícola.", "danger")
+        return redirect(url_for('panel_principal'))
 
-@gestionavicola_bp.route("/glp_offline.html")
+    return render_template('A_gestion_avicola.html')
+
+@gestionavicola_bp.route("/B_operador_glp_offline.html")
 def glp_offline():
-    # Renderiza el validador offline de tanques
-    return render_template("glp_offline.html")
+    # Renderiza la vista PWA Offline del Operador GLP
+    return render_template("B_operador_glp_offline.html")

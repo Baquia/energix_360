@@ -2,13 +2,28 @@
 import os
 import uuid
 import json
-from flask import render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, current_app
+import inspect
+import re
+import time
+from functools import wraps
+from datetime import datetime, timedelta, timezone
+
+from flask import (
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    session,
+    jsonify,
+    send_from_directory,
+    current_app
+)
+import MySQLdb.cursors
+
 from app import create_app, mysql, csrf, bcrypt
 from app.forms import LoginForm
-from functools import wraps
-import MySQLdb.cursors
-from datetime import datetime, timedelta, timezone
-import time
+from app.utils import registrar_auditoria
 
 # ==============================================================================
 # 1. CONFIGURACIÓN DE RUTAS FÍSICAS E INICIALIZACIÓN (App Factory)
@@ -19,6 +34,155 @@ static_path = os.path.join(base_dir, "app", "static")
 app = create_app()
 app.static_folder = static_path
 app.static_url_path = "/static"
+
+# ==============================================================================
+# 2. AUDITORÍA TRANSACCIONAL CENTRALIZADA BQA-ONE
+# ==============================================================================
+def registrar_operacion_bqa(cur, accion, datos):
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                empresa VARCHAR(150),
+                empresa_id VARCHAR(50),
+                backend_emisor VARCHAR(100),
+                usuario VARCHAR(100),
+                cedula VARCHAR(50),
+                accion VARCHAR(100),
+                datos JSON
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        if hasattr(datos, 'to_dict'):
+            datos_dict = datos.to_dict(flat=False)
+            datos_dict = {k: v[0] if len(v) == 1 else v for k, v in datos_dict.items()}
+            payload = json.dumps(datos_dict)
+        elif isinstance(datos, dict):
+            payload = json.dumps(datos)
+        else:
+            payload = json.dumps({"raw": str(datos)})
+
+        emp = session.get('empresa', 'Sistema')
+        emp_id = session.get('empresa_id', 'N/A')
+        usr = session.get('nombre', 'N/A')
+        ced = session.get('cedula', 'N/A')
+
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (emp, emp_id, 'energix_360.py', usr, ced, accion, payload))
+    except Exception as e:
+        print(f"Error auditoria bqa_one en energix_360.py: {e}")
+
+# ==============================================================================
+# MATRIZ MAESTRA DE PRODUCTO (Regla Determinista del SaaS BQA-ONE)
+# ==============================================================================
+MATRIZ_MAESTRA = {
+    'bodegas': {
+        'nombre_comercial': 'Gestión de Bodegas y Despachos (WMS)',
+        'perfiles': [
+            {'perfil': 'controlador_logistica', 'operacion': 'bodegas', 'archivo': 'B_modulo_controlador_bodegas.html'},
+            {'perfil': 'operador_logistica', 'operacion': 'bodegas', 'archivo': 'B_modulo_operador_bodegas.html'},
+            {'perfil': 'verificador_logistica', 'operacion': 'bodegas', 'archivo': 'B_verificador_bodegas.html'}
+        ]
+    },
+    'flota': {
+        'nombre_comercial': 'Gestión de Flota de Carga',
+        'perfiles': [
+            {'perfil': 'gestor_flotacarga', 'operacion': 'flota', 'archivo': 'B_modulo_controlador_flotacarga.html'},
+            {'perfil': 'operador_flotacarga', 'operacion': 'flota', 'archivo': 'B_modulo_operador_flotacarga.html'}
+        ]
+    },
+    'flotaespecial': {
+        'nombre_comercial': 'Transporte Especial',
+        'perfiles': [
+            {'perfil': 'controlador_flotaespecial', 'operacion': 'flotaespecial', 'archivo': 'B_modulo_controlador_flotaespecial.html'},
+            {'perfil': 'operador_flotaespecial', 'operacion': 'flotaespecial', 'archivo': 'B_modulo_operador_flotaespecial.html'}
+        ]
+    },
+    'ventas': {
+        'nombre_comercial': 'Ventas y Comercialización (M3)',
+        'perfiles': [
+            {'perfil': 'gerente_ventasdistribucion', 'operacion': 'ventas', 'archivo': 'B_gerente_ventasdistribucion.html'},
+            {'perfil': 'controlador_ventas', 'operacion': 'ventas', 'archivo': 'B_controlador_ventas.html'},
+            {'perfil': 'operador_ventas', 'operacion': 'ventas', 'archivo': 'B_modulo_operador_ventas.html'}
+        ]
+    },
+    'facturacion': {
+        'nombre_comercial': 'Facturación',
+        'perfiles': [
+            {'perfil': 'controlador_facturacion', 'operacion': 'facturacion', 'archivo': 'B_controlador_facturacion.html'},
+            {'perfil': 'operador_facturacion', 'operacion': 'facturacion', 'archivo': 'B_modulo_operador_facturacion.html'}
+        ]
+    },
+    'contabilidad': {
+        'nombre_comercial': 'Contabilidad',
+        'perfiles': [
+            {'perfil': 'controlador_contabilidad', 'operacion': 'contabilidad', 'archivo': 'B_controlador_contabilidad.html'},
+            {'perfil': 'operador_contable', 'operacion': 'contabilidad', 'archivo': 'B_modulo_operador_contable.html'}
+        ]
+    },
+    'recursos_humanos': {
+        'nombre_comercial': 'Recursos Humanos',
+        'perfiles': [
+            {'perfil': 'controlador_recurso_humano', 'operacion': 'recursos_humanos', 'archivo': 'B_controlador_recursohumano.html'},
+            {'perfil': 'operador_recursohumano', 'operacion': 'recursos_humanos', 'archivo': 'B_modulo_operador_recursohumano.html'}
+        ]
+    },
+    
+    'gas': {
+        'nombre_comercial': 'Gestión de Gas / GLP',
+        'perfiles': [
+            {'perfil': 'controlador_gas', 'operacion': 'gas', 'archivo': 'B_controladorgas.html'},
+            {'perfil': 'operador_gas', 'operacion': 'gas', 'archivo': 'B_operador_glp.html'},
+            {'perfil': 'controlfacturas_gas', 'operacion': 'gas', 'archivo': 'C_facturas_glp.html'}
+        ]
+    },
+    
+    'mermas': {
+        'nombre_comercial': 'Control de Mermas',
+        'perfiles': [
+            {'perfil': 'controlador_mermas', 'operacion': 'mermas', 'archivo': 'controlador_mermas.html'},
+            {'perfil': 'operador_mermas', 'operacion': 'mermas', 'archivo': 'operador_mermas.html'}
+        ]
+    },
+    'carga': {
+        'nombre_comercial': 'Gestión de Carga (Báscula)',
+        'perfiles': [
+            {'perfil': 'operador_bascula', 'operacion': 'carga', 'archivo': 'B_pesaje_carga_avicola.html'}
+        ]
+    },
+    'comercializador_glp': {
+        'nombre_comercial': 'Comercializador GLP',
+        'perfiles': [
+            {'perfil': 'controlador_comercializadorglp', 'operacion': 'comercializador_glp', 'archivo': 'equipos.html'},
+            {'perfil': 'mecanico_glp', 'operacion': 'comercializador_glp', 'archivo': 'visitas_offline.html'}
+        ]
+    },
+    'pesv': {
+        'nombre_comercial': 'Auditorías PESV',
+        'perfiles': [
+            {'perfil': 'controlador_pesv', 'operacion': 'pesv', 'archivo': 'B_controlador_pesv.html'}
+        ]
+    },
+    'preoperacional': {
+        'nombre_comercial': 'Preoperacionales de Flota',
+        'perfiles': []
+    },
+    'eps_gestion': {
+        'nombre_comercial': 'Gestión Operativa EPS',
+        'perfiles': []
+    },
+    'eps_facturacion': {
+        'nombre_comercial': 'Pre-Facturación EPS',
+        'perfiles': []
+    },
+    'avicola': {
+        'nombre_comercial': 'Sector Avícola',
+        'perfiles': []
+    }
+}
 
 # ==============================================================================
 # 3. MIDDLEWARE Y DECORADORES DE SEGURIDAD
@@ -57,11 +221,11 @@ def login_required_custom(f):
         # -----------------------------------------------------------
         
         # --- LÓGICA DE CONTROL DE SESIONES ÚNICAS ---
-        perfil = str(session.get('perfil', '')).strip().lower()
+        perfil = str(session.get('nombre_perfil', session.get('perfil', ''))).strip().lower()
         perfiles_multi_sesion = [
             'operador_logistica', 
             'webmaster_admin', 
-            'supervisor_gas', 
+            'controlador_gas', 
             'gestor_flotacarga',
             'verificador_bodegas',
             'operador_ventas',
@@ -153,66 +317,63 @@ def index():
 @app.route('/panel_principal.html')
 @login_required_custom
 def panel_principal():
-    if 'webmaster' in str(session.get('tipo_empresa', '')).lower() or session.get('empresa_id') == '901811727':
-        return redirect(url_for('bp_901811727_main.panel_webmaster'))
-
-    perfil_usuario = str(session.get('perfil', '')).strip().lower()
+    nombre_perfil = str(session.get('nombre_perfil', session.get('perfil', ''))).strip().lower()
     tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
+    empresa_id = str(session.get('empresa_id', '')).strip()
 
-    # REGLA M1, M2 Y M3 ESTRICTA: El Operador NUNCA pasa por el panel de tarjetas unificado
-    if perfil_usuario == 'operador_flotaespecial':
-        return redirect(url_for('router_universal', modulo='flotaespecial'))
-    elif perfil_usuario == 'operador_flotacarga':
-        return redirect(url_for('router_universal', modulo='carga'))
-    elif perfil_usuario == 'operador_logistica':
-        return redirect(url_for('router_universal', modulo='operador_bodegas'))
-    elif perfil_usuario == 'verificador_bodegas':
-        return redirect(url_for('router_universal', modulo='verificador_bodegas'))
-    elif perfil_usuario in ['vendedor', 'operador_ventas']:
-        return redirect(url_for('router_universal', modulo='operador_ventas'))
-    elif perfil_usuario in ['operador_recursohumano', 'operador_rrhh']:
-        return redirect(url_for('router_universal', modulo='operador_recursohumano'))
-    elif perfil_usuario == 'operador_contable':
-        return redirect(url_for('router_universal', modulo='operador_contable'))
-    elif perfil_usuario == 'operador_facturacion':
-        return redirect(url_for('router_universal', modulo='operador_facturacion'))
-    elif perfil_usuario == 'controlador_pesv':
-        return redirect('/gestor_flota/pesv_bp/')
+    # BIFURCACIÓN ESTRICTA CORPORATIVA BAQUÍA-EMS SAS
+    if empresa_id == '901811727' or 'webmaster' in tipo_empresa:
+        if nombre_perfil in ['gerente_bqa', 'webmaster', 'webmaster_admin', 'admin_general']:
+            return redirect('/hub_gerencia_baquia.html')
+        elif nombre_perfil == 'webmaster_baqone':
+            return redirect('/hub_webmaster_baqone.html')
+        elif nombre_perfil in ['webmaster_gestionenergetica', 'webmaster_energia']:
+            return redirect('/hub_gestion_energetica.html')
+        elif nombre_perfil == 'webmaster_inspecciones':
+            return redirect('/hub_inspecciones_tecnicas_clientes.html')
+        elif nombre_perfil == 'webmaster_administrador_baquia':
+            return redirect('/hub_administracion_baquia.html')
+        else:
+            return redirect('/hub_gerencia_baquia.html')
 
-    # SALTO DIRECTO Y DEFINITIVO: Omite la vista universal (Imágenes 4 y 7 redundantes)
-    # Encamina la petición incondicionalmente a la vista nativa consolidada del controlador.
-    if tipo_empresa == 'transporte_especial':
-        return redirect('/gestor_flotaespecial/dashboard')
-    elif tipo_empresa == 'transporte_carga':
-        return redirect('/gestor_flota/dashboard')
-    elif tipo_empresa == 'ventas_distribucion':
-        # Enrutamiento jerárquico según perfil para la suite M3
-        if perfil_usuario in ['gerente_ventasdistribucion', 'gerente']:
-            return redirect('/gerencia_ventas/dashboard')
-        elif perfil_usuario in ['controlador_bodegas', 'controlador_logistica']:
-            return redirect('/hub_bodegas/dashboard')
-        elif perfil_usuario == 'controlador_ventas':
-            return redirect('/hub_ventas/dashboard')
-        elif perfil_usuario in ['controlador_administracion', 'controlador_recurso_humano', 'controlador_contabilidad', 'controlador_facturacion']:
-            return redirect('/hub_administracion/dashboard')
-        return redirect('/hub_ventas_distribucion/dashboard')
-    elif tipo_empresa == 'cria_beneficio_aves_corral':
-        return redirect(url_for('router_universal', modulo='avicola'))
+    # Resolución Dinámica por Perfil (Motor Dinámico)
+    archivo_destino = session.get('archivo_destino', 'A_dashboard_universal.html')
 
-    # Fallback para empresas generales que requieran vista de tarjetas mezclada
-    nombre_empresa = session.get('empresa', 'Empresa')
-    nombre_usuario = session.get('nombre', 'Usuario')
-    nit_empresa = session.get('empresa_id')
-    modulos_activos = session.get('modulos_activos', [])
+    # Mantenimiento del tipo_empresa como Clasificador de Negocio para consolidación de Hubs
+    if archivo_destino in ['panel_principal.html', 'A_dashboard_universal.html']:
+        if tipo_empresa == 'transporte_especial':
+            return redirect('/gestor_flotaespecial/dashboard')
+        elif tipo_empresa == 'transporte_carga':
+            return redirect('/gestor_flota/dashboard')
+        elif tipo_empresa == 'ventas_distribucion':
+            if nombre_perfil in ['gerente_ventasdistribucion', 'gerente']:
+                return redirect('/gerencia_ventas/dashboard')
+            elif nombre_perfil in ['controlador_bodegas', 'controlador_logistica']:
+                return redirect('/hub_bodegas/dashboard')
+            elif nombre_perfil == 'controlador_ventas':
+                return redirect('/hub_ventas/dashboard')
+            elif nombre_perfil in ['controlador_administracion', 'controlador_recurso_humano', 'controlador_contabilidad', 'controlador_facturacion']:
+                return redirect('/hub_administracion/dashboard')
+            return redirect('/hub_ventas_distribucion/dashboard')
+        elif tipo_empresa == 'cria_beneficio_aves_corral':
+            return redirect(url_for('router_universal', modulo='avicola'))
 
-    return render_template(
-        'A_dashboard_universal.html',
-        empresa=nombre_empresa,
-        usuario=nombre_usuario,
-        nit=nit_empresa,
-        modulos_activos=modulos_activos,
-        perfil=perfil_usuario
-    )
+    # Enrutamiento Automático Dinámico
+    mapa_sistema = ejecutar_escaneo_introspeccion()
+
+    if archivo_destino in mapa_sistema:
+        return redirect(url_for(mapa_sistema[archivo_destino]))
+    elif not archivo_destino.endswith(".html"):
+        return redirect(url_for(archivo_destino))
+    else:
+        return render_template(
+            archivo_destino,
+            empresa=session.get('empresa', 'Empresa'),
+            usuario=session.get('nombre', 'Usuario'),
+            nit=empresa_id,
+            modulos_activos=session.get('modulos_activos', []),
+            perfil=nombre_perfil
+        )
 
 # ==============================================================================
 # 7. PROCESADOR DE AUTENTICACIÓN (LOGIN VÍA JSON)
@@ -252,7 +413,14 @@ def login():
         else:
             submodulos_activos_empresa = submodulos_raw
 
-    cur.execute("SELECT * FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula, nit_empresa))
+    # JOIN con tabla perfiles (Normalización con enlace por id_perfil y fallback por nombre)
+    cur.execute("""
+        SELECT u.*, 
+               p.perfil as nombre_perfil, p.archivo_destino 
+        FROM usuarios u 
+        LEFT JOIN perfiles p ON (u.id_perfil = p.id OR (u.id_perfil IS NULL AND u.perfil = p.perfil AND u.empresa_id = p.nit))
+        WHERE u.cedula = %s AND u.empresa_id = %s
+    """, (cedula, nit_empresa))
     usuario = cur.fetchone()
 
     if not usuario or not bcrypt.check_password_hash(usuario['password'], password):
@@ -287,22 +455,30 @@ def login():
     
     cur.close()
 
+    perfil_final = str(usuario.get('nombre_perfil') or usuario.get('perfil') or '').strip().lower()
+    archivo_destino_final = str(usuario.get('archivo_destino') or 'A_dashboard_universal.html')
+
+    session.clear()
+    # Inyección Estricta de Contexto en Sesión
     session.update({
         'usuario_id': usuario['id'],
-        'cedula': usuario['cedula'],
-        'nombre': usuario['nombre'],
-        'empresa': usuario['empresa'],
+        'id_perfil': usuario.get('id_perfil'),
+        'nombre_perfil': perfil_final,
+        'perfil': perfil_final,
         'empresa_id': usuario['empresa_id'],
         'nit': usuario['empresa_id'],
         'tipo_empresa': tipo_empresa,
-        'perfil': str(usuario.get('perfil') or '').strip().lower(),
         'modulos_activos': modulos_activos,
         'submodulos_activos': submodulos_activos_empresa, 
+        'archivo_destino': archivo_destino_final,
+        'nombre': usuario['nombre'],
+        'empresa': nombre_empresa,
+        'cedula': usuario['cedula'],
         'token_sesion': token_sesion,
         'login_time': login_timestamp
     })
 
-    print(f"[{datetime.now()}] Login Exitoso - CC: {session['cedula']} | NIT: {session['empresa_id']} | Perfil: {session['perfil']} | Modulos: {session['modulos_activos']} | Submodulos: {session['submodulos_activos']}")
+    print(f"[{datetime.now()}] Login Exitoso - CC: {session['cedula']} | NIT: {session['empresa_id']} | Perfil: {session['nombre_perfil']} | Archivo Destino: {session['archivo_destino']}")
 
     return jsonify(
         success=True,
@@ -313,18 +489,12 @@ def login():
 # ==============================================================================
 # 8. ENRUTADOR MAESTRO UNIVERSAL (DINÁMICO POR BD CON CAPA DE TRADUCCIÓN)
 # ==============================================================================
-import inspect
-import re
-
 def ejecutar_escaneo_introspeccion():
     if 'MAPA_RUTAS_AUTODESCUBIERTO' in current_app.config:
         return current_app.config['MAPA_RUTAS_AUTODESCUBIERTO']
 
     nuevo_mapa = {}
-    # Se elimina la línea "from flask import current_app" para heredar el objeto global importado en la línea 4
     for endpoint, func in current_app.view_functions.items():
-        # REGLA ESTRICTA BQA-ONE: Ignorar router_universal para no crear un loop infinito 
-        # en la asignación del mapa de introspección que causa el BuildError.
         if endpoint == 'router_universal':
             continue
             
@@ -343,7 +513,8 @@ def ejecutar_escaneo_introspeccion():
 @app.route('/router/<modulo>')
 @login_required_custom
 def router_universal(modulo):
-    perfil_usuario = str(session.get('perfil', '')).strip().lower()
+    id_perfil = session.get('id_perfil')
+    nombre_perfil = str(session.get('nombre_perfil', session.get('perfil', ''))).strip().lower()
     nit_empresa = str(session.get('empresa_id', '')).strip()
     modulos_comprados = session.get('modulos_activos', [])
     submodulos_activos = session.get('submodulos_activos', [])
@@ -356,7 +527,7 @@ def router_universal(modulo):
     elif modulo == 'ventas' and tipo_empresa == 'ventas_distribucion': es_nativo = True
     elif modulo == 'avicola' and tipo_empresa == 'cria_beneficio_aves_corral': es_nativo = True
     
-    # Módulos transversales universales permitidos (Evita bloqueos falsos)
+    # Módulos transversales universales permitidos
     modulos_transversales_permitidos = [
         'preoperacional', 'eps_gestion', 'eps_facturacion', 
         'operador_flotaespecial', 'operador_flotacarga', 'operador_bodegas', 
@@ -368,108 +539,39 @@ def router_universal(modulo):
         flash(f"Tu empresa no tiene habilitado el módulo o submódulo de {modulo.upper()}.", "warning")
         return redirect(url_for('panel_principal'))
 
-    # FALLBACK ESTRUCTURAL PARA SUB-HUBS NATIVOS
-    if es_nativo:
-        if modulo == 'ventas':
-            if perfil_usuario in ['gerente_ventasdistribucion', 'gerente']:
-                return redirect('/gerencia_ventas/dashboard')
-            elif perfil_usuario in ['controlador_bodegas', 'controlador_logistica']:
-                return redirect('/hub_bodegas/dashboard')
-            elif perfil_usuario == 'controlador_ventas':
-                return redirect('/hub_ventas/dashboard')
-            elif perfil_usuario in ['controlador_administracion', 'controlador_recurso_humano', 'controlador_contabilidad', 'controlador_facturacion']:
-                return redirect('/hub_administracion/dashboard')
-            return redirect('/hub_ventas_distribucion/dashboard')
-        elif modulo == 'flotaespecial':
-            # REGLA M1 ESTRICTA: Aislamiento estricto del Operador Flota Especial
-            if perfil_usuario == 'operador_flotaespecial':
-                try:
-                    max_reintentos = 3
-                    preop = None
-                    for intento in range(max_reintentos):
-                        try:
-                            cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-                            # Bloqueo pesimista OBLIGATORIO para prevenir race conditions en turno
-                            cur.execute("""
-                                SELECT id_inspeccion 
-                                FROM inspeccion_preoperacional 
-                                WHERE id_usuario_conductor = %s 
-                                  AND id_empresa = %s 
-                                  AND fecha_inspeccion = CURDATE() 
-                                FOR UPDATE
-                            """, (session.get('usuario_id'), nit_empresa))
-                            preop = cur.fetchone()
-                            mysql.connection.commit()
-                            cur.close()
-                            break
-                        except Exception as e:
-                            mysql.connection.rollback()
-                            if intento == max_reintentos - 1:
-                                raise e
-                            time.sleep(0.5)
-                    
-                    if preop:
-                        return redirect(url_for('router_universal', modulo='operador_flotaespecial'))
-                    else:
-                        return redirect(url_for('router_universal', modulo='preoperacional'))
-                except Exception as e:
-                    print(f"Error en validación M1 (Preoperacional): {e}")
-                    return redirect(url_for('router_universal', modulo='preoperacional'))
-            else:
-                return redirect('/gestor_flotaespecial/dashboard')
-        elif modulo == 'carga':
-            # REGLA M2 ESTRICTA: Aislamiento estricto del Operador Transporte Carga
-            if perfil_usuario == 'operador_flotacarga':
-                # El flujo dicta que el operador de carga entra directamente a su Hub/Lector QR
-                return redirect(url_for('router_universal', modulo='operador_flotacarga'))
-            elif perfil_usuario == 'controlador_pesv':
-                return redirect('/gestor_flota/pesv_bp/')
-            else:
-                return redirect('/gestor_flota/dashboard')
-        elif modulo == 'avicola':
-            return render_template('A_gestion_avicola_offline.html', nombre=session.get('nombre'), empresa=session.get('empresa'), perfil=perfil_usuario, nit=nit_empresa, tipo_empresa=tipo_empresa)
-
-    # FALLBACK ANTI-LOOP DE SUBMÓDULOS CON ENRUTAMIENTO DIRECTO A BLUEPRINTS
-    if modulo == 'eps_gestion':
-        return redirect('/gestor_flotaespecial/eps_bp/')
-    elif modulo == 'eps_facturacion':
-        return redirect('/gestor_flotaespecial/facturacion_eps_bp/')
-    elif modulo == 'pesv':
-        return redirect('/gestor_flota/pesv_bp/')
-    elif modulo == 'preoperacional':
-        return redirect(url_for('preoperacional.preoperacional_tc'))
-    elif modulo == 'operador_flotaespecial':
-        return redirect(url_for('operador_flotaespecial.dashboard_operador_especial'))
-    elif modulo == 'operador_flotacarga':
-        return redirect(url_for('flotacarga.dashboard_operador'))
-    elif modulo == 'operador_bodegas':
-        return redirect(url_for('oper_bodegas.bodega_operativa'))
-    elif modulo == 'verificador_bodegas':
-        return redirect(url_for('verificador_bodegas.bodega_verificador'))
-    elif modulo == 'vendedor':
-        return redirect(url_for('operador_ventas.dashboard_operador'))
-    elif modulo == 'operador_ventas':
-        return redirect(url_for('operador_ventas.dashboard_operador'))
-    elif modulo == 'operador_recursohumano':
-        return redirect(url_for('operador_recursohumano.dashboard_operador'))
-    elif modulo == 'operador_contable':
-        return redirect(url_for('operador_contable.dashboard_operador'))
-    elif modulo == 'operador_facturacion':
-        return redirect(url_for('operador_facturacion.dashboard_operador'))
-
+    # Resolución Dinámica por Perfil y Módulo según BD
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("""
-        SELECT archivo_destino FROM perfiles 
-        WHERE nit = %s AND operacion = %s AND perfil = %s
-    """, (nit_empresa, modulo, perfil_usuario))
-    regla_perfil = cur.fetchone()
-    cur.close()
+    regla_perfil = None
+    if id_perfil:
+        cur.execute("""
+            SELECT archivo_destino FROM perfiles 
+            WHERE nit = %s AND operacion = %s AND id = %s
+        """, (nit_empresa, modulo, id_perfil))
+        regla_perfil = cur.fetchone()
 
     if not regla_perfil or not regla_perfil.get('archivo_destino'):
-        flash(f"Acceso denegado: Tu perfil no tiene rutas asignadas para {modulo}.", "danger")
+        cur.execute("""
+            SELECT archivo_destino FROM perfiles 
+            WHERE nit = %s AND operacion = %s AND perfil = %s
+        """, (nit_empresa, modulo, nombre_perfil))
+        regla_perfil = cur.fetchone()
+
+    archivo_destino = None
+    if regla_perfil and regla_perfil.get('archivo_destino'):
+        archivo_destino = str(regla_perfil['archivo_destino']).strip()
+    else:
+        # Fallback a la Matriz Maestra de Producto
+        if modulo in MATRIZ_MAESTRA:
+            for p_info in MATRIZ_MAESTRA[modulo]['perfiles']:
+                if p_info['perfil'] == nombre_perfil:
+                    archivo_destino = p_info['archivo']
+                    break
+
+    cur.close()
+
+    if not archivo_destino:
         return redirect(url_for('panel_principal'))
 
-    archivo_destino = str(regla_perfil['archivo_destino']).strip()
     mapa_sistema = ejecutar_escaneo_introspeccion()
 
     if archivo_destino in mapa_sistema:
@@ -477,7 +579,98 @@ def router_universal(modulo):
     elif not archivo_destino.endswith(".html"):
         return redirect(url_for(archivo_destino))
     else:
-        return render_template(archivo_destino, nombre=session.get('nombre'), empresa=session.get('empresa'), perfil=perfil_usuario, nit=nit_empresa, tipo_empresa=session.get('tipo_empresa'))
+        return render_template(
+            archivo_destino,
+            nombre=session.get('nombre'), 
+            empresa=session.get('empresa'), 
+            perfil=nombre_perfil, 
+            nit=nit_empresa, 
+            tipo_empresa=tipo_empresa
+        )
+
+# ==============================================================================
+# 8.5 ONBOARDING TRANSACCIONAL ATÓMICO (WIZARD 4 PASOS)
+# ==============================================================================
+@app.route('/api/admin/onboarding_empresa', methods=['POST'])
+@login_required_custom
+def onboarding_empresa():
+    nombre_perfil = session.get('nombre_perfil', session.get('perfil', ''))
+    if nombre_perfil not in ['webmaster', 'webmaster_admin', 'admin_general']:
+        return jsonify(success=False, message="Acceso denegado."), 403
+
+    data = request.get_json(force=True)
+    nombre_comercial = data.get('nombre_comercial')
+    nit = data.get('nit')
+    tipo_empresa = data.get('tipo_empresa')
+    modulos = data.get('modulos', [])
+    submodulos = data.get('submodulos', [])
+    
+    usuario_cedula = data.get('usuario_cedula')
+    usuario_nombre = data.get('usuario_nombre')
+    usuario_password = data.get('usuario_password')
+
+    if not all([nombre_comercial, nit, tipo_empresa, usuario_cedula, usuario_nombre, usuario_password]):
+        return jsonify(success=False, message="Faltan datos obligatorios para el onboarding."), 400
+
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("START TRANSACTION")
+
+        # Paso 1: Empresa
+        cur.execute("INSERT INTO empresas (nombre_comercial, nit, tipo_empresa, submodulos_activos) VALUES (%s, %s, %s, %s)", 
+                    (nombre_comercial, nit, tipo_empresa, json.dumps(submodulos)))
+
+        # Paso 2: Módulos Activos y Aprovisionamiento Determinista de Perfiles de la Matriz
+        for mod in modulos:
+            cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, mod))
+            
+            # Inyección de roles nativos cableados
+            if mod in MATRIZ_MAESTRA:
+                for p in MATRIZ_MAESTRA[mod]['perfiles']:
+                    cur.execute("""
+                        INSERT INTO perfiles (empresa, nit, operacion, perfil, archivo_destino)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (nombre_comercial, nit, p['operacion'], p['perfil'], p['archivo']))
+
+        # Paso 3: Perfiles Base y Administrador Raíz
+        archivo_destino_def = 'panel_principal.html'
+        if tipo_empresa == 'transporte_especial':
+            archivo_destino_def = 'B_modulo_controlador_flotaespecial.html'
+        elif tipo_empresa == 'transporte_carga':
+            archivo_destino_def = 'B_modulo_controlador_flotacarga.html'
+        elif tipo_empresa == 'ventas_distribucion':
+            archivo_destino_def = 'B_gerente_ventasdistribucion.html'
+        
+        # Perfil raíz para el administrador de la empresa
+        cur.execute("INSERT INTO perfiles (empresa, nit, operacion, perfil, archivo_destino) VALUES (%s, %s, %s, %s, %s)",
+                    (nombre_comercial, nit, 'admin', 'admin_general', archivo_destino_def))
+        id_perfil_admin = cur.lastrowid
+
+        # Paso 4: Usuario Administrador Inicial vinculado a su id_perfil
+        hashed_pw = bcrypt.generate_password_hash(usuario_password).decode('utf-8')
+        cur.execute("""INSERT INTO usuarios (cedula, nombre, empresa_id, id_perfil, perfil, password, tipo_usuario, clase) 
+                       VALUES (%s, %s, %s, %s, 'admin_general', %s, 'cliente', 'admin')""",
+                    (usuario_cedula, usuario_nombre, nit, id_perfil_admin, hashed_pw))
+
+        # Persistencia de Auditoría Obligatoria en Ecosistema
+        payload_str = json.dumps(data)
+        registrar_auditoria(
+            empresa_id=nit,
+            empresa_nombre=nombre_comercial,
+            modulo='Onboarding',
+            usuario=f"{session.get('cedula')} - {session.get('nombre')}",
+            accion='CREACION_EMPRESA_COMPLETA',
+            detalle=payload_str,
+            nivel='INFO'
+        )
+        registrar_operacion_bqa(cur, 'ONBOARDING_EMPRESA', data)
+
+        cur.execute("COMMIT")
+        cur.close()
+        return jsonify(success=True, message="Onboarding transaccional completado exitosamente.")
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify(success=False, message=f"Error en Onboarding: {str(e)}"), 500
 
 # ==============================================================================
 # 9. CIERRE DE SESIÓN
@@ -490,43 +683,8 @@ def logout():
 @app.route('/api/modulos_sistema_disponibles')
 @login_required_custom
 def api_modulos_sistema_disponibles():
-    from flask import current_app
-    excluir = ['static', 'bp_901811727_main', 'bp_901811727_admin', 'bp_901811727_energia_glp', 'bp_901811727_audit', 'main_router']
-    
-    # Saneamiento unificado reconociendo los prefijos arquitectónicos B_ y C_
-    modulos_raw = list(set([name.replace('bp_', '').replace('B_bp_', '').replace('C_bp_', '').replace('B_modulo_', '').replace('C_modulo_', '') 
-                        for name in current_app.blueprints.keys() if name not in excluir]))
-    
-    mapa_normalizacion = {
-        'glp': 'gas', 
-        'supervisorgas': 'gas',
-        'flotacarga': 'flota', 
-        'combustible_flota': 'flota', 
-        'gestorflota': 'flota', 
-        'preoperacional': 'flota',
-        'gestion_carga': 'carga', 
-        'gestionavicola_bp': 'carga',
-        'gestion_mermas': 'mermas',
-        'controlador_flotaespecial': 'flotaespecial',
-        'operador_flotaespecial': 'flotaespecial',
-        'bodegas': 'bodegas',
-        'oper_bodegas': 'bodegas',
-        'verificador_bodegas': 'bodegas',
-        'hub_bodegas': 'bodegas',
-        'hub_ventas': 'ventas',
-        'hub_administracion': 'administracion',
-        'gerencia_ventas': 'gerencia',
-        'hub_ventas_distribucion': 'ventas',
-        'controlador_pesv': 'pesv',
-        'auditorias_pesv': 'pesv'
-    }
-    
-    modulos_v2 = set()
-    for mod in modulos_raw:
-        nombre_limpio = mapa_normalizacion.get(mod, mod)
-        modulos_v2.add(nombre_limpio)
-        
-    return jsonify(success=True, modulos=sorted(list(modulos_v2)))
+    # Retorna de forma limpia las soluciones reconocidas en la Matriz Maestra
+    return jsonify(success=True, modulos=sorted(list(MATRIZ_MAESTRA.keys())))
 
 # ==============================================================================
 # 10. BLOQUE DE EJECUCIÓN LOCAL

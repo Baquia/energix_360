@@ -1,4 +1,6 @@
-# -*- coding: utf-8 -*-
+
+# MÓDULO: GAS | SUBMÓDULO: B_bp_operador_glp | CONDICIÓN: OBLIGATORIO | TIPO: 1
+# app/blueprints/B_bp_operador_glp.py
 from flask import render_template  
 from flask import Blueprint, jsonify, request, session
 from flask import current_app as app
@@ -28,6 +30,7 @@ from email.utils import make_msgid, formatdate
 # --------------------------------
 
 bp_glp = Blueprint('bp_glp', __name__, url_prefix='/glp')
+bp_operador_glp = bp_glp  # <-- Alias de compatibilidad Plug & Play
 
 # ==========================================
 # CONFIGURACIÓN GLOBAL & HOLIDAYS
@@ -2823,7 +2826,7 @@ def ver_facturas_glp():
                 "ubicacion": p_ubi
             })
 
-        return render_template('facturas_glp.html', 
+        return render_template('C_facturas_glp.html', 
                                pedidos=pedidos_listos, 
                                empresa=empresa, 
                                nombre=nombre, 

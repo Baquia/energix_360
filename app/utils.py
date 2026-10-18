@@ -36,11 +36,11 @@ def login_required_custom(f):
         # -----------------------------------------------------------
         
         # --- LÓGICA DE CONTROL DE SESIONES ÚNICAS ---
-        perfil = str(session.get('perfil', '')).strip().lower()
+        perfil = str(session.get('nombre_perfil', session.get('perfil', ''))).strip().lower()
         perfiles_multi_sesion = [
             'operador_logistica', 
             'webmaster_admin', 
-            'supervisor_gas', 
+            'controlador_gas', 
             'gestor_flotacarga',
             'verificador_bodegas',
             'operador_ventas',
@@ -99,7 +99,8 @@ def submodulo_required(submodulo_nombre):
 
 def registrar_auditoria(empresa_id, empresa_nombre, modulo, usuario, accion, detalle, nivel='INFO'):
     """
-    Registra un evento en la tabla audit_log para trazabilidad.
+    Mecanismo modular y centralizado.
+    Registra un evento transaccional en la tabla audit_log para trazabilidad estricta.
     """
     try:
         # Validar que haya conexión
@@ -109,7 +110,7 @@ def registrar_auditoria(empresa_id, empresa_nombre, modulo, usuario, accion, det
 
         cur = mysql.connection.cursor()
         
-        # Inserción segura
+        # Inserción segura con prevención de inyección SQL
         cur.execute("""
             INSERT INTO audit_log (empresa_id, empresa_nombre, modulo, usuario, accion, detalle, nivel)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -119,8 +120,8 @@ def registrar_auditoria(empresa_id, empresa_nombre, modulo, usuario, accion, det
         cur.close()
         
     except Exception as e:
-        # Usamos print para no romper el flujo principal si falla la auditoría
-        print(f"⛔ Error guardando auditoría: {e}")
+        # Control de daños: Si falla la auditoría, no se tumba el hilo transaccional principal
+        print(f"⛔ Error crítico guardando auditoría: {e}")
 
 
 def validar_aptitud_operativa(conductor, vehiculo):

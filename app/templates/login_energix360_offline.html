@@ -1,3 +1,4 @@
+<!-- MÓDULO: UNIVERSAL | ARCHIVO: login_energix360_offline.html | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
 <!DOCTYPE html>
 <html lang="es">
 
@@ -7,7 +8,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- PWA -->
-  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/BQA_ONE_192.png">
+  <link rel="icon" type="image/png" href="/static/BQA_ONE_192.png">
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#015249">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +17,7 @@
   <style>
     :root {
       --color-primary: #015249;
-      --color-primary-dark: #013d36;
+      --color-primary-dark: #003832;
       --color-bg: #f6f7f8;
       --color-surface: #ffffff;
       --color-border: #e5e7eb;
@@ -211,7 +213,6 @@
   </style>
 
   <script>
-    // Registro SW también aquí para asegurar control offline
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("/sw.js")
@@ -224,7 +225,7 @@
 
 <body>
   <div class="login-container">
-    <img src="/static/logo_energix360.png" alt="Logo Energix 360" class="logo">
+    <img src="/static/logo_energix360.png" alt="Logo Energix 360" class="logo" onerror="this.src='/static/BQA_ONE_192.png'">
 
     <div class="offline-badge">
       ● MODO OFFLINE
@@ -259,7 +260,7 @@
     <p class="help-text">
       <strong>¿Qué significa esto?</strong><br>
       • No se verifica usuario ni contraseña en el servidor.<br>
-      • Solo tendrás disponible el <strong>panel Pollos Gar OFFLINE</strong> y el módulo <strong>GLP Offline</strong>.<br>
+      • Tendrás disponible el módulo <strong>GLP Operador Offline</strong>.<br>
       • Cuando recuperes la señal, entra por el login normal para sincronizar.
     </p>
 
@@ -267,10 +268,13 @@
       Estado de conexión:
       <span id="statusOnline">detectando…</span>
     </p>
+
+    <footer style="text-align: center; font-size: 0.75rem; color: var(--color-muted); margin-top: 15px;">
+      BQA-ONE © 2026 |
+    </footer>
   </div>
 
   <script>
-    // Mostrar estado de conexión
     function actualizarEstadoConexion() {
       const el = document.getElementById("statusOnline");
       if (!el) return;
@@ -286,7 +290,6 @@
     window.addEventListener("online", actualizarEstadoConexion);
     window.addEventListener("offline", actualizarEstadoConexion);
 
-    // Cargar último usuario recordado
     document.addEventListener("DOMContentLoaded", () => {
       try {
         const last = localStorage.getItem("bqa_last_user") || "";
@@ -300,7 +303,6 @@
       actualizarEstadoConexion();
     });
 
-    // Login OFFLINE
     async function offlineLogin(cedula, password) {
       const errBox = document.getElementById("errorMsg");
       if (errBox) errBox.textContent = "";
@@ -313,7 +315,6 @@
         return;
       }
 
-      // Guardar usuario localmente si el checkbox está activo
       const check = document.getElementById("recordarUsuario");
       if (check && check.checked) {
         try {
@@ -323,12 +324,35 @@
         }
       }
 
-      // Aquí NO se llama al backend.
-      // Simplemente redirigimos al panel OFFLINE de Pollos Gar.
-      window.location.href = "/890707006_offline.html";
+      try {
+        const key = `bqa_offline_user_${cedula}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          const pack = JSON.parse(saved);
+          let targetHtml = pack.html || "B_operador_glp_offline.html";
+          if (targetHtml === "glp.html" || targetHtml === "glp_offline.html" || targetHtml === "B_operador_glp.html") {
+            targetHtml = "B_operador_glp_offline.html";
+          }
+          localStorage.setItem("bqa_offline_session", JSON.stringify({
+            cedula: pack.cedula || cedula,
+            nombre: pack.nombre || "Usuario Offline",
+            empresa: pack.empresa || "",
+            empresa_id: pack.empresa_id || "",
+            perfil: pack.perfil || "operador_gas",
+            html: targetHtml,
+            offline: true,
+            ts: Date.now()
+          }));
+          window.location.href = "/" + targetHtml;
+          return;
+        }
+      } catch (err) {
+        console.warn("Error leyendo sesión offline:", err);
+      }
+
+      window.location.href = "/B_operador_glp_offline.html";
     }
 
-    // Manejador del formulario
     document.getElementById("offlineLoginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const cedula = document.getElementById("cedula").value;

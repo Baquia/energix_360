@@ -78,6 +78,17 @@
     .nav-item:hover { background: rgba(255, 255, 255, 0.1); color: white; }
     .icon-spacer { display: inline-flex; width: 25px; justify-content: center; margin-right: 10px; }
 
+    /* WIZARD ONBOARDING STYLES */
+    .wizard-step-ind {
+        padding: 10px; border-radius: 8px; background: #e2e8f0; color: #64748b; font-weight: bold; font-size: 0.9rem; flex: 1; margin: 0 5px; text-align: center; transition: all 0.3s ease;
+    }
+    .wizard-step-ind.active {
+        background: var(--color-primary); color: white; box-shadow: 0 4px 10px rgba(1, 82, 73, 0.3); transform: scale(1.05);
+    }
+    .wizard-step-ind.completed {
+        background: #10b981; color: white;
+    }
+
     @media (max-width: 992px) {
       .btn-hamburguesa { display: block; }
       .layout { display: block; padding: 10px; }
@@ -91,6 +102,7 @@
         background: rgba(0, 0, 0, 0.6); z-index: 1999; display: none; backdrop-filter: blur(2px);
       }
       .sidebar-overlay.show { display: block; }
+      .wizard-step-ind { font-size: 0.75rem; padding: 5px; margin: 0 2px; }
     }
   </style>
 
@@ -109,19 +121,23 @@
 </head>
 <body>
 
+  <input type="hidden" id="csrf_token_global" value="{{ csrf_token() }}">
   <div id="mobileOverlay" class="sidebar-overlay" onclick="toggleMenu()"></div>
 
   <!-- HEADER -->
   <div class="header">
     <div class="d-flex align-items-center">
       <button class="btn-hamburguesa" onclick="toggleMenu()">☰</button>
+      <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo BQA-ONE" style="height: 32px; margin-right: 10px;" onerror="this.style.display='none'">
+      <img src="{{ url_for('static', filename='logo_' ~ session.get('empresa_id', '') ~ '.png') }}" alt="Logo Cliente" style="height: 32px; margin-right: 10px;" onerror="this.style.display='none'">
       <h4 class="m-0 fw-bold" style="color: var(--color-primary);">Administración del Sistema</h4>
     </div>
     <div class="d-none d-md-block text-center text-muted small fw-bold">
-      {{ nombre }} | {{ empresa }}
+      {{ usuario | default(nombre) }} | {{ empresa }}
     </div>
-    <div>
-      <a href="/logout" class="btn btn-outline-danger btn-sm">Salir</a>
+    <div class="d-flex align-items-center gap-2">
+      <a href="/hub_administracion/dashboard" class="btn btn-outline-secondary btn-sm fw-bold">⬅ Volver al Hub</a>
+      <a href="/logout" class="btn btn-outline-danger btn-sm fw-bold">Salir</a>
     </div>
   </div>
 
@@ -133,31 +149,22 @@
       </div>
       
       <div class="sidebar-section-title">NAVEGACIÓN</div>
-      <a href="/901811727.html" class="nav-item">
-        <span class="icon-spacer">⬅️</span> Volver al Hub Principal
+      <a href="/hub_administracion/dashboard" class="nav-item">
+        <span class="icon-spacer">⬅️</span> Volver al Hub
       </a>
       
       <div class="sidebar-section-title mt-3">GESTIÓN DE ENTIDADES</div>
-      <button class="nav-item" onclick="mostrarSeccion('gestionEmpresas'); cargarTablaEmpresas();">
-        <span class="icon-spacer">🏢</span> Empresas
-      </button>
-      <button class="nav-item" onclick="mostrarSeccion('gestionEmpresasTransporteEspecial'); cargarTablaEmpresasEspecial();">
-        <span class="icon-spacer">🚐</span> Empresas Transporte Especial
-      </button>
-      <button class="nav-item" onclick="mostrarSeccion('gestionEmpresasTransporteCarga'); cargarTablaEmpresasCarga();">
-        <span class="icon-spacer">🚛</span> Empresas Transporte Carga
-      </button>
-      <button class="nav-item" onclick="mostrarSeccion('gestionEmpresasVentasDistribucion'); cargarTablaEmpresasVentas();">
-        <span class="icon-spacer">📦</span> Empresas Ventas y Distribución
-      </button>
       <button class="nav-item" onclick="mostrarSeccion('gestionTiposEmpresa'); cargarTablaTiposEmpresa();">
         <span class="icon-spacer">🏷️</span> Tipos de Empresa
       </button>
-      <button class="nav-item" onclick="mostrarSeccion('gestionUsuarios'); cargarTablaUsuarios();">
-        <span class="icon-spacer">👥</span> Usuarios
+      <button class="nav-item" onclick="mostrarSeccion('gestionEmpresas'); cargarTablaEmpresas();">
+        <span class="icon-spacer">🏢</span> Empresas
       </button>
       <button class="nav-item" onclick="mostrarSeccion('gestionPerfiles'); cargarTablaPerfiles();">
         <span class="icon-spacer">🔑</span> Perfiles
+      </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionUsuarios'); cargarTablaUsuarios();">
+        <span class="icon-spacer">👥</span> Usuarios
       </button>
       <button class="nav-item" onclick="mostrarSeccion('gestionProveedores'); cargarTablaProveedores();">
         <span class="icon-spacer">🚚</span> Proveedores
@@ -174,106 +181,10 @@
           <!-- Mensaje inicial de espera -->
           <div id="msgBienvenidaAdmin" class="text-center py-5 bg-white rounded shadow-sm p-4">
               <h4 class="text-muted fw-bold">Centro de Administración del Sistema</h4>
-              <p class="text-secondary">Seleccione una opción del submenú lateral para gestionar usuarios, empresas o perfiles.</p>
+              <p class="text-secondary">Seleccione una opción del submenú lateral para gestionar usuarios, empresas o perfiles autorizados.</p>
           </div>
 
-          <!-- 1. GESTIÓN DE EMPRESAS (GENERAL) -->
-          <div id="gestionEmpresas" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="text-primary fw-bold mb-0">Gestión de Empresas (General)</h4>
-                <div>
-                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Empresa')">+ Nueva Empresa</button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
-                </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm table-hover table-bordered text-center align-middle">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>NIT</th>
-                      <th>Nombre Comercial</th>
-                      <th>Tipo Empresa</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody id="bodyEmpresas"></tbody>
-                </table>
-              </div>
-          </div>
-
-          <!-- 1B. GESTIÓN DE EMPRESAS TRANSPORTE ESPECIAL -->
-          <div id="gestionEmpresasTransporteEspecial" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="text-primary fw-bold mb-0">Empresas de Transporte Especial</h4>
-                <div>
-                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('EmpresaEspecial')">+ Nueva Empresa Especial</button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
-                </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm table-hover table-bordered text-center align-middle">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>NIT</th>
-                      <th>Nombre Comercial</th>
-                      <th>Submódulos Activos</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody id="bodyEmpresasEspecial"></tbody>
-                </table>
-              </div>
-          </div>
-
-          <!-- 1C. GESTIÓN DE EMPRESAS TRANSPORTE DE CARGA -->
-          <div id="gestionEmpresasTransporteCarga" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="text-primary fw-bold mb-0">Empresas de Transporte de Carga</h4>
-                <div>
-                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('EmpresaCarga')">+ Nueva Empresa Carga</button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
-                </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm table-hover table-bordered text-center align-middle">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>NIT</th>
-                      <th>Nombre Comercial</th>
-                      <th>Submódulos Activos</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody id="bodyEmpresasCarga"></tbody>
-                </table>
-              </div>
-          </div>
-
-          <!-- 1D. GESTIÓN DE EMPRESAS VENTAS Y DISTRIBUCIÓN -->
-          <div id="gestionEmpresasVentasDistribucion" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="text-primary fw-bold mb-0">Empresas de Ventas y Distribución</h4>
-                <div>
-                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('EmpresaVentas')">+ Nueva Empresa Ventas</button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
-                </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm table-hover table-bordered text-center align-middle">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>NIT</th>
-                      <th>Nombre Comercial</th>
-                      <th>Submódulos Activos</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody id="bodyEmpresasVentas"></tbody>
-                </table>
-              </div>
-          </div>
-
-          <!-- 2. GESTIÓN TIPOS DE EMPRESA -->
+          <!-- 1. GESTIÓN TIPOS DE EMPRESA -->
           <div id="gestionTiposEmpresa" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-primary fw-bold mb-0">Tipos de Empresa</h4>
@@ -295,7 +206,56 @@
               </div>
           </div>
 
-          <!-- 3. GESTIÓN DE USUARIOS -->
+          <!-- 2. GESTIÓN DE EMPRESAS (GENERAL) -->
+          <div id="gestionEmpresas" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Gestión de Empresas</h4>
+                <div>
+                    <button class="btn btn-warning fw-bold text-dark btn-sm me-2" onclick="abrirWizardOnboarding('general')">🚀 Nuevo Onboarding (General)</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>NIT</th>
+                      <th>Nombre Comercial</th>
+                      <th>Tipo Empresa</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyEmpresas"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 3. GESTIÓN DE PERFILES -->
+          <div id="gestionPerfiles" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Gestión de Perfiles</h4>
+                <div>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Perfil')">+ Nuevo Perfil</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>NIT</th>
+                      <th>Empresa</th>
+                      <th>Operación</th>
+                      <th>Perfil</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bodyPerfiles"></tbody>
+                </table>
+              </div>
+          </div>
+
+          <!-- 4. GESTIÓN DE USUARIOS -->
           <div id="gestionUsuarios" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-primary fw-bold mb-0">Gestión de Usuarios</h4>
@@ -317,31 +277,6 @@
                     </tr>
                   </thead>
                   <tbody id="bodyUsuarios"></tbody>
-                </table>
-              </div>
-          </div>
-
-          <!-- 4. GESTIÓN DE PERFILES -->
-          <div id="gestionPerfiles" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="text-primary fw-bold mb-0">Gestión de Perfiles</h4>
-                <div>
-                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Perfil')">+ Nuevo Perfil</button>
-                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
-                </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm table-hover table-bordered text-center align-middle">
-                  <thead class="table-dark">
-                    <tr>
-                      <th>NIT</th>
-                      <th>Empresa</th>
-                      <th>Operación</th>
-                      <th>Perfil</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody id="bodyPerfiles"></tbody>
                 </table>
               </div>
           </div>
@@ -399,6 +334,97 @@
     </div>
   </div>
 
+  <!-- MODAL WIZARD ONBOARDING (TRANSACCIONAL Y SINCRÓNICO) -->
+  <div class="modal fade" id="modalWizard" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-warning text-dark">
+          <h5 class="modal-title fw-bold">🚀 Onboarding Transaccional Multi-Tenant</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-light">
+          <!-- Stepper UI -->
+          <div class="d-flex justify-content-between mb-4">
+            <div class="wizard-step-ind active" id="step1-ind">1. Empresa</div>
+            <div class="wizard-step-ind" id="step2-ind">2. Módulos y Alcance</div>
+            <div class="wizard-step-ind" id="step3-ind">3. Perfiles Base</div>
+            <div class="wizard-step-ind" id="step4-ind">4. Administrador Raíz</div>
+          </div>
+          
+          <!-- Step 1 -->
+          <div id="step1" class="wizard-step">
+            <h5 class="fw-bold text-primary mb-3">Información del Inquilino</h5>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-muted">NIT de la Empresa <span class="text-danger">*</span></label>
+                <input type="text" id="wiz_nit" class="form-control fw-bold border-primary" placeholder="Ej: 900123456">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-muted">Nombre Comercial <span class="text-danger">*</span></label>
+                <input type="text" id="wiz_nom" class="form-control fw-bold border-primary" placeholder="Ej: Mi Empresa S.A.S">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label fw-bold small text-muted">Tipo de Empresa (Modelo de Negocio) <span class="text-danger">*</span></label>
+                <select id="wiz_tipo" class="form-select border-primary fw-bold" onchange="wizardData.tipo_empresa = this.value">
+                    <option value="general">General</option>
+                    <option value="transporte_especial">Transporte Especial</option>
+                    <option value="transporte_carga">Transporte de Carga</option>
+                    <option value="ventas_distribucion">Ventas y Distribución</option>
+                    <option value="cria_beneficio_aves_corral">Avícola</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Step 2 -->
+          <div id="step2" class="wizard-step" style="display:none;">
+            <h5 class="fw-bold text-primary mb-3">Módulos del Sistema (Matriz Maestra de Producto)</h5>
+            <p class="small text-muted mb-3">Seleccione las soluciones de negocio autorizadas. El sistema aprovisionará automáticamente los perfiles y ruteos para sus empleados.</p>
+            <div id="wiz_modulos_container" class="row g-3">
+              <!-- Cargado dinámicamente desde /api/matriz_maestra -->
+            </div>
+          </div>
+          
+          <!-- Step 3 -->
+          <div id="step3" class="wizard-step" style="display:none;">
+            <h5 class="fw-bold text-primary mb-3">Aprovisionamiento Automático de Perfiles</h5>
+            <div class="alert alert-info border-info shadow-sm">
+              <p class="mb-2 fw-bold">Basado en los módulos seleccionados, el backend inyectará de forma determinista los roles y sus archivos de acceso correspondientes:</p>
+              <ul id="wiz_perfiles_list" class="mb-0"></ul>
+            </div>
+            <p class="small text-muted">No se requiere intervención manual de archivos HTML ni controladores Python. La arquitectura BQA-ONE garantiza la integridad total de ruteo.</p>
+          </div>
+          
+          <!-- Step 4 -->
+          <div id="step4" class="wizard-step" style="display:none;">
+            <h5 class="fw-bold text-primary mb-3">Usuario Administrador Inicial</h5>
+            <p class="small text-danger fw-bold mb-3">Este usuario será el administrador principal del inquilino (perfil admin_general).</p>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-muted">Cédula <span class="text-danger">*</span></label>
+                <input type="text" id="wiz_u_ced" class="form-control fw-bold border-danger" placeholder="Cédula del administrador">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-muted">Nombre Completo <span class="text-danger">*</span></label>
+                <input type="text" id="wiz_u_nom" class="form-control fw-bold border-danger" placeholder="Nombre completo">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label fw-bold small text-muted">Contraseña de Acceso Seguro <span class="text-danger">*</span></label>
+                <input type="password" id="wiz_u_pwd" class="form-control fw-bold border-danger" placeholder="Contraseña">
+              </div>
+            </div>
+          </div>
+          
+        </div>
+        <div class="modal-footer bg-white">
+          <button type="button" class="btn btn-secondary fw-bold" id="btnPrev" onclick="cambiarPaso(-1)" style="display:none;">⬅ Atrás</button>
+          <button type="button" class="btn btn-primary fw-bold px-4" id="btnNext" onclick="cambiarPaso(1)">Siguiente ➡</button>
+          <button type="button" class="btn btn-success fw-bold px-4 shadow-sm" id="btnSubmitWizard" onclick="enviarOnboarding()" style="display:none;">✅ Finalizar y Ejecutar Transacción</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL MAESTRO DE EDICIÓN / CREACIÓN -->
   <div class="modal fade" id="modalMaestro" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -416,6 +442,10 @@
       </div>
   </div>
 
+  <footer class="text-center py-3 text-muted small mt-4">
+    BQA-ONE © 2026 |
+  </footer>
+
   <!-- INYECCIÓN DE DATOS DESDE FLASK -->
   <script id="tipos-empresa-data" type="application/json">
     {{ tipos_empresa | default([]) | tojson | safe }}
@@ -426,19 +456,32 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- JAVASCRIPT EXCLUSIVO DEL MÓDULO CRUD (ADMIN) -->
+  <!-- JAVASCRIPT DEL SISTEMA MÁSTER BQA-ONE -->
   <script>
       let currentMode = "";
       let currentAction = "crear";
       let currentUrl = "";
 
       let tiposEmpresaData = [];
+      let matrizMaestraCache = {};
+
       document.addEventListener("DOMContentLoaded", function() {
           try {
               const txt = document.getElementById('tipos-empresa-data');
               if(txt) tiposEmpresaData = JSON.parse(txt.textContent);
           } catch(e) {}
+          cargarMatrizMaestraCache();
       });
+
+      function cargarMatrizMaestraCache() {
+          fetch('/api/matriz_maestra')
+          .then(r => r.json())
+          .then(res => {
+              if (res.success && res.matriz) {
+                  matrizMaestraCache = res.matriz;
+              }
+          }).catch(e => console.warn("Error cargando matriz maestra:", e));
+      }
 
       function toggleMenu() {
         const sidebar = document.getElementById('sidebarMenu');
@@ -474,72 +517,6 @@
                   </tr>`;
               });
           }
-      }
-
-      window.cargarTablaEmpresasEspecial = function() {
-          fetch('/obtener_empresas_transporte_especial').then(r => r.json()).then(d => {
-              const b = document.getElementById('bodyEmpresasEspecial');
-              b.innerHTML = '';
-              if (d.success && d.empresas) {
-                  d.empresas.forEach(e => {
-                      const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(e))));
-                      const submodulosText = (e.submodulos_activos && e.submodulos_activos.length > 0)
-                          ? e.submodulos_activos.map(s => `<span class="badge bg-info text-dark me-1">${s}</span>`).join('')
-                          : '<span class="text-muted small">Ninguno</span>';
-                      
-                      b.innerHTML += `<tr>
-                          <td class="text-muted small">${e.nit}</td>
-                          <td class="fw-bold">${e.nombre_comercial}</td>
-                          <td>${submodulosText}</td>
-                          <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('EmpresaEspecial', '${dataStr}')">✏️ Editar</button></td>
-                      </tr>`;
-                  });
-              }
-          });
-      }
-
-      window.cargarTablaEmpresasCarga = function() {
-          fetch('/obtener_empresas_transporte_carga').then(r => r.json()).then(d => {
-              const b = document.getElementById('bodyEmpresasCarga');
-              b.innerHTML = '';
-              if (d.success && d.empresas) {
-                  d.empresas.forEach(e => {
-                      const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(e))));
-                      const submodulosText = (e.submodulos_activos && e.submodulos_activos.length > 0)
-                          ? e.submodulos_activos.map(s => `<span class="badge bg-success text-white me-1">${s}</span>`).join('')
-                          : '<span class="text-muted small">Ninguno</span>';
-                      
-                      b.innerHTML += `<tr>
-                          <td class="text-muted small">${e.nit}</td>
-                          <td class="fw-bold">${e.nombre_comercial}</td>
-                          <td>${submodulosText}</td>
-                          <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('EmpresaCarga', '${dataStr}')">✏️ Editar</button></td>
-                      </tr>`;
-                  });
-              }
-          });
-      }
-
-      window.cargarTablaEmpresasVentas = function() {
-          fetch('/obtener_empresas_ventas_distribucion').then(r => r.json()).then(d => {
-              const b = document.getElementById('bodyEmpresasVentas');
-              b.innerHTML = '';
-              if (d.success && d.empresas) {
-                  d.empresas.forEach(e => {
-                      const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(e))));
-                      const submodulosText = (e.submodulos_activos && e.submodulos_activos.length > 0)
-                          ? e.submodulos_activos.map(s => `<span class="badge bg-warning text-dark me-1">${s}</span>`).join('')
-                          : '<span class="text-muted small">Ninguno</span>';
-                      
-                      b.innerHTML += `<tr>
-                          <td class="text-muted small">${e.nit}</td>
-                          <td class="fw-bold">${e.nombre_comercial}</td>
-                          <td>${submodulosText}</td>
-                          <td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('EmpresaVentas', '${dataStr}')">✏️ Editar</button></td>
-                      </tr>`;
-                  });
-              }
-          });
       }
 
       window.cargarTablaTiposEmpresa = function() {
@@ -620,21 +597,180 @@
       }
 
       function eliminarUsuario(cedula) {
-          if (confirm("¿Estás seguro de que deseas eliminar permanentemente este usuario? Esta acción no se puede deshacer.")) {
-              const fd = new FormData();
-              fd.append('accion', 'eliminar');
-              fd.append('cedula', cedula);
-              fetch('/gestionar_usuario', { method: 'POST', body: fd })
-              .then(r => r.json()).then(d => {
-                  alert(d.message);
-                  if (d.success) window.cargarTablaUsuarios();
-              }).catch(err => { alert("Error de conexión al intentar eliminar."); });
-          }
+          if (!window.confirm("¿Está seguro de eliminar permanentemente este usuario?")) return;
+          const fd = new FormData();
+          fd.append('accion', 'eliminar');
+          fd.append('cedula', cedula);
+          fetch('/gestionar_usuario', { method: 'POST', body: fd })
+          .then(r => r.json()).then(d => {
+              alert(d.message);
+              if (d.success) window.cargarTablaUsuarios();
+          }).catch(err => { alert("Error de conexión al intentar eliminar."); });
       }
 
-      // -------------------------------------------------------------
-      // FUNCIONES DE AUTO-DESCUBRIMIENTO (EMPRESAS, MÓDULOS, RUTAS)
-      // -------------------------------------------------------------
+      // =============================================================
+      // WIZARD ONBOARDING TRANSACCIONAL MULTI-TENANT
+      // =============================================================
+      let wizardStep = 1;
+      let wizardData = { tipo_empresa: 'general' };
+
+      window.abrirWizardOnboarding = function(tipoDefault) {
+          wizardStep = 1;
+          wizardData = { tipo_empresa: tipoDefault || 'general' };
+          
+          document.getElementById('wiz_nit').value = '';
+          document.getElementById('wiz_nom').value = '';
+          document.getElementById('wiz_tipo').value = wizardData.tipo_empresa;
+          document.getElementById('wiz_u_ced').value = '';
+          document.getElementById('wiz_u_nom').value = '';
+          document.getElementById('wiz_u_pwd').value = '';
+          
+          mostrarPasoWizard(1);
+          new bootstrap.Modal(document.getElementById('modalWizard')).show();
+      }
+
+      window.cambiarPaso = function(dir) {
+          if (dir === 1 && !validarPasoActual()) return;
+          wizardStep += dir;
+          if (wizardStep === 2) cargarModulosWizard();
+          if (wizardStep === 3) mostrarPerfilesAuto();
+          mostrarPasoWizard(wizardStep);
+      }
+
+      function mostrarPasoWizard(step) {
+          document.querySelectorAll('.wizard-step').forEach(el => el.style.display = 'none');
+          document.getElementById('step' + step).style.display = 'block';
+          
+          document.querySelectorAll('.wizard-step-ind').forEach((el, index) => {
+              el.classList.remove('active', 'completed');
+              if (index + 1 < step) el.classList.add('completed');
+              else if (index + 1 === step) el.classList.add('active');
+          });
+
+          document.getElementById('btnPrev').style.display = step === 1 ? 'none' : 'block';
+          document.getElementById('btnNext').style.display = step === 4 ? 'none' : 'block';
+          document.getElementById('btnSubmitWizard').style.display = step === 4 ? 'block' : 'none';
+      }
+
+      function validarPasoActual() {
+          if (wizardStep === 1) {
+              const nit = document.getElementById('wiz_nit').value.trim();
+              const nom = document.getElementById('wiz_nom').value.trim();
+              if (!nit || !nom) { alert("Complete el NIT y Nombre Comercial."); return false; }
+              wizardData.nit = nit;
+              wizardData.nombre_comercial = nom;
+              wizardData.tipo_empresa = document.getElementById('wiz_tipo').value;
+          }
+          if (wizardStep === 2) {
+              let mods = []; document.querySelectorAll('.wiz-chk-mod:checked').forEach(c => mods.push(c.value));
+              wizardData.modulos = mods;
+              wizardData.submodulos = mods;
+          }
+          return true;
+      }
+
+      function cargarModulosWizard() {
+          const container = document.getElementById('wiz_modulos_container');
+          container.innerHTML = '<div class="col-12 text-center"><div class="spinner-border text-primary"></div> Cargando soluciones de negocio...</div>';
+          
+          fetch('/api/matriz_maestra')
+          .then(r => r.json())
+          .then(res => {
+              let html = '';
+              if (res.success && res.matriz) {
+                  html += '<div class="col-12"><h6 class="fw-bold text-success">Módulos de la Plataforma</h6></div>';
+                  Object.keys(res.matriz).forEach(k => {
+                      const m = res.matriz[k];
+                      const rolesList = m.perfiles && m.perfiles.length > 0 ? m.perfiles.map(p => p.perfil).join(', ') : 'Transversal';
+                      html += `
+                      <div class="col-md-6 mb-2">
+                          <div class="form-check form-switch p-3 border rounded bg-white shadow-sm">
+                              <input class="form-check-input wiz-chk-mod ms-1 me-2" type="checkbox" value="${k}" id="wmod_${k}">
+                              <label class="form-check-label fw-bold text-primary" for="wmod_${k}">${m.nombre_comercial}</label>
+                              <div class="text-muted small ms-1">Roles incluidos: ${rolesList}</div>
+                          </div>
+                      </div>`;
+                  });
+              }
+              container.innerHTML = html;
+          }).catch(err => {
+              container.innerHTML = '<span class="text-danger small">Error cargando módulos de la matriz.</span>';
+          });
+      }
+
+      function mostrarPerfilesAuto() {
+          const ul = document.getElementById('wiz_perfiles_list');
+          ul.innerHTML = `<li><b>admin_general</b> (Administrador Principal Inquilino) → <i>panel_principal.html</i></li>`;
+          
+          const mods = wizardData.modulos || [];
+          mods.forEach(modClave => {
+              if (matrizMaestraCache[modClave] && matrizMaestraCache[modClave].perfiles) {
+                  matrizMaestraCache[modClave].perfiles.forEach(p => {
+                      ul.innerHTML += `<li><b>${p.perfil}</b> (Operación: ${p.operacion}) → <i>${p.archivo}</i></li>`;
+                  });
+              }
+          });
+      }
+
+      window.enviarOnboarding = function() {
+          if (!validarPasoActual()) return;
+          const ced = document.getElementById('wiz_u_ced').value.trim();
+          const nom = document.getElementById('wiz_u_nom').value.trim();
+          const pwd = document.getElementById('wiz_u_pwd').value.trim();
+          
+          if(!ced || !nom || !pwd) { alert("Complete todos los campos del Administrador Inicial."); return; }
+          
+          if (!window.confirm("¿Está seguro de realizar el Onboarding de Empresa?")) return;
+
+          wizardData.usuario_cedula = ced;
+          wizardData.usuario_nombre = nom;
+          wizardData.usuario_password = pwd;
+
+          const csrfToken = document.getElementById('csrf_token_global') ? document.getElementById('csrf_token_global').value : '';
+
+          fetch('/api/admin/onboarding_empresa', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': csrfToken
+              },
+              body: JSON.stringify(wizardData)
+          }).then(r => r.json()).then(d => {
+              alert(d.message);
+              if(d.success) location.reload();
+          }).catch(e => alert("Error crítico de red durante Onboarding."));
+      }
+
+      // =============================================================
+      // GESTIÓN DINÁMICA DE PERFILES Y FORMULARIOS CRUD
+      // =============================================================
+
+      function cargarSelectorPerfilesUsuario(empresaId, perfilActualVal) {
+          const sel = document.getElementById('f_perf');
+          if (!sel) return;
+          if (!empresaId) {
+              sel.innerHTML = '<option value="">Seleccione Empresa primero...</option>';
+              return;
+          }
+          sel.innerHTML = '<option value="">Cargando perfiles...</option>';
+          fetch('/obtener_perfiles?empresa_id=' + empresaId)
+          .then(r => r.json())
+          .then(d => {
+              sel.innerHTML = '<option value="">Seleccione Perfil...</option>';
+              if (d.perfiles && d.perfiles.length > 0) {
+                  d.perfiles.forEach(p => {
+                      let val = p.id ? `${p.id}|${p.perfil}` : p.perfil;
+                      let isSel = (perfilActualVal == p.id || perfilActualVal === p.perfil || (perfilActualVal && perfilActualVal.includes(p.perfil))) ? 'selected' : '';
+                      sel.innerHTML += `<option value="${val}" ${isSel}>${p.perfil} (${p.operacion})</option>`;
+                  });
+              } else {
+                  sel.innerHTML += '<option value="admin_general">admin_general (Por defecto)</option>';
+              }
+          }).catch(() => {
+              sel.innerHTML = '<option value="">Error cargando perfiles</option>';
+          });
+      }
+
       window.cargarModulosPerfil = function(selectElem) {
           let nit = selectElem.options[selectElem.selectedIndex].getAttribute('data-nit');
           if (!nit) return;
@@ -691,7 +827,6 @@
                       opts3 += `<option value="${r}" ${rutasArray[2] === r ? 'selected' : ''}>${r}</option>`;
                   });
                   
-                  // Inyectar manualmente rutas previas (legacy) que no fueron descubiertas
                   rutasArray.forEach((rg, index) => {
                       if (rg && !res.rutas.includes(rg)) {
                           if (index === 0) opts1 += `<option value="${rg}" selected>${rg} (Actual)</option>`;
@@ -735,11 +870,13 @@
 
           if (tipo === 'Empresa') {
               currentUrl = "/gestionar_empresa";
+
               let optsTipos = '<option value="">Seleccione...</option>';
               tiposEmpresaData.forEach(t => {
                   let sel = (data.tipo_empresa === t) ? 'selected' : '';
                   optsTipos += `<option value="${t}" ${sel}>${t}</option>`;
               });
+
               html += `
                   <label class="fw-bold small mt-2 text-primary">NIT</label>
                   <input type="text" id="f_nit" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
@@ -747,46 +884,35 @@
                   <input type="text" id="f_nom" class="form-control" value="${data.nombre_comercial || ''}">
                   <label class="fw-bold small mt-2">Tipo de Empresa</label>
                   <select id="f_tipo" class="form-select">${optsTipos}</select>
-                  <label class="fw-bold small mt-4 mb-2 text-success">Módulos Autorizados (Auto-detectados)</label>
+                  <label class="fw-bold small mt-4 mb-2 text-success">Módulos Autorizados (Matriz Maestra)</label>
                   <div id="contenedor_switches_modulos" class="row g-2">
-                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando módulos...</span>
+                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando soluciones de la matriz...</span>
                   </div>`;
-          } 
-          else if (tipo === 'EmpresaEspecial') {
-              currentUrl = "/gestionar_empresa_transporte_especial";
-              html += `
-                  <label class="fw-bold small mt-2 text-primary">NIT</label>
-                  <input type="text" id="f_nit_esp" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
-                  <label class="fw-bold small mt-2">Nombre Comercial</label>
-                  <input type="text" id="f_nom_esp" class="form-control" value="${data.nombre_comercial || ''}">
-                  <label class="fw-bold small mt-3 mb-2 text-success">Submódulos y Módulos Universales Habilitados (Descubrimiento Dinámico Plug & Play)</label>
-                  <div id="contenedor_switches_transporte_especial" class="row g-2">
-                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando submódulos dinámicos...</span>
-                  </div>`;
-          }
-          else if (tipo === 'EmpresaCarga') {
-              currentUrl = "/gestionar_empresa_transporte_carga";
-              html += `
-                  <label class="fw-bold small mt-2 text-primary">NIT</label>
-                  <input type="text" id="f_nit_carga" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
-                  <label class="fw-bold small mt-2">Nombre Comercial</label>
-                  <input type="text" id="f_nom_carga" class="form-control" value="${data.nombre_comercial || ''}">
-                  <label class="fw-bold small mt-3 mb-2 text-success">Submódulos y Módulos Universales Habilitados (Descubrimiento Dinámico Plug & Play)</label>
-                  <div id="contenedor_switches_transporte_carga" class="row g-2">
-                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando submódulos dinámicos...</span>
-                  </div>`;
-          }
-          else if (tipo === 'EmpresaVentas') {
-              currentUrl = "/gestionar_empresa_ventas_distribucion";
-              html += `
-                  <label class="fw-bold small mt-2 text-primary">NIT</label>
-                  <input type="text" id="f_nit_ventas" class="form-control" value="${data.nit || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
-                  <label class="fw-bold small mt-2">Nombre Comercial</label>
-                  <input type="text" id="f_nom_ventas" class="form-control" value="${data.nombre_comercial || ''}">
-                  <label class="fw-bold small mt-3 mb-2 text-success">Submódulos y Módulos Universales Habilitados (Descubrimiento Dinámico Plug & Play)</label>
-                  <div id="contenedor_switches_ventas_distribucion" class="row g-2">
-                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando submódulos dinámicos...</span>
-                  </div>`;
+              
+              setTimeout(() => {
+                  fetch('/api/matriz_maestra').then(r => r.json()).then(res => {
+                      const contenedor = document.getElementById('contenedor_switches_modulos');
+                      if (contenedor && res.success && res.matriz) {
+                          const subActivos = data.submodulos_activos || data.modulos_activos || [];
+                          let htmlSwitches = '';
+                          
+                          Object.keys(res.matriz).forEach(clave => {
+                              const modInfo = res.matriz[clave];
+                              const isChecked = subActivos.includes(clave) ? 'checked' : '';
+                              const rolesStr = modInfo.perfiles && modInfo.perfiles.length > 0 ? modInfo.perfiles.map(p => p.perfil).join(', ') : 'Transversal';
+                              htmlSwitches += `
+                              <div class="col-md-6 mb-2">
+                                  <div class="form-check form-switch p-2 border rounded bg-white shadow-sm">
+                                      <input class="form-check-input chk-modulo ms-1 me-2" type="checkbox" value="${clave}" id="mod_${clave}" ${isChecked}>
+                                      <label class="form-check-label fw-bold text-primary" for="mod_${clave}">${modInfo.nombre_comercial}</label>
+                                      <div class="text-muted small ms-1">Roles: ${rolesStr}</div>
+                                  </div>
+                              </div>`;
+                          });
+                          contenedor.innerHTML = htmlSwitches;
+                      }
+                  });
+              }, 100);
           }
           else if (tipo === 'TipoEmpresa') {
               currentUrl = "/gestionar_tipo_empresa";
@@ -817,10 +943,12 @@
                   <label class="fw-bold small mt-2">Nombre Completo</label>
                   <input type="text" id="f_unom" class="form-control fw-bold" value="${data.nombre || ''}">
                   <label class="fw-bold small mt-2 text-secondary">Asignar a Empresa</label>
-                  <select id="f_enom" class="form-select fw-bold" onchange="document.getElementById('f_eid').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select>
+                  <select id="f_enom" class="form-select fw-bold" onchange="document.getElementById('f_eid').value = this.options[this.selectedIndex].getAttribute('data-nit'); cargarSelectorPerfilesUsuario(this.options[this.selectedIndex].getAttribute('data-nit'), '');">${optsEmpresas}</select>
                   <input type="hidden" id="f_eid" value="${data.empresa_id || ''}">
-                  <label class="fw-bold small mt-2 text-info">Perfil del Sistema</label>
-                  <input type="text" id="f_perf" class="form-control fw-bold border-info" value="${data.perfil || ''}" placeholder="Ej: operador_logistica">
+                  
+                  <label class="fw-bold small mt-2 text-info">Perfil del Sistema (Inyectado por Matriz)</label>
+                  <select id="f_perf" class="form-select fw-bold border-info"></select>
+                  
                   <div class="row mt-2">
                       <div class="col-6">
                           <label class="fw-bold small text-primary">Telegram ID</label>
@@ -877,151 +1005,21 @@
 
           document.getElementById('contenedorCamposMaestro').innerHTML = html;
 
-          if (tipo === 'Empresa') {
-              fetch('/api/modulos_sistema_disponibles').then(r => r.json()).then(res => {
-                  const contenedor = document.getElementById('contenedor_switches_modulos');
-                  if (contenedor && res.success) {
-                      contenedor.innerHTML = '';
-                      const modulosActivos = data.modulos_activos || [];
-                      res.modulos.forEach(mod => {
-                          const isChecked = modulosActivos.includes(mod) ? 'checked' : '';
-                          contenedor.innerHTML += `
-                              <div class="col-6">
-                                  <div class="form-check form-switch p-2 border rounded bg-light">
-                                      <input class="form-check-input chk-modulo ms-1 me-2" type="checkbox" value="${mod}" id="mod_${mod}" ${isChecked}>
-                                      <label class="form-check-label text-capitalize small fw-bold" for="mod_${mod}">${mod}</label>
-                                  </div>
-                              </div>`;
-                      });
-                  }
-              }).catch(err => {
-                  const contenedor = document.getElementById('contenedor_switches_modulos');
-                  if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error escaneando módulos del sistema.</span>';
-              });
-          } else if (tipo === 'EmpresaEspecial') {
-              fetch('/api/submodulos_transporte_especial').then(r => r.json()).then(res => {
-                  const contenedor = document.getElementById('contenedor_switches_transporte_especial');
-                  if (contenedor && res.success) {
-                      const subActivos = data.submodulos_activos || [];
-                      let htmlSwitches = '<div class="col-12"><h6 class="fw-bold text-primary mt-2 mb-1">Submódulos Directos de Transporte Especial</h6></div>';
-                      
-                      res.directos.forEach(s => {
-                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
-                          htmlSwitches += `
-                              <div class="col-md-6 mb-2">
-                                  <div class="form-check form-switch p-3 border rounded bg-light">
-                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
-                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
-                                      <div class="text-muted small ms-1">${s.desc}</div>
-                                  </div>
-                              </div>`;
-                      });
-
-                      htmlSwitches += '<div class="col-12"><h6 class="fw-bold text-success mt-3 mb-1">Módulos Universales / Proyectados</h6></div>';
-                      res.universales.forEach(s => {
-                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
-                          htmlSwitches += `
-                              <div class="col-md-6 mb-2">
-                                  <div class="form-check form-switch p-3 border rounded bg-light">
-                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
-                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
-                                      <div class="text-muted small ms-1">${s.desc}</div>
-                                  </div>
-                              </div>`;
-                      });
-
-                      contenedor.innerHTML = htmlSwitches;
-                  }
-              }).catch(err => {
-                  const contenedor = document.getElementById('contenedor_switches_transporte_especial');
-                  if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error consultando submódulos del sistema.</span>';
-              });
-          } else if (tipo === 'EmpresaCarga') {
-              fetch('/api/submodulos_transporte_carga').then(r => r.json()).then(res => {
-                  const contenedor = document.getElementById('contenedor_switches_transporte_carga');
-                  if (contenedor && res.success) {
-                      const subActivos = data.submodulos_activos || [];
-                      let htmlSwitches = '<div class="col-12"><h6 class="fw-bold text-primary mt-2 mb-1">Submódulos Directos de Transporte de Carga</h6></div>';
-                      
-                      res.directos.forEach(s => {
-                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
-                          htmlSwitches += `
-                              <div class="col-md-6 mb-2">
-                                  <div class="form-check form-switch p-3 border rounded bg-light">
-                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
-                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
-                                      <div class="text-muted small ms-1">${s.desc}</div>
-                                  </div>
-                              </div>`;
-                      });
-
-                      htmlSwitches += '<div class="col-12"><h6 class="fw-bold text-success mt-3 mb-1">Módulos Universales / Proyectados</h6></div>';
-                      res.universales.forEach(s => {
-                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
-                          htmlSwitches += `
-                              <div class="col-md-6 mb-2">
-                                  <div class="form-check form-switch p-3 border rounded bg-light">
-                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
-                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
-                                      <div class="text-muted small ms-1">${s.desc}</div>
-                                  </div>
-                              </div>`;
-                      });
-
-                      contenedor.innerHTML = htmlSwitches;
-                  }
-              }).catch(err => {
-                  const contenedor = document.getElementById('contenedor_switches_transporte_carga');
-                  if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error consultando submódulos del sistema.</span>';
-              });
-          } else if (tipo === 'EmpresaVentas') {
-              fetch('/api/submodulos_ventas_distribucion').then(r => r.json()).then(res => {
-                  const contenedor = document.getElementById('contenedor_switches_ventas_distribucion');
-                  if (contenedor && res.success) {
-                      const subActivos = data.submodulos_activos || [];
-                      let htmlSwitches = '<div class="col-12"><h6 class="fw-bold text-primary mt-2 mb-1">Submódulos Directos de Ventas y Distribución</h6></div>';
-                      
-                      res.directos.forEach(s => {
-                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
-                          htmlSwitches += `
-                              <div class="col-md-6 mb-2">
-                                  <div class="form-check form-switch p-3 border rounded bg-light">
-                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
-                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
-                                      <div class="text-muted small ms-1">${s.desc}</div>
-                                  </div>
-                              </div>`;
-                      });
-
-                      htmlSwitches += '<div class="col-12"><h6 class="fw-bold text-success mt-3 mb-1">Módulos Universales / Proyectados</h6></div>';
-                      res.universales.forEach(s => {
-                          const isChecked = subActivos.includes(s.clave) ? 'checked' : '';
-                          htmlSwitches += `
-                              <div class="col-md-6 mb-2">
-                                  <div class="form-check form-switch p-3 border rounded bg-light">
-                                      <input class="form-check-input chk-submodulo ms-1 me-2" type="checkbox" value="${s.clave}" id="submod_${s.clave}" ${isChecked}>
-                                      <label class="form-check-label fw-bold" for="submod_${s.clave}">${s.nombre}</label>
-                                      <div class="text-muted small ms-1">${s.desc}</div>
-                                  </div>
-                              </div>`;
-                      });
-
-                      contenedor.innerHTML = htmlSwitches;
-                  }
-              }).catch(err => {
-                  const contenedor = document.getElementById('contenedor_switches_ventas_distribucion');
-                  if (contenedor) contenedor.innerHTML = '<span class="text-danger small">Error consultando submódulos del sistema.</span>';
-              });
-          } else if (tipo === 'Perfil') {
-              // Pre-carga automática de módulos y rutas al estar en modo edición
+          if (tipo === 'Perfil') {
               let selEmpresa = document.getElementById('f_enom_p');
-              if (selEmpresa && selEmpresa.value !== "") {
-                  window.cargarModulosPerfil(selEmpresa);
+              if (selEmpresa && selEmpresa.value !== "") window.cargarModulosPerfil(selEmpresa);
+          } else if (tipo === 'Usuario') {
+              let selEmp = document.getElementById('f_enom');
+              let nitEmp = data.empresa_id;
+              if (!nitEmp && selEmp && selEmp.selectedIndex >= 0) {
+                  nitEmp = selEmp.options[selEmp.selectedIndex].getAttribute('data-nit');
               }
+              cargarSelectorPerfilesUsuario(nitEmp, data.id_perfil || data.perfil);
           }
       }
 
       window.guardarMaestro = function() {
+          if (!window.confirm("¿Está seguro de guardar los cambios?")) return;
           const fd = new FormData();
           fd.append('accion', document.getElementById('form_accion_maestro').value);
 
@@ -1030,21 +1028,6 @@
               fd.append('nombre_comercial', document.getElementById('f_nom').value);
               fd.append('tipo_empresa', document.getElementById('f_tipo').value);
               document.querySelectorAll('.chk-modulo:checked').forEach(chk => { fd.append('modulos[]', chk.value); });
-          } 
-          else if (currentMode === 'EmpresaEspecial') {
-              fd.append('nit', document.getElementById('f_nit_esp').value);
-              fd.append('nombre_comercial', document.getElementById('f_nom_esp').value);
-              document.querySelectorAll('.chk-submodulo:checked').forEach(chk => { fd.append('submodulos[]', chk.value); });
-          }
-          else if (currentMode === 'EmpresaCarga') {
-              fd.append('nit', document.getElementById('f_nit_carga').value);
-              fd.append('nombre_comercial', document.getElementById('f_nom_carga').value);
-              document.querySelectorAll('.chk-submodulo:checked').forEach(chk => { fd.append('submodulos[]', chk.value); });
-          }
-          else if (currentMode === 'EmpresaVentas') {
-              fd.append('nit', document.getElementById('f_nit_ventas').value);
-              fd.append('nombre_comercial', document.getElementById('f_nom_ventas').value);
-              document.querySelectorAll('.chk-submodulo:checked').forEach(chk => { fd.append('submodulos[]', chk.value); });
           }
           else if (currentMode === 'TipoEmpresa') {
               fd.append('id', document.getElementById('f_tid') ? document.getElementById('f_tid').value : '');
@@ -1076,7 +1059,6 @@
               fd.append('operacion', document.getElementById('f_op').value);
               fd.append('perfil', document.getElementById('f_perf_p').value);
               
-              // Recolección y unificación multi-rutas
               let r1 = document.getElementById('f_ruta_1') ? document.getElementById('f_ruta_1').value : '';
               let r2 = document.getElementById('f_ruta_2') ? document.getElementById('f_ruta_2').value : '';
               let r3 = document.getElementById('f_ruta_3') ? document.getElementById('f_ruta_3').value : '';
@@ -1097,7 +1079,7 @@
               alert(d.message);
               if (d.success) {
                   bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
-                  if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa' || currentMode === 'EmpresaEspecial' || currentMode === 'EmpresaCarga' || currentMode === 'EmpresaVentas') location.reload();
+                  if (['Empresa', 'TipoEmpresa'].includes(currentMode)) location.reload();
                   else if (currentMode === 'Usuario') window.cargarTablaUsuarios();
                   else if (currentMode === 'Proveedor') window.cargarTablaProveedores();
                   else if (currentMode === 'Perfil') window.cargarTablaPerfiles();
@@ -1108,3 +1090,4 @@
   </script>
 </body>
 </html>
+<!-- MÓDULO: WEBMASTER_ADMIN | ARCHIVO: 901811727_admin.html | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->

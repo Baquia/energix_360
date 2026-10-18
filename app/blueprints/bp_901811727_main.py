@@ -1,4 +1,4 @@
-# bp_901811727_main.py
+# MÓDULO: WEBMASTER_BQAONE | SUBMÓDULO: MAIN_ROUTER | CONDICIÓN: OBLIGATORIO | TIPO: 1
 from flask import Blueprint, render_template, session, redirect, url_for, flash
 from app import mysql
 from app.forms import RegistroUsuarioForm
@@ -24,10 +24,18 @@ def _obtener_datos_base():
     data_empresas = cur.fetchall()
     
     mapa_normalizacion = {
-        'glp': 'gas', 'supervisorgas': 'gas', 'flotacarga': 'flota', 
-        'combustible_flota': 'flota', 'gestorflota': 'flota', 
-        'preoperacional': 'flota', 'gestion_carga': 'carga', 
-        'gestionavicola_bp': 'carga', 'gestion_mermas': 'mermas'
+        'glp': 'gas', 
+        'supervisorgas': 'gas', 
+        'flotacarga': 'flota', 
+        'combustible_flota': 'flota', 
+        'gestorflota': 'flota', 
+        'preoperacional': 'flota', 
+        'gestion_carga': 'carga', 
+        'gestionavicola_bp': 'carga', 
+        'gestion_mermas': 'mermas',
+        'bodegas': 'bodegas',
+        'ventas': 'ventas',
+        'administracion': 'administracion'
     }
 
     empresas = []
@@ -68,12 +76,18 @@ def _obtener_datos_base():
     return empresas, tipos_empresa, clientes
 
 def _validar_acceso_submodulo(roles_permitidos):
-    """Valida si el perfil en sesión tiene acceso al submódulo o si es Super-Webmaster"""
+    """Valida si el perfil en sesión tiene acceso al submódulo o si es Super-Webmaster / Gerente Corporativo"""
     perfil = str(session.get('perfil', '')).strip().lower()
     empresa_id = str(session.get('empresa_id', '')).strip()
     
-    # Perfiles super-administradores con acceso universal
-    if perfil in ['webmaster', 'webmaster_admin', 'admin_general'] or empresa_id == '901811727':
+    # Perfiles con privilegios universales corporativos en el tenant Baquía-ems SAS
+    roles_gerenciales = [
+        'gerente_bqa', 
+        'webmaster', 
+        'webmaster_admin', 
+        'admin_general'
+    ]
+    if perfil in roles_gerenciales or (empresa_id == '901811727' and 'webmaster' in perfil):
         return True
         
     return perfil in roles_permitidos
@@ -85,59 +99,70 @@ def _validar_acceso_submodulo(roles_permitidos):
 @bp_main.route('/901811727.html')
 @login_required_custom
 def panel_webmaster():
-    """Renderiza el Hub Principal (Tarjeta de inicio)"""
-    empresas, tipos_empresa, clientes = _obtener_datos_base()
-    
-    return render_template('901811727.html', 
-                           nombre=session.get('nombre'), 
-                           empresa=session.get('empresa'), 
-                           empresas=empresas)
+    """
+    Ruta de compatibilidad legacy: redirige dinámicamente al nuevo Super-Hub Gerencial
+    evitando el renderizado del monolito descontinuado.
+    """
+    return redirect('/hub_gerencia_baquia.html')
 
 @bp_main.route('/901811727_admin.html')
 @login_required_custom
 def panel_admin():
-    """Renderiza el submódulo de Administración (CRUD)"""
-    if not _validar_acceso_submodulo(['webmaster_admin']):
+    """Renderiza el submódulo de Administración (CRUD Multiempresa)"""
+    roles_validos = ['webmaster_admin', 'webmaster_baqone']
+    if not _validar_acceso_submodulo(roles_validos):
         flash("No tienes permisos suficientes para acceder al módulo de Administración.", "warning")
-        return redirect(url_for('bp_901811727_main.panel_webmaster'))
+        return redirect('/hub_gerencia_baquia.html')
 
     form = RegistroUsuarioForm()
     empresas, tipos_empresa, clientes = _obtener_datos_base()
     
-    return render_template('901811727_admin.html', 
-                           nombre=session.get('nombre'), 
-                           empresa=session.get('empresa'), 
-                           form=form, 
-                           empresas=empresas, 
-                           tipos_empresa=tipos_empresa)
+    return render_template(
+        '901811727_admin.html', 
+        nombre=session.get('nombre', 'Administrador'), 
+        empresa=session.get('empresa', 'Baquía-ems SAS'), 
+        nit=session.get('empresa_id', '901811727'),
+        form=form, 
+        empresas=empresas, 
+        tipos_empresa=tipos_empresa,
+        clientes=clientes
+    )
 
 @bp_main.route('/901811727_energia.html')
 @login_required_custom
 def panel_energia():
-    """Renderiza el submódulo de Gestión Energética (Pestañas)"""
-    if not _validar_acceso_submodulo(['webmaster_energia', 'webmaster_operaciones']):
+    """Renderiza el submódulo de Gestión Energética (GLP y Auditorías)"""
+    roles_validos = ['webmaster_energia', 'webmaster_gestionenergetica', 'webmaster_operaciones']
+    if not _validar_acceso_submodulo(roles_validos):
         flash("No tienes permisos suficientes para acceder al módulo de Gestión Energética.", "warning")
-        return redirect(url_for('bp_901811727_main.panel_webmaster'))
+        return redirect('/hub_gerencia_baquia.html')
 
     empresas, _, clientes = _obtener_datos_base()
     
-    return render_template('901811727_energia.html', 
-                           nombre=session.get('nombre'), 
-                           empresa=session.get('empresa'), 
-                           empresas=empresas,
-                           clientes=clientes)
+    return render_template(
+        '901811727_energia.html', 
+        nombre=session.get('nombre', 'Gestor Energético'), 
+        empresa=session.get('empresa', 'Baquía-ems SAS'), 
+        nit=session.get('empresa_id', '901811727'),
+        empresas=empresas,
+        clientes=clientes
+    )
 
 @bp_main.route('/901811727_audit.html')
 @login_required_custom
 def panel_audit():
-    """Renderiza el submódulo de Auditoría de Sistema"""
-    if not _validar_acceso_submodulo(['webmaster_audit', 'webmaster_soporte']):
+    """Renderiza el submódulo de Auditoría de Sistema (Health Check y Audit.log)"""
+    roles_validos = ['webmaster_audit', 'webmaster_baqone', 'webmaster_soporte']
+    if not _validar_acceso_submodulo(roles_validos):
         flash("No tienes permisos suficientes para acceder al módulo de Auditoría.", "warning")
-        return redirect(url_for('bp_901811727_main.panel_webmaster'))
+        return redirect('/hub_gerencia_baquia.html')
 
     empresas, _, _ = _obtener_datos_base()
     
-    return render_template('901811727_audit.html', 
-                           nombre=session.get('nombre'), 
-                           empresa=session.get('empresa'), 
-                           empresas=empresas)
+    return render_template(
+        '901811727_audit.html', 
+        nombre=session.get('nombre', 'Auditor de Sistema'), 
+        empresa=session.get('empresa', 'Baquía-ems SAS'), 
+        nit=session.get('empresa_id', '901811727'),
+        empresas=empresas
+    )

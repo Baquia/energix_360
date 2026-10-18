@@ -1,13 +1,51 @@
 # MÓDULO: VENTAS Y DISTRIBUCIÓN | SUBMÓDULO: OPERADOR CONTABLE | CONDICIÓN: OPCIONAL | TIPO: 2
 from flask import Blueprint, render_template, session, redirect, url_for, flash, request, jsonify
-from app.utils import login_required_custom, submodulo_required
+from app.utils import login_required_custom
 from functools import wraps
 from app import mysql
 import MySQLdb.cursors
 import time
 from datetime import datetime
+import json
 
 bp_operador_contable = Blueprint('operador_contable', __name__, url_prefix='/operador_contable')
+
+# ==============================================================================
+# DECORADOR DE SUBMÓDULO MULTI-TENANT HOMOLOGADO (DIRECTO Y ROBUSTO)
+# ==============================================================================
+def submodulo_required(submodulo_nombre):
+    """
+    Decorador de autorización Plug & Play homologado:
+    Verifica explícitamente en session['submodulos_activos'] o en session['modulos_activos']
+    o autoriza de forma irrestricta si pertenece al tenant corporativo (NIT 901811727).
+    Debe invocarse SIEMPRE con el argumento: @submodulo_required('nombre_modulo')
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            submodulos_activos = session.get('submodulos_activos', [])
+            modulos_activos = session.get('modulos_activos', [])
+            empresa_id = str(session.get('empresa_id', '')).strip()
+
+            if isinstance(submodulos_activos, str):
+                try:
+                    submodulos_activos = json.loads(submodulos_activos)
+                except Exception:
+                    submodulos_activos = []
+
+            # Validación: inquilino corporativo Baquía o empresas con el módulo activo
+            if (
+                submodulo_nombre not in submodulos_activos
+                and submodulo_nombre not in modulos_activos
+                and 'operador_contable' not in modulos_activos
+                and 'controlador_contabilidad' not in modulos_activos
+                and empresa_id != '901811727'
+            ):
+                flash(f'Acceso denegado: Su empresa no tiene habilitado el submódulo de {submodulo_nombre}.', 'danger')
+                return redirect(url_for('panel_principal'))
+            return f(*args, **kwargs)
+        return decorated_function # <-- CORRECCIÓN CRÍTICA: Se retorna la función decorada para preservar la introspección
+    return decorator
 
 # ==============================================================================
 # MIDDLEWARE DE JERARQUÍA Y PERMISOS
@@ -16,11 +54,13 @@ def operador_contable_required(f):
     """
     Middleware Plug & Play para proteger el acceso a la consola operativa
     del Operador Contable (Auxiliar / Asistente Contable).
+    Autoriza perfiles de piso nativos y la jerarquía corporativa de Baquía-ems SAS.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         perfil = str(session.get('perfil', '')).strip().lower()
         tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
+        empresa_id = str(session.get('empresa_id', '')).strip()
         
         perfiles_permitidos = [
             'operador_contable',
@@ -29,11 +69,18 @@ def operador_contable_required(f):
             'gerente_ventasdistribucion',
             'administrador',
             'webmaster_admin',
-            'webmaster'
+            'webmaster',
+            'gerente_bqa',
+            'admin_general',
+            'webmaster_administrador_baquia'
         ]
         
-        # Validación estricta de perfil
-        if perfil not in perfiles_permitidos and 'webmaster' not in tipo_empresa:
+        # Validación estricta de perfil y aislamiento Multi-Tenant
+        if (
+            perfil not in perfiles_permitidos 
+            and 'webmaster' not in tipo_empresa 
+            and empresa_id != '901811727'
+        ):
             flash('Acceso denegado: Se requiere perfil de Operador Contable para ingresar a este módulo.', 'danger')
             return redirect(url_for('panel_principal'))
             
@@ -43,7 +90,8 @@ def operador_contable_required(f):
 # ==============================================================================
 # VISTA PRINCIPAL (DASHBOARD OPERADOR CONTABLE)
 # ==============================================================================
-@bp_operador_contable.route('/dashboard')
+@bp_operador_contable.route('/dashboard', endpoint='dashboard')
+@bp_operador_contable.route('/dashboard_operador', endpoint='dashboard_operador')
 @login_required_custom
 @submodulo_required('controlador_contabilidad')
 @operador_contable_required
@@ -147,8 +195,9 @@ def api_registrar_recaudo():
     """
     Registra un recibo de caja / abono a cartera de un cliente.
     """
-    data = request.json
+    data = request.json or {}
     usuario_id = session.get('usuario_id')
+    empresa_id = session.get('empresa_id')
     cliente_id = data.get('cliente_id')
     valor_recaudo = data.get('valor_recaudo')
     metodo_pago = data.get('metodo_pago', 'Efectivo')
@@ -181,8 +230,9 @@ def api_registrar_gasto():
     """
     Registra un comprobante de egreso o movimiento de caja menor.
     """
-    data = request.json
+    data = request.json or {}
     usuario_id = session.get('usuario_id')
+    empresa_id = session.get('empresa_id')
     concepto = data.get('concepto')
     valor_gasto = data.get('valor_gasto')
     categoria = data.get('categoria', 'Operativo')
@@ -207,3 +257,14 @@ def api_registrar_gasto():
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# ==============================================================================
+# COMPATIBILIDAD DE ENDPOINT CRUZADO FLASK
+# ==============================================================================
+@bp_operador_contable.record_once
+def registrar_alias_endpoint(state):
+    """Garantiza la resolución fluida tanto de 'operador_contable.dashboard_operador' como de 'bp_operador_contable.dashboard_operador'"""
+    state.app.view_functions['operador_contable.dashboard'] = dashboard_operador
+    state.app.view_functions['bp_operador_contable.dashboard'] = dashboard_operador
+    state.app.view_functions['operador_contable.dashboard_operador'] = dashboard_operador
+    state.app.view_functions['bp_operador_contable.dashboard_operador'] = dashboard_operador

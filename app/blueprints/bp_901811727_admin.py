@@ -9,6 +9,155 @@ from flask_bcrypt import Bcrypt
 bcrypt = Bcrypt()
 bp_admin = Blueprint('bp_901811727_admin', __name__)
 
+def registrar_operacion_bqa(cur, accion, datos):
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                empresa VARCHAR(150),
+                empresa_id VARCHAR(50),
+                backend_emisor VARCHAR(100),
+                usuario VARCHAR(100),
+                cedula VARCHAR(50),
+                accion VARCHAR(100),
+                datos JSON
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        if hasattr(datos, 'to_dict'):
+            datos_dict = datos.to_dict(flat=False)
+            datos_dict = {k: v[0] if len(v) == 1 else v for k, v in datos_dict.items()}
+            payload = json.dumps(datos_dict)
+        elif isinstance(datos, dict):
+            payload = json.dumps(datos)
+        else:
+            payload = json.dumps({"raw": str(datos)})
+        
+        emp = session.get('empresa', 'Sistema')
+        emp_id = session.get('empresa_id', 'N/A')
+        usr = session.get('nombre', 'N/A')
+        ced = session.get('cedula', 'N/A')
+        
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (emp, emp_id, 'bp_901811727_admin.py', usr, ced, accion, payload))
+    except Exception as e:
+        print(f"Error auditoria bqa_one: {e}")
+
+# ==============================================================================
+# MATRIZ MAESTRA DE PRODUCTO (Regla Determinista del SaaS BQA-ONE)
+# ==============================================================================
+MATRIZ_MAESTRA = {
+    'bodegas': {
+        'nombre_comercial': 'Gestión de Bodegas y Despachos (WMS)',
+        'perfiles': [
+            {'perfil': 'controlador_logistica', 'operacion': 'bodegas', 'archivo': 'B_modulo_controlador_bodegas.html'},
+            {'perfil': 'operador_logistica', 'operacion': 'bodegas', 'archivo': 'B_modulo_operador_bodegas.html'},
+            {'perfil': 'verificador_bodegas', 'operacion': 'bodegas', 'archivo': 'B_verificador_bodegas.html'}
+        ]
+    },
+    'flota': {
+        'nombre_comercial': 'Gestión de Flota de Carga',
+        'perfiles': [
+            {'perfil': 'gestor_flotacarga', 'operacion': 'flota', 'archivo': 'B_modulo_controlador_flotacarga.html'},
+            {'perfil': 'operador_flotacarga', 'operacion': 'flota', 'archivo': 'B_modulo_operador_flotacarga.html'}
+        ]
+    },
+    'flotaespecial': {
+        'nombre_comercial': 'Transporte Especial',
+        'perfiles': [
+            {'perfil': 'controlador_flotaespecial', 'operacion': 'flotaespecial', 'archivo': 'B_modulo_controlador_flotaespecial.html'},
+            {'perfil': 'operador_flotaespecial', 'operacion': 'flotaespecial', 'archivo': 'B_modulo_operador_flotaespecial.html'}
+        ]
+    },
+    'ventas': {
+        'nombre_comercial': 'Ventas y Comercialización (M3)',
+        'perfiles': [
+            {'perfil': 'gerente_ventasdistribucion', 'operacion': 'ventas', 'archivo': 'B_gerente_ventasdistribucion.html'},
+            {'perfil': 'controlador_ventas', 'operacion': 'ventas', 'archivo': 'B_controlador_ventas.html'},
+            {'perfil': 'operador_ventas', 'operacion': 'ventas', 'archivo': 'B_modulo_operador_ventas.html'}
+        ]
+    },
+    'facturacion': {
+        'nombre_comercial': 'Facturación',
+        'perfiles': [
+            {'perfil': 'controlador_facturacion', 'operacion': 'facturacion', 'archivo': 'B_controlador_facturacion.html'},
+            {'perfil': 'operador_facturacion', 'operacion': 'facturacion', 'archivo': 'B_modulo_operador_facturacion.html'}
+        ]
+    },
+    'contabilidad': {
+        'nombre_comercial': 'Contabilidad',
+        'perfiles': [
+            {'perfil': 'controlador_contabilidad', 'operacion': 'contabilidad', 'archivo': 'B_controlador_contabilidad.html'},
+            {'perfil': 'operador_contable', 'operacion': 'contabilidad', 'archivo': 'B_modulo_operador_contable.html'}
+        ]
+    },
+    'recursos_humanos': {
+        'nombre_comercial': 'Recursos Humanos',
+        'perfiles': [
+            {'perfil': 'controlador_recurso_humano', 'operacion': 'recursos_humanos', 'archivo': 'B_controlador_recursohumano.html'},
+            {'perfil': 'operador_recursohumano', 'operacion': 'recursos_humanos', 'archivo': 'B_modulo_operador_recursohumano.html'}
+        ]
+    },
+    'gas': {
+        'nombre_comercial': 'Gestión de Gas / GLP',
+        'perfiles': [
+            {'perfil': 'controlador_gas', 'operacion': 'gas', 'archivo': 'B_controladorgas.html'},
+            {'perfil': 'operador_gas', 'operacion': 'gas', 'archivo': 'B_operador_glp.html'},
+            {'perfil': 'controlfacturas_gas', 'operacion': 'gas', 'archivo': 'C_facturas_glp.html'}
+        ]
+    },
+    'mermas': {
+        'nombre_comercial': 'Control de Mermas',
+        'perfiles': [
+            {'perfil': 'controlador_mermas', 'operacion': 'mermas', 'archivo': 'controlador_mermas.html'},
+            {'perfil': 'operador_mermas', 'operacion': 'mermas', 'archivo': 'operador_mermas.html'}
+        ]
+    },
+    'carga': {
+        'nombre_comercial': 'Gestión de Carga (Báscula)',
+        'perfiles': [
+            {'perfil': 'operador_bascula', 'operacion': 'carga', 'archivo': 'B_pesaje_carga_avicola.html'}
+        ]
+    },
+    'comercializador_glp': {
+        'nombre_comercial': 'Comercializador GLP',
+        'perfiles': [
+            {'perfil': 'controlador_comercializadorglp', 'operacion': 'comercializador_glp', 'archivo': 'equipos.html'},
+            {'perfil': 'mecanico_glp', 'operacion': 'comercializador_glp', 'archivo': 'visitas_offline.html'}
+        ]
+    },
+    'pesv': {
+        'nombre_comercial': 'Auditorías PESV',
+        'perfiles': [
+            {'perfil': 'controlador_pesv', 'operacion': 'pesv', 'archivo': 'B_controlador_pesv.html'}
+        ]
+    },
+    'preoperacional': {
+        'nombre_comercial': 'Preoperacionales de Flota',
+        'perfiles': []
+    },
+    'eps_gestion': {
+        'nombre_comercial': 'Gestión Operativa EPS',
+        'perfiles': []
+    },
+    'eps_facturacion': {
+        'nombre_comercial': 'Pre-Facturación EPS',
+        'perfiles': []
+    },
+    'avicola': {
+        'nombre_comercial': 'Sector Avícola',
+        'perfiles': []
+    }
+}
+
+@bp_admin.route('/api/matriz_maestra', methods=['GET'])
+@login_required_custom
+def api_matriz_maestra():
+    return jsonify(success=True, matriz=MATRIZ_MAESTRA)
+
 # ==============================================================================
 # RUTAS DE GESTIÓN (ADMINISTRACIÓN CRUD COMPLETA)
 # ==============================================================================
@@ -21,294 +170,45 @@ def gestionar_empresa():
     modulos_seleccionados = request.form.getlist('modulos[]')
     if not modulos_seleccionados:
         modulos_seleccionados = request.form.getlist('modulos')
+    
     nit = d.get('nit')
+    nombre_comercial = d.get('nombre_comercial')
+    tipo_empresa = d.get('tipo_empresa', 'general')
+    accion = d.get('accion', 'crear')
     
     cur = mysql.connection.cursor()
     try:
-        if d.get('accion') == 'crear':
+        if accion == 'crear':
             cur.execute("INSERT INTO empresas (nit, nombre_comercial, tipo_empresa) VALUES (%s, %s, %s)", 
-                       (nit, d.get('nombre_comercial'), d.get('tipo_empresa')))
+                       (nit, nombre_comercial, tipo_empresa))
         else:
             cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s WHERE nit=%s", 
-                       (d.get('nombre_comercial'), d.get('tipo_empresa'), nit))
+                       (nombre_comercial, tipo_empresa, nit))
                        
+        # Reset y Asignación de Módulos (Tabla de permisos directos)
         cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
         for modulo in modulos_seleccionados:
             cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, modulo))
             
-        mysql.connection.commit()
-        return jsonify(success=True, message="Empresa y módulos procesados correctamente.")
-    except Exception as e: 
-        mysql.connection.rollback()
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
-
-# --- EMPRESAS DE TRANSPORTE ESPECIAL ---
-
-@csrf.exempt
-@bp_admin.route('/gestionar_empresa_transporte_especial', methods=['POST'])
-@login_required_custom
-def gestionar_empresa_transporte_especial():
-    d = request.form
-    submodulos_seleccionados = request.form.getlist('submodulos[]')
-    if not submodulos_seleccionados:
-        submodulos_seleccionados = request.form.getlist('submodulos')
-        
-    nit = d.get('nit')
-    nombre_comercial = d.get('nombre_comercial')
-    accion = d.get('accion', 'crear')
-    
-    cur = mysql.connection.cursor()
-    try:
-        submodulos_json = json.dumps(submodulos_seleccionados, ensure_ascii=False)
-        
-        if accion == 'crear':
-            cur.execute("""
-                INSERT INTO empresas (nit, nombre_comercial, tipo_empresa, submodulos_activos) 
-                VALUES (%s, %s, 'transporte_especial', %s)
-            """, (nit, nombre_comercial, submodulos_json))
-        else:
-            cur.execute("""
-                UPDATE empresas 
-                SET nombre_comercial=%s, tipo_empresa='transporte_especial', submodulos_activos=%s 
-                WHERE nit=%s
-            """, (nombre_comercial, submodulos_json, nit))
-                       
-        cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
-        cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, 'flotaespecial', 'activo')", (nit,))
-        
-        for submod in submodulos_seleccionados:
-            cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, submod))
+            # Auto-Aprovisionamiento / Inyección determinista de Perfiles al Inquilino
+            if modulo in MATRIZ_MAESTRA:
+                for p in MATRIZ_MAESTRA[modulo]['perfiles']:
+                    # Verificar si el inquilino ya posee este perfil para no duplicarlo
+                    cur.execute("SELECT id FROM perfiles WHERE nit=%s AND perfil=%s", (nit, p['perfil']))
+                    if not cur.fetchone():
+                        cur.execute("""
+                            INSERT INTO perfiles (empresa, nit, operacion, perfil, archivo_destino) 
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (nombre_comercial, nit, p['operacion'], p['perfil'], p['archivo']))
             
+        registrar_operacion_bqa(cur, 'GESTION_EMPRESA', d)
         mysql.connection.commit()
-        return jsonify(success=True, message="Empresa de Transporte Especial y submódulos procesados correctamente.")
+        return jsonify(success=True, message="Empresa, Módulos y Perfiles de Matriz procesados correctamente.")
     except Exception as e: 
         mysql.connection.rollback()
         return jsonify(success=False, message=str(e))
     finally: 
         cur.close()
-
-@bp_admin.route('/obtener_empresas_transporte_especial')
-@login_required_custom
-def obtener_empresas_transporte_especial():
-    cur = mysql.connection.cursor()
-    try:
-        cur.execute("SELECT id, nit, nombre_comercial, tipo_empresa, submodulos_activos FROM empresas WHERE tipo_empresa = 'transporte_especial'")
-        rows = cur.fetchall()
-        empresas = []
-        cols = ['id', 'nit', 'nombre_comercial', 'tipo_empresa', 'submodulos_activos']
-        for r in rows:
-            row_dict = dict(zip(cols, r)) if not isinstance(r, dict) else r
-            sub_raw = row_dict.get('submodulos_activos')
-            if sub_raw:
-                try:
-                    row_dict['submodulos_activos'] = json.loads(sub_raw) if isinstance(sub_raw, str) else sub_raw
-                except:
-                    row_dict['submodulos_activos'] = []
-            else:
-                row_dict['submodulos_activos'] = []
-            empresas.append(row_dict)
-        return jsonify(success=True, empresas=empresas)
-    except Exception as e:
-        return jsonify(success=False, message=str(e))
-    finally:
-        cur.close()
-
-@bp_admin.route('/api/submodulos_transporte_especial', methods=['GET'])
-@login_required_custom
-def api_submodulos_transporte_especial():
-    submodulos_directos = [
-        {"clave": "controlador_flota", "nombre": "B_Controlador Flota Especial", "desc": "Acceso al panel administrativo, monitoreo satelital, vehículos y QRs."},
-        {"clave": "operador_flota", "nombre": "B_Operador en Ruta", "desc": "Acceso a la PWA móvil para conductores (Pre-logueo, inicio/fin de viaje)."},
-        {"clave": "eps_gestion", "nombre": "B_Gestión Operativa EPS", "desc": "Flujo de captura, desglose, programación y kanban de pacientes."},
-        {"clave": "eps_facturacion", "nombre": "C_Pre-Facturación EPS", "desc": "Generación de RIPS JSON y CUV (Depende de Gestión Operativa)."},
-        {"clave": "preoperacional", "nombre": "C_Preoperacionales", "desc": "Auditoría diaria PESV y registro de novedades de vehículos."}
-    ]
-    modulos_universales = [
-        {"clave": "mantenimiento", "nombre": "Mantenimiento Preventivo (Proyectado)", "desc": "Módulo Universal de Mantenimiento"},
-        {"clave": "pesv", "nombre": "PESV - Seguridad Vial Institucional (Proyectado)", "desc": "Plan Estratégico de Seguridad Vial corporativo"},
-        {"clave": "contabilidad", "nombre": "Contabilidad (Proyectado)", "desc": "Módulo Contable General"},
-        {"clave": "combustible", "nombre": "Control de Combustibles", "desc": "Gestión y Control de Combustibles"}
-    ]
-    return jsonify(success=True, directos=submodulos_directos, universales=modulos_universales)
-
-# --- EMPRESAS DE TRANSPORTE DE CARGA ---
-
-@csrf.exempt
-@bp_admin.route('/gestionar_empresa_transporte_carga', methods=['POST'])
-@login_required_custom
-def gestionar_empresa_transporte_carga():
-    d = request.form
-    submodulos_seleccionados = request.form.getlist('submodulos[]')
-    if not submodulos_seleccionados:
-        submodulos_seleccionados = request.form.getlist('submodulos')
-        
-    nit = d.get('nit')
-    nombre_comercial = d.get('nombre_comercial')
-    accion = d.get('accion', 'crear')
-    
-    cur = mysql.connection.cursor()
-    try:
-        submodulos_json = json.dumps(submodulos_seleccionados, ensure_ascii=False)
-        
-        if accion == 'crear':
-            cur.execute("""
-                INSERT INTO empresas (nit, nombre_comercial, tipo_empresa, submodulos_activos) 
-                VALUES (%s, %s, 'transporte_carga', %s)
-            """, (nit, nombre_comercial, submodulos_json))
-        else:
-            cur.execute("""
-                UPDATE empresas 
-                SET nombre_comercial=%s, tipo_empresa='transporte_carga', submodulos_activos=%s 
-                WHERE nit=%s
-            """, (nombre_comercial, submodulos_json, nit))
-                       
-        cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
-        # HOMOLOGACIÓN ESTRICTA CON TRANSPORTE ESPECIAL: Inserción automática del módulo base 'flota'
-        cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, 'flota', 'activo')", (nit,))
-        
-        for submod in submodulos_seleccionados:
-            cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, submod))
-            
-        mysql.connection.commit()
-        return jsonify(success=True, message="Empresa de Transporte de Carga y submódulos procesados correctamente.")
-    except Exception as e: 
-        mysql.connection.rollback()
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
-
-@bp_admin.route('/obtener_empresas_transporte_carga')
-@login_required_custom
-def obtener_empresas_transporte_carga():
-    cur = mysql.connection.cursor()
-    try:
-        cur.execute("SELECT id, nit, nombre_comercial, tipo_empresa, submodulos_activos FROM empresas WHERE tipo_empresa = 'transporte_carga'")
-        rows = cur.fetchall()
-        empresas = []
-        cols = ['id', 'nit', 'nombre_comercial', 'tipo_empresa', 'submodulos_activos']
-        for r in rows:
-            row_dict = dict(zip(cols, r)) if not isinstance(r, dict) else r
-            sub_raw = row_dict.get('submodulos_activos')
-            if sub_raw:
-                try:
-                    row_dict['submodulos_activos'] = json.loads(sub_raw) if isinstance(sub_raw, str) else sub_raw
-                except:
-                    row_dict['submodulos_activos'] = []
-            else:
-                row_dict['submodulos_activos'] = []
-            empresas.append(row_dict)
-        return jsonify(success=True, empresas=empresas)
-    except Exception as e:
-        return jsonify(success=False, message=str(e))
-    finally:
-        cur.close()
-
-@bp_admin.route('/api/submodulos_transporte_carga', methods=['GET'])
-@login_required_custom
-def api_submodulos_transporte_carga():
-    submodulos_directos = [
-        {"clave": "controlador_flota", "nombre": "B_Controlador Flota Carga", "desc": "Acceso al panel administrativo, monitoreo satelital en tiempo real, gestión de vehículos y creación de códigos QR."},
-        {"clave": "operador_flota", "nombre": "B_Operador en Ruta (Carga)", "desc": "Acceso a la PWA móvil para conductores (Pre-logueo QR, inicio/fin de viaje y reporte de paradas)."},
-        {"clave": "carga", "nombre": "B_Gestión de Báscula (Pesaje)", "desc": "Módulo transversal para la operación de báscula, remisiones y pesaje."},
-        {"clave": "preoperacional", "nombre": "C_Preoperacionales", "desc": "Diligenciamiento y auditoría de seguridad vial diaria (PESV)."}
-    ]
-    modulos_universales = [
-        {"clave": "combustible", "nombre": "Control de Combustibles", "desc": "Módulo Universal de Gestión, monitoreo de consumo y eficiencia de combustible."},
-        {"clave": "mantenimiento", "nombre": "Mantenimiento Preventivo (Proyectado)", "desc": "Módulo Universal de Mantenimiento"},
-        {"clave": "pesv", "nombre": "PESV - Seguridad Vial Institucional (Proyectado)", "desc": "Plan Estratégico de Seguridad Vial corporativo"},
-        {"clave": "contabilidad", "nombre": "Contabilidad (Proyectado)", "desc": "Módulo Contable General"}
-    ]
-    return jsonify(success=True, directos=submodulos_directos, universales=modulos_universales)
-
-# --- EMPRESAS DE VENTAS Y DISTRIBUCIÓN ---
-
-@csrf.exempt
-@bp_admin.route('/gestionar_empresa_ventas_distribucion', methods=['POST'])
-@login_required_custom
-def gestionar_empresa_ventas_distribucion():
-    d = request.form
-    submodulos_seleccionados = request.form.getlist('submodulos[]')
-    if not submodulos_seleccionados:
-        submodulos_seleccionados = request.form.getlist('submodulos')
-        
-    nit = d.get('nit')
-    nombre_comercial = d.get('nombre_comercial')
-    accion = d.get('accion', 'crear')
-    
-    cur = mysql.connection.cursor()
-    try:
-        submodulos_json = json.dumps(submodulos_seleccionados, ensure_ascii=False)
-        
-        if accion == 'crear':
-            cur.execute("""
-                INSERT INTO empresas (nit, nombre_comercial, tipo_empresa, submodulos_activos) 
-                VALUES (%s, %s, 'ventas_distribucion', %s)
-            """, (nit, nombre_comercial, submodulos_json))
-        else:
-            cur.execute("""
-                UPDATE empresas 
-                SET nombre_comercial=%s, tipo_empresa='ventas_distribucion', submodulos_activos=%s 
-                WHERE nit=%s
-            """, (nombre_comercial, submodulos_json, nit))
-                       
-        cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
-        
-        for submod in submodulos_seleccionados:
-            cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, submod))
-            
-        mysql.connection.commit()
-        return jsonify(success=True, message="Empresa de Ventas y Distribución y submódulos procesados correctamente.")
-    except Exception as e: 
-        mysql.connection.rollback()
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
-
-@bp_admin.route('/obtener_empresas_ventas_distribucion')
-@login_required_custom
-def obtener_empresas_ventas_distribucion():
-    cur = mysql.connection.cursor()
-    try:
-        cur.execute("SELECT id, nit, nombre_comercial, tipo_empresa, submodulos_activos FROM empresas WHERE tipo_empresa = 'ventas_distribucion'")
-        rows = cur.fetchall()
-        empresas = []
-        cols = ['id', 'nit', 'nombre_comercial', 'tipo_empresa', 'submodulos_activos']
-        for r in rows:
-            row_dict = dict(zip(cols, r)) if not isinstance(r, dict) else r
-            sub_raw = row_dict.get('submodulos_activos')
-            if sub_raw:
-                try:
-                    row_dict['submodulos_activos'] = json.loads(sub_raw) if isinstance(sub_raw, str) else sub_raw
-                except:
-                    row_dict['submodulos_activos'] = []
-            else:
-                row_dict['submodulos_activos'] = []
-            empresas.append(row_dict)
-        return jsonify(success=True, empresas=empresas)
-    except Exception as e:
-        return jsonify(success=False, message=str(e))
-    finally:
-        cur.close()
-
-@bp_admin.route('/api/submodulos_ventas_distribucion', methods=['GET'])
-@login_required_custom
-def api_submodulos_ventas_distribucion():
-    submodulos_directos = [
-        {"clave": "aws", "nombre": "B_Controlador Bodegas WMS", "desc": "Panel administrativo para supervisión logística, despachos y andon."},
-        {"clave": "operador_bodegas", "nombre": "B_Operador Bodegas (Picking)", "desc": "PWA Móvil para alistamiento y picking en piso."},
-        {"clave": "verificador_bodegas", "nombre": "B_Verificador Bodegas (Auditor)", "desc": "Auditoría de despachos y sellado de actas."},
-        {"clave": "gestion_mermas", "nombre": "B_Gestión de Mermas", "desc": "Control y registro de mermas, averías y bajas de inventario."},
-        {"clave": "facturacion", "nombre": "C_Facturación (Proyectado)", "desc": "Facturación electrónica y control de remisiones."}
-    ]
-    modulos_universales = [
-        {"clave": "flota", "nombre": "Módulo Universal: Flota", "desc": "Gestión de vehículos propios o tercerizados para la distribución."},
-        {"clave": "combustible", "nombre": "Control de Combustibles", "desc": "Módulo Universal de Gestión, monitoreo de consumo y eficiencia de combustible."},
-        {"clave": "mantenimiento", "nombre": "Mantenimiento Preventivo (Proyectado)", "desc": "Módulo Universal de Mantenimiento"},
-        {"clave": "contabilidad", "nombre": "Contabilidad (Proyectado)", "desc": "Módulo Contable General"}
-    ]
-    return jsonify(success=True, directos=submodulos_directos, universales=modulos_universales)
 
 # ---------------------------------------------------------------
 
@@ -336,6 +236,7 @@ def registrar_empresa():
             cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s WHERE nit=%s", (nombre_comercial, tipo_empresa, nit))
             msg = 'Empresa actualizada correctamente.'
             
+        registrar_operacion_bqa(cur, 'REGISTRO_EMPRESA', request.form)
         mysql.connection.commit()
         return jsonify({'success': True, 'message': msg})
     except Exception as e:
@@ -354,6 +255,8 @@ def gestionar_tipo_empresa():
             cur.execute("INSERT INTO tipos_empresa (tipo) VALUES (%s)", (d.get('tipo'),))
         else:
             cur.execute("UPDATE tipos_empresa SET tipo=%s WHERE id=%s", (d.get('tipo'), d.get('id')))
+            
+        registrar_operacion_bqa(cur, 'GESTION_TIPO_EMPRESA', d)
         mysql.connection.commit()
         return jsonify(success=True, message="Tipo de empresa gestionado exitosamente.")
     except Exception as e: 
@@ -374,10 +277,21 @@ def gestionar_usuario():
 
         if d.get('accion') == 'crear':
             pw = bcrypt.generate_password_hash(d.get('password')).decode('utf-8')
-            cur.execute("""INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa, telegram_id, telefono) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                       (d.get('cedula'), d.get('nombre'), pw, d.get('tipo_usuario'), d.get('clase'), d.get('perfil'), empresa_id, d.get('empresa_select'), None, d.get('telefono')))
-            msg = "Usuario creado exitosamente."
+            
+            # Desacoplamiento del formato id_perfil|perfil que viene del Frontend
+            perfil_raw = d.get('perfil', '')
+            id_perfil = None
+            perfil_nombre = perfil_raw
+            if '|' in perfil_raw:
+                parts = perfil_raw.split('|', 1)
+                if parts[0].isdigit():
+                    id_perfil = int(parts[0])
+                    perfil_nombre = parts[1]
+            
+            cur.execute("""INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, id_perfil, empresa_id, empresa, telegram_id, telefono) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                       (d.get('cedula'), d.get('nombre'), pw, d.get('tipo_usuario'), d.get('clase'), perfil_nombre, id_perfil, empresa_id, d.get('empresa_select'), None, d.get('telefono')))
+            msg = "Usuario creado exitosamente con Perfil Inyectado."
             
         elif d.get('accion') == 'eliminar':
             cedula = d.get('cedula')
@@ -388,6 +302,15 @@ def gestionar_usuario():
             cedula = d.get('cedula')
             nuevo_telefono = d.get('telefono')
             telegram_id_enviado = d.get('telegram_id')
+            
+            perfil_raw = d.get('perfil', '')
+            id_perfil = None
+            perfil_nombre = perfil_raw
+            if '|' in perfil_raw:
+                parts = perfil_raw.split('|', 1)
+                if parts[0].isdigit():
+                    id_perfil = int(parts[0])
+                    perfil_nombre = parts[1]
 
             cur.execute("SELECT telefono FROM usuarios WHERE cedula=%s AND empresa_id=%s", (cedula, empresa_id))
             row = cur.fetchone()
@@ -401,8 +324,8 @@ def gestionar_usuario():
             elif not telegram_id_enviado or telegram_id_enviado.strip() == "":
                 telegram_id_enviado = None
 
-            query = "UPDATE usuarios SET nombre=%s, perfil=%s, telegram_id=%s, telefono=%s, empresa_id=%s, empresa=%s, tipo_usuario=%s, clase=%s"
-            params = [d.get('nombre'), d.get('perfil'), telegram_id_enviado, nuevo_telefono, empresa_id, d.get('empresa_select'), d.get('tipo_usuario'), d.get('clase')]
+            query = "UPDATE usuarios SET nombre=%s, perfil=%s, id_perfil=%s, telegram_id=%s, telefono=%s, empresa_id=%s, empresa=%s, tipo_usuario=%s, clase=%s"
+            params = [d.get('nombre'), perfil_nombre, id_perfil, telegram_id_enviado, nuevo_telefono, empresa_id, d.get('empresa_select'), d.get('tipo_usuario'), d.get('clase')]
             
             if d.get('password'):
                 query += ", password=%s"
@@ -414,6 +337,7 @@ def gestionar_usuario():
             cur.execute(query, tuple(params))
             msg = "Usuario actualizado exitosamente."
             
+        registrar_operacion_bqa(cur, 'GESTION_USUARIO', d)
         mysql.connection.commit()
         return jsonify(success=True, message=msg)
     except Exception as e: 
@@ -438,8 +362,10 @@ def gestionar_perfil():
         else:
             cur.execute("UPDATE perfiles SET operacion=%s, perfil=%s, archivo_destino=%s WHERE id=%s AND nit=%s", 
                        (d.get('operacion'), d.get('perfil'), d.get('archivo_destino'), d.get('id'), nit))
+                       
+        registrar_operacion_bqa(cur, 'GESTION_PERFIL', d)
         mysql.connection.commit()
-        return jsonify(success=True, message="Perfil y ruteo procesado.")
+        return jsonify(success=True, message="Perfil manual y ruteo procesado.")
     except Exception as e: 
         return jsonify(success=False, message=str(e))
     finally: 
@@ -451,12 +377,16 @@ def gestionar_perfil():
 def obtener_perfiles():
     empresa_id = request.args.get('empresa_id', '').strip()
     operacion = request.args.get('operacion', '').strip()
-    if not empresa_id or not operacion:
+    if not empresa_id:
         return jsonify({'perfiles': []})
     try:
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT DISTINCT perfil FROM perfiles WHERE nit = %s AND operacion = %s", (empresa_id, operacion))
-        perfiles = [row['perfil'] if isinstance(row, dict) else row[0] for row in cur.fetchall()]
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        if operacion:
+            cur.execute("SELECT DISTINCT perfil FROM perfiles WHERE nit = %s AND operacion = %s", (empresa_id, operacion))
+            perfiles = [row['perfil'] for row in cur.fetchall()]
+        else:
+            cur.execute("SELECT id, perfil, operacion FROM perfiles WHERE nit = %s ORDER BY operacion, perfil", (empresa_id,))
+            perfiles = cur.fetchall()
         cur.close()
         return jsonify({'perfiles': perfiles})
     except Exception as e:
@@ -476,6 +406,8 @@ def gestionar_proveedor():
         else:
             cur.execute("""UPDATE proveedores SET proveedor=%s, email1=%s, email2=%s, precio=%s WHERE id_proveedor=%s""",
                        (d.get('proveedor'), d.get('id_proveedor'), d.get('email1'), d.get('email2'), d.get('precio'), d.get('id_proveedor')))
+                       
+        registrar_operacion_bqa(cur, 'GESTION_PROVEEDOR', d)
         mysql.connection.commit()
         return jsonify(success=True, message="Proveedor actualizado.")
     except Exception as e: 
@@ -504,6 +436,8 @@ def registrar_proveedor():
                 WHERE id_proveedor=%s
             """, (d.get('proveedor'), d.get('email1'), d.get('email2'), d.get('precio'), d.get('id_proveedor')))
             msg = "Proveedor actualizado."
+            
+        registrar_operacion_bqa(cur, 'REGISTRO_PROVEEDOR', d)
         mysql.connection.commit()
         return jsonify(success=True, message=msg)
     except Exception as e: return jsonify(success=False, message=str(e))
@@ -538,6 +472,8 @@ def gestionar_contacto():
                        (d.get('empresa_nombre'), d.get('id_empresa'), d.get('area_contacto'), d.get('email')))
         else:
             cur.execute("UPDATE contactos SET area_contacto=%s, email=%s WHERE id=%s", (d.get('area_contacto'), d.get('email'), d.get('id')))
+            
+        registrar_operacion_bqa(cur, 'GESTION_CONTACTO', d)
         mysql.connection.commit()
         return jsonify(success=True, message="Contacto gestionado.")
     except Exception as e: 
@@ -565,6 +501,8 @@ def registrar_contacto():
                 WHERE id=%s
             """, (d.get('area_contacto'), d.get('email'), d.get('id')))
             msg = "Contacto actualizado."
+            
+        registrar_operacion_bqa(cur, 'REGISTRO_CONTACTO', d)
         mysql.connection.commit()
         return jsonify(success=True, message=msg)
     except Exception as e: return jsonify(success=False, message=str(e))
@@ -587,9 +525,9 @@ def obtener_todos_tipos_empresa():
 @login_required_custom
 def obtener_todos_usuarios():
     cur = mysql.connection.cursor()
-    cur.execute("SELECT id, cedula, nombre, perfil, empresa, empresa_id, telegram_id, telefono FROM usuarios")
+    cur.execute("SELECT id, cedula, nombre, perfil, id_perfil, empresa, empresa_id, telegram_id, telefono FROM usuarios")
     rows = cur.fetchall()
-    cols = ['id','cedula','nombre','perfil','empresa','empresa_id','telegram_id','telefono']
+    cols = ['id','cedula','nombre','perfil','id_perfil','empresa','empresa_id','telegram_id','telefono']
     res = [dict(zip(cols, r)) if not isinstance(r, dict) else r for r in rows]
     cur.close(); return jsonify(success=True, users=res)
 

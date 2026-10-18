@@ -1,3 +1,6 @@
+# MÓDULO: GAS | SUBMÓDULO: B_bp_supervisorgas | CONDICIÓN: OBLIGATORIO | TIPO: 1
+# app/blueprints/B_bp_supervisorgas.py
+
 from flask import Blueprint, render_template, session, redirect, url_for, flash
 from app.utils import login_required_custom
 

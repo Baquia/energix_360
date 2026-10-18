@@ -1,0 +1,221 @@
+<!-- MÓDULO: ADMINISTRACION | SUBMÓDULO: HUB_BAQUIA | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hub de Administración | Baquía-EMS</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <meta name="theme-color" content="#015249">
+    <style>
+        :root {
+            --color-primary: #015249;
+            --color-secondary: #003832;
+            --bg-light: #f4f7f6;
+            --text-dark: #1f2937;
+        }
+        body { 
+            background: var(--bg-light); 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            margin-bottom: 70px; 
+            color: var(--text-dark);
+        }
+        
+        /* Navbar Corporativo Estricto */
+        .navbar-custom { 
+            background: #ffffff; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+            border-bottom: 2px solid var(--color-primary);
+        }
+        .logo-sys { 
+            height: 45px; 
+            object-fit: contain;
+        }
+        
+        /* Banner de Bienvenida */
+        .hero-banner {
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+            color: white;
+            padding: 40px 0;
+            border-radius: 0 0 20px 20px;
+            box-shadow: 0 4px 20px rgba(1, 82, 73, 0.15);
+            margin-bottom: 40px;
+        }
+
+        /* Secciones de Unidades de Negocio */
+        .hub-section { 
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.03);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .section-title {
+            color: var(--color-primary);
+            font-weight: 800;
+            font-size: 1.4rem;
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Tarjetas Premium */
+        .hub-card {
+            background: #ffffff; 
+            border-radius: 12px; 
+            padding: 25px 20px; 
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.04); 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            height: 100%; 
+            display: block; 
+            text-decoration: none; 
+            color: inherit;
+            border: 1px solid #f3f4f6;
+            position: relative;
+            overflow: hidden;
+        }
+        .hub-card:hover { 
+            transform: translateY(-8px); 
+            box-shadow: 0 12px 24px rgba(0,0,0,0.08); 
+            color: inherit; 
+            border-color: #e5e7eb;
+        }
+        
+        /* Decorador superior de la tarjeta basado en el color de la UN */
+        .card-top-indicator {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+        }
+
+        .hub-icon { 
+            font-size: 3rem; 
+            margin-bottom: 15px; 
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+        }
+        
+        /* Tarjetas Deshabilitadas / Próximamente */
+        .disabled-card {
+            background-color: #f9fafb;
+            cursor: not-allowed;
+            border: 1px dashed #d1d5db;
+        }
+        .disabled-card:hover {
+            transform: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+            border-color: #d1d5db;
+        }
+        .disabled-card .hub-icon {
+            filter: grayscale(100%) opacity(60%);
+        }
+        .badge-proximamente {
+            position: absolute;
+            top: 15px;
+            right: -30px;
+            background: #f59e0b;
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: bold;
+            padding: 4px 30px;
+            transform: rotate(45deg);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Footer estricto */
+        .footer-custom { 
+            position: fixed; 
+            bottom: 0; 
+            width: 100%; 
+            background: #111827; 
+            color: #f9fafb; 
+            text-align: center; 
+            padding: 12px; 
+            font-size: 14px; 
+            font-weight: 500;
+            z-index: 1000; 
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR ESTRUCTURAL (Regla de Arquitectura) -->
+<nav class="navbar navbar-expand-lg navbar-custom py-2 sticky-top">
+    <div class="container-fluid px-4">
+        <div class="d-flex align-items-center gap-3">
+            <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="logo-sys" alt="BQA-ONE" onerror="this.style.display='none'">
+            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" class="logo-sys" alt="Cliente" onerror="this.style.display='none'">
+        </div>
+        
+        <div class="d-none d-md-block text-center mx-auto">
+            <span class="fw-bolder text-dark fs-5 tracking-wide">{{ empresa }}</span><br>
+            <span class="text-muted small fw-bold text-uppercase">Herramientas Internas | {{ nombre }}</span>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a href="/hub_gerencia_baquia.html" class="btn btn-outline-secondary btn-sm fw-bold px-3 shadow-sm">⬅ Volver al Hub</a>
+            <a href="/logout" class="btn btn-danger btn-sm fw-bold px-4 shadow-sm">Salir</a>
+        </div>
+    </div>
+</nav>
+
+<!-- BANNER DE BIENVENIDA -->
+<div class="hero-banner text-center">
+    <div class="container">
+        <h1 class="fw-bold display-6 mb-2">Hub Administración Baquía</h1>
+        <p class="lead mb-0 opacity-75 fs-6">Panel centralizado para herramientas internas de backoffice corporativo.</p>
+    </div>
+</div>
+
+<!-- CONTENIDO DATA-DRIVEN (Renderizado Dinámico en Bloques Jerárquicos) -->
+<div class="container">
+    {% for cat in modulos_admin %}
+    <div class="hub-section">
+        <h4 class="section-title">
+            <span>{{ '🏛️' if loop.index == 1 else '🛠️' }}</span> {{ cat.categoria }}
+        </h4>
+        <div class="row g-4">
+            {% for sub in cat.modulos %}
+            <div class="col-md-6 col-lg-4">
+                <a href="{{ url_for(sub.endpoint) if sub.endpoint else '#' }}" 
+                   class="hub-card {% if not sub.endpoint or sub.estado == 'proximamente' %}disabled-card{% endif %}"
+                   {% if not sub.endpoint or sub.estado == 'proximamente' %}onclick="event.preventDefault();"{% endif %}>
+                    
+                    <!-- Indicador superior de color -->
+                    <div class="card-top-indicator bg-{{ cat.color }}"></div>
+                    
+                    <!-- Etiqueta de Próximamente -->
+                    {% if not sub.endpoint or sub.estado == 'proximamente' %}
+                    <div class="badge-proximamente">PRÓXIMAMENTE</div>
+                    {% endif %}
+
+                    <div class="hub-icon">{{ sub.icono }}</div>
+                    <h5 class="fw-bold text-dark mb-2">{{ sub.nombre }}</h5>
+                    <p class="text-muted small mb-0 lh-sm">{{ sub.descripcion }}</p>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning text-center fw-bold shadow-sm rounded-3 py-4">
+        ⚠️ No hay módulos administrativos configurados o hubo un error al cargar la matriz.
+    </div>
+    {% endfor %}
+</div>
+
+<!-- FOOTER ESTRICTO -->
+<div class="footer-custom">
+    BQA-ONE © 2026 |
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

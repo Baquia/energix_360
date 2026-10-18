@@ -64,11 +64,18 @@ def create_app():
     # ---------------------------------------------------------
     from app.blueprints.A_bp_pwa_Avicola import gestionavicola_bp  
     
-    # --- SUBMÓDULOS WEBMASTER BQA-ONE ---
+    # --- SUBMÓDULOS WEBMASTER BQA-ONE (OPERATIVOS) ---
     from app.blueprints.bp_901811727_main import bp_main
     from app.blueprints.bp_901811727_admin import bp_admin
     from app.blueprints.bp_901811727_energia_glp import bp_energia_glp
     from app.blueprints.bp_901811727_audit import bp_audit
+
+    # --- NUEVOS HUBS CORPORATIVOS BAQUÍA-EMS SAS (ENRUTAMIENTO) ---
+    from app.blueprints.B_bp_hub_gerencia_baquia import B_bp_hub_gerencia_baquia
+    from app.blueprints.B_bp_hub_webmaster_baqone import B_bp_hub_webmaster_baqone
+    from app.blueprints.B_bp_hub_gestion_energetica import B_bp_hub_gestion_energetica
+    from app.blueprints.B_bp_hub_inspecciones_tecnicas import B_bp_hub_inspecciones_tecnicas
+    from app.blueprints.B_bp_hub_administracion_baquia import B_bp_hub_administracion_baquia
 
     # --- NUEVOS HUBS NATIVOS: VENTAS Y DISTRIBUCIÓN (M3) ---
     from app.blueprints.B_bp_hub_bodegas import bp_hub_bodegas
@@ -81,6 +88,13 @@ def create_app():
     app.register_blueprint(bp_admin)
     app.register_blueprint(bp_energia_glp)
     app.register_blueprint(bp_audit)
+
+    # Registro de nuevos Hubs
+    app.register_blueprint(B_bp_hub_gerencia_baquia)
+    app.register_blueprint(B_bp_hub_webmaster_baqone)
+    app.register_blueprint(B_bp_hub_gestion_energetica)
+    app.register_blueprint(B_bp_hub_inspecciones_tecnicas)
+    app.register_blueprint(B_bp_hub_administracion_baquia)
     
     app.register_blueprint(bp_hub_bodegas)
     app.register_blueprint(bp_hub_ventas)
@@ -89,7 +103,7 @@ def create_app():
     # ---------------------------------------------------------
     #  GRUPO B: MÓDULOS FUNCIONALES / SERVICIOS / CONTROLADORES
     # ---------------------------------------------------------
-    from app.blueprints.bp_glp import bp_glp                               
+    from app.blueprints.B_bp_operador_glp import bp_operador_glp                               
     from app.blueprints.B_bp_gestion_mermas import bp_gestion_mermas         
     from app.blueprints.B_bp_supervisorgas import bp_supervisorgas         
     from app.blueprints.B_bp_controlador_bodegas import bp_bodegas                     
@@ -121,7 +135,7 @@ def create_app():
     from app.blueprints.B_bp_controlador_contabilidad import bp_controlador_contabilidad
     from app.blueprints.B_bp_controlador_facturacion import bp_controlador_facturacion
 
-    app.register_blueprint(bp_glp)
+    app.register_blueprint(bp_operador_glp)
     app.register_blueprint(bp_gestion_mermas)
     app.register_blueprint(bp_supervisorgas)                               
     app.register_blueprint(bp_bodegas)
