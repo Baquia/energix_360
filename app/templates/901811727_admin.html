@@ -597,7 +597,7 @@
       }
 
       function eliminarUsuario(cedula) {
-          if (!window.confirm("¿Está seguro de eliminar permanentemente este usuario?")) return;
+          if (!window.confirm("¿Está seguro de eliminar el usuario?")) return;
           const fd = new FormData();
           fd.append('accion', 'eliminar');
           fd.append('cedula', cedula);

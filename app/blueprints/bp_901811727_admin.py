@@ -1,6 +1,7 @@
 # MÓDULO: WEBMASTER_ADMIN | ARCHIVO: bp_901811727_admin.py | CONDICIÓN: OBLIGATORIO | TIPO: 1
 # app/blueprints/bp_901811727_admin.py
 import json
+import time
 from flask import Blueprint, request, jsonify, session
 from app import mysql, csrf
 from app.utils import login_required_custom
@@ -175,40 +176,47 @@ def gestionar_empresa():
     nombre_comercial = d.get('nombre_comercial')
     tipo_empresa = d.get('tipo_empresa', 'general')
     accion = d.get('accion', 'crear')
+    modulos_json = json.dumps(modulos_seleccionados)
     
-    cur = mysql.connection.cursor()
-    try:
-        if accion == 'crear':
-            cur.execute("INSERT INTO empresas (nit, nombre_comercial, tipo_empresa) VALUES (%s, %s, %s)", 
-                       (nit, nombre_comercial, tipo_empresa))
-        else:
-            cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s WHERE nit=%s", 
-                       (nombre_comercial, tipo_empresa, nit))
-                       
-        # Reset y Asignación de Módulos (Tabla de permisos directos)
-        cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
-        for modulo in modulos_seleccionados:
-            cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, modulo))
-            
-            # Auto-Aprovisionamiento / Inyección determinista de Perfiles al Inquilino
-            if modulo in MATRIZ_MAESTRA:
-                for p in MATRIZ_MAESTRA[modulo]['perfiles']:
-                    # Verificar si el inquilino ya posee este perfil para no duplicarlo
-                    cur.execute("SELECT id FROM perfiles WHERE nit=%s AND perfil=%s", (nit, p['perfil']))
-                    if not cur.fetchone():
-                        cur.execute("""
-                            INSERT INTO perfiles (empresa, nit, operacion, perfil, archivo_destino) 
-                            VALUES (%s, %s, %s, %s, %s)
-                        """, (nombre_comercial, nit, p['operacion'], p['perfil'], p['archivo']))
-            
-        registrar_operacion_bqa(cur, 'GESTION_EMPRESA', d)
-        mysql.connection.commit()
-        return jsonify(success=True, message="Empresa, Módulos y Perfiles de Matriz procesados correctamente.")
-    except Exception as e: 
-        mysql.connection.rollback()
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if accion == 'crear':
+                cur.execute("INSERT INTO empresas (nit, nombre_comercial, tipo_empresa, submodulos_activos) VALUES (%s, %s, %s, %s)", 
+                           (nit, nombre_comercial, tipo_empresa, modulos_json))
+            else:
+                cur.execute("SELECT id FROM empresas WHERE nit=%s FOR UPDATE", (nit,))
+                cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s, submodulos_activos=%s WHERE nit=%s", 
+                           (nombre_comercial, tipo_empresa, modulos_json, nit))
+                           
+            # Reset y Asignación de Módulos (Tabla de permisos directos)
+            cur.execute("DELETE FROM modulos_empresas_autorizadas WHERE id_empresa = %s", (nit,))
+            for modulo in modulos_seleccionados:
+                cur.execute("INSERT INTO modulos_empresas_autorizadas (id_empresa, modulo, estatus) VALUES (%s, %s, 'activo')", (nit, modulo))
+                
+                # Auto-Aprovisionamiento / Inyección determinista de Perfiles al Inquilino
+                if modulo in MATRIZ_MAESTRA:
+                    for p in MATRIZ_MAESTRA[modulo]['perfiles']:
+                        # Verificar si el inquilino ya posee este perfil para no duplicarlo
+                        cur.execute("SELECT id FROM perfiles WHERE nit=%s AND perfil=%s FOR UPDATE", (nit, p['perfil']))
+                        if not cur.fetchone():
+                            cur.execute("""
+                                INSERT INTO perfiles (empresa, nit, operacion, perfil, archivo_destino) 
+                                VALUES (%s, %s, %s, %s, %s)
+                            """, (nombre_comercial, nit, p['operacion'], p['perfil'], p['archivo']))
+                
+            registrar_operacion_bqa(cur, 'GESTION_EMPRESA', d)
+            mysql.connection.commit()
+            return jsonify(success=True, message="Empresa, Módulos y Perfiles de Matriz procesados correctamente.")
+        except Exception as e: 
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify(success=False, message=str(e))
+        finally: 
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia. Intente nuevamente.")
 
 # ---------------------------------------------------------------
 
@@ -224,152 +232,180 @@ def registrar_empresa():
     if not nombre_comercial or not nit:
         return jsonify({'success': False, 'message': 'Faltan datos obligatorios.'})
     
-    cur = mysql.connection.cursor()
-    try:
-        if accion == 'crear':
-            cur.execute("SELECT * FROM empresas WHERE nit = %s", (nit,))
-            if cur.fetchone():
-                return jsonify({'success': False, 'message': 'La empresa ya existe.'})
-            cur.execute("INSERT INTO empresas (nit, nombre_comercial, tipo_empresa) VALUES (%s, %s, %s)", (nit, nombre_comercial, tipo_empresa))
-            msg = 'Empresa creada correctamente.'
-        else:
-            cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s WHERE nit=%s", (nombre_comercial, tipo_empresa, nit))
-            msg = 'Empresa actualizada correctamente.'
-            
-        registrar_operacion_bqa(cur, 'REGISTRO_EMPRESA', request.form)
-        mysql.connection.commit()
-        return jsonify({'success': True, 'message': msg})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
-    finally:
-        cur.close()
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if accion == 'crear':
+                cur.execute("SELECT id FROM empresas WHERE nit = %s FOR UPDATE", (nit,))
+                if cur.fetchone():
+                    return jsonify({'success': False, 'message': 'La empresa ya existe.'})
+                cur.execute("INSERT INTO empresas (nit, nombre_comercial, tipo_empresa) VALUES (%s, %s, %s)", (nit, nombre_comercial, tipo_empresa))
+                msg = 'Empresa creada correctamente.'
+            else:
+                cur.execute("SELECT id FROM empresas WHERE nit = %s FOR UPDATE", (nit,))
+                cur.execute("UPDATE empresas SET nombre_comercial=%s, tipo_empresa=%s WHERE nit=%s", (nombre_comercial, tipo_empresa, nit))
+                msg = 'Empresa actualizada correctamente.'
+                
+            registrar_operacion_bqa(cur, 'REGISTRO_EMPRESA', request.form)
+            mysql.connection.commit()
+            return jsonify({'success': True, 'message': msg})
+        except Exception as e:
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+        finally:
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia.")
 
 @csrf.exempt
 @bp_admin.route('/gestionar_tipo_empresa', methods=['POST'])
 @login_required_custom
 def gestionar_tipo_empresa():
     d = request.form
-    cur = mysql.connection.cursor()
-    try:
-        if d.get('accion') == 'crear':
-            cur.execute("INSERT INTO tipos_empresa (tipo) VALUES (%s)", (d.get('tipo'),))
-        else:
-            cur.execute("UPDATE tipos_empresa SET tipo=%s WHERE id=%s", (d.get('tipo'), d.get('id')))
-            
-        registrar_operacion_bqa(cur, 'GESTION_TIPO_EMPRESA', d)
-        mysql.connection.commit()
-        return jsonify(success=True, message="Tipo de empresa gestionado exitosamente.")
-    except Exception as e: 
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if d.get('accion') == 'crear':
+                cur.execute("INSERT INTO tipos_empresa (tipo) VALUES (%s)", (d.get('tipo'),))
+            else:
+                cur.execute("SELECT id FROM tipos_empresa WHERE id=%s FOR UPDATE", (d.get('id'),))
+                cur.execute("UPDATE tipos_empresa SET tipo=%s WHERE id=%s", (d.get('tipo'), d.get('id')))
+                
+            registrar_operacion_bqa(cur, 'GESTION_TIPO_EMPRESA', d)
+            mysql.connection.commit()
+            return jsonify(success=True, message="Tipo de empresa gestionado exitosamente.")
+        except Exception as e: 
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify(success=False, message=str(e))
+        finally: 
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia.")
 
 @csrf.exempt
 @bp_admin.route('/gestionar_usuario', methods=['GET', 'POST'])
 @login_required_custom
 def gestionar_usuario():
     d = request.form
-    cur = mysql.connection.cursor()
     empresa_id = d.get('empresa_id')
-    try:
-        if not empresa_id:
-            return jsonify(success=False, message="Falta ID de empresa (Validación Multi-Tenant requerida).")
+    if not empresa_id:
+        return jsonify(success=False, message="Falta ID de empresa (Validación Multi-Tenant requerida).")
 
-        if d.get('accion') == 'crear':
-            pw = bcrypt.generate_password_hash(d.get('password')).decode('utf-8')
-            
-            # Desacoplamiento del formato id_perfil|perfil que viene del Frontend
-            perfil_raw = d.get('perfil', '')
-            id_perfil = None
-            perfil_nombre = perfil_raw
-            if '|' in perfil_raw:
-                parts = perfil_raw.split('|', 1)
-                if parts[0].isdigit():
-                    id_perfil = int(parts[0])
-                    perfil_nombre = parts[1]
-            
-            cur.execute("""INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, id_perfil, empresa_id, empresa, telegram_id, telefono) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                       (d.get('cedula'), d.get('nombre'), pw, d.get('tipo_usuario'), d.get('clase'), perfil_nombre, id_perfil, empresa_id, d.get('empresa_select'), None, d.get('telefono')))
-            msg = "Usuario creado exitosamente con Perfil Inyectado."
-            
-        elif d.get('accion') == 'eliminar':
-            cedula = d.get('cedula')
-            cur.execute("DELETE FROM usuarios WHERE cedula=%s AND empresa_id=%s", (cedula, empresa_id))
-            msg = "Usuario eliminado correctamente."
-            
-        else:
-            cedula = d.get('cedula')
-            nuevo_telefono = d.get('telefono')
-            telegram_id_enviado = d.get('telegram_id')
-            
-            perfil_raw = d.get('perfil', '')
-            id_perfil = None
-            perfil_nombre = perfil_raw
-            if '|' in perfil_raw:
-                parts = perfil_raw.split('|', 1)
-                if parts[0].isdigit():
-                    id_perfil = int(parts[0])
-                    perfil_nombre = parts[1]
-
-            cur.execute("SELECT telefono FROM usuarios WHERE cedula=%s AND empresa_id=%s", (cedula, empresa_id))
-            row = cur.fetchone()
-            if not row:
-                return jsonify(success=False, message="Usuario no encontrado o no pertenece a la empresa actual.")
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if d.get('accion') == 'crear':
+                pw = bcrypt.generate_password_hash(d.get('password')).decode('utf-8')
                 
-            telefono_actual = row['telefono'] if isinstance(row, dict) else row[0]
-
-            if str(telefono_actual) != str(nuevo_telefono):
-                telegram_id_enviado = None
-            elif not telegram_id_enviado or telegram_id_enviado.strip() == "":
-                telegram_id_enviado = None
-
-            query = "UPDATE usuarios SET nombre=%s, perfil=%s, id_perfil=%s, telegram_id=%s, telefono=%s, empresa_id=%s, empresa=%s, tipo_usuario=%s, clase=%s"
-            params = [d.get('nombre'), perfil_nombre, id_perfil, telegram_id_enviado, nuevo_telefono, empresa_id, d.get('empresa_select'), d.get('tipo_usuario'), d.get('clase')]
-            
-            if d.get('password'):
-                query += ", password=%s"
-                params.append(bcrypt.generate_password_hash(d.get('password')).decode('utf-8'))
+                perfil_raw = d.get('perfil', '')
+                id_perfil = None
+                perfil_nombre = perfil_raw
+                if '|' in perfil_raw:
+                    parts = perfil_raw.split('|', 1)
+                    if parts[0].isdigit():
+                        id_perfil = int(parts[0])
+                        perfil_nombre = parts[1]
                 
-            query += " WHERE cedula=%s AND empresa_id=%s"
-            params.extend([cedula, empresa_id])
-            
-            cur.execute(query, tuple(params))
-            msg = "Usuario actualizado exitosamente."
-            
-        registrar_operacion_bqa(cur, 'GESTION_USUARIO', d)
-        mysql.connection.commit()
-        return jsonify(success=True, message=msg)
-    except Exception as e: 
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
+                cur.execute("""INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, id_perfil, empresa_id, empresa, telegram_id, telefono) 
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                           (d.get('cedula'), d.get('nombre'), pw, d.get('tipo_usuario'), d.get('clase'), perfil_nombre, id_perfil, empresa_id, d.get('empresa_select'), None, d.get('telefono')))
+                msg = "Usuario creado exitosamente con Perfil Inyectado."
+                
+            elif d.get('accion') == 'eliminar':
+                cedula = d.get('cedula')
+                cur.execute("SELECT id FROM usuarios WHERE cedula=%s AND empresa_id=%s FOR UPDATE", (cedula, empresa_id))
+                cur.execute("DELETE FROM usuarios WHERE cedula=%s AND empresa_id=%s", (cedula, empresa_id))
+                msg = "Usuario eliminado correctamente."
+                
+            else:
+                cedula = d.get('cedula')
+                nuevo_telefono = d.get('telefono')
+                telegram_id_enviado = d.get('telegram_id')
+                
+                perfil_raw = d.get('perfil', '')
+                id_perfil = None
+                perfil_nombre = perfil_raw
+                if '|' in perfil_raw:
+                    parts = perfil_raw.split('|', 1)
+                    if parts[0].isdigit():
+                        id_perfil = int(parts[0])
+                        perfil_nombre = parts[1]
+
+                cur.execute("SELECT telefono FROM usuarios WHERE cedula=%s AND empresa_id=%s FOR UPDATE", (cedula, empresa_id))
+                row = cur.fetchone()
+                if not row:
+                    mysql.connection.rollback()
+                    return jsonify(success=False, message="Usuario no encontrado o no pertenece a la empresa actual.")
+                    
+                telefono_actual = row['telefono'] if isinstance(row, dict) else row[0]
+
+                if str(telefono_actual) != str(nuevo_telefono):
+                    telegram_id_enviado = None
+                elif not telegram_id_enviado or telegram_id_enviado.strip() == "":
+                    telegram_id_enviado = None
+
+                query = "UPDATE usuarios SET nombre=%s, perfil=%s, id_perfil=%s, telegram_id=%s, telefono=%s, empresa=%s, tipo_usuario=%s, clase=%s"
+                params = [d.get('nombre'), perfil_nombre, id_perfil, telegram_id_enviado, nuevo_telefono, d.get('empresa_select'), d.get('tipo_usuario'), d.get('clase')]
+                
+                if d.get('password'):
+                    query += ", password=%s"
+                    params.append(bcrypt.generate_password_hash(d.get('password')).decode('utf-8'))
+                    
+                query += " WHERE cedula=%s AND empresa_id=%s"
+                params.extend([cedula, empresa_id])
+                
+                cur.execute(query, tuple(params))
+                msg = "Usuario actualizado exitosamente."
+                
+            registrar_operacion_bqa(cur, 'GESTION_USUARIO', d)
+            mysql.connection.commit()
+            return jsonify(success=True, message=msg)
+        except Exception as e: 
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify(success=False, message=str(e))
+        finally: 
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia.")
 
 @csrf.exempt
 @bp_admin.route('/gestionar_perfil', methods=['POST'])
 @login_required_custom
 def gestionar_perfil():
     d = request.form
-    cur = mysql.connection.cursor()
     nit = d.get('nit')
-    try:
-        if not nit:
-            return jsonify(success=False, message="Falta NIT de empresa (Validación Multi-Tenant requerida).")
+    if not nit:
+        return jsonify(success=False, message="Falta NIT de empresa (Validación Multi-Tenant requerida).")
 
-        if d.get('accion') == 'crear':
-            cur.execute("INSERT INTO perfiles (empresa, nit, operacion, perfil, archivo_destino) VALUES (%s, %s, %s, %s, %s)",
-                       (d.get('empresa_select'), nit, d.get('operacion'), d.get('perfil'), d.get('archivo_destino')))
-        else:
-            cur.execute("UPDATE perfiles SET operacion=%s, perfil=%s, archivo_destino=%s WHERE id=%s AND nit=%s", 
-                       (d.get('operacion'), d.get('perfil'), d.get('archivo_destino'), d.get('id'), nit))
-                       
-        registrar_operacion_bqa(cur, 'GESTION_PERFIL', d)
-        mysql.connection.commit()
-        return jsonify(success=True, message="Perfil manual y ruteo procesado.")
-    except Exception as e: 
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if d.get('accion') == 'crear':
+                cur.execute("INSERT INTO perfiles (empresa, nit, operacion, perfil, archivo_destino) VALUES (%s, %s, %s, %s, %s)",
+                           (d.get('empresa_select'), nit, d.get('operacion'), d.get('perfil'), d.get('archivo_destino')))
+            else:
+                cur.execute("SELECT id FROM perfiles WHERE id=%s AND nit=%s FOR UPDATE", (d.get('id'), nit))
+                cur.execute("UPDATE perfiles SET operacion=%s, perfil=%s, archivo_destino=%s WHERE id=%s AND nit=%s", 
+                           (d.get('operacion'), d.get('perfil'), d.get('archivo_destino'), d.get('id'), nit))
+                           
+            registrar_operacion_bqa(cur, 'GESTION_PERFIL', d)
+            mysql.connection.commit()
+            return jsonify(success=True, message="Perfil manual y ruteo procesado.")
+        except Exception as e: 
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify(success=False, message=str(e))
+        finally: 
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia.")
 
 @csrf.exempt
 @bp_admin.route('/obtener_perfiles')
@@ -379,6 +415,7 @@ def obtener_perfiles():
     operacion = request.args.get('operacion', '').strip()
     if not empresa_id:
         return jsonify({'perfiles': []})
+    import MySQLdb.cursors
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         if operacion:
@@ -397,23 +434,34 @@ def obtener_perfiles():
 @login_required_custom
 def gestionar_proveedor():
     d = request.form
-    cur = mysql.connection.cursor()
-    try:
-        if d.get('accion') == 'crear':
-            cur.execute("""INSERT INTO proveedores (proveedor, id_proveedor, email1, email2, producto_servicio, precio) 
-                           VALUES (%s, %s, %s, %s, %s, %s)""",
-                       (d.get('proveedor'), d.get('id_proveedor'), d.get('email1'), d.get('email2'), 'GLP', d.get('precio')))
-        else:
-            cur.execute("""UPDATE proveedores SET proveedor=%s, email1=%s, email2=%s, precio=%s WHERE id_proveedor=%s""",
-                       (d.get('proveedor'), d.get('id_proveedor'), d.get('email1'), d.get('email2'), d.get('precio'), d.get('id_proveedor')))
-                       
-        registrar_operacion_bqa(cur, 'GESTION_PROVEEDOR', d)
-        mysql.connection.commit()
-        return jsonify(success=True, message="Proveedor actualizado.")
-    except Exception as e: 
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
+    empresa_id = d.get('id_empresa') or session.get('empresa_id')
+    if not empresa_id:
+        return jsonify(success=False, message="Falta ID de empresa (Validación Multi-Tenant requerida).")
+
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if d.get('accion') == 'crear':
+                cur.execute("""INSERT INTO proveedores (proveedor, id_proveedor, email1, email2, producto_servicio, precio, id_empresa) 
+                               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                           (d.get('proveedor'), d.get('id_proveedor'), d.get('email1'), d.get('email2'), 'GLP', d.get('precio'), empresa_id))
+            else:
+                cur.execute("SELECT id_proveedor FROM proveedores WHERE id_proveedor=%s AND id_empresa=%s FOR UPDATE", (d.get('id_proveedor'), empresa_id))
+                cur.execute("""UPDATE proveedores SET proveedor=%s, email1=%s, email2=%s, precio=%s WHERE id_proveedor=%s AND id_empresa=%s""",
+                           (d.get('proveedor'), d.get('email1'), d.get('email2'), d.get('precio'), d.get('id_proveedor'), empresa_id))
+                           
+            registrar_operacion_bqa(cur, 'GESTION_PROVEEDOR', d)
+            mysql.connection.commit()
+            return jsonify(success=True, message="Proveedor actualizado.")
+        except Exception as e: 
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify(success=False, message=str(e))
+        finally: 
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia.")
 
 @csrf.exempt
 @bp_admin.route('/registrar_proveedor', methods=['POST'])
@@ -421,27 +469,40 @@ def gestionar_proveedor():
 def registrar_proveedor():
     d = request.form
     accion = d.get('accion', 'crear')
-    cur = mysql.connection.cursor()
-    try:
-        if accion == 'crear':
-            cur.execute("""
-                INSERT INTO proveedores (proveedor, id_proveedor, email1, email2, producto_servicio, precio)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (d.get('proveedor'), d.get('id_proveedor'), d.get('email1'), d.get('email2'), 'GLP', d.get('precio')))
-            msg = "Proveedor creado."
-        else:
-            cur.execute("""
-                UPDATE proveedores 
-                SET proveedor=%s, email1=%s, email2=%s, precio=%s 
-                WHERE id_proveedor=%s
-            """, (d.get('proveedor'), d.get('email1'), d.get('email2'), d.get('precio'), d.get('id_proveedor')))
-            msg = "Proveedor actualizado."
-            
-        registrar_operacion_bqa(cur, 'REGISTRO_PROVEEDOR', d)
-        mysql.connection.commit()
-        return jsonify(success=True, message=msg)
-    except Exception as e: return jsonify(success=False, message=str(e))
-    finally: cur.close()
+    empresa_id = d.get('id_empresa') or session.get('empresa_id')
+    if not empresa_id:
+        return jsonify(success=False, message="Falta ID de empresa (Validación Multi-Tenant requerida).")
+
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if accion == 'crear':
+                cur.execute("""
+                    INSERT INTO proveedores (proveedor, id_proveedor, email1, email2, producto_servicio, precio, id_empresa)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (d.get('proveedor'), d.get('id_proveedor'), d.get('email1'), d.get('email2'), 'GLP', d.get('precio'), empresa_id))
+                msg = "Proveedor creado."
+            else:
+                cur.execute("SELECT id_proveedor FROM proveedores WHERE id_proveedor=%s AND id_empresa=%s FOR UPDATE", (d.get('id_proveedor'), empresa_id))
+                cur.execute("""
+                    UPDATE proveedores 
+                    SET proveedor=%s, email1=%s, email2=%s, precio=%s 
+                    WHERE id_proveedor=%s AND id_empresa=%s
+                """, (d.get('proveedor'), d.get('email1'), d.get('email2'), d.get('precio'), d.get('id_proveedor'), empresa_id))
+                msg = "Proveedor actualizado."
+                
+            registrar_operacion_bqa(cur, 'REGISTRO_PROVEEDOR', d)
+            mysql.connection.commit()
+            return jsonify(success=True, message=msg)
+        except Exception as e: 
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify(success=False, message=str(e))
+        finally: 
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia.")
 
 @csrf.exempt
 @bp_admin.route('/consultar_proveedores', methods=['POST'])
@@ -465,21 +526,33 @@ def consultar_proveedores():
 @login_required_custom
 def gestionar_contacto():
     d = request.form
-    cur = mysql.connection.cursor()
-    try:
-        if d.get('accion') == 'crear':
-            cur.execute("INSERT INTO contactos (empresa, id_empresa, area_contacto, email) VALUES (%s, %s, %s, %s)",
-                       (d.get('empresa_nombre'), d.get('id_empresa'), d.get('area_contacto'), d.get('email')))
-        else:
-            cur.execute("UPDATE contactos SET area_contacto=%s, email=%s WHERE id=%s", (d.get('area_contacto'), d.get('email'), d.get('id')))
-            
-        registrar_operacion_bqa(cur, 'GESTION_CONTACTO', d)
-        mysql.connection.commit()
-        return jsonify(success=True, message="Contacto gestionado.")
-    except Exception as e: 
-        return jsonify(success=False, message=str(e))
-    finally: 
-        cur.close()
+    empresa_id = d.get('id_empresa') or session.get('empresa_id')
+    if not empresa_id:
+        return jsonify(success=False, message="Falta ID de empresa (Validación Multi-Tenant requerida).")
+
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if d.get('accion') == 'crear':
+                cur.execute("INSERT INTO contactos (empresa, id_empresa, area_contacto, email) VALUES (%s, %s, %s, %s)",
+                           (d.get('empresa_nombre'), empresa_id, d.get('area_contacto'), d.get('email')))
+            else:
+                cur.execute("SELECT id FROM contactos WHERE id=%s AND id_empresa=%s FOR UPDATE", (d.get('id'), empresa_id))
+                cur.execute("UPDATE contactos SET area_contacto=%s, email=%s WHERE id=%s AND id_empresa=%s", 
+                           (d.get('area_contacto'), d.get('email'), d.get('id'), empresa_id))
+                
+            registrar_operacion_bqa(cur, 'GESTION_CONTACTO', d)
+            mysql.connection.commit()
+            return jsonify(success=True, message="Contacto gestionado.")
+        except Exception as e: 
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify(success=False, message=str(e))
+        finally: 
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia.")
 
 @csrf.exempt
 @bp_admin.route('/registrar_contacto', methods=['POST'])
@@ -487,26 +560,39 @@ def gestionar_contacto():
 def registrar_contacto():
     d = request.form
     accion = d.get('accion', 'crear')
-    cur = mysql.connection.cursor()
-    try:
-        if accion == 'crear':
-            cur.execute("""
-                INSERT INTO contactos (empresa, id_empresa, area_contacto, email)
-                VALUES (%s, %s, %s, %s)
-            """, (d.get('empresa_nombre'), d.get('id_empresa'), d.get('area_contacto'), d.get('email')))
-            msg = "Contacto creado."
-        else:
-            cur.execute("""
-                UPDATE contactos SET area_contacto=%s, email=%s 
-                WHERE id=%s
-            """, (d.get('area_contacto'), d.get('email'), d.get('id')))
-            msg = "Contacto actualizado."
-            
-        registrar_operacion_bqa(cur, 'REGISTRO_CONTACTO', d)
-        mysql.connection.commit()
-        return jsonify(success=True, message=msg)
-    except Exception as e: return jsonify(success=False, message=str(e))
-    finally: cur.close()
+    empresa_id = d.get('id_empresa') or session.get('empresa_id')
+    if not empresa_id:
+        return jsonify(success=False, message="Falta ID de empresa (Validación Multi-Tenant requerida).")
+
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if accion == 'crear':
+                cur.execute("""
+                    INSERT INTO contactos (empresa, id_empresa, area_contacto, email)
+                    VALUES (%s, %s, %s, %s)
+                """, (d.get('empresa_nombre'), empresa_id, d.get('area_contacto'), d.get('email')))
+                msg = "Contacto creado."
+            else:
+                cur.execute("SELECT id FROM contactos WHERE id=%s AND id_empresa=%s FOR UPDATE", (d.get('id'), empresa_id))
+                cur.execute("""
+                    UPDATE contactos SET area_contacto=%s, email=%s 
+                    WHERE id=%s AND id_empresa=%s
+                """, (d.get('area_contacto'), d.get('email'), d.get('id'), empresa_id))
+                msg = "Contacto actualizado."
+                
+            registrar_operacion_bqa(cur, 'REGISTRO_CONTACTO', d)
+            mysql.connection.commit()
+            return jsonify(success=True, message=msg)
+        except Exception as e: 
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify(success=False, message=str(e))
+        finally: 
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia.")
 
 # ==============================================================================
 # RUTAS DE LECTURA (PARA LLENAR LAS TABLAS DEL FRONTEND)
