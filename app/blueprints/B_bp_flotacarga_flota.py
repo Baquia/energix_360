@@ -7,6 +7,7 @@ import io
 import base64
 import smtplib
 import threading
+import qrcode
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import make_msgid, formatdate
@@ -21,6 +22,8 @@ from functools import wraps
 import MySQLdb.cursors
 
 # Librerías PDF (Reportes Platypus)
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
@@ -525,6 +528,110 @@ def gestion_vehiculos():
         nombre=session.get('nombre'),
         active_module='vehiculos', 
         vehiculos=vehiculos_db
+    )
+
+# ==============================================================================
+# NUEVO: GENERACIÓN NATIVA DE QR EN FORMATO PDF DESDE EL SERVIDOR
+# ==============================================================================
+@bp_flotacarga_flota.route('/vehiculos/qr/<placa>', methods=['GET'])
+@login_required_custom
+@gestor_flota_required
+def generar_qr_vehiculo(placa):
+    """
+    Genera un PDF con diseño corporativo BQA-ONE que contiene el Código QR 
+    del vehículo. El payload incrustado procesa de forma segura caracteres UTF-8.
+    """
+    empresa_id = session.get('empresa_id')
+    empresa_nombre = session.get('empresa')
+    nit_empresa = session.get('nit')
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("SELECT tipo FROM vehiculos WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, empresa_id))
+    vehiculo = cur.fetchone()
+    cur.close()
+
+    if not vehiculo:
+        flash("Vehículo no encontrado o no pertenece a la empresa.", "danger")
+        return redirect(url_for('flotacarga_flota.gestion_vehiculos'))
+
+    tipo = vehiculo.get('tipo', '')
+    
+    # 1. Preparación Segura del Payload
+    payload_dict = {
+        "placa": placa,
+        "nit": str(nit_empresa),
+        "tipo": tipo
+    }
+    
+    # Serialización a JSON. ensure_ascii=False respeta tildes y caracteres especiales
+    payload_str = json.dumps(payload_dict, ensure_ascii=False)
+    
+    # 2. Generación del Código QR en Memoria
+    qr = qrcode.QRCode(
+        version=1, 
+        error_correction=qrcode.constants.ERROR_CORRECT_M, 
+        box_size=10, 
+        border=1
+    )
+    # Se codifica en UTF-8 para garantizar soporte de caracteres especiales
+    qr.add_data(payload_str.encode('utf-8'))
+    qr.make(fit=True)
+    img_qr = qr.make_image(fill_color="#015249", back_color="white")
+    
+    qr_io = io.BytesIO()
+    img_qr.save(qr_io, format='PNG')
+    qr_io.seek(0)
+    
+    # 3. Construcción del PDF Corporativo (4x5 pulgadas - Tamaño Etiqueta)
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=(4*inch, 5*inch))
+    
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    static_dir = os.path.join(base_dir, '..', 'static')
+    logo_cliente_path = os.path.join(static_dir, f'logo_{nit_empresa}.PNG')
+    logo_app_path = os.path.join(static_dir, 'logo_energix360.png')
+    
+    # Fondo Blanco
+    pdf.setFillColor(colors.white)
+    pdf.rect(0, 0, 4*inch, 5*inch, fill=1)
+    
+    # Logo del Cliente (Parte Superior)
+    if os.path.exists(logo_cliente_path):
+        pdf.drawImage(logo_cliente_path, 0.5*inch, 3.6*inch, width=3*inch, height=1.2*inch, preserveAspectRatio=True, anchor='c')
+    else:
+        pdf.setFillColor(colors.HexColor('#015249'))
+        pdf.setFont("Helvetica-Bold", 16)
+        pdf.drawCentredString(2*inch, 4.2*inch, empresa_nombre)
+
+    # Identificador de Placa Central
+    pdf.setFillColor(colors.black)
+    pdf.setFont("Helvetica-Bold", 26)
+    pdf.drawCentredString(2*inch, 3.1*inch, placa.upper())
+    
+    # Texto de Propiedad
+    pdf.setFont("Helvetica", 10)
+    pdf.drawCentredString(2*inch, 2.8*inch, f"Propiedad de: {empresa_nombre}")
+    
+    # Código QR Renderizado
+    pdf.drawImage(ImageReader(qr_io), 1*inch, 0.7*inch, width=2*inch, height=2*inch, preserveAspectRatio=True)
+    
+    # Sello / Logo BQA-ONE (Parte Inferior)
+    if os.path.exists(logo_app_path):
+        pdf.drawImage(logo_app_path, 1.5*inch, 0.2*inch, width=1*inch, height=0.4*inch, preserveAspectRatio=True, anchor='c')
+    else:
+        pdf.setFillColor(colors.HexColor('#015249'))
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawCentredString(2*inch, 0.3*inch, "BQA ONE")
+        
+    pdf.showPage()
+    pdf.save()
+    buffer.seek(0)
+    
+    return send_file(
+        buffer, 
+        as_attachment=True, 
+        download_name=f"QR_{placa}.pdf", 
+        mimetype='application/pdf'
     )
 
 @bp_flotacarga_flota.route('/operadores', methods=['GET', 'POST'])

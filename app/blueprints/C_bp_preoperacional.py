@@ -98,15 +98,23 @@ def preoperacional_tc():
         if placa_carga:
             cur.execute("SELECT * FROM vehiculos WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
             vehiculo = cur.fetchone()
+            
+            # INYECCIÓN DEL TIPO DESDE EL QR SI EXISTE (Sobrescribe BD en memoria temporal)
+            if vehiculo and session.get("tipo_vehiculo_qr"):
+                vehiculo['tipo'] = session.get("tipo_vehiculo_qr")
         else:
             cur.execute("SELECT placa, clase as tipo, marca as referencia, estatus FROM vehiculos_especial WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
             vehiculo = cur.fetchone()
             if vehiculo:
+                # INYECCIÓN DEL TIPO DESDE EL QR SI EXISTE
+                if session.get("tipo_vehiculo_qr"):
+                    vehiculo['tipo'] = session.get("tipo_vehiculo_qr")
                 vehiculo['tipo_vehiculo'] = vehiculo.get('tipo', 'Especial')
         
         if not vehiculo:
             session.pop("placa_prelogueada", None)
             session.pop("placa_prelogueada_especial", None)
+            session.pop("tipo_vehiculo_qr", None)
             flash("Vehículo no válido o no pertenece a su empresa.", "danger")
             cur.close()
             return redirect(url_for('preoperacional.preoperacional_tc'))
@@ -141,12 +149,18 @@ def validar_qr():
     data = request.get_json(silent=True) or {}
     placa = (data.get("placa") or "").upper().strip()
     qr_nit = str(data.get("nit") or "").strip()
+    tipo_vehiculo_qr = str(data.get("tipo") or "").strip()
+    
     session_nit = str(session.get("empresa_id") or "").strip()
 
     if not placa or not qr_nit: 
         return jsonify(success=False, message="Datos de QR incompletos."), 400
     if qr_nit != session_nit: 
         return jsonify(success=False, message="Este vehículo pertenece a otra empresa."), 403
+
+    # ALMACENAMIENTO TEMPORAL DEL TIPO DE VEHÍCULO DESDE EL QR
+    if tipo_vehiculo_qr:
+        session["tipo_vehiculo_qr"] = tipo_vehiculo_qr
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
@@ -503,6 +517,7 @@ def guardar_inspeccion():
                     session.pop('usuario_id', None)
                     session.pop('nombre', None)
                     session.pop('perfil', None)
+                    session.pop('tipo_vehiculo_qr', None)
 
                     return redirect(url_for('validacion_terceros_carga.exito_preoperacional', consecutivo=consecutivo, placa=placa))
                 else:
@@ -512,6 +527,7 @@ def guardar_inspeccion():
                     """, (empresa_id, usuario_id, placa, latitud, longitud))
                     mysql.connection.commit()
                     flash(f"La inspección se ha registrado y auditado (Selfie + Firma). Consecutivo: {consecutivo}", "success")
+                    session.pop('tipo_vehiculo_qr', None)
                     try: return redirect(url_for('router_universal', modulo='flota'))
                     except: return redirect(url_for('flotacarga.dashboard_operador'))
             else:
@@ -519,6 +535,7 @@ def guardar_inspeccion():
                 cur.execute("UPDATE vehiculos_especial SET estatus = 'Logueado' WHERE placa = %s AND id_empresa = %s", (placa, empresa_id))
                 mysql.connection.commit()
                 flash(f"La inspección se ha registrado y auditado exitosamente. Consecutivo: {consecutivo}", "success")
+                session.pop('tipo_vehiculo_qr', None)
                 return redirect(url_for('operador_flotaespecial.dashboard_operador_especial'))
 
         except Exception as e:

@@ -126,7 +126,7 @@ def registrar_auditoria(empresa_id, empresa_nombre, modulo, usuario, accion, det
 
 def validar_aptitud_operativa(conductor, vehiculo):
     """
-    Motor de cálculo para validar la aptitud operativa de conductores aliados.
+    Motor de cálculo para validar la aptitud operativa documental y PESV.
     Retorna un diccionario con 'apto' (boolean), 'bloqueos' (list de dicts) y 'alertas' (list).
     """
     resultado = {
@@ -227,25 +227,40 @@ def validar_aptitud_operativa(conductor, vehiculo):
             "mensaje": "Fecha de expedición de licencia no registrada."
         })
 
-    # Paso 5: Seguridad Social
-    ultimo_pago_ss = parse_date(conductor.get('ultimo_pago_seguridad_social'))
-    if ultimo_pago_ss:
-        fecha_fin_cobertura = ultimo_pago_ss + timedelta(days=30)
-        dias_restantes_ss = (fecha_fin_cobertura - hoy).days
-        if dias_restantes_ss <= 0:
+    # Paso 5: Seguridad Social (ÚNICA Y EXCLUSIVAMENTE para Conductores Terceros / Aliados)
+    # Para conductores Propios, la empresa cliente realiza el pago unificado parafiscal por nómina corporativa (PILA).
+    tipo_conductor = str(conductor.get('tipo_conductor', '')).strip().capitalize()
+    if tipo_conductor == 'Tercero':
+        venc_ss = parse_date(conductor.get('vencimiento_seguridad_social'))
+        ultimo_pago_ss = parse_date(conductor.get('ultimo_pago_seguridad_social'))
+
+        if venc_ss:
+            dias_restantes_ss = (venc_ss - hoy).days
+            if dias_restantes_ss <= 0:
+                resultado['bloqueos'].append({
+                    "clave": "seguridad_social",
+                    "tipo": "vencido",
+                    "mensaje": "Cobertura de Seguridad Social (EPS/ARL) suspendida."
+                })
+            elif 0 < dias_restantes_ss <= 5:
+                resultado['alertas'].append(f"Seguridad Social requiere refrendación en {dias_restantes_ss} días.")
+        elif ultimo_pago_ss:
+            fecha_fin_cobertura = ultimo_pago_ss + timedelta(days=30)
+            dias_restantes_ss = (fecha_fin_cobertura - hoy).days
+            if dias_restantes_ss <= 0:
+                resultado['bloqueos'].append({
+                    "clave": "seguridad_social",
+                    "tipo": "vencido",
+                    "mensaje": "Cobertura de Seguridad Social (EPS/ARL) suspendida."
+                })
+            elif 0 < dias_restantes_ss <= 5:
+                resultado['alertas'].append(f"Seguridad Social requiere refrendación en {dias_restantes_ss} días.")
+        else:
             resultado['bloqueos'].append({
                 "clave": "seguridad_social",
-                "tipo": "vencido",
-                "mensaje": "Cobertura de Seguridad Social (EPS/ARL) suspendida."
+                "tipo": "faltante",
+                "mensaje": "Último pago de Seguridad Social no registrado."
             })
-        elif 0 < dias_restantes_ss <= 5:
-            resultado['alertas'].append(f"Seguridad Social requiere refrendación en {dias_restantes_ss} días.")
-    else:
-        resultado['bloqueos'].append({
-            "clave": "seguridad_social",
-            "tipo": "faltante",
-            "mensaje": "Último pago de Seguridad Social no registrado."
-        })
 
     # Paso 6: Consolidación
     if len(resultado['bloqueos']) > 0:

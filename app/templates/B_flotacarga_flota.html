@@ -116,6 +116,7 @@
         
         .btn-icon { background: none; border: none; cursor: pointer; font-size: 18px; margin-left: 10px; transition: 0.2s; padding: 5px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;}
         .btn-icon:hover { background: #f1f5f9; }
+        .btn-icon.qr:hover { color: #015249; transform: scale(1.1); background: #d7f2ec;}
         .btn-icon.edit:hover { color: #f59e0b; transform: scale(1.1); background: #fef3c7;}
         .btn-icon.delete:hover { color: #ef4444; transform: scale(1.1); background: #fee2e2;}
 
@@ -249,6 +250,8 @@
                                     <td>{{ v['capacidad (kg)'] }} kg</td>
                                     <td><span class="badge {% if v.propiedad == 'Propio' %}badge-success{% else %}badge-gray{% endif %}">{{ v.propiedad }}</span></td>
                                     <td style="text-align: right; white-space: nowrap;">
+                                        <!-- PUENTE: El botón de descarga ahora redirige al backend PDF -->
+                                        <a href="{{ url_for('flotacarga_flota.generar_qr_vehiculo', placa=v.placa) }}" target="_blank" class="btn-icon qr" title="Descargar QR PDF">🔲</a>
                                         <button class="btn-icon edit" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.caja_de_carga }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}', '{{ v.propiedad }}', '{{ v.id_tarjeta_propiedad or '' }}', '{{ v.id_soat or '' }}', '{{ v.vencimiento_soat or '' }}', '{{ v.id_tecnomecanica or '' }}', '{{ v.vencimiento_tecnomecanica or '' }}', '{{ v.id_poliza_rce or '' }}', '{{ v.aseguradora_rce or '' }}', '{{ v.vencimiento_poliza_rce or '' }}')" title="Editar">✏️</button>
                                         <button class="btn-icon delete" onclick="confirmarEliminar('{{ v.id }}', '{{ v.placa }}')" title="Eliminar">🗑️</button>
                                     </td>
@@ -463,18 +466,24 @@
                         <label>Clasificación RUNT del Vehículo <span style="color:#ef4444;">*</span></label>
                         <select name="clasificacion_runt_vehiculo" id="clasificacion_runt_vehiculo" class="form-control" required onchange="aplicarFiltroVehiculo()">
                             <option value="" disabled selected>Seleccione la clasificación...</option>
-                            <option value="Automóvil">Automóvil: Vehículo diseñado para el transporte de pasajeros con capacidad reducida.</option>
-                            <option value="Camioneta y Campero">Camioneta y Campero: Vehículos de uso mixto o todoterreno para pasajeros y carga liviana.</option>
-                            <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Automotores destinados al transporte colectivo de pasajeros.</option>
-                            <option value="Camión C2 (Llanta Trasera Sencilla)">Camión C2 ( 2 ejes sencillo - Llanta Trasera Sencilla )</option>
-                            <option value="Camión C2 (Pacha Trasera)">Camión C2 ( 2 ejes sencillo - Pacha Trasera )</option>
-                            <option value="Camión C3">Camión C3 ( 3 ejes doble troque)</option>
-                            <option value="Camión C4">Camión C4 ( 4 ejes-2 ejes direccionales)</option>
-                            <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote de 3 ejes con un semirremolque de 2 ejes)</option>
-                            <option value="Tractocamión C3-S3">Tractocamión C3-S3: E (6 ejes en total: cabezote doble troque con un tráiler de tres ejes)</option>
-                            <option value="Motocicleta, Motocarro y Mototriciclo">Motocicleta, Motocarro y Mototriciclo: Vehículos de dos o tres ruedas con motor.</option>
-                            <option value="Cuatrimoto">Cuatrimoto: Vehículo de cuatro ruedas para recreación o trabajo en terrenos difíciles.</option>
-                            <option value="Volqueta">Volqueta: Vehículo destinado al transporte de materiales de construcción.</option>
+                            <option value="Automóvil">Automóvil: Transporte de pasajeros capacidad reducida</option>
+                            <option value="Camioneta y Campero">Camioneta y Campero: Uso mixto o todoterreno</option>
+                            <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Transporte colectivo</option>
+                            <option value="Camión C2 (Llanta Trasera Sencilla)">Camión C2 (2 ejes sencillo - Llanta Trasera Sencilla)</option>
+                            <option value="Camión C2 (Llanta Trasera Sencilla-REFRIGERADO)">Camión C2 (2 ejes sencillo - Llanta Sencilla REFRIGERADO)</option>
+                            <option value="Camión C2 (Pacha Trasera)">Camión C2 (2 ejes sencillo - Pacha Trasera)</option>
+                            <option value="Camión C2 (Pacha Trasera-REFRIGERADO)">Camión C2 (2 ejes sencillo - Pacha Trasera REFRIGERADO)</option>
+                            <option value="Camión C3">Camión C3 (3 ejes doble troque)</option>
+                            <option value="Camión C3-REFRIGERADO">Camión C3 (3 ejes doble troque REFRIGERADO)</option>
+                            <option value="Camión C4">Camión C4 (4 ejes - 2 ejes direccionales)</option>
+                            <option value="Camión C4-REFRIGERADO">Camión C4 (4 ejes - 2 ejes dir. REFRIGERADO)</option>
+                            <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote 3 ejes + tráiler 2 ejes)</option>
+                            <option value="Tractocamión C3-S2-REFRIGERADO">Tractocamión C3-S2 (Cabezote 3 ejes + tráiler 2 ejes REFRIGERADO)</option>
+                            <option value="Tractocamión C3-S3">Tractocamión C3-S3 (Cabezote 3 ejes + tráiler 3 ejes)</option>
+                            <option value="Tractocamión C3-S3-REFRIGERADO">Tractocamión C3-S3 (Cabezote 3 ejes + tráiler 3 ejes REFRIGERADO)</option>
+                            <option value="Motocicleta, Motocarro y Mototriciclo">Motocicleta, Motocarro y Mototriciclo</option>
+                            <option value="Cuatrimoto">Cuatrimoto</option>
+                            <option value="Volqueta">Volqueta</option>
                         </select>
                     </div>
 
@@ -486,6 +495,9 @@
                             <option value="estacas">Estacas</option>
                             <option value="furgon refrigerado">Furgón Refrigerado</option>
                             <option value="planchon">Planchón</option>
+                            <option value="planchon">Volco</option>
+                            <option value="planchon">Platon</option>
+                            <option value="planchon">Pasajeros-no aplica</option>
                         </select>
                     </div>
                 </div>
@@ -550,18 +562,24 @@
                         <label>Clasificación RUNT <span style="color:#ef4444;">*</span></label>
                         <select name="clasificacion_runt_vehiculo" id="edit_clasificacion_runt_vehiculo" class="form-control" required onchange="aplicarFiltroVehiculo()">
                             <option value="" disabled selected>Seleccione la clasificación...</option>
-                            <option value="Automóvil">Automóvil: Vehículo diseñado para el transporte de pasajeros con capacidad reducida.</option>
-                            <option value="Camioneta y Campero">Camioneta y Campero: Vehículos de uso mixto o todoterreno para pasajeros y carga liviana.</option>
-                            <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Automotores destinados al transporte colectivo de pasajeros.</option>
-                            <option value="Camión C2 (Llanta Trasera Sencilla)">Camión C2 ( 2 ejes sencillo - Llanta Trasera Sencilla )</option>
-                            <option value="Camión C2 (Pacha Trasera)">Camión C2 ( 2 ejes sencillo - Pacha Trasera )</option>
-                            <option value="Camión C3">Camión C3 ( 3 ejes doble troque)</option>
-                            <option value="Camión C4">Camión C4 ( 4 ejes-2 ejes direccionales)</option>
-                            <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote de 3 ejes con un semirremolque de 2 ejes)</option>
-                            <option value="Tractocamión C3-S3">Tractocamión C3-S3: E (6 ejes en total: cabezote doble troque con un tráiler de tres ejes)</option>
-                            <option value="Motocicleta, Motocarro y Mototriciclo">Motocicleta, Motocarro y Mototriciclo: Vehículos de dos o tres ruedas con motor.</option>
-                            <option value="Cuatrimoto">Cuatrimoto: Vehículo de cuatro ruedas para recreación o trabajo en terrenos difíciles.</option>
-                            <option value="Volqueta">Volqueta: Vehículo destinado al transporte de materiales de construcción.</option>
+                            <option value="Automóvil">Automóvil: Transporte de pasajeros capacidad reducida</option>
+                            <option value="Camioneta y Campero">Camioneta y Campero: Uso mixto o todoterreno</option>
+                            <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Transporte colectivo</option>
+                            <option value="Camión C2 (Llanta Trasera Sencilla)">Camión C2 (2 ejes sencillo - Llanta Trasera Sencilla)</option>
+                            <option value="Camión C2 (Llanta Trasera Sencilla-REFRIGERADO)">Camión C2 (2 ejes sencillo - Llanta Sencilla REFRIGERADO)</option>
+                            <option value="Camión C2 (Pacha Trasera)">Camión C2 (2 ejes sencillo - Pacha Trasera)</option>
+                            <option value="Camión C2 (Pacha Trasera-REFRIGERADO)">Camión C2 (2 ejes sencillo - Pacha Trasera REFRIGERADO)</option>
+                            <option value="Camión C3">Camión C3 (3 ejes doble troque)</option>
+                            <option value="Camión C3-REFRIGERADO">Camión C3 (3 ejes doble troque REFRIGERADO)</option>
+                            <option value="Camión C4">Camión C4 (4 ejes - 2 ejes direccionales)</option>
+                            <option value="Camión C4-REFRIGERADO">Camión C4 (4 ejes - 2 ejes dir. REFRIGERADO)</option>
+                            <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote 3 ejes + tráiler 2 ejes)</option>
+                            <option value="Tractocamión C3-S2-REFRIGERADO">Tractocamión C3-S2 (Cabezote 3 ejes + tráiler 2 ejes REFRIGERADO)</option>
+                            <option value="Tractocamión C3-S3">Tractocamión C3-S3 (Cabezote 3 ejes + tráiler 3 ejes)</option>
+                            <option value="Tractocamión C3-S3-REFRIGERADO">Tractocamión C3-S3 (Cabezote 3 ejes + tráiler 3 ejes REFRIGERADO)</option>
+                            <option value="Motocicleta, Motocarro y Mototriciclo">Motocicleta, Motocarro y Mototriciclo</option>
+                            <option value="Cuatrimoto">Cuatrimoto</option>
+                            <option value="Volqueta">Volqueta</option>
                         </select>
                     </div>
 
@@ -936,7 +954,7 @@
 
             openModal('modalEditarVehiculo');
         }
-
+        
         function confirmarEliminar(id, placa) {
             document.getElementById('delete_id').value = id; 
             document.getElementById('delete_placa').innerText = placa; 

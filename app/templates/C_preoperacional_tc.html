@@ -298,24 +298,8 @@
                         <div class="col-6 mb-2"><span style="color: var(--text-muted);">Ref/Tipo:</span> <br><strong><span id="tipo_vehiculo_label">{{ vehiculo.tipo|title }}</span></strong></div>
                     </div>
                     
-                    <div class="form-group mb-3">
-                        <label>Clasificación RUNT del Vehículo <span style="color:#ef4444;">*</span></label>
-                        <select name="clasificacion_runt_vehiculo" id="clasificacion_runt_vehiculo" class="form-control" required onchange="aplicarFiltroVehiculo()">
-                            <option value="" disabled selected>Seleccione la clasificación...</option>
-                            <option value="Automóvil">Automóvil: Vehículo diseñado para el transporte de pasajeros con capacidad reducida.</option>
-                            <option value="Camioneta y Campero">Camioneta y Campero: Vehículos de uso mixto o todoterreno para pasajeros y carga liviana.</option>
-                            <option value="Bus, Buseta y Microbús">Bus, Buseta y Microbús: Automotores destinados al transporte colectivo de pasajeros.</option>
-                            <option value="Camión C2 (Llanta Trasera Sencilla)">Camión C2 ( 2 ejes sencillo - Llanta Trasera Sencilla )</option>
-                            <option value="Camión C2 (Pacha Trasera)">Camión C2 ( 2 ejes sencillo - Pacha Trasera )</option>
-                            <option value="Camión C3">Camión C3 ( 3 ejes doble troque)</option>
-                            <option value="Camión C4">Camión C4 ( 4 ejes-2 ejes direccionales)</option>
-                            <option value="Tractocamión C3-S2">Tractocamión C3-S2 (Cabezote de 3 ejes con un semirremolque de 2 ejes)</option>
-                            <option value="Tractocamión C3-S3">Tractocamión C3-S3: E (6 ejes en total: cabezote doble troque con un tráiler de tres ejes)</option>
-                            <option value="Motocicleta, Motocarro y Mototriciclo">Motocicleta, Motocarro y Mototriciclo: Vehículos de dos o tres ruedas con motor.</option>
-                            <option value="Cuatrimoto">Cuatrimoto: Vehículo de cuatro ruedas para recreación o trabajo en terrenos difíciles.</option>
-                            <option value="Volqueta">Volqueta: Vehículo destinado al transporte de materiales de construcción.</option>
-                        </select>
-                    </div>
+                    <!-- Se eliminó el select manual de clasificación y se automatizó -->
+                    <input type="hidden" name="clasificacion_runt_vehiculo" id="clasificacion_runt_vehiculo" value="{{ vehiculo.tipo }}">
 
                     <div class="form-group">
                         <label>Kilometraje Inicial <span style="color:#ef4444;">*</span></label>
@@ -366,7 +350,7 @@
                 <div class="card-header">Capítulo 4: Llantas (Esquema Posicional)</div>
                 <div class="card-body">
                     <p style="font-size: 13px; color: var(--text-muted); text-align: center; margin-bottom: 15px;">Toque cada llanta del esquema para calificar. <strong style="color:var(--verde);">Obligatorio.</strong></p>
-                    <div class="chasis-wrapper"><div class="chasis-container" id="chasis_render"><p class="text-muted text-center" style="margin:20px 0; font-size: 12px;">Seleccione la clasificación RUNT en el Capítulo 1 para habilitar el esquema de llantas.</p></div></div>
+                    <div class="chasis-wrapper"><div class="chasis-container" id="chasis_render"><p class="text-muted text-center" style="margin:20px 0; font-size: 12px;">Cargando esquema de llantas...</p></div></div>
                     {{ render_3_state('lla_tuercas_pernos', 'Tuercas y Espárragos') }}
                     {{ render_3_state('lla_repuesto_operativa', 'Llanta de Repuesto') }}
                     {{ render_3_state('lla_suspension_muelles', 'Suspensión y Muelles') }}
@@ -486,6 +470,10 @@
 
     </form>
     {% endif %}
+
+    <div class="text-center mt-4 mb-3">
+        <p class="small text-muted mb-0 fw-bold">BQA-ONE © 2026 | Operación Segura de Flotas</p>
+    </div>
 </div>
 
 <!-- MODALES OPERADOR -->
@@ -691,6 +679,10 @@
             alert("⚠️ Debe dibujar su firma en el recuadro blanco para finalizar.");
             return false;
         }
+
+        if(!confirm("¿Está seguro de enviar y registrar esta inspección preoperacional?")) {
+            return false;
+        }
         
         document.getElementById('firma_grafica_base64').value = canvasFirma.toDataURL('image/png');
         
@@ -749,10 +741,10 @@
             window.addEventListener('popstate', function () { history.pushState(null, null, location.href); });
             window.addEventListener('beforeunload', function (e) { if (!isSubmitting) { e.preventDefault(); e.returnValue = ''; }});
 
-            const selectClasificacion = document.getElementById('clasificacion_runt_vehiculo');
-            if(localStorage.getItem('preop_clasificacion_runt_vehiculo')) {
-                selectClasificacion.value = localStorage.getItem('preop_clasificacion_runt_vehiculo');
-                aplicarFiltroVehiculo();
+            // RENDELIZADO AUTOMÁTICO DE LLANTAS BASADO EN BD / QR
+            const inputClasificacion = document.getElementById('clasificacion_runt_vehiculo');
+            if(inputClasificacion && inputClasificacion.value) {
+                renderizarChasis(inputClasificacion.value);
             }
 
             const formInputs = document.querySelectorAll('input:not([type="hidden"]), select, textarea');
@@ -779,23 +771,15 @@
         }
     });
 
-    function aplicarFiltroVehiculo() {
-        const select = document.getElementById('clasificacion_runt_vehiculo');
-        if(!select) return;
-        const tipo = select.value;
-        if(tipo) {
-            localStorage.setItem('preop_clasificacion_runt_vehiculo', tipo);
-            renderizarChasis(tipo);
-        } else {
-            document.getElementById('chasis_render').innerHTML = '<p class="text-muted text-center" style="margin:20px 0; font-size: 12px;">Seleccione la clasificación RUNT en el Capítulo 1 para habilitar el esquema de llantas.</p>';
-            arrayLlantasRequeridas = [];
-        }
-    }
-
     function renderizarChasis(tipo) {
         const container = document.getElementById('chasis_render'); 
         if(!container) return;
         let html = ''; arrayLlantasRequeridas = [];
+
+        if (!tipo) {
+            container.innerHTML = '<p class="text-muted text-center" style="margin:20px 0; font-size: 12px;">Tipo de vehículo no identificado en el sistema. Contacte al administrador.</p>';
+            return;
+        }
 
         const addEjeSencillo = (idIzq, idDer, lblIzq, lblDer, title) => {
             html += `<div class="eje"><div class="llanta-btn" id="${idIzq}" onclick="abrirModalLlanta('${idIzq}', '${lblIzq}')">${title}<br>IZQ</div><div class="eje-barra"></div><div class="llanta-btn" id="${idDer}" onclick="abrirModalLlanta('${idDer}', '${lblDer}')">${title}<br>DER</div></div>`;
