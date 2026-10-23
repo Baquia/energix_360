@@ -848,8 +848,8 @@ def generar_informe():
             cursor.execute(sql_rescate, tuple([empresa_id] + lotes_activos))
             for p_row in cursor.fetchall():
                 l_id = p_row['lote'] if isinstance(p_row, dict) else p_row[0]
-                p_val = p_row['pollitos'] if isinstance(p_row, dict) else p_row[1]
-                p_qty = int(p_val) if p_val is not None else 0
+                raw_qty = p_row['pollitos'] if isinstance(p_row, dict) else p_row[1]
+                p_qty = int(raw_qty) if raw_qty is not None else 0
                 mapa_pob_rescatada[l_id] = p_qty
 
         cursor.close()
