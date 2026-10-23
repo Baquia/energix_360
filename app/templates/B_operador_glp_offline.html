@@ -1,3 +1,4 @@
+<!-- MÓDULO: GAS | SUBMÓDULO: B_operador_glp | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
 <!DOCTYPE html>
 <html lang="es">
 
@@ -5,45 +6,91 @@
   <meta charset="UTF-8" />
   <title>BQA ONE: Módulo GLP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="apple-touch-icon" href="/static/icon-192.png">
-  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <meta name="theme-color" content="#015249">
+
   <script src="/static/js/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="{{ url_for('static', filename='glp_offline_styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
+  <style>
+    /* Estilos para Navbar y Footer obligatorios */
+    html, body {
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .bqa-navbar {
+      background-color: #015249;
+      color: #ffffff;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      width: 100%;
+    }
+    .bqa-navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .bqa-navbar-brand img {
+      height: 38px;
+      object-fit: contain;
+    }
+    .bqa-user-info {
+      font-size: 0.9rem;
+      text-align: right;
+    }
+    .bqa-nav-links {
+      margin-top: 4px;
+      font-size: 0.85rem;
+    }
+    .bqa-nav-links a {
+      color: #726a95;
+      background: #ffffff;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: bold;
+      margin-left: 6px;
+    }
+    .bqa-footer {
+      background-color: #726a95;
+      color: #ffffff;
+      text-align: center;
+      padding: 12px;
+      font-size: 0.85rem;
+      margin-top: auto;
+      width: 100%;
+    }
+  </style>
 </head>
 
 <body>
-  <div class="header" style="flex-direction: column; gap: 10px; padding-top: 25px; padding-bottom: 5px;">
-
-    <img src="/static/logo_energix360.png" class="logo" style="max-height: 55px; width: auto;" alt="BQA ONE">
-
-    <div style="text-align: center;">
-      <h2
-        style="color: var(--verde); margin: 8px 0 5px; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; text-transform: uppercase;">
-        Gestión de Gas
-      </h2>
-
-      <div style="
-          display: inline-flex; 
-          align-items: center; 
-          gap: 6px;
-          background-color: #fff3e0; 
-          color: #e65100; 
-          padding: 6px 14px; 
-          border-radius: 50px; 
-          font-size: 12px; 
-          font-weight: 700;
-          border: 1px solid #ffe0b2;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        <span style="font-size: 14px;">📡</span>HOLA!: ESTÁS TRABAJANDO FUERA DE LÍNEA
+  <!-- NAVBAR OBLIGATORIO -->
+  <nav class="bqa-navbar">
+    <div class="bqa-navbar-brand">
+      <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360" onerror="this.style.display='none'">
+      <img src="{{ url_for('static', filename='logo_' ~ session.get('empresa_id', '') ~ '.png') }}" alt="Logo Cliente" onerror="this.style.display='none'">
+      <span style="font-weight: bold; font-size: 1.1rem; margin-left: 8px;">Sistema BQA-ONE</span>
+    </div>
+    <div class="bqa-user-info">
+      <div>👤 <strong>{{ session.get('nombre', 'Usuario') }}</strong> | 🏢 {{ session.get('empresa', 'Empresa') }}</div>
+      <div class="bqa-nav-links">
+        <a href="/hub_administracion/dashboard">⬅ Volver al Hub</a>
+        <a href="/logout" style="background: #d32f2f; color: white;">Salir</a>
       </div>
     </div>
-
-  </div>
+  </nav>
 
   <div class="wrap">
+    <!-- CSRF TOKEN OBLIGATORIO -->
+    <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token() }}">
+
     <p id="saludo">¡Hola {{ session.get('nombre','Usuario') }}!</p>
 
     <div id="syncWarning" style="display:none;">
@@ -55,23 +102,23 @@
 
       <button class="menu-btn"
         style="background: #e3f2fd; color: #1565c0; border: 2px solid #2196f3; font-weight: bold;"
-        onclick="solicitarConfirmacion('¿Deseas registrar la llegada real de los pollitos?', iniciarConfirmacionArribo)">
+        onclick="ejecutarAccionConConfirmacion('confirmar la llegada real de los pollitos', iniciarConfirmacionArribo)">
         🐣 Confirmar llegada del pollito
       </button>
 
-      <button class="menu-btn" onclick="solicitarConfirmacion('¿Deseas iniciar una nueva operación de CALEFACCIÓN?', iniciarCalefaccion)">
+      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('iniciar una nueva operación de CALEFACCIÓN', iniciarCalefaccion)">
         🔥 Iniciar calefacción
       </button>
 
-      <button class="menu-btn" onclick="solicitarConfirmacion('¿Deseas registrar un nuevo TANQUEO?', registrarTanqueo)">
+      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('registrar un nuevo TANQUEO', registrarTanqueo)">
         ⛽ Registrar tanqueo
       </button>
 
-      <button class="menu-btn" onclick="solicitarConfirmacion('¿Deseas registrar el CONSUMO actual?', iniciarConsumo)">
+      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('registrar el CONSUMO actual', iniciarConsumo)">
         📊 Registrar consumo
       </button>
 
-      <button class="menu-btn" onclick="solicitarConfirmacion('¿Estás seguro de que deseas FINALIZAR la calefacción de este lote?', finalizarCalefaccion)">
+      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('FINALIZAR la calefacción de este lote', finalizarCalefaccion)">
         🔥 Finalizar calefacción
       </button>
 
@@ -124,7 +171,6 @@
       </div>
     </div>
 
-    <a class="logout" href="/logout" style="margin-top: 15px;">Cerrar sesión</a>
     <div id="conversacion" style="display:none">
       <div id="lectorQR" style="display:none; min-height: 250px; background-color: #000;"></div>
       <input id="respuestaInput" type="text" style="display:none" />
@@ -141,39 +187,14 @@
     </div>
   </div>
 
-  <div id="modalConfirmacion"
-    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center; backdrop-filter: blur(2px);">
-    <div
-      style="background:white; padding:24px 20px; border-radius:16px; width:90%; max-width:340px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
-
-      <h3 id="modalTitulo" style="margin-top:0; color:#015249; font-size:20px; margin-bottom:10px;">Confirmar acción
-      </h3>
-
-      <p id="modalMensaje" style="color:#444; font-size:16px; margin-bottom:24px; line-height:1.5;">¿Estás seguro?</p>
-
-      <div style="display:flex; justify-content:center; gap:12px;">
-        <button onclick="cerrarModalConfirmacion()"
-          style="flex:1; padding:12px; border-radius:10px; border:none; background:#f4f6f7; color:#555; font-weight:600; font-size:16px; cursor:pointer;">
-          Cancelar
-        </button>
-
-        <button id="btnModalConfirmar"
-          style="flex:1; padding:12px; border-radius:10px; border:none; background:#015249; color:white; font-weight:600; font-size:16px; cursor:pointer;">
-          Sí, continuar
-        </button>
-      </div>
-
-    </div>
-  </div>
-
   <div id="modalNegociacion" class="modal-negociacion">
     <div class="neg-card">
       <h3 style="color:#d9534f; margin-top:0;">⚠️ Nivel Bajo Detectado</h3>
       <p style="color:#555;">El sistema sugiere pedir gas para asegurar el lote.</p>
       <div style="background:#e8f5e9; padding:15px; border-radius:12px; margin:15px 0;">
-        <label style="font-weight:bold; color:#015249;">Cantidad a Solicitar (%)</label><br>
-        <input type="number" id="neg_nivel" class="neg-input" value="60">
-        <div style="font-size:0.75em; color:#666; margin-top:5px;">(Toca el número para editar)</div>
+        <label style="font-weight:bold; color:#015249;">Nivel Objetivo a Dejar (%)</label><br>
+        <input type="number" id="neg_nivel" class="neg-input" value="80">
+        <div style="font-size:0.75em; color:#666; margin-top:5px;">(Toca el número para editar la meta del tanque)</div>
       </div>
       <div style="margin:20px 0;">
         <label style="font-weight:bold;">⏳ Extensión de Lote</label>
@@ -185,15 +206,15 @@
           <button class="counter-btn" onclick="adjustDias(1)">+</button>
         </div>
       </div>
-      <button class="btn-solicitar" onclick="confirmarSolicitud()">✅ Confirmar y Solicitar</button>
+      <button class="btn-solicitar" onclick="ejecutarAccionConConfirmacion('confirmar y enviar la solicitud de gas', confirmarSolicitud)">✅ Confirmar y Solicitar</button>
       <button onclick="cerrarNegociacion()"
         style="background:transparent; border:none; color:#777; margin-top:15px; text-decoration:underline; font-size:0.9em;">No
         pedir ahora (Asumo el riesgo)</button>
     </div>
   </div>
 
-  <div id="modal-resumen-final">
-  </div>
+  <div id="modal-resumen-final"></div>
+
   <div id="modal-resultado-final"
     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
 
@@ -275,7 +296,7 @@
           style="width: 100%; padding: 12px; margin-top: 5px;">
       </div>
 
-      <button onclick="ejecutarConfirmarArribo()"
+      <button onclick="ejecutarAccionConConfirmacion('confirmar y activar el lote', ejecutarConfirmarArribo)"
         style="background: #2196f3; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; width: 100%; margin-bottom: 10px; cursor: pointer;">
         CONFIRMAR Y ACTIVAR LOTE
       </button>
@@ -287,11 +308,23 @@
     </div>
   </div>
 
+  <!-- FOOTER OBLIGATORIO -->
+  <footer class="bqa-footer">
+    BQA-ONE © 2026 |
+  </footer>
+
   <script>
     window.EMPRESA_SESION = "{{ session.get('empresa','') }}";
+
+    // PROTECCIÓN DE MUTACIONES OBLIGATORIA CON window.confirm()
+    function ejecutarAccionConConfirmacion(nombreOperacion, funcionEjecutar) {
+      if (window.confirm("¿Está seguro de " + nombreOperacion + "?")) {
+        funcionEjecutar();
+      }
+    }
   </script>
 
-  <script src="{{ url_for('static', filename='glp_offline_script.js') }}"></script>
+  <script src="{{ url_for('static', filename='glp_script.js') }}"></script>
 
 </body>
 

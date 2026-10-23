@@ -25,14 +25,14 @@
             color: #1f2937;
             display: flex;
             justify-content: center;
-            min-height: 100vh;
+            min-height: 100dvh;
         }
 
         .app-container {
             width: 100%;
             max-width: 100%;
             background: #ffffff;
-            min-height: 100vh;
+            min-height: 100dvh;
             position: relative;
             display: flex;
             flex-direction: column;
@@ -227,7 +227,7 @@
         }
 
         .picking-sheet {
-            width: 100%; max-width: 600px; height: 100vh; background: white;
+            width: 100%; max-width: 600px; height: 100dvh; background: white;
             display: flex; flex-direction: column; position: relative;
             animation: slideUp 0.3s ease-out;
         }
@@ -282,13 +282,13 @@
            ======================================================= */
         @media (orientation: landscape) and (max-height: 600px) {
             .picking-sheet {
-                flex-direction: row; flex-wrap: wrap; height: 100vh; overflow: hidden; padding: 0;
+                flex-direction: row; flex-wrap: wrap; height: 100dvh; overflow: hidden; padding: 0;
             }
             .picking-scroll-area {
-                flex: 1; height: 100vh; padding: 15px;
+                flex: 1; height: 100dvh; padding: 15px;
             }
             #modal-camera-section {
-                position: absolute; top: 0; left: 0; width: 50%; height: 100vh; margin: 0; border-radius: 0; z-index: 1;
+                position: absolute; top: 0; left: 0; width: 50%; height: 100dvh; margin: 0; border-radius: 0; z-index: 1;
             }
             .picking-scroll-area {
                 margin-left: 50%; width: 50%; padding-bottom: 90px;
@@ -525,6 +525,21 @@
         let scannerModal = null;
         let sleepTimerModal = null;
 
+        // Interceptor asíncrono para blindaje WebKit / iOS
+        const observerCamara = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.tagName && node.tagName.toUpperCase() === 'VIDEO') {
+                        node.setAttribute('playsinline', 'true');
+                        node.setAttribute('webkit-playsinline', 'true');
+                        node.setAttribute('muted', 'true');
+                        node.muted = true;
+                    }
+                });
+            });
+        });
+        observerCamara.observe(document.body, { childList: true, subtree: true });
+
         function cerrarSesionInstantanea(e) {
             if (e) e.preventDefault();
             fetch('/api/bodegas/offline', { method: 'POST' })
@@ -552,42 +567,78 @@
 
         function initAudio() {
             try {
-                if (!audioCtx) {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (AudioContext) {
-                        audioCtx = new AudioContext();
-                        const osc = audioCtx.createOscillator();
-                        const gain = audioCtx.createGain();
-                        gain.gain.value = 0;
-                        osc.connect(gain);
-                        gain.connect(audioCtx.destination);
-                        osc.start();
-                        osc.stop(audioCtx.currentTime + 0.01);
-                    }
-                } else if (audioCtx.state === 'suspended') {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!audioCtx && AudioContext) {
+                    audioCtx = new AudioContext();
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
                     audioCtx.resume();
                 }
             } catch (e) { console.error("Audio init error", e); }
         }
 
-        function playBeep() {
+        function playBeep(isSuccess = true) {
             try {
                 if (navigator.vibrate) {
-                    navigator.vibrate(150); 
+                    navigator.vibrate(isSuccess ? 150 : [50, 100, 50]); 
                 }
                 
                 if (audioCtx) {
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
                     const oscillator = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
-                    oscillator.type = 'square';
-                    oscillator.frequency.setValueAtTime(1500, audioCtx.currentTime); 
+                    oscillator.type = isSuccess ? 'square' : 'sawtooth';
+                    oscillator.frequency.setValueAtTime(isSuccess ? 1800 : 300, audioCtx.currentTime); 
                     gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); 
                     oscillator.connect(gainNode);
                     gainNode.connect(audioCtx.destination);
                     oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + 0.12); 
+                    oscillator.stop(audioCtx.currentTime + (isSuccess ? 0.2 : 0.4)); 
                 }
             } catch (e) { console.log("Audio play error", e); }
+        }
+
+        function mostrarToastError(mensaje) {
+            let toast = document.getElementById('toast-error-scanner');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'toast-error-scanner';
+                toast.style.position = 'fixed';
+                toast.style.bottom = '120px'; // Thumb zone visibility
+                toast.style.left = '50%';
+                toast.style.transform = 'translateX(-50%)';
+                toast.style.background = 'rgba(225, 29, 72, 0.95)';
+                toast.style.color = 'white';
+                toast.style.padding = '12px 24px';
+                toast.style.borderRadius = '30px';
+                toast.style.fontWeight = '900';
+                toast.style.fontSize = '1.1rem';
+                toast.style.zIndex = '9999';
+                toast.style.boxShadow = '0 10px 25px rgba(225, 29, 72, 0.5)';
+                toast.style.transition = 'opacity 0.3s ease';
+                toast.style.backdropFilter = 'blur(4px)';
+                toast.style.pointerEvents = 'none';
+                document.body.appendChild(toast);
+            }
+            toast.innerHTML = '❌ ' + mensaje;
+            toast.style.opacity = '1';
+            
+            // Destello rojo en la mira activa
+            const miras = document.querySelectorAll('.scanner-mira');
+            miras.forEach(mira => {
+                if(mira.style.display === 'block') {
+                    mira.style.borderColor = '#e11d48';
+                    mira.style.backgroundColor = 'rgba(225, 29, 72, 0.4)';
+                    mira.style.boxShadow = '0 0 20px rgba(225, 29, 72, 0.8)';
+                    setTimeout(() => {
+                        mira.style.borderColor = 'rgba(255,255,255,0.6)';
+                        mira.style.backgroundColor = 'transparent';
+                        mira.style.boxShadow = 'none';
+                    }, 500);
+                }
+            });
+
+            setTimeout(() => { toast.style.opacity = '0'; }, 2500);
         }
 
         // =====================================
@@ -630,8 +681,8 @@
 
             const isPortrait = window.innerHeight > window.innerWidth;
             const screenWidth = window.innerWidth;
-            const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
-            const targetHeight = Math.floor(targetWidth * 0.45);
+            const targetWidth = isPortrait ? Math.trunc(screenWidth * 0.8) : Math.trunc(screenWidth * 0.35);
+            const targetHeight = Math.trunc(targetWidth * 0.45);
 
             const mira = document.getElementById('main-scanner-mira');
             mira.style.width = targetWidth + 'px';
@@ -640,10 +691,10 @@
 
             const configScanner = {
                 formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.ITF
+                    Html5QrcodeSupportedFormats.EAN_13, 
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128, 
+                    Html5QrcodeSupportedFormats.QR_CODE
                 ]
             };
 
@@ -665,7 +716,7 @@
 
                     if (targetItem) {
                         lastScanTime = now;
-                        playBeep();
+                        playBeep(true);
 
                         if (mira) {
                             mira.classList.add('success');
@@ -679,7 +730,8 @@
 
                     } else {
                         lastScanTime = now;
-                        alert(`❌ Código incorrecto o el producto ya fue verificado.`);
+                        playBeep(false);
+                        mostrarToastError(`Código incorrecto o el producto ya fue verificado.`);
                     }
                 },
                 (err) => {}
@@ -708,6 +760,12 @@
             } else {
                 if(callback) callback();
             }
+            
+            // Apagado real de pistas de video para Safari
+            if (window.localStream) {
+                window.localStream.getTracks().forEach(track => track.stop());
+            }
+
             const mira = document.getElementById('main-scanner-mira');
             if(mira) mira.style.display = 'none';
             document.getElementById('main-cam-resume-btn').style.display = 'none';
@@ -755,8 +813,8 @@
 
             const isPortrait = window.innerHeight > window.innerWidth;
             const screenWidth = window.innerWidth;
-            const targetWidth = isPortrait ? Math.floor(screenWidth * 0.8) : Math.floor(screenWidth * 0.35);
-            const targetHeight = Math.floor(targetWidth * 0.45);
+            const targetWidth = isPortrait ? Math.trunc(screenWidth * 0.8) : Math.trunc(screenWidth * 0.35);
+            const targetHeight = Math.trunc(targetWidth * 0.45);
 
             const mira = document.getElementById('modal-scanner-mira');
             mira.style.width = targetWidth + 'px';
@@ -765,10 +823,10 @@
 
             const configScanner = {
                 formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.ITF
+                    Html5QrcodeSupportedFormats.EAN_13, 
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128, 
+                    Html5QrcodeSupportedFormats.QR_CODE
                 ]
             };
 
@@ -786,7 +844,7 @@
 
                     if (target && scanned === target) {
                         lastScanTime = now;
-                        playBeep();
+                        playBeep(true);
 
                         if (mira) {
                             mira.classList.add('success');
@@ -811,7 +869,8 @@
                         evaluarBotonTerminar();
                     } else {
                         lastScanTime = now;
-                        alert(`❌ Código incorrecto. Esperado: ${itemActivo.codigo_producto}`);
+                        playBeep(false);
+                        mostrarToastError(`Código incorrecto. Esperado: ${itemActivo.codigo_producto}`);
                     }
                 },
                 (err) => { }
@@ -840,6 +899,12 @@
             } else {
                 if(callback) callback();
             }
+            
+            // Apagado real de pistas de video para Safari
+            if (window.localStream) {
+                window.localStream.getTracks().forEach(track => track.stop());
+            }
+
             const mira = document.getElementById('modal-scanner-mira');
             if(mira) mira.style.display = 'none';
             document.getElementById('modal-cam-resume-btn').style.display = 'none';
@@ -1145,7 +1210,7 @@
             if (nuevo >= 0 && nuevo <= itemActivo.req_cajas) {
                 itemActivo.act_cajas = nuevo;
                 document.getElementById('pk-count-cajas').textContent = nuevo;
-                playBeep();
+                playBeep(true);
                 evaluarBotonTerminar();
             }
         }
@@ -1158,7 +1223,7 @@
             if (nuevo >= 0 && nuevo <= itemActivo.req_unidades) {
                 itemActivo.act_unidades = nuevo;
                 document.getElementById('pk-count-unidades').textContent = nuevo;
-                playBeep();
+                playBeep(true);
                 evaluarBotonTerminar();
             }
         }
@@ -1216,7 +1281,7 @@
             document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
             
             cerrarMasivo();
-            playBeep();
+            playBeep(true);
             evaluarBotonTerminar();
         }
 
@@ -1229,7 +1294,10 @@
 
             fetch('/api/verificador/confirmar_item', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({
                     id_row: idParaBorrar,
                     cajas_verificadas: itemActivo.act_cajas,
@@ -1243,7 +1311,7 @@
                     cerrarModalVerificacion(); // Esto ya cierra y reabre la cámara principal
                     listaItems = listaItems.filter(i => i.id !== idParaBorrar);
                     renderizarItems();
-                    playBeep();
+                    playBeep(true);
                 } else {
                     alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
                 }
@@ -1318,7 +1386,10 @@
 
             fetch('/api/verificador/sellar_orden', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ orden: ordenActual, firma_verificador: firmaBase64 })
             })
             .then(r => r.json())
@@ -1336,5 +1407,4 @@
         }
     </script>
 </body>
-
 </html>

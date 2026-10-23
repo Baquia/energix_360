@@ -4,6 +4,7 @@ from app import mysql
 import MySQLdb.cursors
 from app.utils import login_required_custom
 import time
+import json
 
 bp_verificador_bodegas = Blueprint('verificador_bodegas', __name__)
 
@@ -174,6 +175,27 @@ def verificador_confirmar_item():
                 WHERE id=%s AND id_empresa=%s
             """, (verif_cajas, verif_unidades, usuario_id, id_row, empresa_id))
             
+            # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+            payload = json.dumps(d)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    empresa VARCHAR(150),
+                    empresa_id VARCHAR(50),
+                    backend_emisor VARCHAR(100),
+                    usuario VARCHAR(100),
+                    cedula VARCHAR(50),
+                    accion VARCHAR(100),
+                    datos JSON
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+            cur.execute("""
+                INSERT INTO registro_operaciones_bqa_one 
+                (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_verificador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'CONFIRMAR_ITEM_VERIFICACION', payload))
+            
             mysql.connection.commit()
             cur.close()
             return jsonify({'status': 'ok', 'message': 'Item verificado con éxito'})
@@ -254,6 +276,27 @@ def sellar_orden():
                     VALUES (%s, %s, %s)
                 """, (empresa_id, orden, firma_verificador))
                 
+            # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+            payload = json.dumps(d)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    empresa VARCHAR(150),
+                    empresa_id VARCHAR(50),
+                    backend_emisor VARCHAR(100),
+                    usuario VARCHAR(100),
+                    cedula VARCHAR(50),
+                    accion VARCHAR(100),
+                    datos JSON
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+            cur.execute("""
+                INSERT INTO registro_operaciones_bqa_one 
+                (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_verificador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'SELLAR_AUDITORIA_ORDEN', payload))
+            
             mysql.connection.commit()
             cur.close()
             

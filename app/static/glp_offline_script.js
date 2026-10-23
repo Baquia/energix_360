@@ -38,9 +38,8 @@ function enviarConsumo() {
   // 2. ¿Nivel crítico? Abrimos el "Peaje" ANTES de enviar
   // Ahora se dispara por promedio bajo O por un tanque bajo
   if (nivelPromedio <= 30.0 || algunTanqueCritico) {
-    let sugerencia = Math.round(80 - nivelPromedio);
-    if (sugerencia < 10) sugerencia = 10;
-    if (sugerencia > 85) sugerencia = 85;
+    // CAMBIO APLICADO: Sugiere directamente el Nivel Objetivo (Meta) en lugar del delta
+    let sugerencia = 80;
 
     abrirNegociacionLocal(sugerencia);
   } else {

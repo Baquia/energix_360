@@ -9,11 +9,10 @@
   <title>Administración del Sistema | BQA-ONE</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <meta name="theme-color" content="#015249">
+  <!-- Librería ExcelJS para exportar e importar Excel (.xlsx) con Selects Dinámicos (Data Validation) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 
   <style>
-    /* ========================================= */
-    /* VARIABLES Y DISEÑO HÍBRIDO (PC/MÓVIL)     */
-    /* ========================================= */
     :root {
       --color-primary: #015249;
       --color-primary-dark: #003832;
@@ -30,7 +29,6 @@
       overflow-x: hidden;
     }
 
-    /* HEADER FIJO */
     .header {
       position: fixed;
       top: 0; left: 0; width: 100%; height: var(--header-height);
@@ -44,12 +42,10 @@
       color: var(--color-primary); cursor: pointer; padding: 5px; margin-right: 10px;
     }
 
-    /* LAYOUT PRINCIPAL */
     .layout {
       display: flex; max-width: 1600px; margin: 0 auto; padding: 20px; gap: 20px; position: relative;
     }
 
-    /* SIDEBAR */
     .sidebar-left {
       flex: 0 0 260px; width: 260px;
       background: linear-gradient(180deg, var(--color-primary) 0%, #002521 100%);
@@ -78,7 +74,6 @@
     .nav-item:hover { background: rgba(255, 255, 255, 0.1); color: white; }
     .icon-spacer { display: inline-flex; width: 25px; justify-content: center; margin-right: 10px; }
 
-    /* WIZARD ONBOARDING STYLES */
     .wizard-step-ind {
         padding: 10px; border-radius: 8px; background: #e2e8f0; color: #64748b; font-weight: bold; font-size: 0.9rem; flex: 1; margin: 0 5px; text-align: center; transition: all 0.3s ease;
     }
@@ -88,6 +83,8 @@
     .wizard-step-ind.completed {
         background: #10b981; color: white;
     }
+    
+    .kpi-row { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; margin-bottom: 10px;}
 
     @media (max-width: 992px) {
       .btn-hamburguesa { display: block; }
@@ -160,6 +157,9 @@
       <button class="nav-item" onclick="mostrarSeccion('gestionEmpresas'); cargarTablaEmpresas();">
         <span class="icon-spacer">🏢</span> Empresas
       </button>
+      <button class="nav-item" onclick="mostrarSeccion('gestionSedes'); cargarTablaSedes();">
+        <span class="icon-spacer">📍</span> Sedes (Granjas/Plantas)
+      </button>
       <button class="nav-item" onclick="mostrarSeccion('gestionPerfiles'); cargarTablaPerfiles();">
         <span class="icon-spacer">🔑</span> Perfiles
       </button>
@@ -178,13 +178,11 @@
     <div class="main-content">
       <div id="adminDashboardContainer">
 
-          <!-- Mensaje inicial de espera -->
           <div id="msgBienvenidaAdmin" class="text-center py-5 bg-white rounded shadow-sm p-4">
               <h4 class="text-muted fw-bold">Centro de Administración del Sistema</h4>
               <p class="text-secondary">Seleccione una opción del submenú lateral para gestionar usuarios, empresas o perfiles autorizados.</p>
           </div>
 
-          <!-- 1. GESTIÓN TIPOS DE EMPRESA -->
           <div id="gestionTiposEmpresa" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-primary fw-bold mb-0">Tipos de Empresa</h4>
@@ -196,17 +194,13 @@
               <div class="table-responsive">
                 <table class="table table-sm table-hover table-bordered text-center align-middle">
                   <thead class="table-dark">
-                    <tr>
-                      <th>Nombre del Tipo</th>
-                      <th>Acción</th>
-                    </tr>
+                    <tr><th>Nombre del Tipo</th><th>Acción</th></tr>
                   </thead>
                   <tbody id="bodyTiposEmpresa"></tbody>
                 </table>
               </div>
           </div>
 
-          <!-- 2. GESTIÓN DE EMPRESAS (GENERAL) -->
           <div id="gestionEmpresas" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-primary fw-bold mb-0">Gestión de Empresas</h4>
@@ -218,19 +212,37 @@
               <div class="table-responsive">
                 <table class="table table-sm table-hover table-bordered text-center align-middle">
                   <thead class="table-dark">
-                    <tr>
-                      <th>NIT</th>
-                      <th>Nombre Comercial</th>
-                      <th>Tipo Empresa</th>
-                      <th>Acción</th>
-                    </tr>
+                    <tr><th>NIT</th><th>Nombre Comercial</th><th>Tipo Empresa</th><th>Acción</th></tr>
                   </thead>
                   <tbody id="bodyEmpresas"></tbody>
                 </table>
               </div>
           </div>
 
-          <!-- 3. GESTIÓN DE PERFILES -->
+          <!-- GESTIÓN DE SEDES -->
+          <div id="gestionSedes" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="text-primary fw-bold mb-0">Gestión Maestra de Sedes</h4>
+                <div>
+                    <button class="btn btn-info btn-sm me-2 fw-bold text-white" onclick="descargarPlantillaSedesExcel()">📥 Plantilla Excel</button>
+                    <label class="btn btn-warning btn-sm me-2 fw-bold text-dark mb-0" style="cursor: pointer;">
+                        📤 Carga Masiva Excel
+                        <input type="file" id="excelCargaSedes" accept=".xls,.xlsx" style="display:none;" onchange="procesarExcelSedes(event)">
+                    </label>
+                    <button class="btn btn-success btn-sm me-2" onclick="nuevoItem('Sede')">+ Nueva Sede</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover table-bordered text-center align-middle">
+                  <thead class="table-dark">
+                    <tr><th>Empresa</th><th>Nombre Sede</th><th>Tipo</th><th>Unidad Base</th><th>Acción</th></tr>
+                  </thead>
+                  <tbody id="bodySedes"></tbody>
+                </table>
+              </div>
+          </div>
+
           <div id="gestionPerfiles" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-primary fw-bold mb-0">Gestión de Perfiles</h4>
@@ -242,20 +254,13 @@
               <div class="table-responsive">
                 <table class="table table-sm table-hover table-bordered text-center align-middle">
                   <thead class="table-dark">
-                    <tr>
-                      <th>NIT</th>
-                      <th>Empresa</th>
-                      <th>Operación</th>
-                      <th>Perfil</th>
-                      <th>Acción</th>
-                    </tr>
+                    <tr><th>NIT</th><th>Empresa</th><th>Operación</th><th>Perfil</th><th>Acción</th></tr>
                   </thead>
                   <tbody id="bodyPerfiles"></tbody>
                 </table>
               </div>
           </div>
 
-          <!-- 4. GESTIÓN DE USUARIOS -->
           <div id="gestionUsuarios" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-primary fw-bold mb-0">Gestión de Usuarios</h4>
@@ -267,21 +272,13 @@
               <div class="table-responsive">
                 <table class="table table-sm table-hover table-bordered text-center align-middle">
                   <thead class="table-dark">
-                    <tr>
-                      <th>Cédula</th>
-                      <th>Nombre</th>
-                      <th>Perfil</th>
-                      <th>Empresa</th>
-                      <th>Teléfono</th>
-                      <th>Acción</th>
-                    </tr>
+                    <tr><th>Cédula</th><th>Nombre</th><th>Perfil</th><th>Empresa</th><th>Teléfono</th><th>Acción</th></tr>
                   </thead>
                   <tbody id="bodyUsuarios"></tbody>
                 </table>
               </div>
           </div>
 
-          <!-- 5. GESTIÓN DE PROVEEDORES -->
           <div id="gestionProveedores" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-primary fw-bold mb-0">Gestión de Proveedores</h4>
@@ -293,20 +290,13 @@
               <div class="table-responsive">
                 <table class="table table-sm table-hover table-bordered text-center align-middle">
                   <thead class="table-dark">
-                    <tr>
-                      <th>NIT/ID</th>
-                      <th>Proveedor</th>
-                      <th>Precio Kg</th>
-                      <th>Emails</th>
-                      <th>Acción</th>
-                    </tr>
+                    <tr><th>NIT/ID</th><th>Proveedor</th><th>Precio Kg</th><th>Emails</th><th>Acción</th></tr>
                   </thead>
                   <tbody id="bodyProveedores"></tbody>
                 </table>
               </div>
           </div>
 
-          <!-- 6. GESTIÓN DE CONTACTOS -->
           <div id="gestionContactos" class="form-section" style="display:none; background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="text-primary fw-bold mb-0">Contactos de Alertas</h4>
@@ -318,12 +308,7 @@
               <div class="table-responsive">
                 <table class="table table-sm table-hover table-bordered text-center align-middle">
                   <thead class="table-dark">
-                    <tr>
-                      <th>Empresa</th>
-                      <th>Área</th>
-                      <th>Email Destino</th>
-                      <th>Acción</th>
-                    </tr>
+                    <tr><th>Empresa</th><th>Área</th><th>Email Destino</th><th>Acción</th></tr>
                   </thead>
                   <tbody id="bodyContactos"></tbody>
                 </table>
@@ -334,7 +319,7 @@
     </div>
   </div>
 
-  <!-- MODAL WIZARD ONBOARDING (TRANSACCIONAL Y SINCRÓNICO) -->
+  <!-- MODAL WIZARD ONBOARDING -->
   <div class="modal fade" id="modalWizard" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-xl modal-dialog-centered">
       <div class="modal-content">
@@ -343,7 +328,6 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body bg-light">
-          <!-- Stepper UI -->
           <div class="d-flex justify-content-between mb-4">
             <div class="wizard-step-ind active" id="step1-ind">1. Empresa</div>
             <div class="wizard-step-ind" id="step2-ind">2. Módulos y Alcance</div>
@@ -351,7 +335,6 @@
             <div class="wizard-step-ind" id="step4-ind">4. Administrador Raíz</div>
           </div>
           
-          <!-- Step 1 -->
           <div id="step1" class="wizard-step">
             <h5 class="fw-bold text-primary mb-3">Información del Inquilino</h5>
             <div class="row g-3">
@@ -376,16 +359,13 @@
             </div>
           </div>
           
-          <!-- Step 2 -->
           <div id="step2" class="wizard-step" style="display:none;">
             <h5 class="fw-bold text-primary mb-3">Módulos del Sistema (Matriz Maestra de Producto)</h5>
             <p class="small text-muted mb-3">Seleccione las soluciones de negocio autorizadas. El sistema aprovisionará automáticamente los perfiles y ruteos para sus empleados.</p>
             <div id="wiz_modulos_container" class="row g-3">
-              <!-- Cargado dinámicamente desde /api/matriz_maestra -->
             </div>
           </div>
           
-          <!-- Step 3 -->
           <div id="step3" class="wizard-step" style="display:none;">
             <h5 class="fw-bold text-primary mb-3">Aprovisionamiento Automático de Perfiles</h5>
             <div class="alert alert-info border-info shadow-sm">
@@ -395,7 +375,6 @@
             <p class="small text-muted">No se requiere intervención manual de archivos HTML ni controladores Python. La arquitectura BQA-ONE garantiza la integridad total de ruteo.</p>
           </div>
           
-          <!-- Step 4 -->
           <div id="step4" class="wizard-step" style="display:none;">
             <h5 class="fw-bold text-primary mb-3">Usuario Administrador Inicial</h5>
             <p class="small text-danger fw-bold mb-3">Este usuario será el administrador principal del inquilino (perfil admin_general).</p>
@@ -425,16 +404,15 @@
     </div>
   </div>
 
-  <!-- MODAL MAESTRO DE EDICIÓN / CREACIÓN -->
-  <div class="modal fade" id="modalMaestro" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal fade" id="modalMaestro" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
           <div class="modal-content">
               <div class="modal-header bg-primary text-white">
                   <h5 class="modal-title fw-bold" id="modalTituloMaestro">Formulario</h5>
                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
-              <div class="modal-body" id="contenedorCamposMaestro"></div>
-              <div class="modal-footer bg-light">
+              <div class="modal-body bg-light" id="contenedorCamposMaestro"></div>
+              <div class="modal-footer bg-white border-top">
                   <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
                   <button type="button" class="btn btn-success fw-bold px-4 shadow-sm" onclick="guardarMaestro()">✅ Guardar Cambios</button>
               </div>
@@ -446,7 +424,6 @@
     BQA-ONE © 2026 |
   </footer>
 
-  <!-- INYECCIÓN DE DATOS DESDE FLASK -->
   <script id="tipos-empresa-data" type="application/json">
     {{ tipos_empresa | default([]) | tojson | safe }}
   </script>
@@ -456,14 +433,47 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- JAVASCRIPT DEL SISTEMA MÁSTER BQA-ONE -->
   <script>
       let currentMode = "";
       let currentAction = "crear";
       let currentUrl = "";
 
       let tiposEmpresaData = [];
-      let matrizMaestraCache = {};
+      let kpisActualesGuardados = {};
+      
+      const unidadesGlobales = [
+          "aves", "kg producidos", "kilogramos despachados", "kilogramos almacenados", 
+          "kilogramos transportados", "unds producidas", "unidades despachadas", 
+          "unidades almacenadas", "unidades transportadas", "m3 producidos", 
+          "m3 almacenados", "m3 despachados", "m3 transportados", "horas", "km", "m2"
+      ];
+
+      const baseUnidadesDinamicas = {
+          "GLP": "kg GLP",
+          "Gas Natural": "m3 GN",
+          "Electricidad": "kw-h",
+          "ACPM": "galones",
+          "Carbón": "kg Carbón"
+      };
+
+      const matrizCaracterizacion = {
+          "oficina-administracion": {
+              tecnologias: ["No aplica"],
+              unidades: ["horas", "m2"]
+          },
+          "bodega-cava": {
+              tecnologias: ["Bodega automática", "Bodega convencional", "Rack de refrigeración", "Refrigeración convencional"],
+              unidades: ["horas", "kilogramos almacenados", "kilogramos despachados", "unidades almacenadas", "unidades despachadas", "m3 almacenados", "m3 despachados", "m2"]
+          },
+          "planta de proceso": {
+              tecnologias: ["Planta automatizada", "Planta semiautomatizada", "Planta análoga"],
+              unidades: ["horas", "kg producidos", "unds producidas", "m3 producidos"]
+          },
+          "granja": {
+              tecnologias: ["Galpón automático", "Galpón semiautomático", "Galpón convencional", "Ambiente Controlado"],
+              unidades: ["aves", "kg de carne", "huevos"]
+          }
+      };
 
       document.addEventListener("DOMContentLoaded", function() {
           try {
@@ -478,7 +488,7 @@
           .then(r => r.json())
           .then(res => {
               if (res.success && res.matriz) {
-                  matrizMaestraCache = res.matriz;
+                  window.matrizMaestraCache = res.matriz;
               }
           }).catch(e => console.warn("Error cargando matriz maestra:", e));
       }
@@ -526,6 +536,31 @@
                   const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(t))));
                   b.innerHTML += `<tr><td class="fw-bold text-primary">${t.tipo}</td><td><button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('TipoEmpresa', '${dataStr}')">✏️ Editar</button></td></tr>`;
               });
+          });
+      }
+
+      window.cargarTablaSedes = function() {
+          fetch('/obtener_todas_sedes').then(r => r.json()).then(d => {
+              const b = document.getElementById('bodySedes'); b.innerHTML = '';
+              if (d.success && d.sedes) {
+                  d.sedes.forEach(s => {
+                      const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(s))));
+                      
+                      let fuentes = "N/D";
+                      try { fuentes = (typeof s.fuentes_energia === 'string') ? JSON.parse(s.fuentes_energia).join(", ") : s.fuentes_energia.join(", "); } catch(e) {}
+
+                      b.innerHTML += `<tr>
+                          <td class="small fw-bold">${s.empresa_nombre}</td>
+                          <td class="fw-bold text-primary">${s.nombre_sede}</td>
+                          <td>${s.tipo_sede}</td>
+                          <td><span class="badge bg-info text-dark">${s.unidad_produccion || 'N/A'}</span></td>
+                          <td>
+                              <button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Sede', '${dataStr}')">✏️ Editar</button>
+                              <button class="btn btn-sm btn-outline-danger fw-bold ms-1" onclick="eliminarSede('${s.id}')">🗑️</button>
+                          </td>
+                      </tr>`;
+                  });
+              }
           });
       }
 
@@ -608,9 +643,18 @@
           }).catch(err => { alert("Error de conexión al intentar eliminar."); });
       }
 
-      // =============================================================
-      // WIZARD ONBOARDING TRANSACCIONAL MULTI-TENANT
-      // =============================================================
+      function eliminarSede(id) {
+          if (!window.confirm("¿Está seguro de eliminar esta Sede (Granja/Planta)? Esta acción podría romper la trazabilidad en otros módulos.")) return;
+          const fd = new FormData();
+          fd.append('accion', 'eliminar');
+          fd.append('id', id);
+          fetch('/gestionar_sede', { method: 'POST', body: fd })
+          .then(r => r.json()).then(d => {
+              alert(d.message);
+              if (d.success) window.cargarTablaSedes();
+          }).catch(err => { alert("Error de red."); });
+      }
+
       let wizardStep = 1;
       let wizardData = { tipo_empresa: 'general' };
 
@@ -704,8 +748,8 @@
           
           const mods = wizardData.modulos || [];
           mods.forEach(modClave => {
-              if (matrizMaestraCache[modClave] && matrizMaestraCache[modClave].perfiles) {
-                  matrizMaestraCache[modClave].perfiles.forEach(p => {
+              if (window.matrizMaestraCache && window.matrizMaestraCache[modClave] && window.matrizMaestraCache[modClave].perfiles) {
+                  window.matrizMaestraCache[modClave].perfiles.forEach(p => {
                       ul.innerHTML += `<li><b>${p.perfil}</b> (Operación: ${p.operacion}) → <i>${p.archivo}</i></li>`;
                   });
               }
@@ -741,107 +785,6 @@
           }).catch(e => alert("Error crítico de red durante Onboarding."));
       }
 
-      // =============================================================
-      // GESTIÓN DINÁMICA DE PERFILES Y FORMULARIOS CRUD
-      // =============================================================
-
-      function cargarSelectorPerfilesUsuario(empresaId, perfilActualVal) {
-          const sel = document.getElementById('f_perf');
-          if (!sel) return;
-          if (!empresaId) {
-              sel.innerHTML = '<option value="">Seleccione Empresa primero...</option>';
-              return;
-          }
-          sel.innerHTML = '<option value="">Cargando perfiles...</option>';
-          fetch('/obtener_perfiles?empresa_id=' + empresaId)
-          .then(r => r.json())
-          .then(d => {
-              sel.innerHTML = '<option value="">Seleccione Perfil...</option>';
-              if (d.perfiles && d.perfiles.length > 0) {
-                  d.perfiles.forEach(p => {
-                      let val = p.id ? `${p.id}|${p.perfil}` : p.perfil;
-                      let isSel = (perfilActualVal == p.id || perfilActualVal === p.perfil || (perfilActualVal && perfilActualVal.includes(p.perfil))) ? 'selected' : '';
-                      sel.innerHTML += `<option value="${val}" ${isSel}>${p.perfil} (${p.operacion})</option>`;
-                  });
-              } else {
-                  sel.innerHTML += '<option value="admin_general">admin_general (Por defecto)</option>';
-              }
-          }).catch(() => {
-              sel.innerHTML = '<option value="">Error cargando perfiles</option>';
-          });
-      }
-
-      window.cargarModulosPerfil = function(selectElem) {
-          let nit = selectElem.options[selectElem.selectedIndex].getAttribute('data-nit');
-          if (!nit) return;
-          
-          let fd = new FormData();
-          fd.append('nit', nit);
-          
-          fetch('/obtener_modulos_empresa', { method: 'POST', body: fd })
-          .then(r => r.json())
-          .then(res => {
-              let selectOp = document.getElementById('f_op');
-              if (!selectOp) return;
-              selectOp.innerHTML = '<option value="">Seleccione Módulo Autorizado...</option>';
-              
-              let modulosDisponibles = [];
-              if (res.success) {
-                  modulosDisponibles = [...new Set([...res.modulos, ...res.submodulos_activos])];
-              }
-              
-              let tempOp = document.getElementById('f_op_temp') ? document.getElementById('f_op_temp').value : '';
-              
-              modulosDisponibles.forEach(m => {
-                  let sel = (tempOp === m) ? 'selected' : '';
-                  selectOp.innerHTML += `<option value="${m}" ${sel} class="text-uppercase">${m}</option>`;
-              });
-              
-              if (selectOp.value !== "") {
-                  window.cargarRutasModulo(selectOp.value);
-              }
-          });
-      }
-
-      window.cargarRutasModulo = function(modulo) {
-          if (!modulo) return;
-          fetch('/api/obtener_rutas_modulo?modulo=' + modulo)
-          .then(r => r.json())
-          .then(res => {
-              let r1 = document.getElementById('f_ruta_1');
-              let r2 = document.getElementById('f_ruta_2');
-              let r3 = document.getElementById('f_ruta_3');
-              if (!r1 || !r2 || !r3) return;
-              
-              let opts1 = '<option value="">Seleccione Ruta Principal...</option>';
-              let opts2 = '<option value="">Seleccione Ruta Secundaria (Opcional)...</option>';
-              let opts3 = '<option value="">Seleccione Ruta Terciaria (Opcional)...</option>';
-              
-              let rutasGuardadasStr = document.getElementById('f_rutas_temp') ? document.getElementById('f_rutas_temp').value : '';
-              let rutasArray = rutasGuardadasStr.split(',').map(s => s.trim());
-              
-              if (res.success && res.rutas) {
-                  res.rutas.forEach(r => {
-                      opts1 += `<option value="${r}" ${rutasArray[0] === r ? 'selected' : ''}>${r}</option>`;
-                      opts2 += `<option value="${r}" ${rutasArray[1] === r ? 'selected' : ''}>${r}</option>`;
-                      opts3 += `<option value="${r}" ${rutasArray[2] === r ? 'selected' : ''}>${r}</option>`;
-                  });
-                  
-                  rutasArray.forEach((rg, index) => {
-                      if (rg && !res.rutas.includes(rg)) {
-                          if (index === 0) opts1 += `<option value="${rg}" selected>${rg} (Actual)</option>`;
-                          if (index === 1) opts2 += `<option value="${rg}" selected>${rg} (Actual)</option>`;
-                          if (index === 2) opts3 += `<option value="${rg}" selected>${rg} (Actual)</option>`;
-                      }
-                  });
-              }
-              
-              r1.innerHTML = opts1;
-              r2.innerHTML = opts2;
-              r3.innerHTML = opts3;
-          });
-      }
-
       window.nuevoItem = function(tipo) {
           currentMode = tipo; currentAction = "crear";
           document.getElementById('modalTituloMaestro').innerText = "Crear Nuevo: " + tipo;
@@ -857,18 +800,173 @@
           new bootstrap.Modal(document.getElementById('modalMaestro')).show();
       }
 
+      window.actualizarDatalistTecnologia = function() {
+          const tipo = document.getElementById('f_s_tipo').value;
+          const dlTec = document.getElementById('listaTecnologiasSede');
+          const selUni = document.getElementById('f_s_uni');
+          
+          dlTec.innerHTML = '';
+          selUni.innerHTML = '';
+          
+          if (matrizCaracterizacion[tipo]) {
+              matrizCaracterizacion[tipo].tecnologias.forEach(t => {
+                  dlTec.innerHTML += `<option value="${t}">`;
+              });
+              
+              let opcionesUni = matrizCaracterizacion[tipo].unidades;
+              opcionesUni.forEach(u => {
+                  selUni.innerHTML += `<option value="${u}">${u}</option>`;
+              });
+          } else {
+              unidadesGlobales.forEach(u => {
+                  selUni.innerHTML += `<option value="${u}">${u}</option>`;
+              });
+          }
+          
+          actualizarPanelKpis();
+      }
+
+      window.actualizarPanelKpis = function() {
+          const contenedorKpi = document.getElementById('panel_kpis_dinamicos');
+          const unidadSelect = document.getElementById('f_s_uni');
+          const unidadActual = unidadSelect ? (unidadSelect.value || "unidad") : "unidad";
+          
+          contenedorKpi.innerHTML = '';
+          let kpisAgregados = 0;
+
+          document.querySelectorAll('.chk-fuente:checked').forEach(chk => {
+              const fuente = chk.value;
+              let preIndicador = baseUnidadesDinamicas[fuente] || `Unidad ${fuente}`;
+              let nombreIndicador = `${preIndicador} / ${unidadActual}`;
+              let idIndicador = fuente; 
+              
+              let valorMin = "";
+              let valorMax = "";
+              if (kpisActualesGuardados && kpisActualesGuardados[idIndicador]) {
+                  valorMin = kpisActualesGuardados[idIndicador].min !== undefined ? kpisActualesGuardados[idIndicador].min : "";
+                  valorMax = kpisActualesGuardados[idIndicador].max !== undefined ? kpisActualesGuardados[idIndicador].max : "";
+              }
+
+              contenedorKpi.innerHTML += `
+                  <div class="kpi-row">
+                      <h6 class="text-primary fw-bold mb-2">⚡ ${nombreIndicador}</h6>
+                      <div class="row g-2">
+                          <div class="col-6">
+                              <label class="small text-success fw-bold">Mínimo (Ahorro)</label>
+                              <input type="number" step="0.0001" class="form-control kpi-input" data-fuente="${idIndicador}" data-tipo="min" value="${valorMin}" placeholder="Ej: 0.02">
+                          </div>
+                          <div class="col-6">
+                              <label class="small text-danger fw-bold">Máximo (Gasto)</label>
+                              <input type="number" step="0.0001" class="form-control kpi-input" data-fuente="${idIndicador}" data-tipo="max" value="${valorMax}" placeholder="Ej: 0.08">
+                          </div>
+                      </div>
+                  </div>
+              `;
+              kpisAgregados++;
+          });
+
+          if(kpisAgregados === 0) {
+              contenedorKpi.innerHTML = '<div class="alert alert-secondary small text-center mb-0">Seleccione al menos una fuente de energía para configurar sus límites.</div>';
+          }
+      }
+
       function renderizarFormMaestro(tipo, data) {
           let html = `<input type="hidden" id="form_accion_maestro" value="${currentAction}">`;
           
           let optsEmpresas = '<option value="">Seleccione Empresa...</option>';
           if (window.empresasData) {
               window.empresasData.forEach(e => {
-                  let sel = (data.empresa === e.nombre_comercial || data.empresa_select === e.nombre_comercial || data.nit === e.nit) ? 'selected' : '';
+                  let sel = (data.empresa === e.nombre_comercial || data.empresa_nombre === e.nombre_comercial || data.empresa_select === e.nombre_comercial || data.nit === e.nit || data.empresa_id === e.nit) ? 'selected' : '';
                   optsEmpresas += `<option value="${e.nombre_comercial}" data-nit="${e.nit}" ${sel}>${e.nombre_comercial}</option>`;
               });
           }
 
-          if (tipo === 'Empresa') {
+          if (tipo === 'Sede') {
+              currentUrl = "/gestionar_sede";
+              
+              let fuentes = [];
+              let alternas = [];
+              kpisActualesGuardados = {};
+              
+              try { fuentes = (typeof data.fuentes_energia === 'string') ? JSON.parse(data.fuentes_energia) : (data.fuentes_energia || []); } catch(e){}
+              try { alternas = (typeof data.tecnologia_alternativa === 'string') ? JSON.parse(data.tecnologia_alternativa) : (data.tecnologia_alternativa || []); } catch(e){}
+              try { if(data.kpi_eficiencia) kpisActualesGuardados = JSON.parse(data.kpi_eficiencia); } catch(e){}
+
+              html += `
+                  <input type="hidden" id="f_sid" value="${data.id || ''}">
+                  <label class="fw-bold small mt-2">Empresa (Inquilino)</label>
+                  <select id="f_s_emp" class="form-select fw-bold border-primary" onchange="document.getElementById('f_s_nit').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select>
+                  <input type="hidden" id="f_s_nit" value="${data.empresa_id || ''}">
+                  
+                  <div class="row g-2 mt-1">
+                      <div class="col-md-6">
+                          <label class="fw-bold small">Nombre de la Sede</label>
+                          <input type="text" id="f_s_nom" class="form-control fw-bold border-primary" value="${data.nombre_sede || ''}" placeholder="Ej: Granja San Diego I">
+                      </div>
+                      <div class="col-md-6">
+                          <label class="fw-bold small">Clima</label>
+                          <select id="f_s_clima" class="form-select">
+                              <option value="calido" ${data.clima == 'calido' ? 'selected' : ''}>Cálido</option>
+                              <option value="frio" ${data.clima == 'frio' ? 'selected' : ''}>Frío</option>
+                              <option value="templado" ${data.clima == 'templado' ? 'selected' : ''}>Templado</option>
+                              <option value="mixto" ${data.clima == 'mixto' ? 'selected' : ''}>Mixto</option>
+                          </select>
+                      </div>
+                      
+                      <div class="col-md-4 mt-3">
+                          <label class="fw-bold small text-primary">1. Tipo de Sede</label>
+                          <select id="f_s_tipo" class="form-select border-primary" onchange="actualizarDatalistTecnologia()">
+                              <option value="granja" ${data.tipo_sede == 'granja' ? 'selected' : ''}>Granja</option>
+                              <option value="planta de proceso" ${data.tipo_sede == 'planta de proceso' ? 'selected' : ''}>Planta de proceso</option>
+                              <option value="bodega-cava" ${data.tipo_sede == 'bodega-cava' ? 'selected' : ''}>Bodega o Cava</option>
+                              <option value="oficina-administracion" ${data.tipo_sede == 'oficina-administracion' ? 'selected' : ''}>Oficina Administrativa</option>
+                          </select>
+                      </div>
+                      <div class="col-md-4 mt-3">
+                          <label class="fw-bold small">2. Tecnología Instalada</label>
+                          <input type="text" id="f_s_tec" class="form-control" value="${data.tecnologia_produccion || ''}" list="listaTecnologiasSede" placeholder="Ej: Ambiente Controlado">
+                          <datalist id="listaTecnologiasSede"></datalist>
+                      </div>
+                      <div class="col-md-4 mt-3">
+                          <label class="fw-bold small">3. Unidad de Producción (Divisor)</label>
+                          <select id="f_s_uni" class="form-select" onchange="actualizarPanelKpis()"></select>
+                      </div>
+                  </div>
+
+                  <label class="fw-bold small mt-4 text-success">Fuentes de Energía Activas en Sede</label>
+                  <div class="d-flex flex-wrap gap-3 mb-3 border p-2 bg-white rounded">
+                      <div class="form-check"><input class="form-check-input chk-fuente" type="checkbox" value="GLP" id="fe_glp" onchange="actualizarPanelKpis()" ${fuentes.includes('GLP') ? 'checked' : ''}><label class="form-check-label fw-bold" for="fe_glp">GLP</label></div>
+                      <div class="form-check"><input class="form-check-input chk-fuente" type="checkbox" value="Gas Natural" id="fe_gn" onchange="actualizarPanelKpis()" ${fuentes.includes('Gas Natural') ? 'checked' : ''}><label class="form-check-label fw-bold" for="fe_gn">Gas Natural</label></div>
+                      <div class="form-check"><input class="form-check-input chk-fuente" type="checkbox" value="Electricidad" id="fe_elec" onchange="actualizarPanelKpis()" ${fuentes.includes('Electricidad') ? 'checked' : ''}><label class="form-check-label fw-bold" for="fe_elec">Electricidad</label></div>
+                      <div class="form-check"><input class="form-check-input chk-fuente" type="checkbox" value="ACPM" id="fe_acpm" onchange="actualizarPanelKpis()" ${fuentes.includes('ACPM') ? 'checked' : ''}><label class="form-check-label fw-bold" for="fe_acpm">ACPM</label></div>
+                      <div class="form-check"><input class="form-check-input chk-fuente" type="checkbox" value="Carbón" id="fe_carbon" onchange="actualizarPanelKpis()" ${fuentes.includes('Carbón') ? 'checked' : ''}><label class="form-check-label fw-bold" for="fe_carbon">Carbón</label></div>
+                  </div>
+
+                  <label class="fw-bold small mt-2 text-danger">Configuración de Límites y Eficiencia</label>
+                  <div id="panel_kpis_dinamicos" class="mb-3"></div>
+
+                  <label class="fw-bold small mt-3 text-info">Tecnología Alternativa de Respaldo</label>
+                  <div class="d-flex flex-wrap gap-3">
+                      <div class="form-check"><input class="form-check-input chk-alter" type="checkbox" value="Solar" id="ta_sol" ${alternas.includes('Solar') ? 'checked' : ''}><label class="form-check-label" for="ta_sol">Solar</label></div>
+                      <div class="form-check"><input class="form-check-input chk-alter" type="checkbox" value="Eólica" id="ta_eol" ${alternas.includes('Eólica') ? 'checked' : ''}><label class="form-check-label" for="ta_eol">Eólica</label></div>
+                      <div class="form-check"><input class="form-check-input chk-alter" type="checkbox" value="Biomasa" id="ta_bio" ${alternas.includes('Biomasa') ? 'checked' : ''}><label class="form-check-label" for="ta_bio">Biomasa</label></div>
+                  </div>
+              `;
+              
+              setTimeout(() => {
+                  actualizarDatalistTecnologia();
+                  // Restaurar valores guardados
+                  if(data.tecnologia_produccion) document.getElementById('f_s_tec').value = data.tecnologia_produccion;
+                  if(data.unidad_produccion) {
+                      let selUni = document.getElementById('f_s_uni');
+                      let exists = Array.from(selUni.options).some(o => o.value === data.unidad_produccion);
+                      if(!exists) selUni.innerHTML += `<option value="${data.unidad_produccion}">${data.unidad_produccion}</option>`;
+                      selUni.value = data.unidad_produccion;
+                  }
+                  actualizarPanelKpis();
+              }, 150);
+          }
+          else if (tipo === 'Empresa') {
               currentUrl = "/gestionar_empresa";
 
               let optsTipos = '<option value="">Seleccione...</option>';
@@ -884,9 +982,9 @@
                   <input type="text" id="f_nom" class="form-control" value="${data.nombre_comercial || ''}">
                   <label class="fw-bold small mt-2">Tipo de Empresa</label>
                   <select id="f_tipo" class="form-select">${optsTipos}</select>
-                  <label class="fw-bold small mt-4 mb-2 text-success">Módulos Autorizados (Matriz Maestra)</label>
+                  <label class="fw-bold small mt-4 mb-2 text-success">Módulos Autorizados</label>
                   <div id="contenedor_switches_modulos" class="row g-2">
-                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando soluciones de la matriz...</span>
+                      <div class="spinner-border spinner-border-sm text-primary"></div> <span class="small text-muted">Cargando...</span>
                   </div>`;
               
               setTimeout(() => {
@@ -899,13 +997,11 @@
                           Object.keys(res.matriz).forEach(clave => {
                               const modInfo = res.matriz[clave];
                               const isChecked = subActivos.includes(clave) ? 'checked' : '';
-                              const rolesStr = modInfo.perfiles && modInfo.perfiles.length > 0 ? modInfo.perfiles.map(p => p.perfil).join(', ') : 'Transversal';
                               htmlSwitches += `
                               <div class="col-md-6 mb-2">
                                   <div class="form-check form-switch p-2 border rounded bg-white shadow-sm">
                                       <input class="form-check-input chk-modulo ms-1 me-2" type="checkbox" value="${clave}" id="mod_${clave}" ${isChecked}>
                                       <label class="form-check-label fw-bold text-primary" for="mod_${clave}">${modInfo.nombre_comercial}</label>
-                                      <div class="text-muted small ms-1">Roles: ${rolesStr}</div>
                                   </div>
                               </div>`;
                           });
@@ -916,114 +1012,62 @@
           }
           else if (tipo === 'TipoEmpresa') {
               currentUrl = "/gestionar_tipo_empresa";
-              html += `
-                  <input type="hidden" id="f_tid" value="${data.id || ''}">
-                  <label class="fw-bold small mt-2">Nombre del Tipo</label>
-                  <input type="text" id="f_tnom" class="form-control fw-bold" value="${data.tipo || ''}">`;
+              html += `<input type="hidden" id="f_tid" value="${data.id || ''}"><label class="fw-bold small mt-2">Nombre</label><input type="text" id="f_tnom" class="form-control fw-bold" value="${data.tipo || ''}">`;
           } 
           else if (tipo === 'Proveedor') {
               currentUrl = "/gestionar_proveedor";
-              html += `
-                  <label class="fw-bold small mt-2 text-primary">NIT/ID Proveedor</label>
-                  <input type="text" id="f_idp" class="form-control" value="${data.id_proveedor || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
-                  <label class="fw-bold small mt-2">Nombre Proveedor</label>
-                  <input type="text" id="f_prov" class="form-control fw-bold" value="${data.proveedor || ''}">
-                  <label class="fw-bold small text-success mt-2">Precio por Kg ($)</label>
-                  <input type="number" id="f_prec" class="form-control border-success fw-bold" value="${data.precio || 0}">
-                  <label class="fw-bold small mt-2">Email Principal</label>
-                  <input type="email" id="f_e1" class="form-control" value="${data.email1 || ''}">
-                  <label class="fw-bold small mt-2">Email Secundario</label>
-                  <input type="email" id="f_e2" class="form-control" value="${data.email2 || ''}">`;
+              html += `<label class="fw-bold small mt-2">NIT/ID Proveedor</label><input type="text" id="f_idp" class="form-control" value="${data.id_proveedor || ''}" ${currentAction === 'editar' ? 'readonly' : ''}><label class="fw-bold small mt-2">Nombre</label><input type="text" id="f_prov" class="form-control fw-bold" value="${data.proveedor || ''}"><label class="fw-bold small mt-2">Precio Kg</label><input type="number" id="f_prec" class="form-control" value="${data.precio || 0}"><label class="fw-bold small mt-2">Email 1</label><input type="email" id="f_e1" class="form-control" value="${data.email1 || ''}">`;
           } 
           else if (tipo === 'Usuario') {
               currentUrl = "/gestionar_usuario";
-              html += `
-                  <label class="fw-bold small mt-2 text-primary">Cédula</label>
-                  <input type="text" id="f_ced" class="form-control" value="${data.cedula || ''}" ${currentAction === 'editar' ? 'readonly' : ''}>
-                  <label class="fw-bold small mt-2">Nombre Completo</label>
-                  <input type="text" id="f_unom" class="form-control fw-bold" value="${data.nombre || ''}">
-                  <label class="fw-bold small mt-2 text-secondary">Asignar a Empresa</label>
-                  <select id="f_enom" class="form-select fw-bold" onchange="document.getElementById('f_eid').value = this.options[this.selectedIndex].getAttribute('data-nit'); cargarSelectorPerfilesUsuario(this.options[this.selectedIndex].getAttribute('data-nit'), '');">${optsEmpresas}</select>
-                  <input type="hidden" id="f_eid" value="${data.empresa_id || ''}">
-                  
-                  <label class="fw-bold small mt-2 text-info">Perfil del Sistema (Inyectado por Matriz)</label>
-                  <select id="f_perf" class="form-select fw-bold border-info"></select>
-                  
-                  <div class="row mt-2">
-                      <div class="col-6">
-                          <label class="fw-bold small text-primary">Telegram ID</label>
-                          <input type="text" id="f_tlg" class="form-control border-primary bg-light small" value="${data.telegram_id || ''}" readonly placeholder="Bot Automático">
-                      </div>
-                      <div class="col-6">
-                          <label class="fw-bold small">Teléfono</label>
-                          <input type="text" id="f_tel" class="form-control" value="${data.telefono || ''}" oninput="if(this.value !== '${data.telefono || ''}') { document.getElementById('f_tlg').value = ''; }">
-                      </div>
-                  </div>
-                  <label class="fw-bold small text-danger mt-3">Contraseña ${currentAction === 'editar' ? '(Dejar vacío para NO cambiar)' : '*'}</label>
-                  <input type="password" id="f_pass" class="form-control border-danger">
-                  <input type="hidden" id="f_tuser" value="cliente">
-                  <input type="hidden" id="f_clase" value="op">`;
+              html += `<label class="fw-bold small mt-2">Cédula</label><input type="text" id="f_ced" class="form-control" value="${data.cedula || ''}" ${currentAction === 'editar' ? 'readonly' : ''}><label class="fw-bold small mt-2">Nombre</label><input type="text" id="f_unom" class="form-control fw-bold" value="${data.nombre || ''}"><label class="fw-bold small mt-2">Empresa</label><select id="f_enom" class="form-select fw-bold" onchange="document.getElementById('f_eid').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select><input type="hidden" id="f_eid" value="${data.empresa_id || ''}"><label class="fw-bold small mt-2">Perfil</label><input type="text" id="f_perf" class="form-control" value="${data.perfil || ''}"><label class="fw-bold small mt-2">Teléfono</label><input type="text" id="f_tel" class="form-control" value="${data.telefono || ''}"><label class="fw-bold small mt-2 text-danger">Clave</label><input type="password" id="f_pass" class="form-control">`;
           } 
           else if (tipo === 'Perfil') {
               currentUrl = "/gestionar_perfil";
-              html += `
-                  <input type="hidden" id="f_pid" value="${data.id || ''}">
-                  <label class="fw-bold small mt-2">Empresa (Inquilino)</label>
-                  <select id="f_enom_p" class="form-select fw-bold" onchange="document.getElementById('f_nit_p').value = this.options[this.selectedIndex].getAttribute('data-nit'); window.cargarModulosPerfil(this);">${optsEmpresas}</select>
-                  <input type="hidden" id="f_nit_p" value="${data.nit || ''}">
-                  
-                  <label class="fw-bold small mt-2">Módulo / Operación</label>
-                  <select id="f_op" class="form-select" onchange="window.cargarRutasModulo(this.value)">
-                      <option value="">Seleccione Empresa primero...</option>
-                  </select>
-                  
-                  <label class="fw-bold small text-success mt-2">Nombre Perfil</label>
-                  <input type="text" id="f_perf_p" class="form-control border-success fw-bold" value="${data.perfil || ''}" placeholder="Ej: supervisor_gas" autocomplete="off">
-                  
-                  <label class="fw-bold small text-danger mt-2">Rutas Físicas (HTML o ViewFunc) - Hasta 3 accesos</label>
-                  <div id="contenedor_rutas_perfil" class="p-2 border rounded bg-light border-danger">
-                      <select id="f_ruta_1" class="form-select border-danger mb-2"><option value="">Seleccione Ruta Principal...</option></select>
-                      <select id="f_ruta_2" class="form-select border-danger mb-2"><option value="">Seleccione Ruta Secundaria (Opcional)...</option></select>
-                      <select id="f_ruta_3" class="form-select border-danger"><option value="">Seleccione Ruta Terciaria (Opcional)...</option></select>
-                  </div>
-                  
-                  <input type="hidden" id="f_op_temp" value="${data.operacion || ''}">
-                  <input type="hidden" id="f_rutas_temp" value="${data.archivo_destino || ''}">`;
+              html += `<input type="hidden" id="f_pid" value="${data.id || ''}"><label class="fw-bold small mt-2">Empresa</label><select id="f_enom_p" class="form-select fw-bold" onchange="document.getElementById('f_nit_p').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select><input type="hidden" id="f_nit_p" value="${data.nit || ''}"><label class="fw-bold small mt-2">Operación</label><input type="text" id="f_op" class="form-control" value="${data.operacion || ''}"><label class="fw-bold small mt-2">Perfil</label><input type="text" id="f_perf_p" class="form-control" value="${data.perfil || ''}"><label class="fw-bold small mt-2">Ruta Físicas</label><input type="text" id="f_ruta_1" class="form-control" value="${data.archivo_destino || ''}">`;
           } 
           else if (tipo === 'Contacto') {
               currentUrl = "/gestionar_contacto";
-              html += `
-                  <input type="hidden" id="f_cid" value="${data.id || ''}">
-                  <label class="fw-bold small mt-2">Empresa</label>
-                  <select id="f_enom_c" class="form-select fw-bold" onchange="document.getElementById('f_eid_c').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select>
-                  <input type="hidden" id="f_eid_c" value="${data.id_empresa || ''}">
-                  <label class="fw-bold small text-warning mt-2">Área del Contacto</label>
-                  <input type="text" id="f_area" class="form-control border-warning fw-bold" value="${data.area_contacto || ''}" placeholder="Ej: gerenciagranjas">
-                  <label class="fw-bold small text-danger mt-2">Email para Alertas</label>
-                  <input type="email" id="f_email" class="form-control border-danger fw-bold" value="${data.email || ''}">`;
+              html += `<input type="hidden" id="f_cid" value="${data.id || ''}"><label class="fw-bold small mt-2">Empresa</label><select id="f_enom_c" class="form-select fw-bold" onchange="document.getElementById('f_eid_c').value = this.options[this.selectedIndex].getAttribute('data-nit');">${optsEmpresas}</select><input type="hidden" id="f_eid_c" value="${data.id_empresa || ''}"><label class="fw-bold small mt-2">Área</label><input type="text" id="f_area" class="form-control" value="${data.area_contacto || ''}"><label class="fw-bold small mt-2">Email</label><input type="email" id="f_email" class="form-control" value="${data.email || ''}">`;
           }
 
           document.getElementById('contenedorCamposMaestro').innerHTML = html;
-
-          if (tipo === 'Perfil') {
-              let selEmpresa = document.getElementById('f_enom_p');
-              if (selEmpresa && selEmpresa.value !== "") window.cargarModulosPerfil(selEmpresa);
-          } else if (tipo === 'Usuario') {
-              let selEmp = document.getElementById('f_enom');
-              let nitEmp = data.empresa_id;
-              if (!nitEmp && selEmp && selEmp.selectedIndex >= 0) {
-                  nitEmp = selEmp.options[selEmp.selectedIndex].getAttribute('data-nit');
-              }
-              cargarSelectorPerfilesUsuario(nitEmp, data.id_perfil || data.perfil);
-          }
       }
 
       window.guardarMaestro = function() {
-          if (!window.confirm("¿Está seguro de guardar los cambios?")) return;
+          const accion_texto = document.getElementById('form_accion_maestro').value === 'crear' ? 'crear el registro' : 'guardar los cambios';
+          if (!window.confirm("¿Está seguro de " + accion_texto + "?")) return;
           const fd = new FormData();
           fd.append('accion', document.getElementById('form_accion_maestro').value);
 
-          if (currentMode === 'Empresa') {
+          if (currentMode === 'Sede') {
+              fd.append('id', document.getElementById('f_sid') ? document.getElementById('f_sid').value : '');
+              fd.append('id_empresa', document.getElementById('f_s_nit').value);
+              let sel = document.getElementById('f_s_emp');
+              fd.append('empresa_nombre', sel.options[sel.selectedIndex].text);
+              fd.append('nombre_sede', document.getElementById('f_s_nom').value);
+              fd.append('tipo_sede', document.getElementById('f_s_tipo').value);
+              fd.append('clima', document.getElementById('f_s_clima').value);
+              fd.append('tecnologia_produccion', document.getElementById('f_s_tec').value);
+              fd.append('unidad_produccion', document.getElementById('f_s_uni').value);
+              
+              // RECOLECTAR Y ENSAMBLAR JSON DE KPIS DINÁMICO
+              let kpiObjeto = {};
+              document.querySelectorAll('.kpi-input').forEach(input => {
+                  let fuente = input.getAttribute('data-fuente');
+                  let tipoLimite = input.getAttribute('data-tipo');
+                  let valor = parseFloat(input.value);
+                  
+                  if(!kpiObjeto[fuente]) kpiObjeto[fuente] = {};
+                  kpiObjeto[fuente][tipoLimite] = isNaN(valor) ? 0 : valor;
+              });
+              
+              fd.append('kpi_eficiencia', JSON.stringify(kpiObjeto));
+              
+              document.querySelectorAll('.chk-fuente:checked').forEach(chk => { fd.append('fuentes_energia[]', chk.value); });
+              document.querySelectorAll('.chk-alter:checked').forEach(chk => { fd.append('tecnologia_alternativa[]', chk.value); });
+          }
+          else if (currentMode === 'Empresa') {
               fd.append('nit', document.getElementById('f_nit').value);
               fd.append('nombre_comercial', document.getElementById('f_nom').value);
               fd.append('tipo_empresa', document.getElementById('f_tipo').value);
@@ -1044,13 +1088,10 @@
               fd.append('cedula', document.getElementById('f_ced').value);
               fd.append('nombre', document.getElementById('f_unom').value);
               fd.append('perfil', document.getElementById('f_perf').value);
-              fd.append('telegram_id', document.getElementById('f_tlg').value);
               fd.append('telefono', document.getElementById('f_tel').value);
               fd.append('password', document.getElementById('f_pass').value);
               fd.append('empresa_id', document.getElementById('f_eid').value);
               fd.append('empresa_select', document.getElementById('f_enom').value);
-              fd.append('tipo_usuario', document.getElementById('f_tuser').value);
-              fd.append('clase', document.getElementById('f_clase').value);
           } 
           else if (currentMode === 'Perfil') {
               fd.append('id', document.getElementById('f_pid').value);
@@ -1058,13 +1099,7 @@
               fd.append('nit', document.getElementById('f_nit_p').value);
               fd.append('operacion', document.getElementById('f_op').value);
               fd.append('perfil', document.getElementById('f_perf_p').value);
-              
-              let r1 = document.getElementById('f_ruta_1') ? document.getElementById('f_ruta_1').value : '';
-              let r2 = document.getElementById('f_ruta_2') ? document.getElementById('f_ruta_2').value : '';
-              let r3 = document.getElementById('f_ruta_3') ? document.getElementById('f_ruta_3').value : '';
-              let rutasFinales = [r1, r2, r3].filter(r => r.trim() !== '').join(',');
-              
-              fd.append('archivo_destino', rutasFinales);
+              fd.append('archivo_destino', document.getElementById('f_ruta_1') ? document.getElementById('f_ruta_1').value : '');
           } 
           else if (currentMode === 'Contacto') {
               fd.append('id', document.getElementById('f_cid').value);
@@ -1079,13 +1114,193 @@
               alert(d.message);
               if (d.success) {
                   bootstrap.Modal.getInstance(document.getElementById('modalMaestro')).hide();
-                  if (['Empresa', 'TipoEmpresa'].includes(currentMode)) location.reload();
+                  if (currentMode === 'Sede') window.cargarTablaSedes();
+                  else if (currentMode === 'Empresa' || currentMode === 'TipoEmpresa') location.reload();
                   else if (currentMode === 'Usuario') window.cargarTablaUsuarios();
                   else if (currentMode === 'Proveedor') window.cargarTablaProveedores();
                   else if (currentMode === 'Perfil') window.cargarTablaPerfiles();
                   else if (currentMode === 'Contacto') window.cargarTablaContactos();
               }
           }).catch(err => { alert("Error crítico al guardar. Verifique conexión."); });
+      }
+
+      window.descargarPlantillaSedesExcel = async function() {
+          const workbook = new ExcelJS.Workbook();
+          const worksheet = workbook.addWorksheet('Plantilla_Sedes');
+          const optionsSheet = workbook.addWorksheet('Opciones');
+
+          // Ocultar hoja de opciones
+          optionsSheet.state = 'hidden';
+
+          // Lista de unidades globales (no debe exceder 255 chars en fórmula, por eso usamos referencia)
+          unidadesGlobales.forEach((u, idx) => {
+              optionsSheet.getCell(`A${idx+1}`).value = u;
+          });
+
+          const headers = [
+              { header: 'id_empresa', key: 'id_empresa', width: 15 },
+              { header: 'empresa_nombre', key: 'empresa_nombre', width: 25 },
+              { header: 'nombre_sede', key: 'nombre_sede', width: 25 },
+              { header: 'tipo_sede', key: 'tipo_sede', width: 25 },
+              { header: 'clima', key: 'clima', width: 15 },
+              { header: 'tecnologia_produccion', key: 'tecnologia_produccion', width: 25 },
+              { header: 'unidad_produccion', key: 'unidad_produccion', width: 25 },
+              { header: 'fuentes_energia(separadas por |)', key: 'fuentes_energia', width: 35 },
+              { header: 'tecnologia_alternativa(separadas por |)', key: 'tecnologia_alternativa', width: 35 },
+              { header: 'GLP_Min', key: 'GLP_Min', width: 12 },
+              { header: 'GLP_Max', key: 'GLP_Max', width: 12 },
+              { header: 'Gas_Natural_Min', key: 'Gas_Natural_Min', width: 18 },
+              { header: 'Gas_Natural_Max', key: 'Gas_Natural_Max', width: 18 },
+              { header: 'Electricidad_Min', key: 'Electricidad_Min', width: 18 },
+              { header: 'Electricidad_Max', key: 'Electricidad_Max', width: 18 },
+              { header: 'ACPM_Min', key: 'ACPM_Min', width: 12 },
+              { header: 'ACPM_Max', key: 'ACPM_Max', width: 12 },
+              { header: 'Carbon_Min', key: 'Carbon_Min', width: 12 },
+              { header: 'Carbon_Max', key: 'Carbon_Max', width: 12 }
+          ];
+
+          worksheet.columns = headers;
+
+          worksheet.addRow({
+              id_empresa: '900123456',
+              empresa_nombre: 'Mi Empresa',
+              nombre_sede: 'Granja Ejemplo',
+              tipo_sede: 'granja',
+              clima: 'calido',
+              tecnologia_produccion: 'Ambiente Controlado',
+              unidad_produccion: 'aves',
+              fuentes_energia: 'GLP|Electricidad',
+              tecnologia_alternativa: 'Solar',
+              GLP_Min: 0.02,
+              GLP_Max: 0.08,
+              Gas_Natural_Min: 0,
+              Gas_Natural_Max: 0,
+              Electricidad_Min: 1.5,
+              Electricidad_Max: 2.0,
+              ACPM_Min: 0,
+              ACPM_Max: 0,
+              Carbon_Min: 0,
+              Carbon_Max: 0
+          });
+
+          // Agregar Data Validations para las filas 2 a 500
+          for (let i = 2; i <= 500; i++) {
+              worksheet.getCell(`D${i}`).dataValidation = {
+                  type: 'list',
+                  allowBlank: true,
+                  formulae: ['"granja,planta de proceso,bodega-cava,oficina-administracion"']
+              };
+              worksheet.getCell(`E${i}`).dataValidation = {
+                  type: 'list',
+                  allowBlank: true,
+                  formulae: ['"calido,frio,templado,mixto"']
+              };
+              worksheet.getCell(`G${i}`).dataValidation = {
+                  type: 'list',
+                  allowBlank: true,
+                  formulae: ['Opciones!$A$1:$A$16'] // Referencia a la hoja oculta para evitar límite de caracteres
+              };
+          }
+
+          // Generar archivo
+          const buffer = await workbook.xlsx.writeBuffer();
+          const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "Plantilla_Carga_Sedes_Dinamica.xlsx";
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+      }
+
+      window.procesarExcelSedes = async function(event) {
+          const file = event.target.files[0];
+          if(!file) return;
+          
+          if (!window.confirm("¿Está seguro de iniciar la carga masiva de sedes en Excel?")) {
+              event.target.value = "";
+              return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = async function(e) {
+              try {
+                  const arrayBuffer = e.target.result;
+                  const workbook = new ExcelJS.Workbook();
+                  await workbook.xlsx.load(arrayBuffer);
+                  
+                  const worksheet = workbook.worksheets[0]; // Primera hoja
+                  
+                  if(worksheet.rowCount < 2) {
+                      alert("El archivo está vacío o no tiene el formato correcto.");
+                      return;
+                  }
+
+                  let exitosos = 0;
+                  let fallidos = 0;
+                  let promises = [];
+
+                  worksheet.eachRow(function(row, rowNumber) {
+                      if(rowNumber === 1) return; // Saltar encabezados
+
+                      // Extraer valores (ExcelJS row.values es 1-indexed)
+                      const vals = row.values;
+                      const id_empresa = vals[1] ? String(vals[1]).trim() : '';
+                      if(!id_empresa) return;
+
+                      const fd = new FormData();
+                      fd.append('accion', 'crear');
+                      fd.append('id_empresa', id_empresa);
+                      fd.append('empresa_nombre', vals[2] ? String(vals[2]).trim() : '');
+                      fd.append('nombre_sede', vals[3] ? String(vals[3]).trim() : '');
+                      fd.append('tipo_sede', vals[4] ? String(vals[4]).trim() : '');
+                      fd.append('clima', vals[5] ? String(vals[5]).trim() : '');
+                      fd.append('tecnologia_produccion', vals[6] ? String(vals[6]).trim() : '');
+                      fd.append('unidad_produccion', vals[7] ? String(vals[7]).trim() : '');
+
+                      const fuentes = vals[8] ? String(vals[8]).split('|').map(f => f.trim()).filter(f=>f) : [];
+                      const alternas = vals[9] ? String(vals[9]).split('|').map(f => f.trim()).filter(f=>f) : [];
+
+                      fuentes.forEach(f => fd.append('fuentes_energia[]', f));
+                      alternas.forEach(f => fd.append('tecnologia_alternativa[]', f));
+
+                      let kpis = {
+                          "GLP": { min: parseFloat(vals[10]) || 0, max: parseFloat(vals[11]) || 0 },
+                          "Gas Natural": { min: parseFloat(vals[12]) || 0, max: parseFloat(vals[13]) || 0 },
+                          "Electricidad": { min: parseFloat(vals[14]) || 0, max: parseFloat(vals[15]) || 0 },
+                          "ACPM": { min: parseFloat(vals[16]) || 0, max: parseFloat(vals[17]) || 0 },
+                          "Carbón": { min: parseFloat(vals[18]) || 0, max: parseFloat(vals[19]) || 0 }
+                      };
+                      fd.append('kpi_eficiencia', JSON.stringify(kpis));
+
+                      const p = fetch('/gestionar_sede', { 
+                          method: 'POST', 
+                          body: fd, 
+                          headers: {'X-CSRFToken': document.getElementById('csrf_token_global').value} 
+                      }).then(r => r.json()).then(d => {
+                          if(d.success) exitosos++;
+                          else fallidos++;
+                      }).catch(err => {
+                          fallidos++;
+                      });
+                      
+                      promises.push(p);
+                  });
+
+                  await Promise.all(promises);
+
+                  alert(`Carga masiva completada.\nSedes creadas/actualizadas: ${exitosos}\nErrores/Fallos de red: ${fallidos}`);
+                  window.cargarTablaSedes();
+                  event.target.value = "";
+              } catch (error) {
+                  console.error(error);
+                  alert("Ocurrió un error leyendo el archivo Excel. Asegúrate de que sea un archivo .xlsx válido.");
+              }
+          };
+          reader.readAsArrayBuffer(file);
       }
   </script>
 </body>

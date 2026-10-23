@@ -2,6 +2,8 @@
 from flask import Blueprint, render_template, session, redirect, request, jsonify
 from app import mysql, csrf
 import MySQLdb.cursors
+import time
+import json
 from app.utils import login_required_custom
 
 bp_oper_bodegas = Blueprint('oper_bodegas', __name__)
@@ -74,14 +76,22 @@ def operario_mis_ordenes():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # --- HEARTBEAT OPERARIO ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (uid,))
-        mysql.connection.commit()
-        # -----------------------------
+        # --- HEARTBEAT OPERARIO CON REINTENTOS POR DEADLOCK ---
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                    VALUES (%s, NOW())
+                    ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+                """, (uid,))
+                mysql.connection.commit()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                break
+        # --------------------------------------------------------
 
         cur.execute("""
             SELECT 
@@ -113,14 +123,22 @@ def operario_items_orden(orden):
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # --- HEARTBEAT OPERARIO ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (uid,))
-        mysql.connection.commit()
-        # -----------------------------
+        # --- HEARTBEAT OPERARIO CON REINTENTOS POR DEADLOCK ---
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                    VALUES (%s, NOW())
+                    ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+                """, (uid,))
+                mysql.connection.commit()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                break
+        # --------------------------------------------------------
 
         cur.execute("""
             SELECT 
@@ -157,12 +175,14 @@ def operario_items_orden(orden):
         data = cur.fetchall()
         cur.close()
         return jsonify(data)
-    except Exception as e: return jsonify([])
+    except Exception as e: 
+        return jsonify([])
     
 @bp_oper_bodegas.route('/api/operario/confirmar_item', methods=['POST'])
 @login_required_custom
 def operario_confirmar_item():
     uid = session.get('usuario_id')
+    empresa_id = session.get('empresa_id')
     d = request.json
     id_row = d.get('id_row')
     act_cajas = d.get('cajas_alistadas', 0)
@@ -172,54 +192,82 @@ def operario_confirmar_item():
     
     if not id_row: return jsonify({'error': 'Datos incompletos'}), 400
 
-    try:
-        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
-        # --- HEARTBEAT OPERARIO ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (uid,))
-        # -----------------------------
+    for intento in range(3):
+        try:
+            cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            
+            # --- HEARTBEAT OPERARIO ---
+            cur.execute("""
+                INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                VALUES (%s, NOW())
+                ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+            """, (uid,))
+            # -----------------------------
 
-        cur.execute("SELECT cajas_calculadas, unidades_calculadas FROM picking_importacion_raw WHERE id=%s AND id_empresa=%s", (id_row, session.get('empresa_id')))
-        row = cur.fetchone()
-        
-        if not row:
+            # LECTURA CON BLOQUEO PESIMISTA
+            cur.execute("SELECT cajas_calculadas, unidades_calculadas FROM picking_importacion_raw WHERE id=%s AND id_empresa=%s FOR UPDATE", (id_row, empresa_id))
+            row = cur.fetchone()
+            
+            if not row:
+                cur.close()
+                return jsonify({'error': 'Item no encontrado'}), 404
+                
+            estado_final = 'ALISTADO'
+            
+            if novedad in ['NO_EN_BD', 'SIN_EAN', 'FALTA_EXISTENCIAS']:
+                estado_final = 'EN_PROCESO'
+            elif act_cajas < row['cajas_calculadas'] or act_unidades < row['unidades_calculadas']:
+                estado_final = 'EN_PROCESO'
+                
+            cur.execute("""
+                UPDATE picking_importacion_raw 
+                SET 
+                    estado_actividad=%s, 
+                    fecha_fin_alistamiento=NOW(),
+                    cajas_alistadas=%s,
+                    unidades_alistadas=%s,
+                    novedad_alistamiento=%s,
+                    id_supervisor_novedad=%s,
+                    id_auxiliar_asignado=%s,
+                    nombre_auxiliar_asignado=%s
+                WHERE id=%s AND id_empresa=%s
+            """, (estado_final, act_cajas, act_unidades, novedad, id_supervisor, uid, session.get('nombre'), id_row, empresa_id))
+            
+            # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+            payload = json.dumps(d)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    empresa VARCHAR(150),
+                    empresa_id VARCHAR(50),
+                    backend_emisor VARCHAR(100),
+                    usuario VARCHAR(100),
+                    cedula VARCHAR(50),
+                    accion VARCHAR(100),
+                    datos JSON
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+            cur.execute("""
+                INSERT INTO registro_operaciones_bqa_one 
+                (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_operador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'CONFIRMAR_ITEM_PICKING', payload))
+
+            mysql.connection.commit()
             cur.close()
-            return jsonify({'error': 'Item no encontrado'}), 404
             
-        estado_final = 'ALISTADO'
-        
-        if novedad in ['NO_EN_BD', 'SIN_EAN', 'FALTA_EXISTENCIAS']:
-            estado_final = 'EN_PROCESO'
-        elif act_cajas < row['cajas_calculadas'] or act_unidades < row['unidades_calculadas']:
-            estado_final = 'EN_PROCESO'
-            
-        cur.execute("""
-            UPDATE picking_importacion_raw 
-            SET 
-                estado_actividad=%s, 
-                fecha_fin_alistamiento=NOW(),
-                cajas_alistadas=%s,
-                unidades_alistadas=%s,
-                novedad_alistamiento=%s,
-                id_supervisor_novedad=%s,
-                id_auxiliar_asignado=%s,
-                nombre_auxiliar_asignado=%s
-            WHERE id=%s AND id_empresa=%s
-        """, (estado_final, act_cajas, act_unidades, novedad, id_supervisor, uid, session.get('nombre'), id_row, session.get('empresa_id')))
-        
-        mysql.connection.commit()
-        cur.close()
-        
-        if estado_final == 'EN_PROCESO':
-            return jsonify({'status': 'ok', 'message': 'Guardado parcial exitoso. El ítem seguirá pendiente en tu lista.'})
-        else:
-            return jsonify({'status': 'ok', 'message': 'Item alistado, pendiente de verificación'})
-    except Exception as e: 
-        return jsonify({'error': str(e)}), 500
+            if estado_final == 'EN_PROCESO':
+                return jsonify({'status': 'ok', 'message': 'Guardado parcial exitoso. El ítem seguirá pendiente en tu lista.'})
+            else:
+                return jsonify({'status': 'ok', 'message': 'Item alistado, pendiente de verificación'})
+                
+        except Exception as e: 
+            mysql.connection.rollback()
+            if "deadlock" in str(e).lower() and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify({'error': str(e)}), 500
            
 @bp_oper_bodegas.route('/api/operario/mis_marcas')
 @login_required_custom
@@ -229,14 +277,22 @@ def operario_mis_marcas():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # --- HEARTBEAT OPERARIO ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (uid,))
-        mysql.connection.commit()
-        # -----------------------------
+        # --- HEARTBEAT OPERARIO CON REINTENTOS POR DEADLOCK ---
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                    VALUES (%s, NOW())
+                    ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+                """, (uid,))
+                mysql.connection.commit()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                break
+        # --------------------------------------------------------
 
         cur.execute("""
             SELECT 
@@ -269,14 +325,22 @@ def operario_items_lote(marca):
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # --- HEARTBEAT OPERARIO ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (uid,))
-        mysql.connection.commit()
-        # -----------------------------
+        # --- HEARTBEAT OPERARIO CON REINTENTOS POR DEADLOCK ---
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                    VALUES (%s, NOW())
+                    ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+                """, (uid,))
+                mysql.connection.commit()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                break
+        # --------------------------------------------------------
 
         cur.execute("""
             SELECT 
@@ -369,14 +433,22 @@ def operario_mis_kpis():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # --- HEARTBEAT OPERARIO ---
-        cur.execute("""
-            INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-            VALUES (%s, NOW())
-            ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-        """, (uid,))
-        mysql.connection.commit()
-        # -----------------------------
+        # --- HEARTBEAT OPERARIO CON REINTENTOS POR DEADLOCK ---
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                    VALUES (%s, NOW())
+                    ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+                """, (uid,))
+                mysql.connection.commit()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                break
+        # --------------------------------------------------------
 
         cur.execute("""
             SELECT 

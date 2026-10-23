@@ -1,3 +1,4 @@
+# MÓDULO: GAS | SUBMÓDULO: bp_901811727_energia_glp | CONDICIÓN: OBLIGATORIO | TIPO: 1
 # bp_901811727_energia_glp.py
 from flask import Blueprint, render_template, session, request, jsonify, flash, redirect, url_for, current_app, send_file
 from datetime import datetime
@@ -12,14 +13,19 @@ import MySQLdb
 import textwrap
 import os
 import smtplib
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.utils import ImageReader
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 bp_energia_glp = Blueprint('bp_energia_glp', __name__)
 
@@ -32,6 +38,29 @@ EMAIL_PORT = 587
 EMAIL_USER = os.environ.get("EMAIL_USER", "tu_email@ejemplo.com")
 EMAIL_PASS = os.environ.get("EMAIL_PASS", "tu_password")
 EMAIL_FROM = EMAIL_USER
+
+# ==============================================================================
+# HELPERS GLOBALES (AUDITORÍA BD)
+# ==============================================================================
+
+def _registrar_operacion_global(cur, empresa_id, usuario_cedula, usuario_nombre, datos_modificados):
+    """Registra cualquier mutación en la tabla de auditoría global obligatoria."""
+    try:
+        cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1", (empresa_id,))
+        row = cur.fetchone()
+        if isinstance(row, dict):
+            empresa_nombre = row.get('nombre_comercial', 'N/D')
+        else:
+            empresa_nombre = row[0] if row else 'N/D'
+
+        query = """
+            INSERT INTO `registro_operaciones_bqa-one` 
+            (empresa, empresa_id, backend_origen, datos_modificados, usuario_nombre, usuario_cedula, fecha_operacion) 
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+        """
+        cur.execute(query, (empresa_nombre, empresa_id, "bp_901811727_energia_glp", json.dumps(datos_modificados), usuario_nombre, usuario_cedula))
+    except Exception as e:
+        print(f"Error registrando en registro_operaciones_bqa-one: {e}")
 
 def _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos, archivos):
     try:
@@ -227,160 +256,217 @@ def procesar_validacion_tanqueo():
 
     id_registro = data.get('id')
     decision = data.get('decision') 
+    usuario_nombre = session.get('nombre', 'Sistema')
+    usuario_cedula = session.get('cedula', session.get('user_id', '0'))
 
     if not id_registro:
          return jsonify({'status': 'error', 'message': 'ID no proporcionado'})
 
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT * FROM cardex_glp WHERE id = %s", (id_registro,))
-    row = cur.fetchone()
-    
-    if not row:
-        cur.close()
-        return jsonify({'status': 'error', 'message': 'Registro no encontrado'})
-
-    if isinstance(row, dict):
-        row_dict = row
-    else:
-        columns = [desc[0] for desc in cur.description]
-        row_dict = dict(zip(columns, row))
-
-    empresa_id = row_dict.get('id_empresa')
-    empresa_nombre = row_dict.get('empresa')
-    ubicacion = row_dict.get('ubicacion')
-
-    archivos_adjuntos = []
-    
-    for key, value in row_dict.items():
-        if value and isinstance(value, str) and 'testigo' in key.lower():
-            archivos_adjuntos.append(value.strip())
-
-    msg = ""
-
-    if decision == 'NO': 
-        datos_alerta = {
-            'ubicacion': ubicacion,
-            'fecha': str(row_dict.get('fecha')),
-            'lote': str(row_dict.get('lote'))
-        }
-        
-        enviado = _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos_alerta, archivos_adjuntos)
-        
-        if enviado:
-            _borrar_evidencias_tanqueo(archivos_adjuntos)
+    for intento in range(3):
+        try:
+            cur = mysql.connection.cursor()
+            cur.execute("SELECT * FROM cardex_glp WHERE id = %s FOR UPDATE", (id_registro,))
+            row = cur.fetchone()
             
-            cur.execute("DELETE FROM cardex_glp WHERE id = %s", (id_registro,))
-            mysql.connection.commit()
-            msg = "Registro rechazado. Se envió alerta a Gerencia y se eliminaron las evidencias."
-        else:
+            if not row:
+                cur.close()
+                return jsonify({'status': 'error', 'message': 'Registro no encontrado'})
+
+            if isinstance(row, dict):
+                row_dict = row
+            else:
+                columns = [desc[0] for desc in cur.description]
+                row_dict = dict(zip(columns, row))
+
+            empresa_id = row_dict.get('id_empresa')
+            empresa_nombre = row_dict.get('empresa')
+            ubicacion = row_dict.get('ubicacion')
+
+            archivos_adjuntos = []
+            
+            for key, value in row_dict.items():
+                if value and isinstance(value, str) and 'testigo' in key.lower():
+                    archivos_adjuntos.append(value.strip())
+
+            msg = ""
+
+            if decision == 'NO': 
+                datos_alerta = {
+                    'ubicacion': ubicacion,
+                    'fecha': str(row_dict.get('fecha')),
+                    'lote': str(row_dict.get('lote'))
+                }
+                
+                enviado = _enviar_alerta_gerencia(empresa_id, empresa_nombre, datos_alerta, archivos_adjuntos)
+                
+                if enviado:
+                    _borrar_evidencias_tanqueo(archivos_adjuntos)
+                    
+                    cur.execute("DELETE FROM cardex_glp WHERE id = %s", (id_registro,))
+                    _registrar_operacion_global(cur, empresa_id, usuario_cedula, usuario_nombre, {"accion": "rechazo_eliminacion_tanqueo", "id_registro": id_registro})
+                    
+                    mysql.connection.commit()
+                    msg = "Registro rechazado. Se envió alerta a Gerencia y se eliminaron las evidencias."
+                else:
+                    cur.close()
+                    return jsonify({'success': False, 'message': 'Fallo el envío de correo. No se eliminó el registro por seguridad.'})
+                    
+            elif decision == 'SI':
+                cur.execute("""
+                    UPDATE cardex_glp 
+                    SET estatus_validacion = 'validado', 
+                        fecha_validacion = NOW(), 
+                        validador_id = %s 
+                    WHERE id = %s
+                """, (session.get('nombre'), id_registro))
+                
+                _registrar_operacion_global(cur, empresa_id, usuario_cedula, usuario_nombre, {"accion": "validacion_tanqueo", "id_registro": id_registro})
+                
+                mysql.connection.commit()
+                msg = "Registro validado correctamente."
+
             cur.close()
-            return jsonify({'success': False, 'message': 'Fallo el envío de correo. No se eliminó el registro por seguridad.'})
-            
-    elif decision == 'SI':
-        cur.execute("""
-            UPDATE cardex_glp 
-            SET estatus_validacion = 'validado', 
-                fecha_validacion = NOW(), 
-                validador_id = %s 
-            WHERE id = %s
-        """, (session.get('nombre'), id_registro))
-        mysql.connection.commit()
-        msg = "Registro validado correctamente."
+            return jsonify({'success': True, 'message': msg})
 
-    cur.close()
-    return jsonify({'success': True, 'message': msg})
+        except MySQLdb.OperationalError as e:
+            if e.args[0] == 1213:
+                mysql.connection.rollback()
+                time.sleep(0.5)
+                if intento == 2: return jsonify({'success': False, 'message': 'Conflicto de red.'}), 500
+            else:
+                mysql.connection.rollback()
+                return jsonify({'success': False, 'message': str(e)}), 500
+        except Exception as e:
+            mysql.connection.rollback()
+            return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==============================================================================
-# LÓGICA DE INFORMES Y ESTADÍSTICAS GLP (KPIs y POBLACIÓN)
+# LÓGICA DE INFORMES Y ESTADÍSTICAS GLP (CON NUEVAS DIMENSIONES E IQR)
 # ==============================================================================
 
-def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_rescatada):
+def _calcular_estadistica_desviacion(desviaciones):
+    if not desviaciones: return 0.0, 0.0, 0
+    desviaciones.sort()
+    n = len(desviaciones)
+    if n < 4:
+        media = sum(desviaciones) / n
+        varianza = sum((x - media)**2 for x in desviaciones) / (n - 1) if n > 1 else 0
+        return media, math.sqrt(varianza), n
+        
+    q1 = desviaciones[int(n * 0.25)]
+    q3 = desviaciones[int(n * 0.75)]
+    iqr = q3 - q1
+    lim_inf = q1 - 1.5 * iqr
+    lim_sup = q3 + 1.5 * iqr
+    
+    filtradas = [x for x in desviaciones if lim_inf <= x <= lim_sup]
+    if not filtradas: return 0.0, 0.0, 0
+    
+    n_filt = len(filtradas)
+    media = sum(filtradas) / n_filt
+    varianza = sum((x - media)**2 for x in filtradas) / (n_filt - 1) if n_filt > 1 else 0
+    return media, math.sqrt(varianza), n_filt
+
+def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_rescatada, kpi_tecnicos, kpi_por_granja):
     if not resultados:
         return None
 
     def safe_float(val):
         if val is None: return 0.0
-        try:
-            return float(val)
-        except (ValueError, TypeError):
-            return 0.0
+        try: return float(val)
+        except (ValueError, TypeError): return 0.0
 
     math_saldo_inicial_kg_global = 0.0
     math_ingresos_kg = 0.0
     math_consumo_real_acumulado = 0.0
     math_dinero_total = 0.0 
+    math_ahorro_total = 0.0
+    math_sobrecosto_total = 0.0
 
-    series = { 
-        'fechas': [], 'kg_pollito': [], 'velocidad_consumo': [],  
-        'saldo_inicial': [], 'saldo_final': [], 'ingresos': [] 
-    }
-    
+    series = { 'fechas': [], 'kg_pollito': [], 'velocidad_consumo': [], 'saldo_inicial': [], 'saldo_final': [], 'ingresos': [] }
     granjas_data = {}
     lotes_info = {} 
+    desviaciones_tanqueo = []
+    comparativa_proveedores = {}
 
     resultados.sort(key=lambda x: str(x.get('fecha')))
 
     for row in resultados:
         lote_id = row.get('lote')
         pollitos_reales = mapa_poblacion_rescatada.get(lote_id, 0) if lote_id else 0
-
-        if pollitos_reales <= 0:
-            continue
+        if pollitos_reales <= 0: continue
 
         fecha_str = str(row.get('fecha'))
         clase = str(row.get('clase') or '').lower().strip()
         ubicacion = row.get('ubicacion') or 'Desconocida'
+        clima = row.get('clima') or 'Sin Definir'
+        tecnologia = row.get('tecnologia_produccion') or row.get('tecnologia') or 'Sin Definir'
+        proveedor = row.get('proveedor') or 'Sin Asignar'
 
         val_kg_saldo = safe_float(row.get('saldo_estimado_kg'))
         masa_fact = safe_float(row.get('masa_kg_facturada'))
         neto_gast = safe_float(row.get('neto_gastado'))
-        
-        if clase in ['egreso', 'consumo'] and neto_gast <= 0:
-            continue
 
         if lote_id not in lotes_info:
             lotes_info[lote_id] = {
                 'estatus': str(row.get('estatus_lote', '')).upper(),
-                'consumo': 0.0,
-                'pollitos': pollitos_reales,
-                'fecha_fin': fecha_str[:10],
-                'ultimo_saldo': 0.0
+                'consumo': 0.0, 'pollitos': pollitos_reales, 'fecha_fin': fecha_str[:10], 'ultimo_saldo': 0.0,
+                'clima': clima, 'tecnologia': tecnologia
             }
             
-        if str(row.get('estatus_lote', '')).upper() == 'INACTIVO':
-            lotes_info[lote_id]['estatus'] = 'INACTIVO'
-            
-        if clase in ['egreso', 'consumo'] and neto_gast > 0:
-            lotes_info[lote_id]['consumo'] += neto_gast
+        if str(row.get('estatus_lote', '')).upper() == 'INACTIVO': lotes_info[lote_id]['estatus'] = 'INACTIVO'
+        
+        if neto_gast > 0: lotes_info[lote_id]['consumo'] += neto_gast
             
         if fecha_str[:10] >= lotes_info[lote_id]['fecha_fin']:
             lotes_info[lote_id]['fecha_fin'] = fecha_str[:10]
-            if val_kg_saldo > 0 or clase == 'saldo final':
-                lotes_info[lote_id]['ultimo_saldo'] = val_kg_saldo
+            if val_kg_saldo > 0 or clase == 'saldo final': lotes_info[lote_id]['ultimo_saldo'] = val_kg_saldo
 
         val_precio = safe_float(row.get('precio_total')) 
-        kg_pollo  = safe_float(row.get('kg_pollito'))
-        vel_consumo = safe_float(row.get('velocidad_consumo'))
-        
+        precio_hist = safe_float(row.get('precio_unitario'))
+        if precio_hist <= 0 and masa_fact > 0: 
+            precio_hist = val_precio / masa_fact
+
+        if ubicacion not in granjas_data:
+            granjas_data[ubicacion] = {
+                'inicial': 0.0, 'ingresos': 0.0, 'consumo_real': 0.0,
+                'pollitos': 0, 'lotes': set(),
+                'limite_inferior': safe_float(row.get('limite_inferior')),
+                'limite_superior': safe_float(row.get('limite_superior')),
+                'precio_promedio': precio_hist,
+                'clima': clima, 'tecnologia': tecnologia,
+                'desviaciones': [],
+                'proveedor': proveedor
+            }
+            
+        if precio_hist > 0:
+            granjas_data[ubicacion]['precio_promedio'] = precio_hist
+
+        if row.get('limite_inferior') is not None: granjas_data[ubicacion]['limite_inferior'] = safe_float(row.get('limite_inferior'))
+        if row.get('limite_superior') is not None: granjas_data[ubicacion]['limite_superior'] = safe_float(row.get('limite_superior'))
+        if row.get('clima') and str(row.get('clima')).strip() not in ['', 'Sin Definir', 'None']: granjas_data[ubicacion]['clima'] = row.get('clima')
+        if row.get('tecnologia_produccion') and str(row.get('tecnologia_produccion')).strip() not in ['', 'Sin Definir', 'None']: granjas_data[ubicacion]['tecnologia'] = row.get('tecnologia_produccion')
+
+        if proveedor and proveedor != 'Sin Asignar':
+            granjas_data[ubicacion]['proveedor'] = proveedor
+
+        if clase == 'ingreso' and masa_fact > 0:
+            pct_dif = safe_float(row.get('porcentaje_diferencia'))
+            desviaciones_tanqueo.append(pct_dif)
+            granjas_data[ubicacion]['desviaciones'].append(pct_dif)
+            
+            if proveedor not in comparativa_proveedores:
+                comparativa_proveedores[proveedor] = {'volumen': 0.0, 'costo': 0.0, 'desviaciones': []}
+            comparativa_proveedores[proveedor]['volumen'] += masa_fact
+            comparativa_proveedores[proveedor]['costo'] += val_precio
+            comparativa_proveedores[proveedor]['desviaciones'].append(pct_dif)
+
         math_consumo_real_acumulado += neto_gast
         math_dinero_total += val_precio
 
         if clase == 'saldo inicial': math_saldo_inicial_kg_global += val_kg_saldo
         if clase == 'ingreso': math_ingresos_kg += masa_fact
 
-        series['fechas'].append(fecha_str)
-        series['kg_pollito'].append(kg_pollo)
-        series['velocidad_consumo'].append(vel_consumo) 
-        series['saldo_inicial'].append(val_kg_saldo if clase == 'saldo inicial' else None)
-        series['saldo_final'].append(val_kg_saldo if clase == 'saldo final' else None)
-        series['ingresos'].append(masa_fact if clase == 'ingreso' else None)
-
-        if ubicacion not in granjas_data:
-            granjas_data[ubicacion] = {
-                'inicial': 0.0, 'ingresos': 0.0, 'consumo_real': 0.0,
-                'pollitos': 0, 'lotes': set()
-            }
-        
         d = granjas_data[ubicacion]
         d['consumo_real'] += neto_gast
         if clase == 'saldo inicial': d['inicial'] += val_kg_saldo
@@ -408,13 +494,9 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
                     label = f"{meses[d_fin.month - 1]} {d_fin.year}"
                     orden = key
                 except:
-                    key = "Desconocido"
-                    label = "Desconocido"
-                    orden = "0000-00"
+                    key = "Desconocido"; label = "Desconocido"; orden = "0000-00"
         else: 
-            key = l_id
-            label = f"{l_id} (Act)" if es_activo else l_id
-            orden = data['fecha_fin']
+            key = l_id; label = f"{l_id} (Act)" if es_activo else l_id; orden = data['fecha_fin']
             
         if key not in grupos:
             grupos[key] = {'orden': orden, 'label': label, 'consumo': 0.0, 'pollitos': 0, 'saldo': 0.0}
@@ -439,37 +521,75 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
 
     for nombre_granja, datos in granjas_data.items():
         consumo_granja = datos['consumo_real']
-        if consumo_granja <= 0.0001:
-            continue
+        if consumo_granja <= 0.0001: continue
 
         rend_granja = 0.0
+        ahorro = 0.0
+        sobrecosto = 0.0
         if datos['pollitos'] > 0:
             rend_granja = consumo_granja / datos['pollitos']
-            if rend_granja > 0.000001:
-                lista_rendimientos.append(rend_granja)
+            if rend_granja > 0.000001: lista_rendimientos.append(rend_granja)
+            
+            if datos['limite_inferior'] > 0 and rend_granja < datos['limite_inferior']:
+                ahorro = (datos['limite_inferior'] - rend_granja) * datos['pollitos'] * datos['precio_promedio']
+            elif datos['limite_superior'] > 0 and rend_granja > datos['limite_superior']:
+                sobrecosto = (rend_granja - datos['limite_superior']) * datos['pollitos'] * datos['precio_promedio']
 
+        math_ahorro_total += ahorro
+        math_sobrecosto_total += sobrecosto
         total_pollitos_global += datos['pollitos']
         total_consumo_final += consumo_granja
+        
+        media_desv_granja, _, _ = _calcular_estadistica_desviacion(datos['desviaciones'])
+        
+        kpi_granja = kpi_por_granja.get(nombre_granja, kpi_tecnicos)
+        kpi_val = kpi_granja.get('cumplimiento', 0.0)
 
         tabla_resumen.append({
             'granja': nombre_granja,
+            'clima': datos['clima'],
+            'tecnologia': datos['tecnologia'],
+            'limite_inferior': datos['limite_inferior'],
+            'limite_superior': datos['limite_superior'],
+            'rango_esperado': f"{datos['limite_inferior']} - {datos['limite_superior']}",
             'total_kg': consumo_granja,
             'pollitos': datos['pollitos'],
-            'kg_pollito': rend_granja
+            'kg_pollito': rend_granja,
+            'ahorro': ahorro,
+            'sobrecosto': sobrecosto,
+            'proveedor': datos['proveedor'],
+            'media_desviacion': media_desv_granja,
+            'kpi_operador': kpi_val
         })
 
-    rendimiento = 0.0
-    if total_pollitos_global > 0:
-        rendimiento = total_consumo_final / total_pollitos_global
+    tabla_resumen.sort(key=lambda x: x['kg_pollito'], reverse=True)
+
+    rendimiento = total_consumo_final / total_pollitos_global if total_pollitos_global > 0 else 0.0
     
+    media_desv, std_desv, n_desv = _calcular_estadistica_desviacion(desviaciones_tanqueo)
+
     kpis = {
         "card1_label": "Saldo Inicial (kg)", "card1_value": math_saldo_inicial_kg_global,
         "card2_label": "Pedidos Gas (kg)", "card2_value": math_ingresos_kg,
         "card3_label": "Consumo Real (kg)", "card3_value": total_consumo_final,
         "card4_label": "Eficiencia (kg/ave)", "card4_value": rendimiento,
-        "card5_label": "Pollitos", "card5_value": total_pollitos_global,
-        "card6_label": "Inversión Total ($)", "card6_value": math_dinero_total
+        "card5_label": "Ahorro Financiero ($)", "card5_value": math_ahorro_total,
+        "card6_label": "Sobrecosto Ineficiencia ($)", "card6_value": math_sobrecosto_total
     }
+
+    kpi_tecnico = {
+        "tiempo_promedio_cierre": kpi_tecnicos.get('promedio', 0),
+        "cumplimiento_sla_pct": kpi_tecnicos.get('cumplimiento', 0),
+        "calificacion": "Óptimo" if kpi_tecnicos.get('cumplimiento', 0) > 85 else ("Aceptable" if kpi_tecnicos.get('cumplimiento', 0) > 60 else "Crítico")
+    }
+
+    tabla_proveedores = []
+    for prov, dprov in comparativa_proveedores.items():
+        pm, ps, pn = _calcular_estadistica_desviacion(dprov['desviaciones'])
+        tabla_proveedores.append({
+            'proveedor': prov, 'volumen_kg': dprov['volumen'], 'costo': dprov['costo'],
+            'desv_media': pm, 'desv_std': ps
+        })
 
     media = 0.0
     desviacion = 0.0
@@ -477,7 +597,6 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
     if n > 0:
         media = sum(lista_rendimientos) / n
         if n > 1:
-            import math
             varianza = sum((x - media) ** 2 for x in lista_rendimientos) / (n - 1)
             desviacion = math.sqrt(varianza)
 
@@ -489,6 +608,9 @@ def _procesar_resultados_glp(resultados, tipo_informe, periodo, mapa_poblacion_r
         "tabla_resumen": tabla_resumen,
         "grafico_ciclos": grafico_ciclos,
         "estadisticas": { "media": media, "desviacion": desviacion, "n_muestras": n },
+        "tabla_proveedores": tabla_proveedores,
+        "estadisticas_tanqueos": { "media_desv": media_desv, "std_desv": std_desv, "muestras": n_desv },
+        "kpi_operativo": kpi_tecnico,
         "periodo_tipo": periodo,
         "nota_metodologica": nota_informativa
     }
@@ -506,12 +628,145 @@ def generar_informe():
         fecha_fin = data.get('fecha_fin')
         ubicacion = data.get('ubicacion') 
         empresa_id = data.get('empresa_id')
+        clima_filtro = data.get('clima')
+        tecnologia_filtro = data.get('tecnologia')
 
         if not empresa_id or not tipo_informe:
             return jsonify({"success": False, "message": "Faltan datos obligatorios."}), 400
 
         cursor = mysql.connection.cursor()
         
+        # =========================================================================
+        # REFACTORIZACIÓN KPI OP: DISCIPLINA OPERATIVA DE CAMPO
+        # (50% Puntualidad Reporte Tanqueo base 26h + 50% Franja Diurna Lun-Sáb 06:00-18:00)
+        # =========================================================================
+
+        # 1. Telemetría de Auditoría: Horario de Operaciones en Sitio (Lun-Sáb, 06:00 a 18:00)
+        cursor.execute("""
+            SELECT fecha, accion, detalle
+            FROM audit_log
+            WHERE empresa_id = %s
+              AND modulo = 'GLP'
+              AND accion IN ('Consumo Registrado', 'Tanqueo Registrado', 'Inicio Calefacción', 'Fin Calefacción')
+        """, (empresa_id,))
+        audit_rows = cursor.fetchall()
+
+        col_audit = [d[0] for d in cursor.description] if cursor.description else []
+        ops_por_granja = {}
+        total_ops_empresa = 0
+        diurnas_ops_empresa = 0
+
+        import re as _re_kpi
+        for a_row in audit_rows:
+            a = dict(zip(col_audit, a_row)) if not isinstance(a_row, dict) else a_row
+            f_op = a.get('fecha')
+            det = a.get('detalle') or ''
+            
+            match_sede = _re_kpi.search(r'Sede:\s*([^.]+)', det)
+            sede_audit = match_sede.group(1).strip() if match_sede else 'General'
+
+            if sede_audit not in ops_por_granja:
+                ops_por_granja[sede_audit] = {'total': 0, 'diurnas': 0}
+
+            ops_por_granja[sede_audit]['total'] += 1
+            total_ops_empresa += 1
+
+            if isinstance(f_op, datetime):
+                if 6 <= f_op.hour <= 18 and f_op.weekday() != 6:
+                    ops_por_granja[sede_audit]['diurnas'] += 1
+                    diurnas_ops_empresa += 1
+
+        # 2. Puntualidad en Reporte de Tanqueos (Base física 26h desde solicitud/aprobación)
+        cursor.execute("""
+            SELECT ubicacion, codigo_pedido, fecha_registro, fecha_solicitud, fecha_validacion
+            FROM pedidos_gas_glp
+            WHERE TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+            )
+            AND (estatus = 'validado' OR estatus_flujo = 'tanqueo_registrado')
+        """, (empresa_id,))
+        ped_rows = cursor.fetchall()
+        col_ped = [d[0] for d in cursor.description] if cursor.description else []
+
+        tanqueos_por_granja = {}
+        todos_pts_tanqueo = []
+
+        for p_row in ped_rows:
+            p = dict(zip(col_ped, p_row)) if not isinstance(p_row, dict) else p_row
+            ubi = p.get('ubicacion') or 'General'
+            f_sol = p.get('fecha_solicitud') or p.get('fecha_registro')
+            f_val = p.get('fecha_validacion')
+
+            if not f_sol or not f_val:
+                continue
+
+            if isinstance(f_sol, datetime):
+                dt_ini = f_sol
+            elif hasattr(f_sol, 'year'):
+                dt_ini = datetime(f_sol.year, f_sol.month, f_sol.day, 8, 0, 0)
+            else:
+                continue
+
+            if isinstance(f_val, datetime):
+                dt_fin = f_val
+            elif hasattr(f_val, 'year'):
+                dt_fin = datetime(f_val.year, f_val.month, f_val.day, 12, 0, 0)
+            else:
+                continue
+
+            delta_horas = (dt_fin - dt_ini).total_seconds() / 3600.0
+            if delta_horas < 0:
+                delta_horas = 0.0
+
+            if delta_horas <= 28.0:
+                pts = 100.0
+            elif delta_horas <= 48.0:
+                pts = 70.0
+            elif delta_horas <= 72.0:
+                pts = 40.0
+            else:
+                pts = 0.0
+
+            if ubi not in tanqueos_por_granja:
+                tanqueos_por_granja[ubi] = []
+            tanqueos_por_granja[ubi].append(pts)
+            todos_pts_tanqueo.append(pts)
+
+        # 3. Consolidación ponderada de KPI Op (50% Tanqueo + 50% Horario de Campo)
+        todas_sedes_kpi = set(list(ops_por_granja.keys()) + list(tanqueos_por_granja.keys()))
+
+        kpi_por_granja = {}
+        for s in todas_sedes_kpi:
+            op_data = ops_por_granja.get(s, {'total': 0, 'diurnas': 0})
+            p_horario = (op_data['diurnas'] / op_data['total'] * 100.0) if op_data['total'] > 0 else 100.0
+
+            t_pts = tanqueos_por_granja.get(s, [])
+            if t_pts:
+                p_tanqueo = sum(t_pts) / len(t_pts)
+                kpi_final = (p_tanqueo * 0.50) + (p_horario * 0.50)
+            else:
+                p_tanqueo = None
+                kpi_final = p_horario
+
+            kpi_por_granja[s] = {
+                'promedio': round(p_tanqueo if p_tanqueo is not None else 0.0, 1),
+                'cumplimiento': round(kpi_final, 1)
+            }
+
+        p_horario_global = (diurnas_ops_empresa / total_ops_empresa * 100.0) if total_ops_empresa > 0 else 100.0
+        if todos_pts_tanqueo:
+            p_tanqueo_global = sum(todos_pts_tanqueo) / len(todos_pts_tanqueo)
+            kpi_global = (p_tanqueo_global * 0.50) + (p_horario_global * 0.50)
+        else:
+            p_tanqueo_global = 0.0
+            kpi_global = p_horario_global
+
+        kpi_tecnicos = {
+            'promedio': round(p_tanqueo_global, 1),
+            'cumplimiento': round(kpi_global, 1)
+        }
+        # =========================================================================
+
         wheres = ["WHERE c.id_empresa = %s AND (c.pollitos > 0 OR c.neto_gastado > 0 OR c.clase = 'ingreso' OR c.operacion = 'inicio_calefaccion')"]
         params = [empresa_id]
 
@@ -534,13 +789,22 @@ def generar_informe():
             
         elif periodo == 'Actual':
             wheres.append("AND c.estatus_lote = 'ACTIVO'")
+            
+        if clima_filtro:
+            wheres.append("AND s.clima = %s")
+            params.append(clima_filtro)
+        if tecnologia_filtro:
+            wheres.append("AND s.tecnologia_produccion = %s")
+            params.append(tecnologia_filtro)
 
         sql = """
             SELECT c.fecha, c.ubicacion, c.lote, c.estatus_lote, c.operacion, c.clase, 
                    c.saldo_estimado_kg, c.saldo_estimado_galones,
-                   c.pollitos, c.kg_pollito,c.velocidad_consumo, c.masa_kg_facturada, c.neto_gastado,
-                   c.precio_total 
+                   c.pollitos, c.kg_pollito, c.velocidad_consumo, c.masa_kg_facturada, c.neto_gastado,
+                   c.precio_total, c.precio_unitario, c.proveedor, c.porcentaje_diferencia,
+                   s.clima, s.tecnologia_produccion as tecnologia, s.kpi_eficiencia
             FROM cardex_glp c
+            LEFT JOIN sedes_empresas s ON c.id_empresa = s.empresa_id AND TRIM(UPPER(c.ubicacion)) = TRIM(UPPER(s.nombre_sede))
         """
         final_sql = f"{sql} {' '.join(wheres)} ORDER BY c.fecha ASC"
         
@@ -552,9 +816,22 @@ def generar_informe():
             columns = [col[0] for col in cursor.description]
             for row in rows:
                 if isinstance(row, dict):
-                    raw_results.append(row)
+                    r_dict = dict(row)
                 else:
-                    raw_results.append(dict(zip(columns, row)))
+                    r_dict = dict(zip(columns, row))
+                
+                kpi_json = r_dict.get('kpi_eficiencia')
+                r_dict['limite_inferior'] = 0.0
+                r_dict['limite_superior'] = 0.0
+                try:
+                    if kpi_json:
+                        kpis = json.loads(kpi_json) if isinstance(kpi_json, str) else kpi_json
+                        if isinstance(kpis, dict) and 'GLP' in kpis:
+                            r_dict['limite_inferior'] = float(kpis['GLP'].get('min', 0.0))
+                            r_dict['limite_superior'] = float(kpis['GLP'].get('max', 0.0))
+                except:
+                    pass
+                raw_results.append(r_dict)
 
         lotes_activos = list(set([r['lote'] for r in raw_results if r.get('lote')]))
         
@@ -565,17 +842,19 @@ def generar_informe():
                 SELECT lote, pollitos 
                 FROM cardex_glp 
                 WHERE operacion = 'inicio_calefaccion' 
+                  AND id_empresa = %s
                   AND lote IN ({placeholders_lotes})
             """
-            cursor.execute(sql_rescate, tuple(lotes_activos))
+            cursor.execute(sql_rescate, tuple([empresa_id] + lotes_activos))
             for p_row in cursor.fetchall():
                 l_id = p_row['lote'] if isinstance(p_row, dict) else p_row[0]
-                p_qty = int(p_row['pollitos'] if isinstance(p_row, dict) else p_row[1])
+                p_val = p_row['pollitos'] if isinstance(p_row, dict) else p_row[1]
+                p_qty = int(p_val) if p_val is not None else 0
                 mapa_pob_rescatada[l_id] = p_qty
 
         cursor.close()
 
-        datos = _procesar_resultados_glp(raw_results, tipo_informe, periodo, mapa_pob_rescatada)
+        datos = _procesar_resultados_glp(raw_results, tipo_informe, periodo, mapa_pob_rescatada, kpi_tecnicos, kpi_por_granja)
         if not datos or not datos.get('tabla_resumen'):
             return jsonify({"success": False, "message": "No hay datos operativos válidos para mostrar."})
 
@@ -585,6 +864,66 @@ def generar_informe():
         if cursor: cursor.close()
         traceback.print_exc()
         return jsonify({"success": False, "message": str(e)}), 500
+    
+@bp_energia_glp.route('/glp/admin/descargar_informe_pdf', methods=['POST'])
+@login_required_custom
+def descargar_informe_pdf():
+    data = request.get_json() or {}
+    empresa = session.get('empresa', 'N/D')
+    nit = session.get('empresa_id', '')
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    title_style = styles['Heading1']
+    title_style.alignment = 1
+
+    base_dir = current_app.static_folder
+    logo_bqa = os.path.join(base_dir, 'logo_energix360.png')
+    logo_cliente = os.path.join(base_dir, f'logo_{nit}.png')
+    
+    img_bqa = RLImage(logo_bqa, width=1.5*inch, height=0.5*inch) if os.path.exists(logo_bqa) else ""
+    img_cliente = RLImage(logo_cliente, width=1.5*inch, height=0.5*inch) if os.path.exists(logo_cliente) else ""
+    
+    header_table = Table([[img_cliente, Paragraph(f"Informe Analítico y Financiero GLP - {empresa}", title_style), img_bqa]], colWidths=[2*inch, 5*inch, 2*inch])
+    header_table.setStyle(TableStyle([
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    
+    elements.append(header_table)
+    elements.append(Spacer(1, 20))
+    
+    table_data = [['Granja', 'Clima', 'Tecnología', 'Rango Esp.', 'Consumo (kg)', 'Eficiencia', 'Ahorro / Sobrecosto ($)', 'Proveedor', 'Desv. Media', 'KPI Operador']]
+    for row in data.get('tabla_resumen', []):
+        ahorro = row.get('ahorro', 0)
+        sobrecosto = row.get('sobrecosto', 0)
+        ahorro_val = f"+${ahorro:,.0f}" if ahorro > 0 else (f"-${sobrecosto:,.0f}" if sobrecosto > 0 else "$0")
+        
+        table_data.append([
+            row.get('granja'), row.get('clima'), row.get('tecnologia'), row.get('rango_esperado'),
+            f"{row.get('total_kg', 0):.2f}", f"{row.get('kg_pollito', 0):.4f}", 
+            ahorro_val, row.get('proveedor'), f"{row.get('media_desviacion', 0):.2f}%", f"{row.get('kpi_operador', 0):.1f}%"
+        ])
+    
+    t = Table(table_data, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#015249")),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0,0), (-1,0), 12),
+        ('BACKGROUND', (0,1), (-1,-1), colors.beige),
+        ('GRID', (0,0), (-1,-1), 1, colors.black)
+    ]))
+    
+    elements.append(t)
+    doc.build(elements)
+    buffer.seek(0)
+    
+    return send_file(buffer, as_attachment=True, download_name=f"Informe_GLP_{empresa}.pdf", mimetype='application/pdf')
 
 @csrf.exempt
 @bp_energia_glp.route('/obtener_ubicaciones', methods=['POST'])
@@ -648,7 +987,7 @@ def generar_informe_saldos():
         cur.execute(sql_lotes, (empresa_id,))
         lotes_inactivos = cur.fetchall()
         
-        col_names = [d[0] for d in cur.description]
+        col_names = [d[0] for d in cur.description] if cur.description else []
         lista_lotes = []
         for row in lotes_inactivos:
             if isinstance(row, dict): lista_lotes.append(row)
@@ -663,13 +1002,18 @@ def generar_informe_saldos():
             tanques_estado = {} 
 
             sql_detalle = """
-                SELECT fecha, 
-                       `nivel tk-1`, `capacidad tk-1`,
-                       `nivel tk-2`, `capacidad tk-2`,
-                       `nivel tk-3`, `capacidad tk-3`,
-                       `nivel tk-4`, `capacidad tk-4`,
-                       `nivel tk-5`, `capacidad tk-5`,
-                       `nivel tk-6`, `capacidad tk-6`
+                SELECT fecha, operacion,
+                       `nivel tk-1`, `nivelfinal tk-1`, `capacidad tk-1`,
+                       `nivel tk-2`, `nivelfinal tk-2`, `capacidad tk-2`,
+                       `nivel tk-3`, `nivelfinal tk-3`, `capacidad tk-3`,
+                       `nivel tk-4`, `nivelfinal tk-4`, `capacidad tk-4`,
+                       `nivel tk-5`, `nivelfinal tk-5`, `capacidad tk-5`,
+                       `nivel tk-6`, `nivelfinal tk-6`, `capacidad tk-6`,
+                       `nivel tk-7`, `nivelfinal tk-7`, `capacidad tk-7`,
+                       `nivel tk-8`, `nivelfinal tk-8`, `capacidad tk-8`,
+                       `nivel tk-9`, `nivelfinal tk-9`, `capacidad tk-9`,
+                       `nivel tk-10`, `nivelfinal tk-10`, `capacidad tk-10`,
+                       `nivel tk-11`, `nivelfinal tk-11`, `capacidad tk-11`
                 FROM cardex_glp
                 WHERE id_empresa = %s AND ubicacion = %s AND lote = %s
                 ORDER BY fecha DESC, id DESC
@@ -688,14 +1032,18 @@ def generar_informe_saldos():
                 fecha_cierre = filas_dict[0].get('fecha')
 
             for row in filas_dict:
-                for i in range(1, 7):
+                for i in range(1, 12):
                     tk_key = f'tk-{i}'
-                    nivel_col = f'nivel tk-{i}'
+                    nivel_col_ini = f'nivel tk-{i}'
+                    nivel_col_fin = f'nivelfinal tk-{i}'
                     cap_col = f'capacidad tk-{i}'
                     
                     if tk_key in tanques_estado: continue 
                         
-                    nivel_val = row.get(nivel_col)
+                    nivel_fin_val = row.get(nivel_col_fin)
+                    nivel_ini_val = row.get(nivel_col_ini)
+                    nivel_val = nivel_fin_val if nivel_fin_val is not None else nivel_ini_val
+
                     cap_val = row.get(cap_col)
 
                     if nivel_val is not None:
@@ -715,7 +1063,7 @@ def generar_informe_saldos():
                 lista_tanques_final = []
                 total_kg_granja = 0
                 
-                for i in range(1, 7):
+                for i in range(1, 12):
                     tk_key = f'tk-{i}'
                     if tk_key in tanques_estado:
                         d = tanques_estado[tk_key]
@@ -844,7 +1192,6 @@ def obtener_lotes_vencidos():
     try:
         cur = mysql.connection.cursor()
         
-        # Calcula los días reales usando el MAX de dias_operacion y COALESCE para la fecha de inicio
         sql = """
             SELECT 
                 ubicacion, 
@@ -949,18 +1296,39 @@ def obtener_tanques_granja():
     
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        cur.execute("SELECT * FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s ORDER BY id ASC", (empresa_id, ubicacion))
+        cur.execute("""
+            SELECT ts.*, s.clima, s.tecnologia_produccion as tecnologia, s.kpi_eficiencia 
+            FROM tanques_sedes ts
+            LEFT JOIN sedes_empresas s ON ts.empresa_id = s.empresa_id AND TRIM(UPPER(ts.ubicacion)) = TRIM(UPPER(s.nombre_sede))
+            WHERE ts.empresa_id = %s AND ts.ubicacion = %s ORDER BY ts.id ASC
+        """, (empresa_id, ubicacion))
         filas = cur.fetchall()
         
         if not filas:
             return jsonify({'success': False, 'message': 'No se encontró configuración para esta granja.'}), 404
+            
+        kpi_json = filas[0].get('kpi_eficiencia')
+        lim_inf = 0.0
+        lim_sup = 0.0
+        try:
+            if kpi_json:
+                kpis = json.loads(kpi_json) if isinstance(kpi_json, str) else kpi_json
+                if isinstance(kpis, dict) and 'GLP' in kpis:
+                    lim_inf = float(kpis['GLP'].get('min', 0.0))
+                    lim_sup = float(kpis['GLP'].get('max', 0.0))
+        except:
+            pass
         
         general = {
             'proveedor': filas[0]['proveedor'],
             'email': filas[0]['email'],
             'zona': filas[0]['zona'],
             'propietario': filas[0]['propietario'],
-            'empresa': filas[0]['empresa']
+            'empresa': filas[0]['empresa'],
+            'clima': filas[0].get('clima', 'Cálido'),
+            'tecnologia': filas[0].get('tecnologia', 'Convencional'),
+            'limite_inferior': lim_inf,
+            'limite_superior': lim_sup
         }
         
         tanques = []
@@ -988,36 +1356,194 @@ def guardar_tanques_granja():
     proveedor = data.get('proveedor')
     email = data.get('email')
     tanques = data.get('tanques')
+    clima = data.get('clima', 'Cálido')
+    tecnologia = data.get('tecnologia', 'Convencional')
+    limite_inferior = float(data.get('limite_inferior', 0))
+    limite_superior = float(data.get('limite_superior', 0))
+    zona = data.get('zona', 'N/D')
+    propietario = data.get('propietario', 'Propio')
+    
+    usuario_cedula = session.get('cedula', session.get('user_id', '0'))
+    usuario_nombre = session.get('nombre', 'Sistema')
     
     if not tanques or len(tanques) == 0:
         return jsonify({'success': False, 'message': 'Debe haber al menos un tanque registrado.'}), 400
         
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    for intento in range(3):
+        try:
+            cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+            
+            cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s LIMIT 1", (empresa_id,))
+            emp_row = cur.fetchone()
+            empresa_nombre = emp_row['nombre_comercial'] if emp_row else 'Empresa Desconocida'
+
+            cur.execute("SELECT zona, propietario FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s LIMIT 1 FOR UPDATE", (empresa_id, ubicacion))
+            row = cur.fetchone()
+            
+            if row:
+                zona_bd = row['zona']
+                propietario_bd = row['propietario']
+            else:
+                zona_bd = zona
+                propietario_bd = propietario
+                
+            cur.execute("DELETE FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s", (empresa_id, ubicacion))
+            
+            for tk in tanques:
+                cur.execute("""
+                    INSERT INTO tanques_sedes (empresa, empresa_id, nombre_tanque, propietario, capacidad_gls, ubicacion, zona, proveedor, email)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (empresa_nombre, empresa_id, tk['nombre'], propietario_bd, tk['capacidad'], ubicacion, zona_bd, proveedor, email))
+                
+            cur.execute("SELECT kpi_eficiencia FROM sedes_empresas WHERE empresa_id = %s AND TRIM(UPPER(nombre_sede)) = TRIM(UPPER(%s)) FOR UPDATE", (empresa_id, ubicacion))
+            row_sede = cur.fetchone()
+            if row_sede:
+                kpi_json = row_sede['kpi_eficiencia'] if isinstance(row_sede, dict) else row_sede[0]
+                try: 
+                    kpis = json.loads(kpi_json) if isinstance(kpi_json, str) else kpi_json
+                except: 
+                    kpis = {}
+                if not isinstance(kpis, dict): kpis = {}
+                if 'GLP' not in kpis: kpis['GLP'] = {}
+                kpis['GLP']['min'] = limite_inferior
+                kpis['GLP']['max'] = limite_superior
+                
+                cur.execute("UPDATE sedes_empresas SET clima=%s, tecnologia_produccion=%s, kpi_eficiencia=%s WHERE empresa_id=%s AND TRIM(UPPER(nombre_sede))=TRIM(UPPER(%s))",
+                            (clima, tecnologia, json.dumps(kpis), empresa_id, ubicacion))
+            else:
+                kpis = {"GLP": {"min": limite_inferior, "max": limite_superior}}
+                cur.execute("INSERT INTO sedes_empresas (empresa_id, empresa_nombre, nombre_sede, tipo_sede, clima, tecnologia_produccion, kpi_eficiencia) VALUES (%s, %s, %s, 'granja', %s, %s, %s)",
+                            (empresa_id, empresa_nombre, ubicacion, clima, tecnologia, json.dumps(kpis)))
+                
+            _registrar_operacion_global(cur, empresa_id, usuario_cedula, usuario_nombre, {"accion": "guardar_tanques_granja", "ubicacion": ubicacion, "clima": clima, "tecnologia": tecnologia})
+                
+            mysql.connection.commit()
+            cur.close()
+            return jsonify({'success': True, 'message': f'Configuración de granja {ubicacion} guardada correctamente.'})
+            
+        except MySQLdb.OperationalError as e:
+            if e.args[0] == 1213:
+                mysql.connection.rollback()
+                time.sleep(0.5)
+                if intento == 2: return jsonify({'success': False, 'message': 'Conflicto de red.'}), 500
+            else:
+                mysql.connection.rollback()
+                return jsonify({'success': False, 'message': str(e)}), 500
+        except Exception as e:
+            mysql.connection.rollback()
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/eliminar_granja', methods=['POST'])
+@login_required_custom
+def eliminar_granja():
+    data = request.get_json()
+    empresa_id = data.get('empresa_id')
+    ubicacion = data.get('ubicacion')
+    usuario_cedula = session.get('cedula', session.get('user_id', '0'))
+    usuario_nombre = session.get('nombre', 'Sistema')
+    
     try:
-        cur.execute("SELECT empresa, zona, propietario FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s LIMIT 1", (empresa_id, ubicacion))
-        row = cur.fetchone()
-        if not row:
-            return jsonify({'success': False, 'message': 'Granja original no encontrada en la base de datos.'}), 404
-            
-        empresa_nombre = row['empresa']
-        zona = row['zona']
-        propietario = row['propietario']
-        
+        cur = mysql.connection.cursor()
         cur.execute("DELETE FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s", (empresa_id, ubicacion))
+        cur.execute("DELETE FROM sedes_empresas WHERE empresa_id = %s AND nombre_sede = %s", (empresa_id, ubicacion))
         
-        for tk in tanques:
-            cur.execute("""
-                INSERT INTO tanques_sedes (empresa, empresa_id, nombre_tanque, propietario, capacidad_gls, ubicacion, zona, proveedor, email)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (empresa_nombre, empresa_id, tk['nombre'], propietario, tk['capacidad'], ubicacion, zona, proveedor, email))
-            
+        _registrar_operacion_global(cur, empresa_id, usuario_cedula, usuario_nombre, {"accion": "eliminar_granja", "ubicacion": ubicacion})
         mysql.connection.commit()
-        return jsonify({'success': True, 'message': f'Configuración de tanques para {ubicacion} actualizada correctamente.'})
-    except Exception as e:
-        mysql.connection.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
-    finally:
         cur.close()
+        return jsonify({'success': True, 'message': f'Granja {ubicacion} eliminada correctamente.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# ==============================================================================
+# CRUD PROVEEDORES
+# ==============================================================================
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/proveedores/listar', methods=['POST'])
+@login_required_custom
+def listar_proveedores():
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("SELECT * FROM proveedores ORDER BY proveedor ASC")
+        rows = cur.fetchall()
+        cur.close()
+        return jsonify({'success': True, 'proveedores': rows})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/proveedores/guardar', methods=['POST'])
+@login_required_custom
+def guardar_proveedor():
+    data = request.get_json()
+    proveedor = data.get('proveedor')
+    precio = data.get('precio', 0)
+    email1 = data.get('email1', '')
+    email2 = data.get('email2', '')
+    empresa_id = session.get('empresa_id', 0)
+    usuario_cedula = session.get('cedula', session.get('user_id', '0'))
+    usuario_nombre = session.get('nombre', 'Sistema')
+    
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            INSERT INTO proveedores (proveedor, precio, email1, email2)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE precio=VALUES(precio), email1=VALUES(email1), email2=VALUES(email2)
+        """, (proveedor, precio, email1, email2))
+        
+        _registrar_operacion_global(cur, empresa_id, usuario_cedula, usuario_nombre, {"accion": "guardar_proveedor", "proveedor": proveedor, "precio": precio})
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'success': True, 'message': f'Proveedor {proveedor} guardado correctamente.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/proveedores/eliminar', methods=['POST'])
+@login_required_custom
+def eliminar_proveedor():
+    data = request.get_json()
+    proveedor = data.get('proveedor')
+    empresa_id = session.get('empresa_id', 0)
+    usuario_cedula = session.get('cedula', session.get('user_id', '0'))
+    usuario_nombre = session.get('nombre', 'Sistema')
+    
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("DELETE FROM proveedores WHERE proveedor = %s", (proveedor,))
+        _registrar_operacion_global(cur, empresa_id, usuario_cedula, usuario_nombre, {"accion": "eliminar_proveedor", "proveedor": proveedor})
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({'success': True, 'message': f'Proveedor {proveedor} eliminado correctamente.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# ==============================================================================
+# EMPRESAS URE
+# ==============================================================================
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/obtener_empresas_ure', methods=['POST'])
+@login_required_custom
+def obtener_empresas_ure():
+    data = request.get_json()
+    tipo_ure = data.get('tipo_ure', 'URE_GLP')
+    
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        valid_columns = ['URE_GLP', 'URE_COMBUSTIBLE', 'URE_ELECTRICIDAD', 'URE_CARBON', 'URE_SOLAR']
+        if tipo_ure not in valid_columns:
+            tipo_ure = 'URE_GLP'
+            
+        query = f"SELECT nit, nombre_comercial FROM empresas WHERE {tipo_ure} = 1 ORDER BY nombre_comercial ASC"
+        cur.execute(query)
+        rows = cur.fetchall()
+        cur.close()
+        return jsonify({'success': True, 'empresas': rows})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @csrf.exempt
 @bp_energia_glp.route('/generar_qrs_pdf', methods=['POST'])
@@ -1120,15 +1646,12 @@ def generar_qrs_pdf():
         return jsonify({'success': False, 'message': f'Error interno: {str(e)}'}), 500
 
 # ==============================================================================
-# RUTAS DE ADMINISTRACIÓN: OBTENER, ANÁLISIS Y APROBACIÓN (CORREGIDAS)
+# RUTAS DE ADMINISTRACIÓN: OBTENER, ANÁLISIS Y APROBACIÓN
 # ==============================================================================
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/obtener_solicitudes_pendientes', methods=['POST'])
 @login_required_custom
 def admin_obtener_solicitudes():
-    """ 
-    BANDEJA DE ENTRADA de Aprobaciones para el Webmaster o Supervisores
-    """
     try:
         data = request.get_json(silent=True) or {}
         empresa_id_req = data.get('empresa_id')
@@ -1140,15 +1663,12 @@ def admin_obtener_solicitudes():
 
         cur = mysql.connection.cursor()
         
-        # 1. Definir permisos de visualización
         es_webmaster = (session_id == '901811727')
         filtrar_empresa = bool(empresa_id_req and str(empresa_id_req).strip() != '901811727')
         
-        # 2. Recolectar variantes del nombre de la empresa para el filtro en Python
         nombres_clean = set()
         
         if not es_webmaster or filtrar_empresa:
-            # Buscar en tabla empresas (Corregido: Solo usamos 'nit' para evitar error de columna inexistente)
             try:
                 cur.execute("SELECT nombre_comercial FROM empresas WHERE nit = %s", (empresa_id,))
                 for row in cur.fetchall():
@@ -1157,7 +1677,6 @@ def admin_obtener_solicitudes():
             except Exception:
                 pass
                 
-            # Buscar en el historial real de Kárdex
             try:
                 cur.execute("SELECT DISTINCT empresa FROM cardex_glp WHERE id_empresa = %s", (empresa_id,))
                 for row in cur.fetchall():
@@ -1166,13 +1685,11 @@ def admin_obtener_solicitudes():
             except Exception:
                 pass
                 
-            # Buscar en la sesión activa
             if session.get('empresa'):
                 nombres_clean.add(str(session.get('empresa')).upper().replace('.', '').replace(' ', ''))
                 
             nombres_clean.add(str(empresa_id).upper().replace('.', '').replace(' ', ''))
 
-        # 3. Traer todos los pedidos pendientes (Aísla la consulta para evitar bloqueos por Collation en MySQL)
         cur.execute("""
             SELECT id, fecha_registro, cliente, ubicacion, lote, nivel_solicitado, dias_extra 
             FROM pedidos_gas_glp 
@@ -1188,13 +1705,11 @@ def admin_obtener_solicitudes():
         for p_row in pedidos_pendientes:
             p = dict(zip(col_pedidos, p_row)) if not isinstance(p_row, dict) else p_row
             
-            # 4. Filtrar por cliente directamente en Python (Inmune a problemas de puntuación o codificación)
             if not es_webmaster or filtrar_empresa:
                 cliente_str = str(p['cliente'] or '').upper().replace('.', '').replace(' ', '')
                 if cliente_str not in nombres_clean:
-                    continue # No pertenece a esta empresa, lo saltamos
+                    continue 
 
-            # 5. Obtener los detalles del nivel del tanque desde Cardex (Manejo de Lote NULL)
             dias_op = 0
             nivel_tk1 = None
             foto_tk1 = None
@@ -1215,7 +1730,6 @@ def admin_obtener_solicitudes():
                         ORDER BY id DESC LIMIT 1
                     """, (p['ubicacion'],))
                 else:
-                    # Failsafe si no hay ubicacion ni lote
                     cur.execute("SELECT 0, NULL, NULL")
 
                 c_row = cur.fetchone()
@@ -1251,6 +1765,7 @@ def admin_obtener_solicitudes():
         import traceback
         print("❌ Error de lectura solicitudes pendientes:\n", traceback.format_exc())
         return jsonify({"success": False, "message": str(e)})
+
 @csrf.exempt
 @bp_energia_glp.route('/glp/admin/analizar_proyeccion', methods=['POST'])
 @login_required_custom
@@ -1265,7 +1780,6 @@ def admin_analizar_proyeccion():
     try:
         cur = mysql.connection.cursor()
         
-        # VALIDACIÓN MULTI-TENANT INTELIGENTE: Permite acceso a Webmaster ('901811727')
         if session_id == '901811727':
             cur.execute("""
                 SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
@@ -1273,7 +1787,6 @@ def admin_analizar_proyeccion():
                 WHERE id=%s
             """, (ped_id,))
         else:
-            # CORRECCIÓN: Colación explícita
             cur.execute("""
                 SELECT lote, cliente, ubicacion, nivel_solicitado, dias_extra 
                 FROM pedidos_gas_glp 
@@ -1299,10 +1812,12 @@ def admin_analizar_proyeccion():
             solicitado = float(head[3] or 0)
             dias_extra = int(head[4] or 0)
         
-        cur.execute("SELECT fecha, `nivel tk-1` FROM cardex_glp WHERE lote=%s ORDER BY fecha DESC LIMIT 5", (lote,))
+        cur.execute("""
+            SELECT fecha, `nivel tk-1` FROM cardex_glp 
+            WHERE lote=%s ORDER BY fecha DESC LIMIT 5
+        """, (lote,))
         rows_hist = cur.fetchall()
-        
-        tasa = 8.0 
+        tasa = 8.0
         if rows_hist and len(rows_hist) > 1:
             deltas = []
             for i in range(len(rows_hist)-1):
@@ -1320,7 +1835,6 @@ def admin_analizar_proyeccion():
 
         cur.execute("SELECT `nivel tk-1`, dias_operacion, fecha FROM cardex_glp WHERE lote=%s ORDER BY id DESC LIMIT 1", (lote,))
         curr = cur.fetchone()
-        cur.close()
         
         niv_act = float(curr[0] or 0) if curr else 0
         dia_act = int(curr[1] or 0) if curr else 0
@@ -1333,7 +1847,9 @@ def admin_analizar_proyeccion():
         
         puntos_grafica = []
         fecha_sim = fecha_ultima
-        nivel_sim = niv_act + solicitado
+        
+        # PARADIGMA OBJETIVO: Arranque de simulación directo en la meta
+        nivel_sim = solicitado
         if nivel_sim > 100: nivel_sim = 100
         
         ciclo_total = 15 + dias_extra
@@ -1370,107 +1886,6 @@ def admin_analizar_proyeccion():
     except Exception as e: 
         return jsonify({"success": False, "message": str(e)})
 
-
-@csrf.exempt
-@bp_energia_glp.route('/glp/admin/aprobar_solicitud', methods=['POST'])
-@login_required_custom
-def admin_aprobar_solicitud():
-    data = request.get_json(force=True) or {}
-    ped_id = data.get('id')
-    nivel = data.get('nivel_aprobado')
-    empresa_id_req = data.get('empresa_id')
-    
-    empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
-    session_id = str(session.get('empresa_id', '')).strip()
-
-    try:
-        cur = mysql.connection.cursor()
-        
-        # VALIDACIÓN MULTI-TENANT INTELIGENTE
-        if session_id == '901811727':
-             cur.execute("SELECT id FROM pedidos_gas_glp WHERE id=%s", (ped_id,))
-        else:
-            # CORRECCIÓN: Colación explícita
-            cur.execute("""
-                SELECT id FROM pedidos_gas_glp 
-                WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
-                    SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
-                )
-            """, (ped_id, empresa_id))
-            
-        if not cur.fetchone():
-            cur.close()
-            return jsonify({"success": False, "message": "Acceso denegado a este registro."})
-        
-        if nivel: 
-            cur.execute("UPDATE pedidos_gas_glp SET nivel_solicitado=%s WHERE id=%s", (nivel, ped_id))
-        else:
-            cur.execute("SELECT nivel_solicitado FROM pedidos_gas_glp WHERE id=%s", (ped_id,))
-            res = cur.fetchone()
-            if res:
-                nivel = res[0] if not isinstance(res, dict) else res.get('nivel_solicitado')
-            
-        cur.execute("UPDATE pedidos_gas_glp SET estatus_flujo='aprobado_webmaster' WHERE id=%s", (ped_id,))
-        mysql.connection.commit()
-        cur.close()
-        
-        env = _enviar_correo_aprobado_proveedor(ped_id, nivel, empresa_id)
-        
-        return jsonify({
-            "success": True, 
-            "message": "Solicitud aprobada correctamente." + (" Proveedor notificado." if env else " Error enviando correo al proveedor.")
-        })
-        
-    except Exception as e: 
-        return jsonify({"success": False, "message": str(e)})
-
-
-@csrf.exempt
-@bp_energia_glp.route('/glp/admin/rechazar_solicitud', methods=['POST'])
-@login_required_custom
-def rechazar_solicitud():
-    try:
-        data = request.get_json()
-        id_solicitud = data.get('id')
-        empresa_id_req = data.get('empresa_id')
-        
-        empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
-        session_id = str(session.get('empresa_id', '')).strip()
-
-        if not id_solicitud:
-            return jsonify({"success": False, "message": "ID de solicitud requerido."}), 400
-
-        cur = mysql.connection.cursor()
-        
-        # VALIDACIÓN MULTI-TENANT INTELIGENTE
-        if session_id == '901811727':
-            cur.execute("SELECT id FROM pedidos_gas_glp WHERE id=%s", (id_solicitud,))
-        else:
-            # CORRECCIÓN: Colación explícita
-            cur.execute("""
-                SELECT id FROM pedidos_gas_glp 
-                WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
-                    SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
-                )
-            """, (id_solicitud, empresa_id))
-            
-        if not cur.fetchone():
-            cur.close()
-            return jsonify({"success": False, "message": "Acceso denegado a este registro."})
-        
-        query = "UPDATE pedidos_gas_glp SET estatus_flujo = 'rechazado' WHERE id = %s"
-        cur.execute(query, (id_solicitud,))
-        mysql.connection.commit()
-        cur.close()
-
-        return jsonify({"success": True, "message": "Solicitud anulada correctamente."})
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "message": str(e)}), 500
-
-
 def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
     if not EMAIL_USER or not EMAIL_PASS:
         return False
@@ -1487,7 +1902,6 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
                 WHERE id=%s
             """, (pedido_id,))
         else:
-            # CORRECCIÓN: Colación explícita
             cur.execute("""
                 SELECT cliente, ubicacion, lote, codigo_pedido, proveedor 
                 FROM pedidos_gas_glp 
@@ -1524,11 +1938,14 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
             if valores_validos:
                 nivel_actual_promedio = sum(valores_validos) / len(valores_validos)
                 
-        try: delta_aprobado = float(nivel_aprobado)
-        except: delta_aprobado = 0.0
+        # PARADIGMA OBJETIVO: Nivel final directo
+        try: 
+            nivel_objetivo = float(nivel_aprobado)
+        except: 
+            nivel_objetivo = 80.0
             
-        nivel_objetivo = nivel_actual_promedio + delta_aprobado
-        if nivel_objetivo > 80.0: nivel_objetivo = 80.0
+        if nivel_objetivo > 80.0: 
+            nivel_objetivo = 80.0
         
         cur.execute("SELECT email1, email2 FROM proveedores WHERE proveedor=%s", (prov,))
         pdat = cur.fetchone()
@@ -1553,7 +1970,7 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
             <div style="background-color: #ffffff; max-width: 500px; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow: hidden;">
                 <div style="background-color: #015249; color: white; padding: 20px; text-align: center;">
                     <h2 style="margin: 0; font-size: 22px;">Orden de Suministro GLP</h2>
-                    <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Solicitud Aprobada</p>
+                    <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Solicitud Aprobada por Webmaster</p>
                 </div>
                 <div style="padding: 25px;">
                     <div style="background-color: #e8f5e9; border: 2px dashed #015249; padding: 15px; text-align: center; margin-bottom: 25px; border-radius: 6px;">
@@ -1571,12 +1988,17 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
                             <td style="padding: 10px 0; font-weight: bold; text-align: right; color: #333;">{ubi}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 10px 0; color: #666;">📊 Nivel Objetivo (Manómetro):</td>
+                            <td style="padding: 10px 0; color: #666;">📊 Nivel Objetivo en Manómetro:</td>
                             <td style="padding: 10px 0; font-weight: bold; text-align: right; color: #015249; font-size: 18px;">{round(nivel_objetivo, 2)}%</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" style="padding-bottom: 10px; font-size: 12px; color: #888; text-align: right;">
+                                <em>(Nivel actual estimado de la granja: {round(nivel_actual_promedio, 1)}%)</em>
+                            </td>
                         </tr>
                     </table>
                     <div style="margin-top: 25px; padding: 10px; background-color: #fff8e1; border-left: 4px solid #ffc107; font-size: 13px; color: #795548;">
-                        <strong>Instrucción:</strong> Favor suministrar gas hasta alcanzar el Nivel Objetivo detallado. Incluir el código de pedido en la factura.
+                        <strong>Instrucción:</strong> Favor suministrar gas hasta alcanzar el Nivel Objetivo detallado ({round(nivel_objetivo, 2)}%). Incluir el código de pedido en la factura. No sobrepasar la marca de seguridad (80%).
                     </div>
                 </div>
             </div>
@@ -1605,3 +2027,127 @@ def _enviar_correo_aprobado_proveedor(pedido_id, nivel_aprobado, empresa_id):
     except Exception as e:
         print(f"⛔ Error enviando correo GLP: {e}")
         return False
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/aprobar_solicitud', methods=['POST'])
+@bp_energia_glp.route('/admin/aprobar_solicitud', methods=['POST'])
+@login_required_custom
+def admin_aprobar_solicitud():
+    data = request.get_json(force=True) or {}
+    ped_id = data.get('id')
+    nivel = data.get('nivel_aprobado')
+    empresa_id_req = data.get('empresa_id')
+    
+    empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
+    session_id = str(session.get('empresa_id', '')).strip()
+    usuario_cedula = session.get('cedula', session.get('user_id', '0'))
+    usuario_nombre = session.get('nombre', 'Sistema')
+    
+    for intento in range(3):
+        try:
+            cur = mysql.connection.cursor()
+            
+            if session_id == '901811727':
+                 cur.execute("SELECT id, nivel_solicitado FROM pedidos_gas_glp WHERE id=%s FOR UPDATE", (ped_id,))
+            else:
+                cur.execute("""
+                    SELECT id, nivel_solicitado FROM pedidos_gas_glp 
+                    WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                        SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+                    ) FOR UPDATE
+                """, (ped_id, empresa_id))
+                
+            row = cur.fetchone()
+            if not row:
+                cur.close()
+                return jsonify({"success": False, "message": "Acceso denegado a este registro."})
+            
+            if not nivel: 
+                nivel = row[1] if not isinstance(row, dict) else row.get('nivel_solicitado')
+                
+            cur.execute("UPDATE pedidos_gas_glp SET nivel_solicitado=%s, estatus_flujo='aprobado_webmaster' WHERE id=%s", (nivel, ped_id))
+            
+            _registrar_operacion_global(cur, empresa_id, usuario_cedula, usuario_nombre, {"accion": "aprobar_solicitud_gas", "pedido_id": ped_id, "nivel_aprobado": nivel})
+            
+            mysql.connection.commit()
+            cur.close()
+            
+            env = _enviar_correo_aprobado_proveedor(ped_id, nivel, empresa_id)
+            
+            return jsonify({
+                "success": True, 
+                "message": "Solicitud aprobada correctamente." + (" Proveedor notificado." if env else " Error enviando correo al proveedor.")
+            })
+            
+        except MySQLdb.OperationalError as e:
+            if e.args[0] == 1213:
+                mysql.connection.rollback()
+                time.sleep(0.5)
+                if intento == 2: return jsonify({'success': False, 'message': 'Conflicto de red.'}), 500
+            else:
+                mysql.connection.rollback()
+                return jsonify({'success': False, 'message': str(e)}), 500
+        except Exception as e: 
+            mysql.connection.rollback()
+            return jsonify({"success": False, "message": str(e)})
+
+@csrf.exempt
+@bp_energia_glp.route('/glp/admin/rechazar_solicitud', methods=['POST'])
+@login_required_custom
+def rechazar_solicitud():
+    try:
+        data = request.get_json()
+        id_solicitud = data.get('id')
+        empresa_id_req = data.get('empresa_id')
+        
+        empresa_id = empresa_id_req if empresa_id_req else session.get('empresa_id')
+        session_id = str(session.get('empresa_id', '')).strip()
+        usuario_cedula = session.get('cedula', session.get('user_id', '0'))
+        usuario_nombre = session.get('nombre', 'Sistema')
+
+        if not id_solicitud:
+            return jsonify({"success": False, "message": "ID de solicitud requerido."}), 400
+
+        for intento in range(3):
+            try:
+                cur = mysql.connection.cursor()
+                
+                if session_id == '901811727':
+                    cur.execute("SELECT id FROM pedidos_gas_glp WHERE id=%s FOR UPDATE", (id_solicitud,))
+                else:
+                    cur.execute("""
+                        SELECT id FROM pedidos_gas_glp 
+                        WHERE id=%s AND TRIM(UPPER(cliente)) COLLATE utf8mb4_general_ci = (
+                            SELECT TRIM(UPPER(nombre_comercial)) COLLATE utf8mb4_general_ci FROM empresas WHERE nit = %s LIMIT 1
+                        ) FOR UPDATE
+                    """, (id_solicitud, empresa_id))
+                    
+                if not cur.fetchone():
+                    cur.close()
+                    return jsonify({"success": False, "message": "Acceso denegado a este registro."})
+                
+                query = "UPDATE pedidos_gas_glp SET estatus_flujo = 'rechazado' WHERE id = %s"
+                cur.execute(query, (id_solicitud,))
+                
+                _registrar_operacion_global(cur, empresa_id, usuario_cedula, usuario_nombre, {"accion": "rechazar_solicitud", "pedido_id": id_solicitud})
+                
+                mysql.connection.commit()
+                cur.close()
+
+                return jsonify({"success": True, "message": "Solicitud anulada correctamente."})
+
+            except MySQLdb.OperationalError as e:
+                if e.args[0] == 1213:
+                    mysql.connection.rollback()
+                    time.sleep(0.5)
+                    if intento == 2: return jsonify({'success': False, 'message': 'Conflicto de red.'}), 500
+                else:
+                    mysql.connection.rollback()
+                    return jsonify({'success': False, 'message': str(e)}), 500
+            except Exception as e:
+                mysql.connection.rollback()
+                import traceback
+                traceback.print_exc()
+                return jsonify({"success": False, "message": str(e)}), 500
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500

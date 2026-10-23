@@ -1,269 +1,611 @@
+<!-- MÓDULO: UNIVERSAL | ARCHIVO: 901811727_energia.html | CONDICIÓN: OBLIGATORIO | TIPO: 1 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="apple-touch-icon" href="/static/icon-192.png">
-  <title>Gestión Energética | BQA-ONE</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-  <meta name="theme-color" content="#015249">
-
-  <!-- Dependencias necesarias para GLP y futuros energéticos -->
-  <script src="/static/js/html5-qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
-  <style>
-    /* VARIABLES Y DISEÑO HÍBRIDO (PC/MÓVIL) */
-    :root {
-      --color-primary: #015249;
-      --color-primary-dark: #003832;
-      --header-height: 60px;
-      --bg-light: #f6f7f8;
-    }
-
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg-light);
-      color: #1f2937;
-      padding-top: var(--header-height);
-      overflow-x: hidden;
-    }
-
-    /* HEADER FIJO */
-    .header {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: var(--header-height);
-      background: white; z-index: 1040;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 15px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-
-    .btn-hamburguesa {
-      display: none; background: none; border: none; font-size: 1.6rem;
-      color: var(--color-primary); cursor: pointer; padding: 5px; margin-right: 10px;
-    }
-
-    /* LAYOUT PRINCIPAL */
-    .layout {
-      display: flex; max-width: 1600px; margin: 0 auto; padding: 20px; gap: 20px; position: relative;
-    }
-
-    /* SIDEBAR */
-    .sidebar-left {
-      flex: 0 0 260px; width: 260px;
-      background: linear-gradient(180deg, var(--color-primary) 0%, #002521 100%);
-      color: white; border-radius: 12px; height: calc(100vh - 90px);
-      position: sticky; top: 80px; overflow-y: auto;
-      box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05); z-index: 1000;
-      transition: transform 0.3s ease;
-    }
-
-    .main-content {
-      flex: 1; min-width: 0;
-    }
-
-    .sidebar-section-title {
-      padding: 15px 20px 10px 20px; font-size: 0.75rem; font-weight: 700;
-      color: rgba(255, 255, 255, 0.5); text-transform: uppercase;
-      letter-spacing: 1px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    /* ELEMENTOS NAVEGACIÓN SIDEBAR EXCLUSIVAMENTE */
-    .sidebar-left .nav-item {
-      display: flex; align-items: center; width: 100%; padding: 12px 20px;
-      color: #e2e8f0; background: transparent; border: none; text-align: left;
-      font-size: 0.95rem; border-left: 4px solid transparent; cursor: pointer;
-      text-decoration: none;
-    }
-    .sidebar-left .nav-item:hover { background: rgba(255, 255, 255, 0.1); color: white; }
-    .icon-spacer { display: inline-flex; width: 25px; justify-content: center; margin-right: 10px; }
-
-    /* ESTILOS DE PESTAÑAS (TABS) PARA ENERGÍA (DESPLIEGUE HORIZONTAL) */
-    .nav-tabs {
-      display: flex;
-      flex-direction: row;
-      flex-wrap: wrap;
-      border-bottom: 2px solid #e5e7eb;
-    }
-    .nav-tabs .nav-item {
-      width: auto;
-    }
-    .nav-tabs .nav-link {
-      color: #6b7280;
-      font-weight: 600;
-      border: none;
-      border-bottom: 3px solid transparent;
-      padding: 12px 20px;
-      transition: all 0.2s ease;
-    }
-    .nav-tabs .nav-link:hover {
-      color: var(--color-primary);
-      border-color: rgba(1, 82, 73, 0.3);
-    }
-    .nav-tabs .nav-link.active {
-      color: var(--color-primary);
-      border-bottom: 3px solid var(--color-primary);
-      background-color: transparent;
-    }
-
-    @media (max-width: 992px) {
-      .btn-hamburguesa { display: block; }
-      .layout { display: block; padding: 10px; }
-      .sidebar-left {
-        position: fixed; top: 0; left: 0; height: 100vh; width: 280px;
-        border-radius: 0; transform: translateX(-105%); z-index: 2000;
-      }
-      .sidebar-left.show { transform: translateX(0); }
-      .sidebar-overlay {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0, 0, 0, 0.6); z-index: 1999; display: none; backdrop-filter: blur(2px);
-      }
-      .sidebar-overlay.show { display: block; }
-      .nav-tabs { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
-    }
-  </style>
-
-  <!-- Script global para parseo de datos de empresas -->
-  <script>
-    let empresasData = [];
-    document.addEventListener("DOMContentLoaded", function() {
-      try {
-        const dataElement = document.getElementById('empresas-data');
-        if (dataElement && dataElement.textContent.trim() !== '') {
-          empresasData = JSON.parse(dataElement.textContent);
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión Energética | BQA-ONE</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        :root {
+            --color-primary: #015249;
+            --color-secondary: #726a95;
+            --color-light: #f4f6f8;
         }
-      } catch (e) { console.warn("Error parseando empresasData:", e); }
-    });
-  </script>
+        body {
+            background-color: var(--color-light);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        .bqa-navbar {
+            background-color: var(--color-primary);
+            color: #ffffff;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            width: 100%;
+            z-index: 1000;
+        }
+        .bqa-navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+        .bqa-navbar-brand img {
+            height: 38px;
+            object-fit: contain;
+        }
+        .bqa-user-info {
+            font-size: 0.9rem;
+            text-align: right;
+            color: white;
+        }
+        .bqa-nav-links {
+            margin-top: 4px;
+            font-size: 0.85rem;
+        }
+        .bqa-nav-links a {
+            color: var(--color-secondary);
+            background: #ffffff;
+            padding: 4px 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-left: 6px;
+            border: 1px solid transparent;
+        }
+        .bqa-nav-links a.btn-salir {
+            background: #d32f2f;
+            color: white;
+        }
+        .bqa-footer {
+            background-color: var(--color-secondary);
+            color: #ffffff;
+            text-align: center;
+            padding: 12px;
+            font-size: 0.85rem;
+            margin-top: auto;
+            width: 100%;
+        }
+        .nav-tabs .nav-link {
+            color: #6c757d;
+            font-weight: 500;
+            border-radius: 8px 8px 0 0;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            color: var(--color-primary) !important;
+            border-top: 3px solid var(--color-primary);
+            background-color: white;
+        }
+        .card-header.bg-primary {
+            background-color: var(--color-primary) !important;
+        }
+    </style>
 </head>
 <body>
-  <div id="mobileOverlay" class="sidebar-overlay" onclick="toggleMenu()"></div>
 
-  <div class="header">
-    <div class="d-flex align-items-center">
-      <button class="btn-hamburguesa" onclick="toggleMenu()">☰</button>
-      <h4 class="m-0 fw-bold" style="color: var(--color-primary);">Gestión Energética</h4>
-    </div>
-    <div class="d-none d-md-block text-center text-muted small fw-bold">
-      {{ nombre }} | {{ empresa }}
-    </div>
-    <div>
-      <a href="/logout" class="btn btn-outline-danger btn-sm">Salir</a>
-    </div>
-  </div>
-
-  <div class="layout">
-    <!-- BARRA LATERAL -->
-    <div class="sidebar-left" id="sidebarMenu">
-      <div class="d-lg-none p-3 border-bottom border-secondary mb-2 text-end">
-        <button class="btn btn-sm btn-light w-100" onclick="toggleMenu()">✕ Cerrar Menú</button>
-      </div>
-      
-      <div class="sidebar-section-title">NAVEGACIÓN</div>
-      <a href="/901811727.html" class="nav-item">
-        <span class="icon-spacer">⬅️</span> Volver al Hub Principal
-      </a>
-      
-      <div class="sidebar-section-title mt-3">MÓDULOS ACTIVOS</div>
-      <div id="listaClientesEnergia">
-        {% for cliente in clientes %}
-        <button class="nav-item" onclick="seleccionarClienteEnergia('{{ cliente.nit }}')">
-          <span class="icon-spacer">🏢</span> {{ cliente.nombre_comercial }}
-        </button>
-        {% endfor %}
-      </div>
-    </div>
-
-    <!-- CONTENIDO PRINCIPAL -->
-    <div class="main-content">
-      
-      <!-- PESTAÑAS (TABS) DE ENERGÉTICOS -->
-      <ul class="nav nav-tabs mb-4 border-bottom-0" id="energiaTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-          <button class="nav-link active" id="glp-tab" data-bs-toggle="tab" data-bs-target="#glp" type="button" role="tab">🔥 GLP / Gas Avícola</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="electricidad-tab" data-bs-toggle="tab" data-bs-target="#electricidad" type="button" role="tab">⚡ Electricidad</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="solar-tab" data-bs-toggle="tab" data-bs-target="#solar" type="button" role="tab">☀️ Solar</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="diesel-tab" data-bs-toggle="tab" data-bs-target="#diesel" type="button" role="tab">⛽ Diésel / Gasolina</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="carbon-tab" data-bs-toggle="tab" data-bs-target="#carbon" type="button" role="tab">🪨 Carbón</button>
-        </li>
-      </ul>
-
-      <!-- CONTENEDOR DE SUBMÓDULOS -->
-      <div class="tab-content" id="energiaTabsContent">
-        
-        <!-- SUBMÓDULO: GLP -->
-        <div class="tab-pane fade show active" id="glp" role="tabpanel" tabindex="0">
-          {% include '901811727_energia_glp.html' %}
+    <!-- NAVBAR OBLIGATORIO -->
+    <nav class="bqa-navbar">
+        <a href="#" class="bqa-navbar-brand">
+            <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360" onerror="this.style.display='none'">
+            <img src="{{ url_for('static', filename='logo_' ~ session.get('empresa_id', '') ~ '.png') }}" alt="Logo Cliente" onerror="this.style.display='none'">
+            <span style="font-weight: bold; font-size: 1.1rem; color: white;">Gestión Energética</span>
+        </a>
+        <div class="bqa-user-info">
+            <div>👤 <strong>{{ session.get('nombre', 'Usuario') }}</strong> | 🏢 {{ session.get('empresa', 'Empresa') }}</div>
+            <div class="bqa-nav-links">
+                <a href="/hub_administracion/dashboard">⬅ Volver al Hub</a>
+                <a href="/logout" class="btn-salir">Salir</a>
+            </div>
         </div>
+    </nav>
 
-        <!-- SUBMÓDULO: ELECTRICIDAD -->
-        <div class="tab-pane fade" id="electricidad" role="tabpanel" tabindex="0">
-          <div class="card border-0 shadow-sm p-5 text-center mt-3">
-            <h3 class="text-muted">Módulo de Electricidad</h3>
-            <p>Sección en construcción para monitoreo de red eléctrica y consumo KWh.</p>
-          </div>
-        </div>
+    <input type="hidden" id="csrf_token" value="{{ csrf_token() }}">
 
-        <!-- SUBMÓDULO: SOLAR -->
-        <div class="tab-pane fade" id="solar" role="tabpanel" tabindex="0">
-          <div class="card border-0 shadow-sm p-5 text-center mt-3">
-            <h3 class="text-muted">Módulo de Energía Solar</h3>
-            <p>Sección en construcción para generación fotovoltaica e inversores.</p>
-          </div>
-        </div>
+    <div class="container-fluid mt-4 px-4 flex-grow-1">
+        <!-- MENÚ HORIZONTAL DE ENERGÍAS -->
+        <ul class="nav nav-tabs" id="energiaTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="glp-tab" data-bs-toggle="tab" data-bs-target="#glp" type="button" role="tab">🔥 GLP / Gas Avícola</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-muted" disabled>⚡ Electricidad</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-muted" disabled>☀️ Solar</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-muted" disabled>⛽ Diésel / Combustible</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link text-muted" disabled>🪨 Carbón</button>
+            </li>
+        </ul>
 
-        <!-- SUBMÓDULO: DIÉSEL / GASOLINA -->
-        <div class="tab-pane fade" id="diesel" role="tabpanel" tabindex="0">
-          <div class="card border-0 shadow-sm p-5 text-center mt-3">
-            <h3 class="text-muted">Módulo de Diésel / Gasolina</h3>
-            <p>Sección en construcción para control de plantas eléctricas y motobombas.</p>
-          </div>
-        </div>
-        
-        <!-- SUBMÓDULO: CARBÓN -->
-        <div class="tab-pane fade" id="carbon" role="tabpanel" tabindex="0">
-          <div class="card border-0 shadow-sm p-5 text-center mt-3">
-            <h3 class="text-muted">Módulo de Carbón</h3>
-            <p>Sección en construcción para control de inventarios de sólidos térmicos.</p>
-          </div>
-        </div>
+        <!-- CONTENIDO PESTAÑAS -->
+        <div class="tab-content bg-white p-4 border border-top-0 shadow-sm mb-4" id="energiaTabsContent" style="border-radius: 0 0 8px 8px;">
+            
+            <!-- SUBMÓDULO: GLP -->
+            <div class="tab-pane fade show active" id="glp" role="tabpanel">
+                
+                <!-- SELECTOR DE EMPRESA POR URE_GLP -->
+                <div class="row mb-4 bg-light p-3 rounded border">
+                    <div class="col-md-6">
+                        <label class="fw-bold text-primary mb-2" style="color: var(--color-primary) !important;">🏢 Seleccione Empresa (Con URE GLP Habilitado):</label>
+                        <select id="clienteUreGlp" class="form-select form-select-lg shadow-sm border-primary fw-bold" onchange="activarEntornoCliente(this.value, this.options[this.selectedIndex].text)">
+                            <option value="">Cargando empresas...</option>
+                        </select>
+                    </div>
+                </div>
 
-      </div>
+                <!-- ENTORNO DE TRABAJO DINÁMICO -->
+                <div id="panelTrabajoGlp" style="display:none;">
+                    <div class="row g-4 mb-4">
+                        
+                        <!-- SECCIÓN: HERRAMIENTAS OPERATIVAS -->
+                        <div class="col-md-6">
+                            <div class="card border-primary h-100 shadow-sm">
+                                <div class="card-header bg-primary text-white fw-bold">🛠️ Operación e Informes GLP</div>
+                                <div class="card-body d-flex flex-column justify-content-center text-center">
+                                    <p class="text-muted small mb-4">Acceda a la generación de informes, validación de tanqueos y aprobación de pedidos para <span id="lblEmpresaOperativa" class="fw-bold text-dark"></span>.</p>
+                                    <button class="btn btn-primary btn-lg fw-bold w-100" style="background-color: var(--color-primary); border-color: var(--color-primary);" onclick="window.activarMenuEnergiaCliente(document.getElementById('clienteUreGlp').value)">
+                                        Desplegar Herramientas Térmicas
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SECCIÓN: CRUD DE CONFIGURACIÓN -->
+                        <div class="col-md-6">
+                            <div class="card border-success h-100 shadow-sm">
+                                <div class="card-header bg-success text-white fw-bold">⚙️ Configuración Maestra</div>
+                                <div class="card-body text-center">
+                                    <p class="text-muted small mb-4">Gestión comercial y estructural de GLP para la empresa seleccionada.</p>
+                                    <div class="d-flex gap-3 justify-content-center">
+                                        <button class="btn btn-outline-success fw-bold w-50 py-3" onclick="abrirCrudProveedores()">🚚 Gestionar Proveedores</button>
+                                        <button class="btn btn-outline-success fw-bold w-50 py-3" onclick="abrirCrudGranjas()">🏠 Gestionar Granjas/Sedes</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <hr class="my-4 text-primary opacity-25">
+
+                    <!-- INYECCIÓN DEL CÓDIGO EXISTENTE DE HERRAMIENTAS (901811727_energia_glp.html) -->
+                    <div id="contenedorVistaModuloGlp">
+                        {% include '901811727_energia_glp.html' %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- Inyección de Datos Globales para el Frontend -->
-  <script id="empresas-data" type="application/json">
-    {{ empresas | default([]) | tojson | safe }}
-  </script>
+    <!-- ========================================================================= -->
+    <!-- MODALES DE CRUD (PROVEEDORES Y GRANJAS) -->
+    <!-- ========================================================================= -->
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    function toggleMenu() {
-      const sidebar = document.getElementById('sidebarMenu');
-      const overlay = document.getElementById('mobileOverlay');
-      sidebar.classList.toggle('show');
-      overlay.classList.toggle('show');
-    }
+    <!-- MODAL CRUD PROVEEDORES -->
+    <div class="modal fade" id="modalCrudProveedores" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">🚚 Maestro de Proveedores GLP</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div class="card shadow-sm border-0 mb-4">
+                        <div class="card-body">
+                            <h6 class="fw-bold text-success mb-3 border-bottom pb-2">Registrar o Actualizar Proveedor</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Nombre Comercial</label>
+                                    <input type="text" id="provNombre" class="form-control fw-bold" placeholder="Ej. Multigas S.A.">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Precio / Kg ($)</label>
+                                    <input type="number" id="provPrecio" class="form-control" placeholder="Ej. 3700">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Correo Notificación 1</label>
+                                    <input type="email" id="provEmail1" class="form-control" placeholder="ejemplo@proveedor.com">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="small fw-bold">Correo Notificación 2</label>
+                                    <input type="email" id="provEmail2" class="form-control" placeholder="(Opcional)">
+                                </div>
+                                <div class="col-12 text-end">
+                                    <button class="btn btn-success fw-bold px-4" onclick="guardarProveedor()">💾 Guardar Proveedor</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6 class="fw-bold text-dark mb-2">Directorio Activo</h6>
+                    <div class="table-responsive bg-white shadow-sm border rounded">
+                        <table class="table table-hover table-bordered table-sm align-middle text-center mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Proveedor</th>
+                                    <th>Precio/Kg</th>
+                                    <th>Correos</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaProveedoresBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    function seleccionarClienteEnergia(nit) {
-        if (typeof activarMenuEnergiaCliente === 'function') {
-            activarMenuEnergiaCliente(nit);
+    <!-- MODAL CRUD GRANJAS MAESTRAS -->
+    <div class="modal fade" id="modalCrudGranjas" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">🏠 Maestro de Granjas y Sedes Operativas</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted">Seleccionar Sede a Editar o Escribir Nueva:</label>
+                            <input type="text" id="granjaUbicacion" class="form-control fw-bold border-success" placeholder="Nombre de la Granja" list="listaSedesExistentes" onchange="cargarDetalleGranja(this.value)">
+                            <datalist id="listaSedesExistentes"></datalist>
+                        </div>
+                    </div>
+
+                    <div id="panelEdicionGranja" style="display:none;" class="card shadow-sm border-0 mt-3">
+                        <div class="card-body">
+                            <h6 class="fw-bold text-success border-bottom pb-2 mb-3">Parámetros Operativos y Técnicos</h6>
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <label class="small fw-bold">Zona Geográfica</label>
+                                    <input type="text" id="granjaZona" class="form-control" placeholder="Ej. Norte">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small fw-bold">Clima Predominante</label>
+                                    <select id="granjaClima" class="form-select">
+                                        <option value="Cálido">☀️ Cálido</option>
+                                        <option value="Caliente">🔥 Caliente</option>
+                                        <option value="Frío">❄️ Frío</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small fw-bold">Tecnología de Galpón</label>
+                                    <select id="granjaTecnologia" class="form-select">
+                                        <option value="Convencional">Convencional</option>
+                                        <option value="Semicontrolado">Semicontrolado</option>
+                                        <option value="Ambiente Controlado">Ambiente Controlado</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small fw-bold">Proveedor Asignado</label>
+                                    <select id="granjaProveedorSelect" class="form-select"></select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small fw-bold">Límite Inferior (Ahorro)</label>
+                                    <input type="number" step="0.0001" id="granjaLimInf" class="form-control text-success fw-bold" placeholder="kg/ave">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="small fw-bold">Límite Superior (Sobrecosto)</label>
+                                    <input type="number" step="0.0001" id="granjaLimSup" class="form-control text-danger fw-bold" placeholder="kg/ave">
+                                </div>
+                            </div>
+
+                            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Matriz de Tanques Instalados</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm text-center align-middle bg-white">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Identificador (Ej. TK-1)</th>
+                                            <th>Capacidad Real (Galones)</th>
+                                            <th>Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tablaTanquesGranjaBody"></tbody>
+                                </table>
+                            </div>
+                            <button class="btn btn-outline-primary btn-sm fw-bold w-100 mt-2" onclick="agregarFilaTanqueCrud('', '')">+ Añadir Tanque Físico</button>
+
+                            <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                                <button class="btn btn-danger fw-bold px-4" id="btnEliminarGranja" onclick="eliminarGranjaActual()">🗑️ Eliminar Sede Completa</button>
+                                <button class="btn btn-success fw-bold px-4" onclick="guardarGranjaCompleta()">💾 Guardar Configuración Transaccional</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER OBLIGATORIO -->
+    <footer class="bqa-footer">
+        BQA-ONE © 2026 |
+    </footer>
+
+    <script>
+        // INIT: Llenar el selector de empresas habilitadas con URE_GLP
+        document.addEventListener("DOMContentLoaded", function() {
+            fetch('/glp/admin/obtener_empresas_ure', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.getElementById('csrf_token').value },
+                body: JSON.stringify({ tipo_ure: 'URE_GLP' })
+            }).then(res => res.json()).then(data => {
+                const selector = document.getElementById('clienteUreGlp');
+                if(data.success && data.empresas.length > 0) {
+                    selector.innerHTML = '<option value="">-- Seleccione una Empresa --</option>';
+                    data.empresas.forEach(emp => {
+                        selector.innerHTML += `<option value="${emp.nit}">${emp.nombre_comercial}</option>`;
+                    });
+                } else {
+                    selector.innerHTML = '<option value="">No hay empresas con URE GLP habilitado.</option>';
+                }
+            }).catch(err => console.error("Error obteniendo URE:", err));
+        });
+
+        // Activa el entorno transaccional para la empresa seleccionada
+        function activarEntornoCliente(nit, nombre) {
+            const panel = document.getElementById('panelTrabajoGlp');
+            if (nit) {
+                document.getElementById('lblEmpresaOperativa').textContent = nombre;
+                panel.style.display = 'block';
+                // Si la vista heredada de herramientas estaba abierta, la reseteamos
+                if(typeof window.cerrarVistasGLP === 'function') {
+                    window.cerrarVistasGLP();
+                }
+            } else {
+                panel.style.display = 'none';
+            }
         }
-        if (window.innerWidth < 992) {
-          toggleMenu();
+
+        // =========================================================================================
+        // CRUD PROVEEDORES
+        // =========================================================================================
+        function abrirCrudProveedores() {
+            const modal = new bootstrap.Modal(document.getElementById('modalCrudProveedores'));
+            listarProveedores();
+            modal.show();
         }
-    }
-  </script>
+
+        function listarProveedores() {
+            const tbody = document.getElementById('tablaProveedoresBody');
+            tbody.innerHTML = '<tr><td colspan="4"><span class="spinner-border spinner-border-sm"></span> Cargando...</td></tr>';
+            
+            fetch('/glp/admin/proveedores/listar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.getElementById('csrf_token').value }
+            }).then(r=>r.json()).then(data => {
+                tbody.innerHTML = '';
+                if(data.success) {
+                    let comboGranjas = document.getElementById('granjaProveedorSelect');
+                    if(comboGranjas) comboGranjas.innerHTML = '<option value="">-- Sin Asignar --</option>';
+
+                    data.proveedores.forEach(p => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td class="fw-bold text-start">${p.proveedor}</td>
+                                <td>$${Number(p.precio).toLocaleString()}</td>
+                                <td class="small text-muted">${p.email1 || '-'} <br> ${p.email2 || ''}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editarProveedorFront('${p.proveedor}', ${p.precio}, '${p.email1}', '${p.email2}')">✏️</button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="eliminarProveedor('${p.proveedor}')">🗑️</button>
+                                </td>
+                            </tr>
+                        `;
+                        if(comboGranjas) comboGranjas.innerHTML += `<option value="${p.proveedor}">${p.proveedor}</option>`;
+                    });
+                }
+            });
+        }
+
+        function editarProveedorFront(nombre, precio, e1, e2) {
+            document.getElementById('provNombre').value = nombre;
+            document.getElementById('provPrecio').value = precio;
+            document.getElementById('provEmail1').value = e1 !== 'null' ? e1 : '';
+            document.getElementById('provEmail2').value = e2 !== 'null' ? e2 : '';
+        }
+
+        function guardarProveedor() {
+            if(!window.confirm("¿Está seguro de guardar o actualizar este proveedor?")) return;
+            
+            const prov = document.getElementById('provNombre').value.trim();
+            const prec = parseFloat(document.getElementById('provPrecio').value) || 0;
+            const e1 = document.getElementById('provEmail1').value.trim();
+            const e2 = document.getElementById('provEmail2').value.trim();
+            
+            if(!prov) { alert("Nombre de proveedor obligatorio."); return; }
+
+            fetch('/glp/admin/proveedores/guardar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.getElementById('csrf_token').value },
+                body: JSON.stringify({ proveedor: prov, precio: prec, email1: e1, email2: e2 })
+            }).then(r=>r.json()).then(data => {
+                if(data.success) {
+                    alert("Proveedor guardado correctamente.");
+                    document.getElementById('provNombre').value = '';
+                    document.getElementById('provPrecio').value = '';
+                    document.getElementById('provEmail1').value = '';
+                    document.getElementById('provEmail2').value = '';
+                    listarProveedores();
+                } else {
+                    alert("Error: " + data.message);
+                }
+            });
+        }
+
+        function eliminarProveedor(nombre) {
+            if(!window.confirm("¿Está seguro de eliminar el proveedor " + nombre + "? Esta acción no se puede deshacer.")) return;
+            
+            fetch('/glp/admin/proveedores/eliminar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.getElementById('csrf_token').value },
+                body: JSON.stringify({ proveedor: nombre })
+            }).then(r=>r.json()).then(data => {
+                if(data.success) {
+                    alert("Proveedor eliminado.");
+                    listarProveedores();
+                } else {
+                    alert("Error: " + data.message);
+                }
+            });
+        }
+
+        // =========================================================================================
+        // CRUD GRANJAS Y TANQUES
+        // =========================================================================================
+        function abrirCrudGranjas() {
+            const empId = document.getElementById('clienteUreGlp').value;
+            if(!empId) return alert("Seleccione primero una empresa.");
+            
+            // Llenar datalist
+            fetch('/obtener_ubicaciones', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.getElementById('csrf_token').value },
+                body: JSON.stringify({ tipo: 'granja', empresa_id: empId })
+            }).then(r=>r.json()).then(data => {
+                const datalist = document.getElementById('listaSedesExistentes');
+                datalist.innerHTML = '';
+                if(data.success) {
+                    data.ubicaciones.forEach(u => {
+                        datalist.innerHTML += `<option value="${u}">`;
+                    });
+                }
+                document.getElementById('granjaUbicacion').value = '';
+                document.getElementById('panelEdicionGranja').style.display = 'none';
+                
+                // Forzar carga de proveedores en el combo
+                listarProveedores();
+                
+                new bootstrap.Modal(document.getElementById('modalCrudGranjas')).show();
+            });
+        }
+
+        function cargarDetalleGranja(ubicacion) {
+            const empId = document.getElementById('clienteUreGlp').value;
+            if(!ubicacion.trim()) {
+                document.getElementById('panelEdicionGranja').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('panelEdicionGranja').style.display = 'block';
+            const btnDel = document.getElementById('btnEliminarGranja');
+
+            fetch('/obtener_tanques_granja', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.getElementById('csrf_token').value },
+                body: JSON.stringify({ empresa_id: empId, ubicacion: ubicacion })
+            }).then(r=>r.json()).then(data => {
+                const tb = document.getElementById('tablaTanquesGranjaBody');
+                tb.innerHTML = '';
+
+                if(data.success) {
+                    btnDel.style.display = 'inline-block';
+                    document.getElementById('granjaZona').value = data.general.zona || '';
+                    document.getElementById('granjaClima').value = data.general.clima || 'Cálido';
+                    document.getElementById('granjaTecnologia').value = data.general.tecnologia || 'Convencional';
+                    document.getElementById('granjaProveedorSelect').value = data.general.proveedor || '';
+                    document.getElementById('granjaLimInf').value = data.general.limite_inferior || '';
+                    document.getElementById('granjaLimSup').value = data.general.limite_superior || '';
+                    
+                    data.tanques.forEach(tk => agregarFilaTanqueCrud(tk.nombre_tanque, tk.capacidad));
+                } else {
+                    // Granja Nueva
+                    btnDel.style.display = 'none';
+                    document.getElementById('granjaZona').value = '';
+                    document.getElementById('granjaClima').value = 'Cálido';
+                    document.getElementById('granjaTecnologia').value = 'Convencional';
+                    document.getElementById('granjaProveedorSelect').value = '';
+                    document.getElementById('granjaLimInf').value = '';
+                    document.getElementById('granjaLimSup').value = '';
+                    agregarFilaTanqueCrud('TK-1', '250');
+                }
+            });
+        }
+
+        function agregarFilaTanqueCrud(nombre, cap) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" class="form-control text-center fw-bold tk-nom" value="${nombre}" placeholder="TK-X"></td>
+                <td><input type="number" class="form-control text-center tk-cap" value="${cap}"></td>
+                <td><button class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">X</button></td>
+            `;
+            document.getElementById('tablaTanquesGranjaBody').appendChild(tr);
+        }
+
+        function guardarGranjaCompleta() {
+            if(!window.confirm("¿Está seguro de guardar o actualizar la estructura transaccional de esta granja?")) return;
+            
+            const empId = document.getElementById('clienteUreGlp').value;
+            const ubi = document.getElementById('granjaUbicacion').value.trim();
+            if(!ubi) return alert("Nombre de granja inválido.");
+
+            const zona = document.getElementById('granjaZona').value.trim();
+            const clima = document.getElementById('granjaClima').value;
+            const tech = document.getElementById('granjaTecnologia').value;
+            const prov = document.getElementById('granjaProveedorSelect').value;
+            const linf = parseFloat(document.getElementById('granjaLimInf').value) || 0;
+            const lsup = parseFloat(document.getElementById('granjaLimSup').value) || 0;
+
+            const filas = document.getElementById('tablaTanquesGranjaBody').querySelectorAll('tr');
+            let arrayTanques = [];
+            filas.forEach(f => {
+                const nom = f.querySelector('.tk-nom').value.trim();
+                const cap = parseFloat(f.querySelector('.tk-cap').value) || 0;
+                if(nom && cap > 0) arrayTanques.push({ nombre: nom, capacidad: cap });
+            });
+
+            if(arrayTanques.length === 0) return alert("Debe definir al menos un tanque con capacidad.");
+
+            fetch('/guardar_tanques_granja', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.getElementById('csrf_token').value },
+                body: JSON.stringify({
+                    empresa_id: empId, ubicacion: ubi, zona: zona, clima: clima, tecnologia: tech, 
+                    proveedor: prov, limite_inferior: linf, limite_superior: lsup, tanques: arrayTanques
+                })
+            }).then(r=>r.json()).then(data => {
+                if(data.success) {
+                    alert("Granja guardada exitosamente.");
+                    abrirCrudGranjas(); // Refrescar modal
+                } else {
+                    alert("Error: " + data.message);
+                }
+            });
+        }
+
+        function eliminarGranjaActual() {
+            const ubi = document.getElementById('granjaUbicacion').value.trim();
+            if(!window.confirm("¿ALERTA CRÍTICA: Está seguro de eliminar la granja " + ubi + " y su configuración de tanques?")) return;
+            
+            const empId = document.getElementById('clienteUreGlp').value;
+            
+            fetch('/glp/admin/eliminar_granja', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.getElementById('csrf_token').value },
+                body: JSON.stringify({ empresa_id: empId, ubicacion: ubi })
+            }).then(r=>r.json()).then(data => {
+                if(data.success) {
+                    alert("Sede eliminada.");
+                    abrirCrudGranjas();
+                } else {
+                    alert("Error: " + data.message);
+                }
+            });
+        }
+    </script>
 </body>
 </html>

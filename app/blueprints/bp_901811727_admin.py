@@ -595,6 +595,106 @@ def registrar_contacto():
     return jsonify(success=False, message="Error de concurrencia.")
 
 # ==============================================================================
+# NUEVO: GESTIÓN MAESTRA DE SEDES (GRANJAS, BODEGAS, OFICINAS, PLANTAS)
+# ==============================================================================
+
+@csrf.exempt
+@bp_admin.route('/gestionar_sede', methods=['POST'])
+@login_required_custom
+def gestionar_sede():
+    d = request.form
+    empresa_id = d.get('id_empresa') or session.get('empresa_id')
+    if not empresa_id:
+        return jsonify(success=False, message="Falta ID de empresa (Validación Multi-Tenant requerida).")
+
+    # Extraer campos JSON
+    fuentes_energia = request.form.getlist('fuentes_energia[]')
+    if not fuentes_energia:
+        fuentes_energia = request.form.getlist('fuentes_energia')
+        
+    tecnologia_alternativa = request.form.getlist('tecnologia_alternativa[]')
+    if not tecnologia_alternativa:
+        tecnologia_alternativa = request.form.getlist('tecnologia_alternativa')
+        
+    kpi_eficiencia = d.get('kpi_eficiencia', '{}')
+
+    for intento in range(3):
+        cur = mysql.connection.cursor()
+        try:
+            if d.get('accion') == 'crear':
+                cur.execute("""
+                    INSERT INTO sedes_empresas 
+                    (empresa_id, empresa_nombre, nombre_sede, tipo_sede, clima, tecnologia_produccion, unidad_produccion, fuentes_energia, tecnologia_alternativa, kpi_eficiencia)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    empresa_id, 
+                    d.get('empresa_nombre', ''), 
+                    d.get('nombre_sede'), 
+                    d.get('tipo_sede'), 
+                    d.get('clima'), 
+                    d.get('tecnologia_produccion'), 
+                    d.get('unidad_produccion'), 
+                    json.dumps(fuentes_energia), 
+                    json.dumps(tecnologia_alternativa), 
+                    kpi_eficiencia
+                ))
+                msg = "Sede creada exitosamente."
+            elif d.get('accion') == 'eliminar':
+                cur.execute("SELECT id FROM sedes_empresas WHERE id=%s AND empresa_id=%s FOR UPDATE", (d.get('id'), empresa_id))
+                cur.execute("DELETE FROM sedes_empresas WHERE id=%s AND empresa_id=%s", (d.get('id'), empresa_id))
+                msg = "Sede eliminada correctamente."
+            else:
+                cur.execute("SELECT id FROM sedes_empresas WHERE id=%s AND empresa_id=%s FOR UPDATE", (d.get('id'), empresa_id))
+                cur.execute("""
+                    UPDATE sedes_empresas 
+                    SET nombre_sede=%s, tipo_sede=%s, clima=%s, tecnologia_produccion=%s, unidad_produccion=%s, fuentes_energia=%s, tecnologia_alternativa=%s, kpi_eficiencia=%s
+                    WHERE id=%s AND empresa_id=%s
+                """, (
+                    d.get('nombre_sede'), 
+                    d.get('tipo_sede'), 
+                    d.get('clima'), 
+                    d.get('tecnologia_produccion'), 
+                    d.get('unidad_produccion'), 
+                    json.dumps(fuentes_energia), 
+                    json.dumps(tecnologia_alternativa), 
+                    kpi_eficiencia, 
+                    d.get('id'), 
+                    empresa_id
+                ))
+                msg = "Sede actualizada exitosamente."
+                
+            registrar_operacion_bqa(cur, 'GESTION_SEDE', d)
+            mysql.connection.commit()
+            return jsonify(success=True, message=msg)
+        except Exception as e: 
+            mysql.connection.rollback()
+            if ('1213' in str(e) or 'Deadlock' in str(e)) and intento < 2:
+                time.sleep(0.5)
+                continue
+            return jsonify(success=False, message=str(e))
+        finally: 
+            cur.close()
+    return jsonify(success=False, message="Error de concurrencia.")
+
+@bp_admin.route('/obtener_todas_sedes')
+@login_required_custom
+def obtener_todas_sedes():
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT id, empresa_id, empresa_nombre, nombre_sede, tipo_sede, clima, 
+               tecnologia_produccion, unidad_produccion, fuentes_energia, 
+               tecnologia_alternativa, kpi_eficiencia 
+        FROM sedes_empresas
+    """)
+    rows = cur.fetchall()
+    cols = ['id', 'empresa_id', 'empresa_nombre', 'nombre_sede', 'tipo_sede', 'clima', 
+            'tecnologia_produccion', 'unidad_produccion', 'fuentes_energia', 
+            'tecnologia_alternativa', 'kpi_eficiencia']
+    res = [dict(zip(cols, r)) if not isinstance(r, dict) else r for r in rows]
+    cur.close()
+    return jsonify(success=True, sedes=res)
+
+# ==============================================================================
 # RUTAS DE LECTURA (PARA LLENAR LAS TABLAS DEL FRONTEND)
 # ==============================================================================
 
