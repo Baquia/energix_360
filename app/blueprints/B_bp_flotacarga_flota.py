@@ -13,7 +13,7 @@ from email.mime.text import MIMEText
 from email.utils import make_msgid, formatdate
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash, current_app, send_file
+from flask import Blueprint, render_template, session, redirect, url_for, request, flash, current_app, send_file, jsonify
 from werkzeug.utils import secure_filename
 from PIL import Image
 from app import mysql, bcrypt
@@ -42,13 +42,43 @@ EMAIL_PASS = os.environ.get("EMAIL_PASS")
 EMAIL_FROM = os.environ.get("EMAIL_FROM", EMAIL_USER)
 
 # ==============================================================================
+# RUTINA LOCAL DE AUDITORÍA (SANA ERROR 500 TRAS COMMIT)
+# ==============================================================================
+def registrar_operacion_bqa_local(cur, accion, datos_afectados):
+    """
+    Registra operaciones CRUD en la tabla global de auditoría exigida, 
+    atrapando cualquier excepción para no romper la ejecución del backend.
+    """
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                empresa VARCHAR(150),
+                empresa_id VARCHAR(50),
+                backend_emisor VARCHAR(100),
+                usuario VARCHAR(100),
+                cedula VARCHAR(50),
+                accion VARCHAR(100),
+                datos JSON
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        emp = session.get('empresa', 'Sistema')
+        emp_id = session.get('empresa_id', 'N/A')
+        usr = session.get('nombre', 'N/A')
+        ced = session.get('cedula', 'N/A')
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (emp, emp_id, 'B_bp_flotacarga_flota.py', usr, ced, accion, json.dumps(datos_afectados)))
+    except Exception as e:
+        print(f"Error auditoría local BQA-ONE en flota: {e}")
+
+# ==============================================================================
 # RUTINAS AUXILIARES Y DE INTEGRIDAD DE DATOS PESV
 # ==============================================================================
 def _enviar_email_vencimientos_carga_hilo(destinatarios, empresa_nombre, alertas_vehiculos, alertas_conductores):
-    """
-    Envía el reporte corporativo de alertas de vencimiento en segundo plano
-    sin interrumpir la solicitud original.
-    """
     def tarea():
         if not EMAIL_USER or not EMAIL_PASS or not destinatarios:
             return
@@ -179,20 +209,14 @@ def _enviar_email_vencimientos_carga_hilo(destinatarios, empresa_nombre, alertas
     hilo.start()
 
 def asegurar_tablas_carga():
-    """
-    Rutina de inyección en caliente para garantizar la existencia de columnas 
-    de estado requeridas por el Motor Operativo y Auditoría PESV, evitando el Error 500.
-    """
     try:
         cur = mysql.connection.cursor()
-        # Verificación y creación para Vehículos Carga
         cur.execute("SHOW COLUMNS FROM vehiculos LIKE 'estado_soat'")
         if not cur.fetchone():
             cur.execute("ALTER TABLE vehiculos ADD COLUMN estado_soat VARCHAR(50) DEFAULT 'Actualizado'")
             cur.execute("ALTER TABLE vehiculos ADD COLUMN estado_tecnomecanica VARCHAR(50) DEFAULT 'Actualizado'")
             cur.execute("ALTER TABLE vehiculos ADD COLUMN estado_poliza_rce VARCHAR(50) DEFAULT 'Actualizado'")
             
-        # Verificación y creación para Conductores Carga
         cur.execute("SHOW COLUMNS FROM conductores_carga LIKE 'estado_licencia'")
         if not cur.fetchone():
             cur.execute("ALTER TABLE conductores_carga ADD COLUMN estado_licencia VARCHAR(50) DEFAULT 'Actualizado'")
@@ -206,10 +230,6 @@ def asegurar_tablas_carga():
         print(f"Aviso asegurando tablas de carga: {e}")
 
 def calcular_vencimiento_ss(cedula, ultimo_pago_str):
-    """
-    Motor de recálculo: Determina la fecha límite hábil del mes siguiente
-    basado en los últimos dos dígitos de la cédula (Decreto 1990).
-    """
     if not ultimo_pago_str or not cedula: return None
     try:
         ult_pago = datetime.strptime(str(ultimo_pago_str).strip(), '%Y-%m-%d').date()
@@ -217,7 +237,6 @@ def calcular_vencimiento_ss(cedula, ultimo_pago_str):
         if not cedula_str: return None
         ult_digitos = int(cedula_str[-2:]) if len(cedula_str) >= 2 else int(cedula_str)
         
-        # Matriz de días hábiles Decreto 1990
         dia_habil = 2
         if 8 <= ult_digitos <= 14: dia_habil = 3
         elif 15 <= ult_digitos <= 21: dia_habil = 4
@@ -239,7 +258,7 @@ def calcular_vencimiento_ss(cedula, ultimo_pago_str):
         fecha_actual = mes_siguiente
         
         while True:
-            if fecha_actual.weekday() < 5: # Lunes a Viernes (0-4)
+            if fecha_actual.weekday() < 5:
                 dias_contados += 1
             if dias_contados == dia_habil:
                 break
@@ -251,10 +270,6 @@ def calcular_vencimiento_ss(cedula, ultimo_pago_str):
         return None
 
 def calcular_vencimiento_licencia(fecha_exp_str, fecha_nac_str, categoria):
-    """
-    Motor de recálculo: Proyecta la vigencia de la licencia según la edad
-    del conductor al momento de expedición y su categoría.
-    """
     if not fecha_exp_str or not fecha_nac_str: return None
     try:
         f_exp = datetime.strptime(str(fecha_exp_str).strip(), '%Y-%m-%d').date()
@@ -284,26 +299,28 @@ def gestor_flota_required(f):
         perfil = str(session.get('perfil', '')).strip().lower()
         tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
         
+        # INYECCIÓN PERFIL CONTROLADOR_PESV
         perfiles_permitidos = [
             'gestor_flotacarga', 
             'controlador_transportecarga', 
             'controlador_flotacarga', 
-            'controlador_logistica', 
+            'controlador_logistica',
+            'controlador_pesv', 
             'webmaster'
         ]
         
         if perfil not in perfiles_permitidos and 'webmaster' not in tipo_empresa:
-            flash('Acceso denegado: Se requiere perfil de Gestor/Controlador de Flota.', 'danger')
-            return redirect('/gestor_flota/dashboard')
+            flash('Acceso denegado: Se requiere perfil de Gestor/Controlador de Flota o PESV.', 'danger')
+            return redirect(url_for('panel_principal'))
             
-        if 'webmaster' not in tipo_empresa:
+        if 'webmaster' not in tipo_empresa and perfil != 'controlador_pesv':
             autorizados = session.get('submodulos_activos', [])
             if not autorizados:
                 autorizados = session.get('modulos_activos', [])
                 
             if not any(m in autorizados for m in ['controlador_flota', 'flota', 'carga']):
                 flash('Acceso denegado: Tu empresa no tiene activo este submódulo.', 'danger')
-                return redirect('/gestor_flota/dashboard')
+                return redirect(url_for('panel_principal'))
                 
         return f(*args, **kwargs)
     return decorated_function
@@ -312,25 +329,17 @@ def gestor_flota_required(f):
 # MOTOR DE CONVERSIÓN Y PROCESAMIENTO DE ARCHIVOS
 # ==============================================================================
 def procesar_archivo_pdf(archivo, identificador, tipo_doc, empresa_id):
-    """
-    Recibe un archivo (FileStorage de Flask).
-    Si es FOTO_FACIAL, la guarda en su formato original de imagen para reconocimiento biométrico.
-    Para los demás, si es PDF lo guarda directo; si es imagen, la convierte a PDF mediante Pillow.
-    Retorna la ruta relativa para almacenar en BD.
-    """
     if not archivo or archivo.filename == '':
         return None
     
     filename = secure_filename(archivo.filename)
     ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
     
-    # Ruta física: app/static/uploads/flotacarga/documentos/<empresa_id>/<identificador>/
     base_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'flotacarga', 'documentos', str(empresa_id), str(identificador).upper())
     os.makedirs(base_dir, exist_ok=True)
     
     timestamp = int(time.time())
     
-    # Excepción para Foto Facial: mantener como imagen
     if tipo_doc == 'FOTO_FACIAL':
         nuevo_nombre = f"{tipo_doc}_{identificador}_{timestamp}.{ext}"
         ruta_fisica = os.path.join(base_dir, nuevo_nombre)
@@ -342,7 +351,6 @@ def procesar_archivo_pdf(archivo, identificador, tipo_doc, empresa_id):
             print(f"Error procesando foto facial: {e}")
             return None
 
-    # Procesamiento estándar a PDF para documentos
     nuevo_nombre = f"{tipo_doc}_{identificador}_{timestamp}.pdf"
     ruta_fisica = os.path.join(base_dir, nuevo_nombre)
     ruta_bd = f"uploads/flotacarga/documentos/{empresa_id}/{str(identificador).upper()}/{nuevo_nombre}"
@@ -354,10 +362,9 @@ def procesar_archivo_pdf(archivo, identificador, tipo_doc, empresa_id):
             image = Image.open(archivo)
             if image.mode != 'RGB':
                 image = image.convert('RGB')
-            # Convertir y guardar en formato PDF
             image.save(ruta_fisica, 'PDF', resolution=100.0)
         else:
-            return None # Extensión no soportada
+            return None
         return ruta_bd
     except Exception as e:
         print(f"Error procesando archivo a PDF: {e}")
@@ -379,6 +386,7 @@ def gestion_vehiculos():
     asegurar_tablas_carga()
     empresa_id = session.get('empresa_id')
     empresa_nombre = session.get('empresa')
+    tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
 
     if request.method == 'POST':
         accion = request.form.get('accion')
@@ -409,27 +417,47 @@ def gestion_vehiculos():
 
                 cur = mysql.connection.cursor()
                 try:
-                    cur.execute("""
-                        INSERT INTO vehiculos (
-                            empresa, id_empresa, placa, tipo, caja_de_carga, referencia, peso_vacio, `capacidad (kg)`, propiedad,
-                            id_tarjeta_propiedad, ruta_tarjeta_propiedad,
+                    # BIFURCACIÓN DE TABLA SEGÚN TIPO DE EMPRESA
+                    if tipo_empresa == 'transporte_especial':
+                        cur.execute("""
+                            INSERT INTO vehiculos_especial (
+                                id_empresa, placa, clase, carroceria, linea, capacidad, tipo_vinculacion,
+                                ruta_pdf_tarjeta_propiedad,
+                                numero_poliza_soat, vencimiento_soat, ruta_pdf_soat,
+                                numero_certificado_rtm, vencimiento_rtm, ruta_pdf_tecnomecanica,
+                                numero_poliza_rcc_rce, aseguradora_rcc_rce, vencimiento_rcc_rce, ruta_pdf_rcc_rce,
+                                estado_soat, estado_rtm, estado_rcc_rce
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Actualizado', 'Actualizado', 'Actualizado')
+                        """, (
+                            empresa_id, placa, tipo, caja_de_carga, referencia, capacidad, propiedad,
+                            ruta_tarjeta,
                             id_soat, vencimiento_soat, ruta_soat,
-                            id_tecnomecanica, vencimiento_tecnomecanica, ruta_tecnomecanica,
-                            id_poliza_rce, aseguradora_rce, vencimiento_poliza_rce, ruta_poliza_rce,
-                            estado_soat, estado_tecnomecanica, estado_poliza_rce
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Actualizado', 'Actualizado', 'Actualizado')
-                    """, (
-                        empresa_nombre, empresa_id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad,
-                        id_tarjeta_propiedad, ruta_tarjeta,
-                        id_soat, vencimiento_soat, ruta_soat,
-                        id_tecnomecanica, vencimiento_tecnomecanica, ruta_tecno,
-                        id_poliza_rce, aseguradora_rce, vencimiento_poliza_rce, ruta_rce
-                    ))
+                            id_tecnomecanica, vencimiento_tecnomecanica, ruta_tecno,
+                            id_poliza_rce, aseguradora_rce, vencimiento_poliza_rce, ruta_rce
+                        ))
+                    else:
+                        cur.execute("""
+                            INSERT INTO vehiculos (
+                                empresa, id_empresa, placa, tipo, caja_de_carga, referencia, peso_vacio, `capacidad (kg)`, propiedad,
+                                id_tarjeta_propiedad, ruta_tarjeta_propiedad,
+                                id_soat, vencimiento_soat, ruta_soat,
+                                id_tecnomecanica, vencimiento_tecnomecanica, ruta_tecnomecanica,
+                                id_poliza_rce, aseguradora_rce, vencimiento_poliza_rce, ruta_poliza_rce,
+                                estado_soat, estado_tecnomecanica, estado_poliza_rce
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Actualizado', 'Actualizado', 'Actualizado')
+                        """, (
+                            empresa_nombre, empresa_id, placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad,
+                            id_tarjeta_propiedad, ruta_tarjeta,
+                            id_soat, vencimiento_soat, ruta_soat,
+                            id_tecnomecanica, vencimiento_tecnomecanica, ruta_tecno,
+                            id_poliza_rce, aseguradora_rce, vencimiento_poliza_rce, ruta_rce
+                        ))
+                    
+                    registrar_operacion_bqa_local(cur, 'CREAR_VEHICULO', {'placa': placa, 'tipo_empresa': tipo_empresa})
                     mysql.connection.commit()
                     flash(f"Vehículo con placa {placa} registrado correctamente.", "success")
                 except Exception as e:
                     mysql.connection.rollback()
-                    # Rollback físico de archivos huérfanos
                     for ruta_relativa in filter(None, [ruta_tarjeta, ruta_soat, ruta_tecno, ruta_rce]):
                         ruta_fisica = os.path.join(current_app.static_folder, ruta_relativa)
                         if os.path.exists(ruta_fisica):
@@ -439,54 +467,77 @@ def gestion_vehiculos():
                     if hasattr(e, 'args') and e.args[0] == 1062:
                         flash("La placa del vehículo ya se encuentra registrada en el sistema.", "warning")
                     else:
-                        flash("Ocurrió una interrupción temporal al procesar la solicitud. Por favor, verifica los datos e intenta nuevamente.", "danger")
+                        print(f"Error Inserción DB Vehículos: {e}")
+                        flash("Ocurrió un error al registrar el vehículo. Verifica los datos.", "danger")
                 finally:
                     cur.close()
 
         elif accion == 'editar':
             vehiculo_id = request.form.get('vehiculo_id')
-            
             if vehiculo_id and placa and caja_de_carga and tipo:
                 cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
                 try:
-                    cur.execute("SELECT * FROM vehiculos WHERE id = %s AND id_empresa = %s", (vehiculo_id, empresa_id))
+                    tabla_consulta = 'vehiculos_especial' if tipo_empresa == 'transporte_especial' else 'vehiculos'
+                    cur.execute(f"SELECT * FROM {tabla_consulta} WHERE id = %s AND id_empresa = %s", (vehiculo_id, empresa_id))
                     old_data = cur.fetchone()
                     
                     if old_data:
-                        # Extraer solo archivos nuevos
                         new_ruta_tarjeta = procesar_archivo_pdf(request.files.get('archivo_tarjeta_propiedad'), placa, 'TARJETA_PROP', empresa_id)
                         new_ruta_soat = procesar_archivo_pdf(request.files.get('archivo_soat'), placa, 'SOAT', empresa_id)
                         new_ruta_tecno = procesar_archivo_pdf(request.files.get('archivo_tecnomecanica'), placa, 'TECNOMECANICA', empresa_id)
                         new_ruta_rce = procesar_archivo_pdf(request.files.get('archivo_poliza_rce'), placa, 'POLIZA_RCE', empresa_id)
                         
-                        ruta_tarjeta = new_ruta_tarjeta or old_data.get('ruta_tarjeta_propiedad')
-                        ruta_soat = new_ruta_soat or old_data.get('ruta_soat')
-                        ruta_tecno = new_ruta_tecno or old_data.get('ruta_tecnomecanica')
-                        ruta_rce = new_ruta_rce or old_data.get('ruta_poliza_rce')
-                        
-                        cur = mysql.connection.cursor()
-                        cur.execute("""
-                            UPDATE vehiculos 
-                            SET placa = %s, tipo = %s, caja_de_carga = %s, referencia = %s, peso_vacio = %s, `capacidad (kg)` = %s, propiedad = %s,
-                                id_tarjeta_propiedad = %s, ruta_tarjeta_propiedad = %s,
-                                id_soat = %s, vencimiento_soat = %s, ruta_soat = %s,
-                                id_tecnomecanica = %s, vencimiento_tecnomecanica = %s, ruta_tecnomecanica = %s,
-                                id_poliza_rce = %s, aseguradora_rce = %s, vencimiento_poliza_rce = %s, ruta_poliza_rce = %s,
-                                estado_soat = 'Actualizado', estado_tecnomecanica = 'Actualizado', estado_poliza_rce = 'Actualizado'
-                            WHERE id = %s AND id_empresa = %s
-                        """, (
-                            placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad,
-                            id_tarjeta_propiedad, ruta_tarjeta,
-                            id_soat, vencimiento_soat, ruta_soat,
-                            id_tecnomecanica, vencimiento_tecnomecanica, ruta_tecno,
-                            id_poliza_rce, aseguradora_rce, vencimiento_poliza_rce, ruta_rce,
-                            vehiculo_id, empresa_id
-                        ))
+                        if tipo_empresa == 'transporte_especial':
+                            ruta_tarjeta = new_ruta_tarjeta or old_data.get('ruta_pdf_tarjeta_propiedad')
+                            ruta_soat = new_ruta_soat or old_data.get('ruta_pdf_soat')
+                            ruta_tecno = new_ruta_tecno or old_data.get('ruta_pdf_tecnomecanica')
+                            ruta_rce = new_ruta_rce or old_data.get('ruta_pdf_rcc_rce')
+                            
+                            cur.execute("""
+                                UPDATE vehiculos_especial 
+                                SET placa = %s, clase = %s, carroceria = %s, linea = %s, capacidad = %s, tipo_vinculacion = %s,
+                                    ruta_pdf_tarjeta_propiedad = %s,
+                                    numero_poliza_soat = %s, vencimiento_soat = %s, ruta_pdf_soat = %s,
+                                    numero_certificado_rtm = %s, vencimiento_rtm = %s, ruta_pdf_tecnomecanica = %s,
+                                    numero_poliza_rcc_rce = %s, aseguradora_rcc_rce = %s, vencimiento_rcc_rce = %s, ruta_pdf_rcc_rce = %s,
+                                    estado_soat = 'Actualizado', estado_rtm = 'Actualizado', estado_rcc_rce = 'Actualizado'
+                                WHERE id = %s AND id_empresa = %s
+                            """, (
+                                placa, tipo, caja_de_carga, referencia, capacidad, propiedad,
+                                ruta_tarjeta,
+                                id_soat, vencimiento_soat, ruta_soat,
+                                id_tecnomecanica, vencimiento_tecnomecanica, ruta_tecno,
+                                id_poliza_rce, aseguradora_rce, vencimiento_poliza_rce, ruta_rce,
+                                vehiculo_id, empresa_id
+                            ))
+                        else:
+                            ruta_tarjeta = new_ruta_tarjeta or old_data.get('ruta_tarjeta_propiedad')
+                            ruta_soat = new_ruta_soat or old_data.get('ruta_soat')
+                            ruta_tecno = new_ruta_tecno or old_data.get('ruta_tecnomecanica')
+                            ruta_rce = new_ruta_rce or old_data.get('ruta_poliza_rce')
+                            
+                            cur.execute("""
+                                UPDATE vehiculos 
+                                SET placa = %s, tipo = %s, caja_de_carga = %s, referencia = %s, peso_vacio = %s, `capacidad (kg)` = %s, propiedad = %s,
+                                    id_tarjeta_propiedad = %s, ruta_tarjeta_propiedad = %s,
+                                    id_soat = %s, vencimiento_soat = %s, ruta_soat = %s,
+                                    id_tecnomecanica = %s, vencimiento_tecnomecanica = %s, ruta_tecnomecanica = %s,
+                                    id_poliza_rce = %s, aseguradora_rce = %s, vencimiento_poliza_rce = %s, ruta_poliza_rce = %s,
+                                    estado_soat = 'Actualizado', estado_tecnomecanica = 'Actualizado', estado_poliza_rce = 'Actualizado'
+                                WHERE id = %s AND id_empresa = %s
+                            """, (
+                                placa, tipo, caja_de_carga, referencia, peso_vacio, capacidad, propiedad,
+                                id_tarjeta_propiedad, ruta_tarjeta,
+                                id_soat, vencimiento_soat, ruta_soat,
+                                id_tecnomecanica, vencimiento_tecnomecanica, ruta_tecno,
+                                id_poliza_rce, aseguradora_rce, vencimiento_poliza_rce, ruta_rce,
+                                vehiculo_id, empresa_id
+                            ))
+                        registrar_operacion_bqa_local(cur, 'EDITAR_VEHICULO', {'placa': placa, 'id': vehiculo_id})
                         mysql.connection.commit()
                         flash(f"Vehículo {placa} actualizado correctamente.", "success")
                 except Exception as e:
                     mysql.connection.rollback()
-                    # Rollback físico exclusivo para archivos recién subidos que no se grabaron
                     for ruta_relativa in filter(None, [new_ruta_tarjeta, new_ruta_soat, new_ruta_tecno, new_ruta_rce]):
                         ruta_fisica = os.path.join(current_app.static_folder, ruta_relativa)
                         if os.path.exists(ruta_fisica):
@@ -496,28 +547,38 @@ def gestion_vehiculos():
                     if hasattr(e, 'args') and e.args[0] == 1062:
                         flash("La placa del vehículo ya se encuentra registrada en el sistema.", "warning")
                     else:
-                        flash("Ocurrió una interrupción temporal al procesar la solicitud. Por favor, verifica los datos e intenta nuevamente.", "danger")
+                        flash("Ocurrió un error al procesar el formulario de edición.", "danger")
                 finally:
                     cur.close()
-            else:
-                flash("No fue posible editar: verifique que la clasificación RUNT y la caja de carga estén seleccionadas.", "danger")
 
         elif accion == 'eliminar':
             vehiculo_id = request.form.get('vehiculo_id')
             cur = mysql.connection.cursor()
             try:
-                cur.execute("DELETE FROM vehiculos WHERE id = %s AND id_empresa = %s", (vehiculo_id, empresa_id))
+                tabla_borrado = 'vehiculos_especial' if tipo_empresa == 'transporte_especial' else 'vehiculos'
+                cur.execute(f"DELETE FROM {tabla_borrado} WHERE id = %s AND id_empresa = %s", (vehiculo_id, empresa_id))
+                registrar_operacion_bqa_local(cur, 'ELIMINAR_VEHICULO', {'id': vehiculo_id, 'tabla': tabla_borrado})
                 mysql.connection.commit()
                 flash("Vehículo eliminado de la base de datos.", "success")
             except Exception as e:
-                flash("Ocurrió una interrupción al intentar eliminar el vehículo. Inténtalo nuevamente.", "danger")
+                mysql.connection.rollback()
+                flash("Ocurrió una interrupción al intentar eliminar el vehículo.", "danger")
             finally:
                 cur.close()
 
         return redirect(url_for('flotacarga_flota.gestion_vehiculos'))
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT * FROM vehiculos WHERE id_empresa = %s ORDER BY id DESC", (empresa_id,))
+    if tipo_empresa == 'transporte_especial':
+        cur.execute("""
+            SELECT id, placa, clase as tipo, carroceria as caja_de_carga, linea as referencia, 0 as peso_vacio, capacidad as `capacidad (kg)`, tipo_vinculacion as propiedad, 
+                   NULL as id_tarjeta_propiedad, numero_poliza_soat as id_soat, vencimiento_soat, 
+                   numero_certificado_rtm as id_tecnomecanica, vencimiento_rtm as vencimiento_tecnomecanica, 
+                   numero_poliza_rcc_rce as id_poliza_rce, aseguradora_rcc_rce as aseguradora_rce, vencimiento_rcc_rce as vencimiento_poliza_rce 
+            FROM vehiculos_especial WHERE id_empresa = %s ORDER BY id DESC
+        """, (empresa_id,))
+    else:
+        cur.execute("SELECT * FROM vehiculos WHERE id_empresa = %s ORDER BY id DESC", (empresa_id,))
     vehiculos_db = cur.fetchall()
     cur.close()
 
@@ -537,16 +598,16 @@ def gestion_vehiculos():
 @login_required_custom
 @gestor_flota_required
 def generar_qr_vehiculo(placa):
-    """
-    Genera un PDF con diseño corporativo BQA-ONE que contiene el Código QR 
-    del vehículo. El payload incrustado procesa de forma segura caracteres UTF-8.
-    """
     empresa_id = session.get('empresa_id')
     empresa_nombre = session.get('empresa')
     nit_empresa = session.get('nit')
+    tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT tipo FROM vehiculos WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, empresa_id))
+    if tipo_empresa == 'transporte_especial':
+        cur.execute("SELECT clase as tipo FROM vehiculos_especial WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, empresa_id))
+    else:
+        cur.execute("SELECT tipo FROM vehiculos WHERE placa = %s AND id_empresa = %s LIMIT 1", (placa, empresa_id))
     vehiculo = cur.fetchone()
     cur.close()
 
@@ -556,24 +617,20 @@ def generar_qr_vehiculo(placa):
 
     tipo = vehiculo.get('tipo', '')
     
-    # 1. Preparación Segura del Payload
     payload_dict = {
         "placa": placa,
         "nit": str(nit_empresa),
         "tipo": tipo
     }
     
-    # Serialización a JSON. ensure_ascii=False respeta tildes y caracteres especiales
     payload_str = json.dumps(payload_dict, ensure_ascii=False)
     
-    # 2. Generación del Código QR en Memoria
     qr = qrcode.QRCode(
         version=1, 
         error_correction=qrcode.constants.ERROR_CORRECT_M, 
         box_size=10, 
         border=1
     )
-    # Se codifica en UTF-8 para garantizar soporte de caracteres especiales
     qr.add_data(payload_str.encode('utf-8'))
     qr.make(fit=True)
     img_qr = qr.make_image(fill_color="#015249", back_color="white")
@@ -582,7 +639,6 @@ def generar_qr_vehiculo(placa):
     img_qr.save(qr_io, format='PNG')
     qr_io.seek(0)
     
-    # 3. Construcción del PDF Corporativo (4x5 pulgadas - Tamaño Etiqueta)
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=(4*inch, 5*inch))
     
@@ -591,11 +647,9 @@ def generar_qr_vehiculo(placa):
     logo_cliente_path = os.path.join(static_dir, f'logo_{nit_empresa}.PNG')
     logo_app_path = os.path.join(static_dir, 'logo_energix360.png')
     
-    # Fondo Blanco
     pdf.setFillColor(colors.white)
     pdf.rect(0, 0, 4*inch, 5*inch, fill=1)
     
-    # Logo del Cliente (Parte Superior)
     if os.path.exists(logo_cliente_path):
         pdf.drawImage(logo_cliente_path, 0.5*inch, 3.6*inch, width=3*inch, height=1.2*inch, preserveAspectRatio=True, anchor='c')
     else:
@@ -603,19 +657,15 @@ def generar_qr_vehiculo(placa):
         pdf.setFont("Helvetica-Bold", 16)
         pdf.drawCentredString(2*inch, 4.2*inch, empresa_nombre)
 
-    # Identificador de Placa Central
     pdf.setFillColor(colors.black)
     pdf.setFont("Helvetica-Bold", 26)
     pdf.drawCentredString(2*inch, 3.1*inch, placa.upper())
     
-    # Texto de Propiedad
     pdf.setFont("Helvetica", 10)
     pdf.drawCentredString(2*inch, 2.8*inch, f"Propiedad de: {empresa_nombre}")
     
-    # Código QR Renderizado
     pdf.drawImage(ImageReader(qr_io), 1*inch, 0.7*inch, width=2*inch, height=2*inch, preserveAspectRatio=True)
     
-    # Sello / Logo BQA-ONE (Parte Inferior)
     if os.path.exists(logo_app_path):
         pdf.drawImage(logo_app_path, 1.5*inch, 0.2*inch, width=1*inch, height=0.4*inch, preserveAspectRatio=True, anchor='c')
     else:
@@ -641,6 +691,8 @@ def gestion_operadores():
     asegurar_tablas_carga()
     empresa_id = session.get('empresa_id')
     empresa_nombre = session.get('empresa')
+    tipo_empresa = str(session.get('tipo_empresa', '')).strip().lower()
+    tabla_cond = 'conductores_flotaespecial' if tipo_empresa == 'transporte_especial' else 'conductores_carga'
 
     if request.method == 'POST':
         accion = request.form.get('accion')
@@ -660,13 +712,11 @@ def gestion_operadores():
             arl = request.form.get('arl', '').strip()
             fondo_pensiones = request.form.get('fondo_pensiones', '').strip()
             
-            # Sincronización Motor PESV
             numero_licencia_conduccion = request.form.get('numero_licencia_conduccion', '').strip()
             fecha_expedicion_licencia = request.form.get('fecha_expedicion_licencia', '').strip() or None
             categoria_licencia = request.form.get('categoria_licencia', 'Publico').strip()
             ultimo_pago_seguridad_social = request.form.get('ultimo_pago_seguridad_social', '').strip() or None
             
-            # Cálculos en caliente
             vencimiento_licencia_conduccion = calcular_vencimiento_licencia(fecha_expedicion_licencia, fecha_nacimiento, categoria_licencia)
             
             if tipo_conductor == 'Propio':
@@ -683,7 +733,6 @@ def gestion_operadores():
                 flash("El conductor propio requiere una contraseña de acceso.", "danger")
                 return redirect(url_for('flotacarga_flota.gestion_operadores'))
 
-            # Procesamiento de documentos y biometría
             ruta_licencia = procesar_archivo_pdf(request.files.get('archivo_licencia'), cedula, 'LICENCIA', empresa_id)
             ruta_foto = procesar_archivo_pdf(request.files.get('archivo_foto_facial'), cedula, 'FOTO_FACIAL', empresa_id)
 
@@ -696,13 +745,12 @@ def gestion_operadores():
 
             cur = mysql.connection.cursor()
             try:
-                cur.execute("SELECT id FROM conductores_carga WHERE cedula = %s AND id_empresa = %s", (cedula, empresa_id))
+                cur.execute(f"SELECT id FROM {tabla_cond} WHERE cedula = %s AND id_empresa = %s", (cedula, empresa_id))
                 if cur.fetchone():
                     flash(f"El conductor con cédula {cedula} ya existe.", "danger")
                 else:
-                    # Inserción en Hoja de Vida Integral (conductores_carga)
-                    cur.execute("""
-                        INSERT INTO conductores_carga (
+                    cur.execute(f"""
+                        INSERT INTO {tabla_cond} (
                             id_empresa, tipo_conductor, nombre, cedula, fecha_nacimiento, edad,
                             password_visible, email, vehiculo_asignado,
                             eps, arl, fondo_pensiones, numero_licencia_conduccion, 
@@ -720,7 +768,6 @@ def gestion_operadores():
                         ruta_licencia, ruta_seg_soc, ruta_pago, ruta_foto
                     ))
                     
-                    # Si es Propio, se le crea usuario maestro de App
                     if tipo_conductor == 'Propio':
                         hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
                         cur.execute("""
@@ -728,11 +775,11 @@ def gestion_operadores():
                             VALUES (%s, %s, %s, %s, %s, %s)
                         """, (nombre, cedula, hashed_pw, perfil, empresa_nombre, empresa_id))
                     
+                    registrar_operacion_bqa_local(cur, 'CREAR_CONDUCTOR', {'cedula': cedula, 'tipo_empresa': tipo_empresa})
                     mysql.connection.commit()
                     flash(f"Personal registrado exitosamente.", "success")
             except Exception as e:
                 mysql.connection.rollback()
-                # Rollback físico de archivos huérfanos
                 for ruta_relativa in filter(None, [ruta_licencia, ruta_seg_soc, ruta_pago, ruta_foto]):
                     ruta_fisica = os.path.join(current_app.static_folder, ruta_relativa)
                     if os.path.exists(ruta_fisica):
@@ -740,9 +787,9 @@ def gestion_operadores():
                         except: pass
                 
                 if hasattr(e, 'args') and e.args[0] == 1062:
-                    flash("El número de identificación del conductor ya se encuentra registrado en el sistema.", "warning")
+                    flash("El número de identificación del conductor ya se encuentra registrado.", "warning")
                 else:
-                    flash("Ocurrió una interrupción temporal al procesar la solicitud. Por favor, verifica los datos e intenta nuevamente.", "danger")
+                    flash("Ocurrió una interrupción temporal al procesar la solicitud.", "danger")
             finally:
                 cur.close()
 
@@ -778,11 +825,10 @@ def gestion_operadores():
             if operador_id and nombre and cedula:
                 cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
                 try:
-                    cur.execute("SELECT * FROM conductores_carga WHERE id = %s AND id_empresa = %s", (operador_id, empresa_id))
+                    cur.execute(f"SELECT * FROM {tabla_cond} WHERE id = %s AND id_empresa = %s", (operador_id, empresa_id))
                     old_data = cur.fetchone()
 
                     if old_data:
-                        # Extraer archivos base compartidos
                         new_ruta_licencia = procesar_archivo_pdf(request.files.get('archivo_licencia'), cedula, 'LICENCIA', empresa_id)
                         new_ruta_foto = procesar_archivo_pdf(request.files.get('archivo_foto_facial'), cedula, 'FOTO_FACIAL', empresa_id)
 
@@ -804,9 +850,8 @@ def gestion_operadores():
                         if tipo_conductor == 'Tercero':
                             pass_visible = None
 
-                        # 1. Actualizar Hoja de Vida Integral
-                        cur.execute("""
-                            UPDATE conductores_carga SET
+                        cur.execute(f"""
+                            UPDATE {tabla_cond} SET
                                 tipo_conductor = %s, nombre = %s, cedula = %s, fecha_nacimiento = %s, edad = %s,
                                 password_visible = %s, email = %s, vehiculo_asignado = %s,
                                 eps = %s, arl = %s, fondo_pensiones = %s, numero_licencia_conduccion = %s, 
@@ -825,7 +870,6 @@ def gestion_operadores():
                             operador_id, empresa_id
                         ))
 
-                        # 2. Sincronizar con Usuarios (Login Maestro)
                         cur.execute("SELECT id FROM usuarios WHERE cedula = %s AND empresa_id = %s", (old_data['cedula'], empresa_id))
                         usr = cur.fetchone()
 
@@ -844,14 +888,13 @@ def gestion_operadores():
                                         VALUES (%s, %s, %s, %s, %s, %s)
                                     """, (nombre, cedula, hashed_pw, perfil, empresa_nombre, empresa_id))
                         elif tipo_conductor == 'Tercero' and usr:
-                            # Terceros no tienen login
                             cur.execute("DELETE FROM usuarios WHERE id = %s AND empresa_id = %s", (usr['id'], empresa_id))
 
+                        registrar_operacion_bqa_local(cur, 'EDITAR_OPERADOR', {'cedula': cedula, 'id': operador_id})
                         mysql.connection.commit()
                         flash("Registro de personal actualizado.", "success")
                 except Exception as e:
                     mysql.connection.rollback()
-                    # Rollback físico exclusivo para archivos recién subidos que no se grabaron
                     for ruta_relativa in filter(None, [new_ruta_licencia, new_ruta_seg_soc, new_ruta_pago, new_ruta_foto]):
                         ruta_fisica = os.path.join(current_app.static_folder, ruta_relativa)
                         if os.path.exists(ruta_fisica):
@@ -859,9 +902,9 @@ def gestion_operadores():
                             except: pass
                             
                     if hasattr(e, 'args') and e.args[0] == 1062:
-                        flash("El número de identificación del conductor ya se encuentra registrado en el sistema.", "warning")
+                        flash("El número de identificación del conductor ya se encuentra registrado.", "warning")
                     else:
-                        flash("Ocurrió una interrupción temporal al procesar la solicitud. Por favor, verifica los datos e intenta nuevamente.", "danger")
+                        flash("Ocurrió un error al procesar el formulario de edición.", "danger")
                 finally:
                     cur.close()
 
@@ -869,31 +912,33 @@ def gestion_operadores():
             operador_id = request.form.get('operador_id')
             cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
             try:
-                cur.execute("SELECT cedula FROM conductores_carga WHERE id = %s AND id_empresa = %s", (operador_id, empresa_id))
+                cur.execute(f"SELECT cedula FROM {tabla_cond} WHERE id = %s AND id_empresa = %s", (operador_id, empresa_id))
                 cd_data = cur.fetchone()
                 if cd_data:
                     cur.execute("DELETE FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cd_data['cedula'], empresa_id))
-                    cur.execute("DELETE FROM conductores_carga WHERE id = %s AND id_empresa = %s", (operador_id, empresa_id))
+                    cur.execute(f"DELETE FROM {tabla_cond} WHERE id = %s AND id_empresa = %s", (operador_id, empresa_id))
+                    registrar_operacion_bqa_local(cur, 'ELIMINAR_OPERADOR', {'id': operador_id, 'tabla': tabla_cond})
                     mysql.connection.commit()
                     flash("Registro desvinculado por completo.", "success")
             except Exception as e:
                 mysql.connection.rollback()
-                flash("Ocurrió una interrupción al intentar eliminar el conductor. Inténtalo nuevamente.", "danger")
+                flash("Ocurrió una interrupción al intentar eliminar el conductor.", "danger")
             finally:
                 cur.close()
 
         return redirect(url_for('flotacarga_flota.gestion_operadores'))
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    
-    # Lista de Vehículos para Selector de Terceros
-    cur.execute("SELECT id, placa, propiedad FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
+    if tipo_empresa == 'transporte_especial':
+        cur.execute("SELECT id, placa, tipo_vinculacion as propiedad FROM vehiculos_especial WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
+    else:
+        cur.execute("SELECT id, placa, propiedad FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
     vehiculos_db = cur.fetchall()
 
-    cur.execute("""
+    cur.execute(f"""
         SELECT c.*, 
                IFNULL(u.perfil, 'operador_flotacarga') as perfil 
-        FROM conductores_carga c 
+        FROM {tabla_cond} c 
         LEFT JOIN usuarios u 
           ON c.cedula COLLATE utf8mb4_unicode_ci = u.cedula COLLATE utf8mb4_unicode_ci 
          AND c.id_empresa = u.empresa_id 
@@ -925,7 +970,6 @@ def gestion_preoperacionales():
 
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     
-    # Consultar Vehículos (Propios y Terceros) registrados para la empresa
     cur.execute("SELECT DISTINCT placa FROM vehiculos WHERE id_empresa = %s ORDER BY placa ASC", (empresa_id,))
     vehiculos_historicos = cur.fetchall()
 
@@ -1155,7 +1199,6 @@ def actualizar_documento_vencido():
             
     except Exception as e:
         mysql.connection.rollback()
-        # Rollback físico del archivo huérfano si la actualización de BD falla
         if 'ruta_pdf' in locals() and ruta_pdf:
             ruta_fisica = os.path.join(current_app.static_folder, ruta_pdf)
             if os.path.exists(ruta_fisica):
@@ -1385,10 +1428,6 @@ def descargar_preoperacional_pdf(consecutivo):
 # ==============================================================================
 @bp_flotacarga_flota.route('/cron/auditoria_vencimientos', methods=['GET'])
 def cron_auditoria_vencimientos():
-    """
-    Motor de Auditoría que proyecta los vencimientos de la flota de carga 
-    y despacha un correo HTML corporativo consolidado a las partes interesadas.
-    """
     token = request.args.get('token')
     if token != 'BQA_CRON_2026':
         return jsonify({"status": "error", "message": "No autorizado"}), 403
@@ -1408,7 +1447,6 @@ def cron_auditoria_vencimientos():
             alertas_vehiculos = []
             alertas_conductores = []
 
-            # 1. Extracción de Datos - Vehículos de Carga
             cur.execute("SELECT placa, vencimiento_soat, vencimiento_tecnomecanica, vencimiento_poliza_rce, estado_soat, estado_tecnomecanica, estado_poliza_rce FROM vehiculos WHERE id_empresa = %s", (empresa_id,))
             vehiculos = cur.fetchall()
             for v in vehiculos:
@@ -1433,17 +1471,14 @@ def cron_auditoria_vencimientos():
                         elif dias <= 8:
                             alertas_vehiculos.append((v['placa'], doc_nombre, str(fecha_vence), "POR VENCER", dias))
             
-            # 2. Extracción de Datos - Conductores de Carga
             cur.execute("SELECT cedula, nombre, email as telefono, vencimiento_licencia_conduccion, vencimiento_seguridad_social, estado_licencia, estado_seguridad_social, tipo_conductor FROM conductores_carga WHERE id_empresa = %s", (empresa_id,))
             conductores = cur.fetchall()
             for c in conductores:
-                # Nota: En carga el campo temporal de contacto secundario podría estar mapeado en email/teléfono
                 tel = c.get('telefono') or 'N/A'
                 docs = [
                     ('Licencia de Conducción', c.get('vencimiento_licencia_conduccion'), c.get('estado_licencia'))
                 ]
                 
-                # Validación condicional de Seguridad Social según el tipo de conductor (Requisito Funcional)
                 if c.get('tipo_conductor') == 'Tercero':
                     docs.append(('Seguridad Social', c.get('vencimiento_seguridad_social'), c.get('estado_seguridad_social')))
                 

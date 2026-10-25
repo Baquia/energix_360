@@ -338,6 +338,11 @@ def panel_principal():
 
     # Resolución Dinámica por Perfil (Motor Dinámico)
     archivo_destino = session.get('archivo_destino', 'A_dashboard_universal.html')
+    
+    # === INYECTAR ESTA CONDICIÓN EXACTAMENTE AQUÍ ===
+    if nombre_perfil == 'controlador_pesv':
+        return redirect(url_for('controlador_pesv.index_pesv'))
+    # ================================================
 
     # Mantenimiento del tipo_empresa como Clasificador de Negocio para consolidación de Hubs
     # Se interceptan los controladores para obligar su paso por el Hub correspondiente,

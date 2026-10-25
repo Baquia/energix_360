@@ -169,8 +169,11 @@
         <div class="sidebar-header">
             <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
         </div>
+        
+        {% set url_retorno = url_for('controlador_pesv.index_pesv') if session.get('perfil') == 'controlador_pesv' else '/gestor_flota/hub_herramientas/' %}
+        
         <nav class="nav-menu">
-            <a href="/gestor_flota/hub_herramientas/" class="nav-item">
+            <a href="{{ url_retorno }}" class="nav-item">
                 <span class="nav-icon">⬅️</span> Volver a Herramientas
             </a>
             <div style="margin: 15px 0 5px 15px; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Gestión Interna</div>
@@ -200,7 +203,7 @@
             </div>
             <div class="user-info">
                 <span class="user-name">{{ nombre }}</span>
-                <span class="user-role">Controlador de Flota</span>
+                <span class="user-role">{% if session.get('perfil') == 'controlador_pesv' %}Controlador PESV{% else %}Controlador de Flota{% endif %}</span>
             </div>
         </header>
 
@@ -218,7 +221,7 @@
             {% if active_module == 'vehiculos' %}
                 <div class="action-header">
                     <div class="action-title-group">
-                        <a href="/gestor_flota/hub_herramientas/" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <a href="{{ url_retorno }}" class="btn-close-view" title="Cerrar vista">&times;</a>
                         <h2>Gestión de Vehículos</h2>
                     </div>
                     <button class="btn-primary" onclick="openModal('modalVehiculo')"><span>➕</span> Registrar Vehículo</button>
@@ -250,7 +253,6 @@
                                     <td>{{ v['capacidad (kg)'] }} kg</td>
                                     <td><span class="badge {% if v.propiedad == 'Propio' %}badge-success{% else %}badge-gray{% endif %}">{{ v.propiedad }}</span></td>
                                     <td style="text-align: right; white-space: nowrap;">
-                                        <!-- PUENTE: El botón de descarga ahora redirige al backend PDF -->
                                         <a href="{{ url_for('flotacarga_flota.generar_qr_vehiculo', placa=v.placa) }}" target="_blank" class="btn-icon qr" title="Descargar QR PDF">🔲</a>
                                         <button class="btn-icon edit" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.caja_de_carga }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}', '{{ v.propiedad }}', '{{ v.id_tarjeta_propiedad or '' }}', '{{ v.id_soat or '' }}', '{{ v.vencimiento_soat or '' }}', '{{ v.id_tecnomecanica or '' }}', '{{ v.vencimiento_tecnomecanica or '' }}', '{{ v.id_poliza_rce or '' }}', '{{ v.aseguradora_rce or '' }}', '{{ v.vencimiento_poliza_rce or '' }}')" title="Editar">✏️</button>
                                         <button class="btn-icon delete" onclick="confirmarEliminar('{{ v.id }}', '{{ v.placa }}')" title="Eliminar">🗑️</button>
@@ -267,7 +269,7 @@
             {% elif active_module == 'operadores' %}
                 <div class="action-header">
                     <div class="action-title-group">
-                        <a href="/gestor_flota/hub_herramientas/" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <a href="{{ url_retorno }}" class="btn-close-view" title="Cerrar vista">&times;</a>
                         <h2>Personal Operativo</h2>
                     </div>
                     <button class="btn-primary" onclick="openModal('modalOperador')"><span>➕</span> Nuevo Registro</button>
@@ -308,7 +310,7 @@
             {% elif active_module == 'preoperacionales' %}
                 <div class="action-header">
                     <div class="action-title-group">
-                        <a href="/gestor_flota/hub_herramientas/" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <a href="{{ url_retorno }}" class="btn-close-view" title="Cerrar vista">&times;</a>
                         <h2>Auditoría de Preoperacionales</h2>
                     </div>
                 </div>
@@ -379,7 +381,7 @@
             {% elif active_module == 'documentos_vencidos' %}
                 <div class="action-header">
                     <div class="action-title-group">
-                        <a href="/gestor_flota/hub_herramientas/" class="btn-close-view" title="Cerrar vista">&times;</a>
+                        <a href="{{ url_retorno }}" class="btn-close-view" title="Cerrar vista">&times;</a>
                         <h2>Documentos Vencidos / Faltantes</h2>
                     </div>
                 </div>
@@ -423,14 +425,14 @@
                                     </td>
                                     <td style="text-align: right;">
                                         {% if nov.estado == 'Actualizado' %}
-                                            <form action="{{ url_for('flotacarga_flota.gestion_documentos_vencidos') }}" method="POST" style="display: inline-block;">
+                                            <form action="{{ url_for('flotacarga_flota.gestion_documentos_vencidos') }}" method="POST" style="display: inline-block;" onsubmit="return window.confirm('¿Confirma la validez de este documento?');">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <input type="hidden" name="accion" value="verificar_documento">
                                                 <input type="hidden" name="entidad_tipo" value="{{ nov.entidad_tipo }}">
                                                 <input type="hidden" name="entidad_id" value="{{ nov.entidad_id }}">
                                                 <input type="hidden" name="documento_clave" value="{{ nov.clave }}">
                                                 <a href="/static/{{ nov.ruta }}" target="_blank" class="btn-icon" style="margin-right: 5px;" title="Ver Soporte">👁️</a>
-                                                <button type="submit" class="btn-primary" style="background: #10b981; padding: 6px 12px; font-size: 12px; display: inline-flex;" onclick="return confirm('¿Confirma la validez de este documento?')">Verificar</button>
+                                                <button type="submit" class="btn-primary" style="background: #10b981; padding: 6px 12px; font-size: 12px; display: inline-flex;">Verificar</button>
                                             </form>
                                         {% elif nov.estado != 'Verificado' %}
                                             <button class="btn-primary" style="padding: 6px 12px; font-size: 12px; display: inline-flex;" onclick="abrirRefrendar('{{ nov.entidad_tipo }}', '{{ nov.entidad_id }}', '{{ nov.clave }}', '{{ nov.documento }}', '{{ nov.identificador }}')">Refrendar</button>
@@ -454,7 +456,7 @@
     <div id="modalVehiculo" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header"><h3>Registrar Vehículo</h3><button class="close-btn" type="button" onclick="closeModal('modalVehiculo')">&times;</button></div>
-            <form action="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" method="POST" enctype="multipart/form-data" onsubmit="return window.confirm('¿Está seguro de registrar este vehículo?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="crear">
                 
@@ -549,7 +551,7 @@
     <div id="modalEditarVehiculo" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header"><h3>Editar Vehículo</h3><button class="close-btn" type="button" onclick="closeModal('modalEditarVehiculo')">&times;</button></div>
-            <form action="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" method="POST" enctype="multipart/form-data" onsubmit="return window.confirm('¿Está seguro de actualizar los datos de este vehículo?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="editar">
                 <input type="hidden" name="vehiculo_id" id="edit_id">
@@ -638,7 +640,7 @@
     <div id="modalEliminar" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header"><h3 style="color: #ef4444;">Eliminar Vehículo</h3><button class="close-btn" type="button" onclick="closeModal('modalEliminar')">&times;</button></div>
-            <form action="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" method="POST">
+            <form action="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" method="POST" onsubmit="return window.confirm('¿Está seguro de eliminar este vehículo?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="eliminar">
                 <input type="hidden" name="vehiculo_id" id="delete_id">
@@ -652,7 +654,7 @@
     <div id="modalOperador" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header"><h3>Registrar Personal</h3><button class="close-btn" type="button" onclick="closeModal('modalOperador')">&times;</button></div>
-            <form action="{{ url_for('flotacarga_flota.gestion_operadores') }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ url_for('flotacarga_flota.gestion_operadores') }}" method="POST" enctype="multipart/form-data" onsubmit="return window.confirm('¿Está seguro de registrar este personal?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="crear">
                 
@@ -746,7 +748,7 @@
     <div id="modalEditarOperador" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header"><h3>Editar Personal</h3><button class="close-btn" type="button" onclick="closeModal('modalEditarOperador')">&times;</button></div>
-            <form action="{{ url_for('flotacarga_flota.gestion_operadores') }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ url_for('flotacarga_flota.gestion_operadores') }}" method="POST" enctype="multipart/form-data" onsubmit="return window.confirm('¿Está seguro de actualizar los datos de este personal?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="editar">
                 <input type="hidden" name="operador_id" id="edit_operador_id">
@@ -842,7 +844,7 @@
     <div id="modalEliminarOperador" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header"><h3 style="color: #ef4444;">Eliminar Registro</h3><button class="close-btn" type="button" onclick="closeModal('modalEliminarOperador')">&times;</button></div>
-            <form action="{{ url_for('flotacarga_flota.gestion_operadores') }}" method="POST">
+            <form action="{{ url_for('flotacarga_flota.gestion_operadores') }}" method="POST" onsubmit="return window.confirm('¿Está seguro de eliminar este operador?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="accion" value="eliminar">
                 <input type="hidden" name="operador_id" id="delete_operador_id">
@@ -859,7 +861,7 @@
                 <h3>Refrendar Documento</h3>
                 <button class="close-btn" type="button" onclick="closeModal('modalRefrendar')">&times;</button>
             </div>
-            <form action="{{ url_for('flotacarga_flota.actualizar_documento_vencido') }}" method="POST" enctype="multipart/form-data">
+            <form action="{{ url_for('flotacarga_flota.actualizar_documento_vencido') }}" method="POST" enctype="multipart/form-data" onsubmit="return window.confirm('¿Está seguro de actualizar este documento?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="entidad_tipo" id="refrendar_entidad_tipo">
                 <input type="hidden" name="entidad_id" id="refrendar_entidad_id">

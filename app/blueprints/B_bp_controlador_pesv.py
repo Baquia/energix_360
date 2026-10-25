@@ -134,26 +134,42 @@ def index_pesv():
             resultado = cur.fetchone()
             kpis['novedades_ruta'] = resultado['novedades'] if resultado else 0
 
+# ======================================================================
+        # 2. PILAR VEHÍCULOS SEGUROS (BIFURCADO POR TIPO EMPRESA)
         # ======================================================================
-        # 2. PILAR VEHÍCULOS SEGUROS (COMPARTIDO PERO AISLADO POR EMPRESA)
-        # ======================================================================
-        cur.execute("""
-            SELECT COUNT(DISTINCT v.id) as vehiculos_bloqueados
-            FROM vehiculos v
-            LEFT JOIN inspeccion_preoperacional i 
-              ON v.placa = i.placa_vehiculo 
-              AND i.fecha_inspeccion = CURDATE() 
-              AND i.id_empresa = v.id_empresa
-            WHERE v.id_empresa = %s
-            AND (
-                v.vencimiento_soat < CURDATE() 
-                OR v.vencimiento_tecnomecanica < CURDATE()
-                OR i.vehiculo_aprobado = 0
-            )
-        """, (empresa_id,))
+        if tipo_empresa == 'transporte_especial':
+            cur.execute("""
+                SELECT COUNT(DISTINCT v.id) as vehiculos_bloqueados
+                FROM vehiculos_especial v
+                LEFT JOIN inspeccion_preoperacional i 
+                  ON v.placa = i.placa_vehiculo 
+                  AND i.fecha_inspeccion = CURDATE() 
+                  AND i.id_empresa = v.id_empresa
+                WHERE v.id_empresa = %s
+                AND (
+                    v.vencimiento_soat < CURDATE() 
+                    OR v.vencimiento_rtm < CURDATE()
+                    OR i.vehiculo_aprobado = 0
+                )
+            """, (empresa_id,))
+        else:
+            cur.execute("""
+                SELECT COUNT(DISTINCT v.id) as vehiculos_bloqueados
+                FROM vehiculos v
+                LEFT JOIN inspeccion_preoperacional i 
+                  ON v.placa = i.placa_vehiculo 
+                  AND i.fecha_inspeccion = CURDATE() 
+                  AND i.id_empresa = v.id_empresa
+                WHERE v.id_empresa = %s
+                AND (
+                    v.vencimiento_soat < CURDATE() 
+                    OR v.vencimiento_tecnomecanica < CURDATE()
+                    OR i.vehiculo_aprobado = 0
+                )
+            """, (empresa_id,))
+            
         resultado = cur.fetchone()
-        kpis['vehiculos_bloqueados'] = resultado['vehiculos_bloqueados'] if resultado else 0
-
+        kpis['vehiculos_bloqueados'] = resultado['vehiculos_bloqueados'] if resultado else 0       
         cur.close()
     except Exception as e:
         print(f"Error consultando analítica PESV: {e}")

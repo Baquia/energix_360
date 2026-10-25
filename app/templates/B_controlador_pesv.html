@@ -36,34 +36,42 @@
         .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: var(--radius); color: var(--text-muted); font-size: 14px; font-weight: 600; transition: all 0.2s; }
         .nav-item:hover { background-color: #f9fafb; color: var(--verde); }
         .nav-item.active { background-color: #eefcf9; color: var(--verde); border-left: 4px solid var(--verde); }
-        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); }
-        .logout-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--radius); color: #ef4444; font-size: 13px; font-weight: bold; border: 1px solid #fee2e2; background: #fef2f2; }
+        .sidebar-footer { padding: 20px 15px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;}
+        .logout-btn, .hub-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--radius); font-size: 13px; font-weight: bold; transition: 0.2s; }
+        .logout-btn { color: #ef4444; border: 1px solid #fee2e2; background: #fef2f2; }
+        .logout-btn:hover { background: #fee2e2; }
+        .hub-btn { color: #334155; border: 1px solid #e2e8f0; background: #f8fafc; }
+        .hub-btn:hover { background: #e2e8f0; }
         .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         .topbar { height: var(--topbar-height); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .user-info { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
         .user-name { font-weight: 700; font-size: 14px; color: var(--verde); }
         .user-role { font-size: 10px; color: var(--text-muted); background: #f3f4f6; padding: 3px 10px; border-radius: 12px; margin-top: 3px; font-weight: 600; }
-        .content-area { flex-grow: 1; padding: 30px; overflow-y: auto; }
-        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto 25px auto; }
-        .action-header h2 { color: var(--verde); font-size: 22px; font-weight: 800; }
-        .btn-close-view { background: #e2e8f0; color: #475569; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 18px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; max-width: 1100px; margin: 0 auto 30px auto; }
+        .logo-cliente { max-height: 40px; width: auto; object-fit: contain; }
+        .content-area { flex-grow: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column;}
+        .action-header { display: flex; justify-content: space-between; align-items: center; max-width: 1100px; margin: 0 auto 25px auto; width: 100%;}
+        .action-title-group { display: flex; align-items: center; gap: 15px; }
+        .action-header h2 { color: var(--verde); font-size: 22px; font-weight: 800; margin: 0;}
+        .btn-close-view { background: #e2e8f0; color: #475569; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 18px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; transition: 0.2s;}
+        .btn-close-view:hover { background: #cbd5e1; color: #0f172a; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; max-width: 1100px; margin: 0 auto 30px auto; width: 100%;}
         .kpi-card { background: var(--surface); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.02); display: flex; align-items: center; gap: 15px; }
         .kpi-icon { font-size: 28px; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 12px; flex-shrink: 0; }
         .kpi-data h3 { font-size: 24px; color: var(--verde); margin-bottom: 2px; }
         .kpi-data p { font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; line-height: 1.2; }
-        .cards-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-width: 1100px; margin: 0 auto; }
+        .cards-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-width: 1100px; margin: 0 auto; width: 100%;}
         .card { background: var(--surface); border-radius: 16px; padding: 25px 20px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; flex: 1 1 250px; transition: transform 0.2s; cursor: pointer; }
         .card:hover { transform: translateY(-5px); border-color: var(--verde); }
         .card-icon { font-size: 36px; margin-bottom: 12px; }
         .card-title { font-size: 15px; font-weight: 800; color: #1e293b; margin-bottom: 8px; }
         .card-desc { font-size: 12px; color: #64748b; line-height: 1.5; }
+        .main-footer { text-align: center; padding: 15px; color: #94a3b8; font-size: 12px; margin-top: auto; font-weight: 500; }
     </style>
 </head>
 <body>
     <aside class="sidebar">
         <div class="sidebar-header">
-            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360" onerror="this.style.display='none'">
         </div>
         <nav class="nav-menu">
             <div style="margin: 15px 0 5px 15px; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Gestión PESV</div>
@@ -73,9 +81,24 @@
             <a href="{{ url_for('auditorias_pesv.index_auditorias') }}" class="nav-item">
                 <span class="nav-icon">📋</span> Auditorías Flota
             </a>
+
+            <div style="margin: 15px 0 5px 15px; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Gestión Interna</div>
+            <a href="{{ url_for('flotacarga_flota.gestion_vehiculos') }}" class="nav-item">
+                <span class="nav-icon">🚛</span> Vehículos
+            </a>
+            <a href="{{ url_for('flotacarga_flota.gestion_operadores') }}" class="nav-item">
+                <span class="nav-icon">👷</span> Conductores / Auxiliares
+            </a>
+            <a href="{{ url_for('flotacarga_flota.gestion_preoperacionales') }}" class="nav-item">
+                <span class="nav-icon">📋</span> Preoperacionales
+            </a>
+            <a href="{{ url_for('flotacarga_flota.gestion_documentos_vencidos') }}" class="nav-item">
+                <span class="nav-icon">⚠️</span> Documentos Vencidos
+            </a>
         </nav>
         <div class="sidebar-footer">
-            <a href="{{ url_for('logout') }}" class="logout-btn"><span>🚪</span> Cerrar Sesión</a>
+            <a href="/hub_administracion/dashboard" class="hub-btn"><span>⬅️</span> Volver al Hub</a>
+            <a href="/logout" class="logout-btn"><span>🚪</span> Salir</a>
         </div>
     </aside>
 
@@ -93,7 +116,7 @@
         <div class="content-area">
             <div class="action-header">
                 <div class="action-title-group">
-                    <a href="/panel_principal.html" class="btn-close-view" title="Cerrar vista">&times;</a>
+                    <a href="/gestor_flota/hub_herramientas/" class="btn-close-view" title="Cerrar vista">&times;</a>
                     <h2>Dashboard: Plan Estratégico de Seguridad Vial</h2>
                 </div>
             </div>
@@ -163,6 +186,10 @@
                     <div class="card-title">Auditorías Flota</div>
                     <div class="card-desc">Panel centralizado de inspecciones diarias obligatorias con firma digital y registro fotográfico.</div>
                 </a>
+            </div>
+            
+            <div class="main-footer">
+                BQA-ONE © 2026 |
             </div>
         </div>
     </main>
