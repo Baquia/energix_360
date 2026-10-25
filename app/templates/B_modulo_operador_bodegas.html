@@ -438,30 +438,40 @@
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
                     Volver al Menú
                 </button>
-                <h2 style="margin: 0 0 15px 0; color: var(--primary-dark);">Mis Tareas Asignadas</h2>
-
-                <h4 style="color:#64748b; border-bottom:2px solid #e2e8f0; padding-bottom:5px; margin-top:20px;">🏷️ Lotes Agrupados</h4>
-                <div id="marcas-container" class="responsive-grid" style="margin-bottom:25px;"></div>
-
-                <h4 style="color:#64748b; border-bottom:2px solid #e2e8f0; padding-bottom:5px;">📦 Órdenes de Pedido Sueltas</h4>
+                <h2 style="margin: 0 0 15px 0; color: var(--primary-dark);">Mis Pedidos Asignados</h2>
                 <div id="orders-container" class="responsive-grid"></div>
             </div>
 
-            <div id="view-items" class="hidden">
+            <div id="view-brands" class="hidden">
                 <button class="nav-back" onclick="cargarOrdenes()">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                    Volver a Órdenes
+                    Volver a Pedidos
                 </button>
 
                 <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">Orden / Lote Activo</div>
-                    <div style="font-size: 2.2rem; font-weight: 900; margin-bottom: 5px;" id="lblOrdenTitle">#0000</div>
+                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">Orden Activa</div>
+                    <div style="font-size: 2.2rem; font-weight: 900; margin-bottom: 5px;" id="lblOrdenTitleBrands">#0000</div>
                     <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 700; font-size:1.1rem;">
-                        <span>Progreso General</span><span id="lblProgress">0/0</span>
+                        <span>Progreso General</span><span id="lblProgressBrands">0/0</span>
                     </div>
                     <div class="p-bar" style="height: 10px; background: rgba(255,255,255,0.2);">
-                        <div id="header-progress-bar" class="p-fill" style="width: 0%; background: #2ecc71;"></div>
+                        <div id="header-progress-bar-brands" class="p-fill" style="width: 0%; background: #2ecc71;"></div>
                     </div>
+                </div>
+
+                <h3 style="color: var(--text-gray); margin-bottom: 15px;">Ruta de Alistamiento (Marcas)</h3>
+                <div id="brands-container" class="responsive-grid"></div>
+            </div>
+
+            <div id="view-items" class="hidden">
+                <button class="nav-back" onclick="volverAMarcas()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Marcas
+                </button>
+
+                <div style="background: linear-gradient(135deg, var(--secondary) 0%, #d97706 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">Marca Actual</div>
+                    <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 5px;" id="lblMarcaTitleItems">MARCA</div>
                 </div>
 
                 <div style="position: sticky; top: 70px; z-index: 40; background: #f8fafc; padding-bottom: 10px;">
@@ -618,13 +628,12 @@
         let novedadPendiente = null;
         let idSupervisorAutorizado = null;
 
-        let ordenActual = null, isLoteMode = false, listaItems = [], itemActivo = null, scanner = null;
+        let ordenActual = null, marcaActual = null, listaItems = [], itemActivo = null, scanner = null;
         let lastScanTime = 0; 
         let audioCtx = null;
         let wakeLock = null;
-        let sleepTimer = null; // Temporizador para el ahorro de batería
+        let sleepTimer = null; 
 
-        // Interceptor asíncrono para blindaje WebKit / iOS
         const observerCamara = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach((node) => {
@@ -676,7 +685,6 @@
             } catch (e) { console.error("Audio init error", e); }
         }
 
-        // BEEP FUERTE Y VIBRACIÓN INCORPORADA
         function playBeep(isSuccess = true) {
             try {
                 if (navigator.vibrate) {
@@ -704,7 +712,7 @@
                 toast = document.createElement('div');
                 toast.id = 'toast-error-scanner';
                 toast.style.position = 'fixed';
-                toast.style.bottom = '120px'; // Thumb zone visibility
+                toast.style.bottom = '120px';
                 toast.style.left = '50%';
                 toast.style.transform = 'translateX(-50%)';
                 toast.style.background = 'rgba(225, 29, 72, 0.95)';
@@ -723,7 +731,6 @@
             toast.innerHTML = '❌ ' + mensaje;
             toast.style.opacity = '1';
             
-            // Destello rojo en la mira
             const mira = document.getElementById('scanner-mira');
             if(mira) {
                 mira.style.borderColor = '#e11d48';
@@ -739,17 +746,15 @@
             setTimeout(() => { toast.style.opacity = '0'; }, 2500);
         }
 
-        // FUNCIONES DE AHORRO DE BATERÍA (SLEEP MODE)
         function iniciarTemporizadorInactividad() {
             clearTimeout(sleepTimer);
-            // Si pasan 20 segundos sin leer código, pausamos la cámara
             sleepTimer = setTimeout(pausarCamaraPorInactividad, 20000);
         }
 
         function pausarCamaraPorInactividad() {
             if (scanner) {
                 try {
-                    scanner.pause(true); // Pausa el consumo de CPU/Video
+                    scanner.pause(true); 
                     document.getElementById('embedded-reader').style.opacity = '0.3';
                     document.getElementById('scanner-mira').style.display = 'none';
                     document.getElementById('cam-resume-btn').style.display = 'flex';
@@ -774,34 +779,17 @@
         function mostrarMenu() { toggleView('view-menu'); }
         function iniciarApp(op) { op === 'picking' ? cargarOrdenes() : toggleView('view-alistamiento'); }
         function volverAlMenu() { mostrarMenu(); }
+        
         function toggleView(id) {
-            ['view-menu', 'view-orders', 'view-items', 'view-alistamiento'].forEach(v => document.getElementById(v).classList.add('hidden'));
+            ['view-menu', 'view-orders', 'view-brands', 'view-items', 'view-alistamiento'].forEach(v => {
+                const el = document.getElementById(v);
+                if (el) el.classList.add('hidden');
+            });
             document.getElementById(id).classList.remove('hidden');
         }
 
         function cargarOrdenesSilencioso() {
             const t = new Date().getTime();
-            fetch('/api/operario/mis_marcas?v=' + t).then(r => r.json()).then(d => {
-                let html = '';
-                if (d.length === 0) html = '<div style="grid-column: 1 / -1; text-align:center; color:#94a3b8; font-weight:600; padding:20px;">Sin lotes de trabajo asignados</div>';
-                d.forEach(m => {
-                    const p = m.total_items > 0 ? Math.round((m.items_listos / m.total_items) * 100) : 0;
-                    html += `
-                    <div class="order-card" style="border-left-color: var(--secondary);" onclick="abrirMarca('${m.marca.replace(/'/g, "\\'")}')">
-                        <div class="oc-top">
-                            <span class="oc-number">LOTE: ${m.marca}</span>
-                            <span class="oc-badge" style="background:#fef3c7; color:#b45309;">${m.total_ordenes} Peds</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#64748b; font-weight:700;">
-                            <span>Progreso</span><span>${m.items_listos}/${m.total_items}</span>
-                        </div>
-                        <div class="p-bar"><div class="p-fill" style="width:${p}%; background: var(--secondary);"></div></div>
-                    </div>`;
-                });
-                const cMar = document.getElementById('marcas-container');
-                if (cMar && cMar.innerHTML !== html) cMar.innerHTML = html;
-            }).catch(e => console.log(e));
-
             fetch('/api/operario/mis_ordenes?v=' + t).then(r => r.json()).then(d => {
                 let html = '';
                 if (d.length === 0) html = '<div style="grid-column: 1 / -1; text-align:center; color:#94a3b8; font-weight:600; padding:20px;">Sin órdenes individuales asignadas</div>';
@@ -835,33 +823,28 @@
                 .catch(e => console.log(e));
         }
 
-        // POLLING PRINCIPAL DE ITEMS (Escucha resolución del Controlador)
         function cargarItemsSilencioso() {
             if (!ordenActual) return;
-            const url = isLoteMode ? `/api/operario/items_lote/${encodeURIComponent(ordenActual)}` : `/api/operario/items_orden/${encodeURIComponent(ordenActual)}`;
+            const url = `/api/operario/items_orden/${encodeURIComponent(ordenActual)}`;
             
             fetch(url + '?v=' + new Date().getTime()).then(r => r.json()).then(d => {
                 listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
                 
-                // Si la pantalla de bloqueo está activa, buscamos si el controlador ya resolvió
                 if (itemActivo !== null && document.getElementById('overlay-bloqueo-andon').style.display === 'flex') {
                     const itemActualizado = listaItems.find(i => i.id === itemActivo.id);
                     if (itemActualizado) {
-                        // Caso A: El controlador confirmó el agotado o lo saltó (pasa a VERIFICADO o ALISTADO sin novedad)
                         if (itemActualizado.estado_actividad === 'VERIFICADO' || itemActualizado.estado_actividad === 'ALISTADO') {
                             document.getElementById('overlay-bloqueo-andon').style.display = 'none';
                             alert("✅ Novedad resuelta por el Controlador. Ítem cerrado.");
                             cerrarModalPicking();
                             renderizarItems();
                         } 
-                        // Caso B: El controlador Autorizó a ciegas
                         else if (itemActualizado.novedad_alistamiento === 'AUTORIZADO_CIEGAS') {
                             document.getElementById('overlay-bloqueo-andon').style.display = 'none';
                             alert("✅ El Controlador autorizó el ingreso manual a ciegas. Por favor cuenta las cantidades físicas manualmente.");
                             cerrarModalPicking();
                             abrirModalPickingId(itemActualizado.id);
                         }
-                        // Caso C: El controlador inyectó el EAN (la novedad se limpió y vuelve a PENDIENTE)
                         else if (!itemActualizado.novedad_alistamiento && novedadPendiente) {
                             document.getElementById('overlay-bloqueo-andon').style.display = 'none';
                             alert("✅ ¡Éxito! El Controlador ha formalizado el producto. Ya puedes escanear el código.");
@@ -870,7 +853,11 @@
                         }
                     }
                 } else {
-                    renderizarItems();
+                    if (!document.getElementById('view-brands').classList.contains('hidden')) {
+                        renderizarMarcas();
+                    } else if (!document.getElementById('view-items').classList.contains('hidden')) {
+                        renderizarItems();
+                    }
                 }
             }).catch(e => console.log(e));
         }
@@ -880,7 +867,7 @@
                 cargarKPIsOperador();
             } else if (!document.getElementById('view-orders').classList.contains('hidden')) {
                 cargarOrdenesSilencioso();
-            } else if (!document.getElementById('view-items').classList.contains('hidden')) {
+            } else if (!document.getElementById('view-brands').classList.contains('hidden') || !document.getElementById('view-items').classList.contains('hidden')) {
                 cargarItemsSilencioso();
             }
         }, 3000);
@@ -888,81 +875,104 @@
         function cargarOrdenes() {
             toggleView('view-orders');
             const cOrd = document.getElementById('orders-container');
-            const cMar = document.getElementById('marcas-container');
             cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>'; 
-            cMar.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>';
             cargarOrdenesSilencioso(); 
-        }
-
-        function abrirMarca(marca) {
-            ordenActual = marca;
-            isLoteMode = true;
-            document.getElementById('lblOrdenTitle').textContent = 'Lote: ' + marca;
-            document.getElementById('searchBox').value = '';
-            toggleView('view-items');
-
-            const c = document.getElementById('items-container');
-            c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando inventario del lote...</div>';
-
-            fetch(`/api/operario/items_lote/${encodeURIComponent(marca)}?v=` + new Date().getTime()).then(r => r.json()).then(d => {
-                listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
-                renderizarItems();
-            });
         }
 
         function abrirOrden(ord) {
             ordenActual = ord;
-            isLoteMode = false;
-            document.getElementById('lblOrdenTitle').textContent = '#' + ord;
-            document.getElementById('searchBox').value = '';
-            toggleView('view-items');
+            document.getElementById('lblOrdenTitleBrands').textContent = '#' + ord;
+            toggleView('view-brands');
             
-            const c = document.getElementById('items-container');
-            c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando lista de picking...</div>';
+            const c = document.getElementById('brands-container');
+            c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando marcas...</div>';
             
             fetch(`/api/operario/items_orden/${encodeURIComponent(ordenActual)}`).then(r => r.json()).then(d => {
                 listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
-                renderizarItems();
+                renderizarMarcas();
             });
+        }
+
+        function volverAMarcas() {
+            marcaActual = null;
+            toggleView('view-brands');
+            renderizarMarcas();
+        }
+
+        function abrirMarcaDeOrden(marca) {
+            marcaActual = marca;
+            document.getElementById('lblMarcaTitleItems').textContent = marca;
+            document.getElementById('searchBox').value = '';
+            toggleView('view-items');
+            renderizarItems();
+        }
+
+        function renderizarMarcas() {
+            const c = document.getElementById('brands-container');
+            let listosCount = 0;
+            let totalCount = listaItems.length;
+            let marcasPendientes = new Map();
+
+            listaItems.forEach(i => {
+                let isDone = (i.estado_actividad === 'ALISTADO' || i.estado_actividad === 'VERIFICADO' || i.estado_actividad === 'DESPACHADO' || i.estado_actividad === 'FINALIZADO' || i.estado_actividad === 'TERMINADO');
+                if (isDone) {
+                    listosCount++;
+                } else {
+                    let m = i.marca || 'GENÉRICO';
+                    if (!marcasPendientes.has(m)) marcasPendientes.set(m, { total: 0, listos: 0 });
+                    marcasPendientes.get(m).total++;
+                }
+            });
+
+            document.getElementById('lblProgressBrands').textContent = `${listosCount}/${totalCount}`;
+            let progressPercent = totalCount > 0 ? Math.round((listosCount / totalCount) * 100) : 0;
+            document.getElementById('header-progress-bar-brands').style.width = `${progressPercent}%`;
+
+            if (totalCount > 0 && listosCount === totalCount) {
+                c.innerHTML = `
+                <div style="grid-column: 1/-1; text-align:center; padding:40px 20px; background: white; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                    <div style="font-size:5rem; margin-bottom:10px;">🏆</div>
+                    <h3 style="color:#10b981; font-size:1.5rem; margin:0 0 10px 0;">¡Orden Completada!</h3>
+                    <p style="color:#64748b; font-size:1.1rem; font-weight:500;">No quedan marcas pendientes por alistar.</p>
+                    <button onclick="cargarOrdenes()" style="padding:18px 30px; background:var(--primary); color:white; border:none; border-radius:12px; margin-top:20px; font-weight:900; font-size:1.1rem; width:100%; box-shadow: 0 4px 10px rgba(0,78,146,0.3);">Volver a Tareas</button>
+                </div>`;
+                return;
+            }
+
+            let htmlInner = '';
+            for (let [marca, counts] of marcasPendientes.entries()) {
+                htmlInner += `
+                <div class="order-card" style="border-left-color: var(--secondary);" onclick="abrirMarcaDeOrden('${marca.replace(/'/g, "\\'")}')">
+                    <div class="oc-top">
+                        <span class="oc-number">${marca}</span>
+                        <span class="oc-badge" style="background:#fef3c7; color:#b45309;">${counts.total} items</span>
+                    </div>
+                    <div style="font-size:0.85rem; color:#64748b; font-weight:700;">Toca para alistar productos</div>
+                </div>`;
+            }
+            c.innerHTML = htmlInner;
         }
 
         function renderizarItems() {
             const c = document.getElementById('items-container');
             let htmlInner = ''; 
-
             const txt = document.getElementById('searchBox').value.toLowerCase();
             
-            let listosCount = 0;
-            let totalCount = listaItems.length;
+            let itemsDeMarca = listaItems.filter(i => (i.marca || 'GENÉRICO') === marcaActual);
+            let pendientesMarca = itemsDeMarca.filter(i => !(i.estado_actividad === 'ALISTADO' || i.estado_actividad === 'VERIFICADO' || i.estado_actividad === 'DESPACHADO' || i.estado_actividad === 'FINALIZADO' || i.estado_actividad === 'TERMINADO'));
 
-            listaItems.forEach(i => {
-                if (i.estado_actividad === 'ALISTADO' || i.estado_actividad === 'VERIFICADO' || i.estado_actividad === 'DESPACHADO' || i.estado_actividad === 'FINALIZADO') {
-                    listosCount++;
-                }
-            });
-
-            document.getElementById('lblProgress').textContent = `${listosCount}/${totalCount}`;
-            let progressPercent = totalCount > 0 ? Math.round((listosCount / totalCount) * 100) : 0;
-            document.getElementById('header-progress-bar').style.width = `${progressPercent}%`;
-
-            if (listaItems.length === 0 || listosCount === totalCount) {
-                c.innerHTML = `
-            <div style="grid-column: 1/-1; text-align:center; padding:40px 20px; background: white; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-                <div style="font-size:5rem; margin-bottom:10px;">🏆</div>
-                <h3 style="color:#10b981; font-size:1.5rem; margin:0 0 10px 0;">¡Trabajo Completado!</h3>
-                <p style="color:#64748b; font-size:1.1rem; font-weight:500;">No quedan ítems pendientes en este grupo.</p>
-                <button onclick="cargarOrdenes()" style="padding:18px 30px; background:var(--primary); color:white; border:none; border-radius:12px; margin-top:20px; font-weight:900; font-size:1.1rem; width:100%; box-shadow: 0 4px 10px rgba(0,78,146,0.3);">Volver a Tareas</button>
-            </div>`;
+            if (itemsDeMarca.length > 0 && pendientesMarca.length === 0) {
+                volverAMarcas();
                 return;
             }
 
-            const visibles = listaItems.filter(i =>
+            const visibles = pendientesMarca.filter(i =>
                 (i.descripcion_producto || '').toLowerCase().includes(txt) ||
                 (i.codigo_producto || '').toLowerCase().includes(txt)
             );
 
             if (visibles.length === 0) {
-                c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:#94a3b8; font-weight:600;">No se encontraron productos con esa búsqueda.</div>';
+                c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:#94a3b8; font-weight:600;">No se encontraron productos pendientes.</div>';
                 return;
             }
 
@@ -974,23 +984,16 @@
                 if (matchPromo) {
                     const nombrePromo = matchPromo[1]; 
                     nombre = nombre.replace(/\(Kit:\s*.*?\)/i, '').trim(); 
-
-                    badgeHtml = `<div style="display:inline-block; background-color:#fef08a; color:#92400e; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fde68a;">
-                                    🎁 KIT: ${nombrePromo}
-                                 </div><br>`;
+                    badgeHtml = `<div style="display:inline-block; background-color:#fef08a; color:#92400e; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fde68a;">🎁 KIT: ${nombrePromo}</div><br>`;
                 }
 
                 let extraBadges = '';
-                if (i.numero_orden_origen) {
-                    extraBadges += `<span style="display:inline-block; background:#e0f2fe; color:#0369a1; font-size:0.7rem; padding:3px 6px; border-radius:6px; font-weight:800; margin-right:5px; margin-top:5px;">📦 Ord: #${i.numero_orden_origen}</span>`;
-                }
-
                 if (i.puerta_asignada) {
                     extraBadges += `<span style="display:inline-block; background:#fce7f3; color:#be185d; font-size:0.7rem; padding:3px 6px; border-radius:6px; font-weight:800; margin-top:5px;">🚚 Muelle: ${i.puerta_asignada}</span>`;
                 }
 
-                // SI LA NOVEDAD ESTÁ BLOQUEADA (NO EN BD) o AUTORIZADA visualmente en lista
-                if (i.novedad_alistamiento === 'NO_EN_BD') {
+                let isLocked = (i.novedad_alistamiento === 'NO_EN_BD');
+                if (isLocked) {
                     extraBadges += `<br><span style="display:inline-block; background:#fff1f2; color:#e11d48; font-size:0.75rem; padding:4px 8px; border-radius:6px; font-weight:800; margin-top:5px; border:1px solid #fecdd3;">⚠️ ESPERANDO SOLUCIÓN DE CONTROLADOR</span>`;
                 } else if (i.novedad_alistamiento === 'AUTORIZADO_CIEGAS') {
                     extraBadges += `<br><span style="display:inline-block; background:#fffbeb; color:#d97706; font-size:0.75rem; padding:4px 8px; border-radius:6px; font-weight:800; margin-top:5px; border:1px solid #fde68a;">⚠️ INGRESO MANUAL AUTORIZADO</span>`;
@@ -1003,27 +1006,17 @@
                 if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.95rem;">📦 ${i.req_cajas} <span style="font-size:0.7rem;">CJ</span></div>`;
                 if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.95rem; color: var(--secondary);">🍬 ${i.req_unidades} <span style="font-size:0.7rem;">UN</span></div>`;
                 if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.95rem;">📦 0</div>`;
-
-                let isDone = (i.estado_actividad === 'ALISTADO' || i.estado_actividad === 'VERIFICADO' || i.estado_actividad === 'DESPACHADO' || i.estado_actividad === 'FINALIZADO');
-                let isLocked = (i.novedad_alistamiento === 'NO_EN_BD');
                 
-                let rowClass = "item-row active";
-                if (isDone) rowClass = "item-row completed";
-                if (isLocked && !isDone) rowClass = "item-row active"; 
-
-                let onclickAction = isDone ? "" : `onclick="abrirModalPickingId(${i.id})"`;
-
-                // Estilo especial para los bloqueados
                 let bgBorder = isLocked ? 'border-left: 5px solid #e11d48; background: #fff1f2;' : '';
 
                 htmlInner += `
-            <div id="card_${i.id}" class="${rowClass}" style="${bgBorder}" ${onclickAction}>
+            <div id="card_${i.id}" class="item-row active" style="${bgBorder}" onclick="abrirModalPickingId(${i.id})">
                 <div class="qty-indicator" style="flex-direction: column; gap: 2px; padding: 5px; width: 60px;">
-                    ${isDone ? '<span style="font-size:1.8rem; color:#2ecc71;">✓</span>' : htmlCantidades}
+                    ${htmlCantidades}
                 </div>
                 <div class="item-details">
                     <div class="id-code">${i.codigo_producto || 'S/C'}</div>
-                    <div class="id-name" style="${isDone ? 'text-decoration: line-through; color: #94a3b8;' : ''}">${badgeHtml}${nombre}</div>
+                    <div class="id-name">${badgeHtml}${nombre}</div>
                     <div>${extraBadges}</div>
                 </div>
             </div>`;
@@ -1032,7 +1025,6 @@
         }
 
         function filtrarLista() { renderizarItems(); }
-
         function abrirModalPickingId(id) {
             const item = listaItems.find(i => i.id === id);
             if (!item || item.estado_actividad === 'FINALIZADO' || item.estado_actividad === 'ALISTADO' || item.estado_actividad === 'VERIFICADO') return;
