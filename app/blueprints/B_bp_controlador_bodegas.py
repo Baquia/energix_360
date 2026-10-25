@@ -50,11 +50,11 @@ def control_logistica():
                 UNIQUE KEY unique_ruta_marca (id_empresa, marca)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
-        
+
         # AGREGAR COLUMNA nombre_componente A promociones_clientes SI NO EXISTE
         try:
             cur.execute("""
-                ALTER TABLE promociones_clientes 
+                ALTER TABLE promociones_clientes
                 ADD COLUMN nombre_componente VARCHAR(255) NULL AFTER ean_componente;
             """)
         except Exception:
@@ -67,38 +67,38 @@ def control_logistica():
             """)
         except Exception:
             pass # Las columnas ya existen
-            
+
         mysql.connection.commit()
         cur.close()
     except Exception as e:
         print(f"Aviso tablas: {e}")
-    
+
     kpis = {
-        'pedidos_totales': 0, 
-        'total_items_pendientes': 0, 
-        'items_finalizados': 0, 
+        'pedidos_totales': 0,
+        'total_items_pendientes': 0,
+        'items_finalizados': 0,
         'pedidos_pendientes_reales': 0,
         'velocidad_promedio': 0.0,
         'requiere_alias': 0,
         'backlog_verificacion': 0
     }
-    
-    ordenes_sin_asignar = [] 
+
+    ordenes_sin_asignar = []
     ordenes_procesadas = []
-    operarios_marcas = [] 
+    operarios_marcas = []
     verificadores_kpis = []
     marcas_huerfanas = []
     alertas_criticas = []
 
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
+
         # KPIs Generales - Items
         cur.execute("""
-            SELECT 
+            SELECT
                 SUM(CASE WHEN estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'TERMINADO') OR estado_actividad IS NULL THEN 1 ELSE 0 END) as pendientes,
                 SUM(CASE WHEN estado_actividad IN ('VERIFICADO', 'DESPACHADO') THEN 1 ELSE 0 END) as listos
-            FROM picking_importacion_raw 
+            FROM picking_importacion_raw
             WHERE id_empresa = %s AND (estado_actividad != 'TERMINADO' OR estado_actividad IS NULL)
         """, (empresa_id,))
         row = cur.fetchone()
@@ -108,17 +108,17 @@ def control_logistica():
 
         # KPIs Alias (Excepciones IA)
         cur.execute("""
-            SELECT COUNT(*) as requiere_alias 
-            FROM picking_importacion_raw 
+            SELECT COUNT(*) as requiere_alias
+            FROM picking_importacion_raw
             WHERE id_empresa = %s AND autorizacion_alistamiento = FALSE AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
         """, (empresa_id,))
         row_alias = cur.fetchone()
         if row_alias:
             kpis['requiere_alias'] = int(row_alias['requiere_alias'])
 
-        # Alertas Críticas 
+        # Alertas Críticas
         cur.execute("""
-            SELECT 
+            SELECT
                 numero_orden_origen as orden, codigo_producto, descripcion_producto,
                 novedad_alistamiento, nombre_auxiliar_asignado as operario, fecha_fin_alistamiento
             FROM picking_importacion_raw
@@ -129,7 +129,7 @@ def control_logistica():
 
         # Órdenes SIN ASIGNAR PUERTA
         cur.execute("""
-            SELECT 
+            SELECT
                 numero_orden_origen as orden,
                 MAX(puerta_asignada) as puerta_asignada,
                 MAX(zona) as zona,
@@ -145,7 +145,7 @@ def control_logistica():
 
         # Operarios y KPIs (Incluye conexión en vivo y trae a todos)
         cur.execute("""
-            SELECT 
+            SELECT
                 u.id as id_operario,
                 u.nombre as nombre_operario,
                 IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
@@ -154,7 +154,7 @@ def control_logistica():
                 COUNT(p.id) as total_asignados,
                 SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_completados,
                 SUM(CASE WHEN p.novedad_alistamiento IS NOT NULL THEN 1 ELSE 0 END) as novedades,
-                SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL 
+                SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL
                          THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM usuarios u
             LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
@@ -172,17 +172,17 @@ def control_logistica():
             completados = int(op_dict['items_completados'] or 0)
             novedades = int(op_dict['novedades'] or 0)
             mins = float(op_dict['minutos_totales'] or 0)
-            
+
             op_dict['avance_porcentaje'] = round((completados / asignados) * 100) if asignados > 0 else 0
             op_dict['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
             op_dict['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
             op_dict['en_linea'] = int(op_dict.get('en_linea', 0))
-            
+
             operarios_marcas.append(op_dict)
 
         # KPIs Verificadores: Trae a TODOS los verificadores e indica conexión
         cur.execute("""
-            SELECT 
+            SELECT
                 u.id as id_verificador,
                 u.nombre as nombre_verificador,
                 IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
@@ -191,43 +191,43 @@ def control_logistica():
             FROM usuarios u
             LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
             LEFT JOIN picking_importacion_raw p ON p.id_verificador = u.id AND p.id_empresa = %s AND p.fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
-            WHERE u.empresa_id = %s 
+            WHERE u.empresa_id = %s
               AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
             GROUP BY u.id, u.nombre, ma.ultima_actividad
             ORDER BY en_linea DESC, total_verificados DESC
         """, (empresa_id, empresa_id))
         verificadores_raw = cur.fetchall()
-        
+
         for v in verificadores_raw:
             v_dict = dict(v)
             verificados = int(v_dict['total_verificados'] or 0)
             discrepancias = int(v_dict['discrepancias'] or 0)
             v_dict['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
             v_dict['en_linea'] = int(v_dict.get('en_linea', 0))
-            
+
             # Obtener el total de ítems en las órdenes que este verificador ha tocado hoy
             cur.execute("""
                 SELECT COUNT(p2.id) as total_items_ordenes_tocadas
                 FROM picking_importacion_raw p2
-                WHERE p2.id_empresa = %s 
+                WHERE p2.id_empresa = %s
                   AND p2.numero_orden_origen IN (
-                      SELECT DISTINCT numero_orden_origen 
-                      FROM picking_importacion_raw 
+                      SELECT DISTINCT numero_orden_origen
+                      FROM picking_importacion_raw
                       WHERE id_verificador = %s AND fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
                   )
             """, (empresa_id, v_dict['id_verificador']))
             row_total = cur.fetchone()
             total_items_ordenes = row_total['total_items_ordenes_tocadas'] if row_total else 0
-            
+
             v_dict['avance_porcentaje'] = round((verificados / total_items_ordenes) * 100) if total_items_ordenes > 0 else 0
             v_dict['items_verificados'] = verificados
-            
+
             verificadores_kpis.append(v_dict)
 
         # Backlog de Verificación
         cur.execute("""
-            SELECT COUNT(id) as total_backlog 
-            FROM picking_importacion_raw 
+            SELECT COUNT(id) as total_backlog
+            FROM picking_importacion_raw
             WHERE id_empresa = %s AND estado_actividad = 'ALISTADO' AND autorizacion_alistamiento = TRUE
         """, (empresa_id,))
         row_backlog = cur.fetchone()
@@ -245,9 +245,9 @@ def control_logistica():
         """, (empresa_id,))
         marcas_huerfanas = cur.fetchall()
 
-        # Órdenes ACTIVAS 
+        # Órdenes ACTIVAS
         cur.execute("""
-            SELECT 
+            SELECT
                 numero_orden_origen as orden,
                 MAX(puerta_asignada) as puerta_asignada,
                 MAX(id_vehiculo) as id_vehiculo,
@@ -266,11 +266,11 @@ def control_logistica():
             HAVING SUM(CASE WHEN estado_actividad IN ('ASIGNADO', 'EN_PROCESO', 'ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) > 0
         """, (empresa_id,))
         raw_ordenes = cur.fetchall()
-        
+
         activos = []
         finalizados = []
         ahora = datetime.now()
-        
+
         total_items_speed = 0
         total_mins_speed = 0
 
@@ -283,7 +283,7 @@ def control_logistica():
             es_alistado = (it_listos == total_it) and (total_it > 0)
             es_verificado = (it_verif == total_it) and (total_it > 0)
             es_despachado = (it_desp == total_it) and (total_it > 0)
-            
+
             o['velocidad'] = 0.0
             mins = float(o['minutos_totales'] or 0)
             if mins > 0:
@@ -338,7 +338,7 @@ def control_logistica():
                 activos.append(o)
             else:
                 o['estado_visual'] = 'EN_PROCESO'
-                if o['velocidad'] > 0 and o['velocidad'] < 1.0: 
+                if o['velocidad'] > 0 and o['velocidad'] < 1.0:
                     o['color_fila'] = '#fef2f2'
                 elif o['velocidad'] >= 1.0:
                     o['color_fila'] = '#fefce8'
@@ -356,23 +356,23 @@ def control_logistica():
                 o['segundos_transcurridos'] = None
 
         kpis['pedidos_pendientes_reales'] = len(ordenes_sin_asignar) + len(activos)
-        kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']  
-        
+        kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']
+
         if total_mins_speed > 0:
             kpis['velocidad_promedio'] = round(total_items_speed / total_mins_speed, 2)
 
         activos.sort(key=lambda x: (x['secuencia'] or 99999, x['inicio'] or datetime.min), reverse=False)
         finalizados.sort(key=lambda x: x['fin'] or datetime.min, reverse=True)
         ordenes_procesadas = activos + finalizados
-        
+
         cur.close()
 
     except Exception as e:
         print(f"Error cargando dashboard: {e}")
 
-    return render_template('B_modulo_controlador_bodegas.html', 
-                           kpis=kpis, 
-                           ordenes_pendientes=ordenes_sin_asignar, 
+    return render_template('B_modulo_controlador_bodegas.html',
+                           kpis=kpis,
+                           ordenes_pendientes=ordenes_sin_asignar,
                            operarios_marcas=operarios_marcas,
                            verificadores_kpis=verificadores_kpis,
                            marcas_huerfanas=marcas_huerfanas,
@@ -389,11 +389,11 @@ def novedades_en_vivo():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT p.id, p.numero_orden_origen, p.codigo_producto, p.descripcion_producto, 
+            SELECT p.id, p.numero_orden_origen, p.codigo_producto, p.descripcion_producto,
                    p.cajas_calculadas, p.unidades_calculadas, p.cajas_alistadas, p.unidades_alistadas,
                    p.novedad_alistamiento, p.nombre_auxiliar_asignado, p.estado_actividad, p.marca
             FROM picking_importacion_raw p
-            WHERE p.id_empresa = %s 
+            WHERE p.id_empresa = %s
               AND p.novedad_alistamiento IN ('NO_EN_BD', 'SIN_EAN', 'FALTA_EXISTENCIAS')
               AND p.estado_actividad IN ('EN_PROCESO', 'ALISTADO')
               AND (p.id_supervisor_novedad IS NULL OR p.id_supervisor_novedad = 0)
@@ -411,20 +411,20 @@ def novedades_en_vivo():
 def resolver_novedad_vivo():
     data = request.json
     id_row = data.get('id_row')
-    accion = data.get('accion') 
-    
+    accion = data.get('accion')
+
     try:
         cur = mysql.connection.cursor()
-        
+
         if accion == 'CONFIRMAR_FALTANTE' or accion == 'CONFIRMAR_AGOTADO':
             cur.execute("""
-                UPDATE picking_importacion_raw 
-                SET estado_actividad = 'VERIFICADO', cajas_verificadas = 0, unidades_verificadas = 0, 
+                UPDATE picking_importacion_raw
+                SET estado_actividad = 'VERIFICADO', cajas_verificadas = 0, unidades_verificadas = 0,
                     novedad_alistamiento = 'FALTA_EXISTENCIAS',
                     id_supervisor_novedad = %s, id_verificador = %s, fecha_verificacion = NOW()
                 WHERE id = %s AND id_empresa = %s
             """, (session.get('usuario_id'), session.get('usuario_id'), id_row, session.get('empresa_id')))
-            
+
         elif accion == 'ASIGNAR_EAN':
             ean = data.get('ean')
             desc = data.get('descripcion')
@@ -432,13 +432,13 @@ def resolver_novedad_vivo():
             embalaje = str(data.get('unidad_embalaje', 'UND')).strip().upper()
             if embalaje not in ['CAJA', 'DISPLAY']:
                 embalaje = 'UND'
-            
+
             for intento in range(3):
                 try:
                     cur.execute("""
                         INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE 
+                        ON DUPLICATE KEY UPDATE
                         producto=VALUES(producto), fabricante=VALUES(fabricante), unidad_embalaje=VALUES(unidad_embalaje)
                     """, (session.get('empresa_id'), session.get('nombre_empresa'), 'general', ean, ean, desc, marca, embalaje))
                     break
@@ -447,18 +447,18 @@ def resolver_novedad_vivo():
                         time.sleep(0.5)
                         continue
                     raise e
-            
+
             cur.execute("""
-                UPDATE picking_importacion_raw 
-                SET codigo_producto = %s, descripcion_producto = %s, marca = %s, 
+                UPDATE picking_importacion_raw
+                SET codigo_producto = %s, descripcion_producto = %s, marca = %s,
                     novedad_alistamiento = NULL, estado_actividad = 'PENDIENTE', id_supervisor_novedad = %s
                 WHERE id = %s AND id_empresa = %s
             """, (ean, desc, marca, session.get('usuario_id'), id_row, session.get('empresa_id')))
-            
+
         elif accion == 'AUTORIZAR_CIEGAS':
             cur.execute("""
-                UPDATE picking_importacion_raw 
-                SET estado_actividad = 'PENDIENTE', 
+                UPDATE picking_importacion_raw
+                SET estado_actividad = 'PENDIENTE',
                     novedad_alistamiento = 'AUTORIZADO_CIEGAS',
                     id_supervisor_novedad = %s
                 WHERE id = %s AND id_empresa = %s
@@ -476,12 +476,12 @@ def resolver_novedad_vivo():
 def buscar_producto_maestro():
     q = request.args.get('q', '').strip()
     if len(q) < 3: return jsonify([])
-    
+
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         query = """
             SELECT ean, producto, IFNULL(fabricante, 'GENERICO') as marca, IFNULL(unidad_embalaje, 'UND') as unidad_embalaje
-            FROM productos 
+            FROM productos
             WHERE id_empresa = %s AND (ean LIKE %s OR producto LIKE %s)
             LIMIT 30
         """
@@ -502,7 +502,7 @@ def buscar_producto_maestro():
 def monitoreo_realtime():
     empresa_id = session.get('empresa_id')
     usuario_id = session.get('usuario_id')
-    
+
     # --- HEARTBEAT CONTROLADOR ---
     for intento in range(3):
         try:
@@ -524,36 +524,36 @@ def monitoreo_realtime():
     # -----------------------------
 
     kpis = {
-        'pedidos_totales': 0, 
-        'items_pendientes': 0, 
-        'items_finalizados': 0, 
+        'pedidos_totales': 0,
+        'items_pendientes': 0,
+        'items_finalizados': 0,
         'pedidos_pendientes_reales': 0,
         'velocidad_promedio': 0.0,
         'requiere_alias': 0,
         'backlog_verificacion': 0
     }
-    
+
     operarios_marcas = []
     verificadores_kpis = []
 
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
+
         cur.execute("""
-            SELECT 
+            SELECT
                 SUM(CASE WHEN estado_actividad NOT IN ('VERIFICADO', 'DESPACHADO', 'TERMINADO') OR estado_actividad IS NULL THEN 1 ELSE 0 END) as pendientes,
                 SUM(CASE WHEN estado_actividad IN ('VERIFICADO', 'DESPACHADO') THEN 1 ELSE 0 END) as listos
-            FROM picking_importacion_raw 
+            FROM picking_importacion_raw
             WHERE id_empresa = %s AND (estado_actividad != 'TERMINADO' OR estado_actividad IS NULL)
         """, (empresa_id,))
         row = cur.fetchone()
         if row:
             kpis['items_pendientes'] = int(row['pendientes'] or 0)
             kpis['items_finalizados'] = int(row['listos'] or 0)
-            
+
         cur.execute("""
-            SELECT COUNT(*) as requiere_alias 
-            FROM picking_importacion_raw 
+            SELECT COUNT(*) as requiere_alias
+            FROM picking_importacion_raw
             WHERE id_empresa = %s AND autorizacion_alistamiento = FALSE AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
         """, (empresa_id,))
         row_alias = cur.fetchone()
@@ -561,7 +561,7 @@ def monitoreo_realtime():
             kpis['requiere_alias'] = int(row_alias['requiere_alias'])
 
         cur.execute("""
-            SELECT 
+            SELECT
                 numero_orden_origen as orden,
                 MAX(puerta_asignada) as puerta_asignada,
                 MAX(zona) as zona,
@@ -580,7 +580,7 @@ def monitoreo_realtime():
         kpis['items_pendientes'] = sum(int(o['total_items']) for o in ordenes_sin_asignar)
 
         cur.execute("""
-            SELECT 
+            SELECT
                 u.id as id_operario,
                 u.nombre as nombre_operario,
                 IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
@@ -589,7 +589,7 @@ def monitoreo_realtime():
                 COUNT(p.id) as total_asignados,
                 SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_completados,
                 SUM(CASE WHEN p.novedad_alistamiento IS NOT NULL THEN 1 ELSE 0 END) as novedades,
-                SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL 
+                SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL
                          THEN TIMESTAMPDIFF(MINUTE, p.fecha_inicio_alistamiento, p.fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM usuarios u
             LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
@@ -607,16 +607,16 @@ def monitoreo_realtime():
             completados = int(op_dict['items_completados'] or 0)
             novedades = int(op_dict['novedades'] or 0)
             mins = float(op_dict['minutos_totales'] or 0)
-            
+
             op_dict['avance_porcentaje'] = round((completados / asignados) * 100) if asignados > 0 else 0
             op_dict['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
             op_dict['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
             op_dict['en_linea'] = int(op_dict.get('en_linea', 0))
-            
+
             operarios_marcas.append(op_dict)
 
         cur.execute("""
-            SELECT 
+            SELECT
                 u.id as id_verificador,
                 u.nombre as nombre_verificador,
                 IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
@@ -625,7 +625,7 @@ def monitoreo_realtime():
             FROM usuarios u
             LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
             LEFT JOIN picking_importacion_raw p ON p.id_verificador = u.id AND p.id_empresa = %s AND p.fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
-            WHERE u.empresa_id = %s 
+            WHERE u.empresa_id = %s
               AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
             GROUP BY u.id, u.nombre, ma.ultima_actividad
             ORDER BY en_linea DESC, total_verificados DESC
@@ -638,28 +638,28 @@ def monitoreo_realtime():
             discrepancias = int(v_dict['discrepancias'] or 0)
             v_dict['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
             v_dict['en_linea'] = int(v_dict.get('en_linea', 0))
-            
+
             cur.execute("""
                 SELECT COUNT(p2.id) as total_items_ordenes_tocadas
                 FROM picking_importacion_raw p2
-                WHERE p2.id_empresa = %s 
+                WHERE p2.id_empresa = %s
                   AND p2.numero_orden_origen IN (
-                      SELECT DISTINCT numero_orden_origen 
-                      FROM picking_importacion_raw 
+                      SELECT DISTINCT numero_orden_origen
+                      FROM picking_importacion_raw
                       WHERE id_verificador = %s AND fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
                   )
             """, (empresa_id, v_dict['id_verificador']))
             row_total = cur.fetchone()
             total_items_ordenes = row_total['total_items_ordenes_tocadas'] if row_total else 0
-            
+
             v_dict['avance_porcentaje'] = round((verificados / total_items_ordenes) * 100) if total_items_ordenes > 0 else 0
             v_dict['items_verificados'] = verificados
-            
+
             verificadores_kpis.append(v_dict)
 
         cur.execute("""
-            SELECT COUNT(id) as total_backlog 
-            FROM picking_importacion_raw 
+            SELECT COUNT(id) as total_backlog
+            FROM picking_importacion_raw
             WHERE id_empresa = %s AND estado_actividad = 'ALISTADO' AND autorizacion_alistamiento = TRUE
         """, (empresa_id,))
         row_backlog = cur.fetchone()
@@ -677,7 +677,7 @@ def monitoreo_realtime():
         marcas_huerfanas = list(cur.fetchall())
 
         cur.execute("""
-            SELECT 
+            SELECT
                 numero_orden_origen as orden,
                 MAX(puerta_asignada) as puerta_asignada,
                 MAX(id_vehiculo) as id_vehiculo,
@@ -696,11 +696,11 @@ def monitoreo_realtime():
             HAVING SUM(CASE WHEN estado_actividad IN ('ASIGNADO', 'EN_PROCESO', 'ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) > 0
         """, (empresa_id,))
         raw_ordenes = list(cur.fetchall())
-        
+
         activos = []
         finalizados = []
         ahora = datetime.now()
-        
+
         total_items_speed = 0
         total_mins_speed = 0
 
@@ -713,7 +713,7 @@ def monitoreo_realtime():
             es_alistado = (it_listos == total_it) and (total_it > 0)
             es_verificado = (it_verif == total_it) and (total_it > 0)
             es_despachado = (it_desp == total_it) and (total_it > 0)
-            
+
             o['velocidad'] = 0.0
             mins = float(o['minutos_totales'] or 0)
             if mins > 0:
@@ -768,8 +768,8 @@ def monitoreo_realtime():
                 activos.append(o)
             else:
                 o['estado_visual'] = 'EN_PROCESO'
-                kpis['items_pendientes'] += (total_it - it_listos) 
-                if o['velocidad'] > 0 and o['velocidad'] < 1.0: 
+                kpis['items_pendientes'] += (total_it - it_listos)
+                if o['velocidad'] > 0 and o['velocidad'] < 1.0:
                     o['color_fila'] = '#fef2f2'
                 elif o['velocidad'] >= 1.0:
                     o['color_fila'] = '#fefce8'
@@ -797,15 +797,15 @@ def monitoreo_realtime():
             o.pop('fin', None)
 
         kpis['pedidos_pendientes_reales'] = len(ordenes_sin_asignar) + len(activos)
-        kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']  
-        
+        kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']
+
         if total_mins_speed > 0:
             kpis['velocidad_promedio'] = round(total_items_speed / total_mins_speed, 2)
 
         activos.sort(key=lambda x: (x['secuencia'] or 99999, x['inicio_str'] or ''), reverse=False)
         finalizados.sort(key=lambda x: x['duracion_str'] or '', reverse=True)
         ordenes_procesadas = activos + finalizados
-        
+
         cur.close()
 
         return jsonify({
@@ -849,8 +849,8 @@ def alias_catalogo():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT ean, producto, fabricante 
-            FROM productos 
+            SELECT ean, producto, fabricante
+            FROM productos
             WHERE id_empresa = %s AND ean IS NOT NULL AND ean != ''
             ORDER BY producto ASC
         """, (session.get('empresa_id'),))
@@ -866,23 +866,23 @@ def alias_guardar():
     data = request.json
     desc_origen = data.get('descripcion_origen')
     ean_correcto = data.get('ean_correcto')
-    
+
     if not desc_origen or not ean_correcto: return jsonify({'status': 'error', 'message': 'Faltan datos'})
 
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
+
         cur.execute("SELECT producto, fabricante FROM productos WHERE id_empresa = %s AND ean = %s", (session.get('empresa_id'), ean_correcto))
         prod_db = cur.fetchone()
-        
+
         if not prod_db: return jsonify({'status': 'error', 'message': 'Producto no encontrado en catálogo'})
-        
+
         cur.execute("""
-            UPDATE picking_importacion_raw 
+            UPDATE picking_importacion_raw
             SET codigo_producto = %s, descripcion_producto = %s, marca = %s, autorizacion_alistamiento = TRUE
             WHERE id_empresa = %s AND descripcion_producto = %s AND autorizacion_alistamiento = FALSE
         """, (ean_correcto, prod_db['producto'], prod_db['fabricante'], session.get('empresa_id'), desc_origen))
-        
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Alias guardado y pedidos liberados.'})
@@ -895,17 +895,17 @@ def alias_guardar():
 def alias_permitir():
     data = request.json
     desc_origen = data.get('descripcion_origen')
-    
+
     if not desc_origen: return jsonify({'status': 'error', 'message': 'Faltan datos'})
 
     try:
         cur = mysql.connection.cursor()
         cur.execute("""
-            UPDATE picking_importacion_raw 
+            UPDATE picking_importacion_raw
             SET autorizacion_alistamiento = TRUE
             WHERE id_empresa = %s AND descripcion_producto = %s AND autorizacion_alistamiento = FALSE
         """, (session.get('empresa_id'), desc_origen))
-        
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Bypass exitoso. Item liberado.'})
@@ -923,7 +923,7 @@ def resolver_promo_huerfana():
         empresa_id = session.get('empresa_id')
 
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
+
         cur.execute("SELECT * FROM picking_importacion_raw WHERE id = %s AND id_empresa = %s AND estado_actividad = 'PROMO_HUERFANA'", (id_row, empresa_id))
         orphan = cur.fetchone()
         if not orphan:
@@ -942,36 +942,36 @@ def resolver_promo_huerfana():
             return jsonify({'status': 'error', 'message': 'El combo aún no existe en el módulo de Promociones. Configúralo primero y luego presiona este botón.'})
 
         nombre_promo = componentes[0]['nombre_promo']
-        
+
         cur.execute("SELECT factor_conversion FROM productos WHERE (ean = %s OR sku = %s) AND id_empresa = %s", (ean_promo, ean_promo, empresa_id))
         prod_info = cur.fetchone()
         factor = prod_info['factor_conversion'] if prod_info and prod_info['factor_conversion'] else 1
-        
+
         total_promos_pedidas = (orphan['cajas_calculadas'] * factor) + orphan['unidades_calculadas']
-        
+
         data_to_insert = []
         for comp in componentes:
             hijo_code = comp['ean_componente']
             hijo_cajas_total = total_promos_pedidas * comp['cajas_componente']
             hijo_unid_total = total_promos_pedidas * comp['fracciones_componente']
-            
+
             cur.execute("SELECT producto, fabricante FROM productos WHERE (ean = %s OR sku = %s) AND id_empresa = %s", (hijo_code, hijo_code, empresa_id))
             hijo_info = cur.fetchone()
             hijo_desc = hijo_info['producto'] if hijo_info else f"ITEM SIN NOMBRE ({hijo_code})"
             hijo_marca = hijo_info['fabricante'] if hijo_info else 'GENERICO'
-            
+
             hijo_desc_visual = f"{hijo_desc} (Kit: {nombre_promo})"
-            
+
             if hijo_cajas_total > 0 or hijo_unid_total > 0:
                 data_to_insert.append((
-                    empresa_id, orphan['numero_orden_origen'], orphan['zona'], hijo_code, orphan['ean_leido'], 
-                    hijo_desc_visual, hijo_marca, hijo_cajas_total, 0, hijo_unid_total, 0, 'PENDIENTE', 
+                    empresa_id, orphan['numero_orden_origen'], orphan['zona'], hijo_code, orphan['ean_leido'],
+                    hijo_desc_visual, hijo_marca, hijo_cajas_total, 0, hijo_unid_total, 0, 'PENDIENTE',
                     orphan['fecha_creacion_orden'], orphan['fecha_entrega_orden'], True
                 ))
 
         if data_to_insert:
-            query = """INSERT INTO picking_importacion_raw 
-            (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
+            query = """INSERT INTO picking_importacion_raw
+            (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
             cur.executemany(query, data_to_insert)
 
@@ -980,7 +980,7 @@ def resolver_promo_huerfana():
         cur.close()
 
         return jsonify({'status': 'success', 'message': 'Promoción resuelta. Los componentes han sido liberados a la bodega.'})
-    
+
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
@@ -996,7 +996,7 @@ def reporte_novedades():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT 
+            SELECT
                 p.numero_orden_origen as orden, p.codigo_producto, p.descripcion_producto,
                 p.novedad_alistamiento, p.nombre_auxiliar_asignado as operario,
                 IFNULL(s.nombre, 'Sin Auth') as supervisor, p.fecha_fin_alistamiento as fecha
@@ -1016,10 +1016,10 @@ def historial_actas():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT 
-                a.numero_orden, 
-                a.placa_vehiculo, 
-                IFNULL(u.nombre, 'Sin Auth') as supervisor, 
+            SELECT
+                a.numero_orden,
+                a.placa_vehiculo,
+                IFNULL(u.nombre, 'Sin Auth') as supervisor,
                 a.fecha_generacion
             FROM actas_despacho_flotacarga a
             LEFT JOIN usuarios u ON a.id_supervisor_despacho = u.id
@@ -1028,11 +1028,11 @@ def historial_actas():
         """, (session.get('empresa_id'),))
         data = cur.fetchall()
         cur.close()
-        
+
         for row in data:
             if isinstance(row['fecha_generacion'], datetime):
                 row['fecha_generacion'] = row['fecha_generacion'].strftime('%Y-%m-%d %H:%M:%S')
-                
+
         return jsonify(data)
     except Exception as e:
         print(f"Error historial actas: {e}")
@@ -1048,7 +1048,7 @@ def operarios_asignacion():
     empresa_id = session.get('empresa_id')
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
+
         cur.execute("SELECT id, nombre FROM usuarios WHERE empresa_id = %s AND perfil = 'operador_logistica' ORDER BY nombre ASC", (empresa_id,))
         operarios = cur.fetchall()
 
@@ -1075,14 +1075,14 @@ def guardar_asignacion_marcas():
     d = request.json
     empresa_id = session.get('empresa_id')
     id_operario = d.get('id_operario')
-    marcas = d.get('marcas', []) 
-    
+    marcas = d.get('marcas', [])
+
     if not id_operario: return jsonify({'status': 'error', 'message': 'Faltan datos.'})
 
     try:
         cur = mysql.connection.cursor()
         cur.execute("DELETE FROM fabricantes_proveedores WHERE id_empresa = %s AND operador_asignado = %s", (empresa_id, id_operario))
-        
+
         if marcas:
             data_to_insert = [(empresa_id, str(m).upper(), id_operario) for m in marcas]
             for intento in range(3):
@@ -1098,7 +1098,7 @@ def guardar_asignacion_marcas():
                         time.sleep(0.5)
                         continue
                     raise e
-            
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Asignación guardada correctamente.'})
@@ -1148,15 +1148,15 @@ def asignar_puerta():
                 """, (op_asignado['id'], op_asignado['nombre'], item['id']))
 
         cur.execute("""
-            UPDATE picking_importacion_raw 
+            UPDATE picking_importacion_raw
             SET puerta_asignada=%s, secuencia_alistamiento=%s, zona=%s, estado_actividad='ASIGNADO', fecha_inicio_alistamiento=NOW()
             WHERE numero_orden_origen=%s AND id_empresa=%s AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
         """, (puerta, secuencia, zona, orden, empresa_id))
-            
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'message': 'Muelle asignado y novedades repartidas equitativamente.'})
-    except Exception as e: 
+    except Exception as e:
         mysql.connection.rollback()
         return jsonify({'error': str(e)}), 500
 
@@ -1166,15 +1166,15 @@ def get_items_orden(orden):
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT 
-                p.id, p.codigo_producto, p.descripcion_producto, p.marca, 
+            SELECT
+                p.id, p.codigo_producto, p.descripcion_producto, p.marca,
                 p.cajas_calculadas, p.cajas_alistadas, p.cajas_verificadas,
                 p.unidades_calculadas, p.unidades_alistadas, p.unidades_verificadas,
                 p.estado_actividad, p.autorizacion_alistamiento,
                 IFNULL(prod.unidad_embalaje, 'UND') as embalaje
             FROM picking_importacion_raw p
-            LEFT JOIN productos prod 
-                ON (p.codigo_producto = prod.ean OR p.codigo_producto = prod.sku) 
+            LEFT JOIN productos prod
+                ON (p.codigo_producto = prod.ean OR p.codigo_producto = prod.sku)
                 AND p.id_empresa = prod.id_empresa
             WHERE p.numero_orden_origen = %s AND p.id_empresa = %s
         """, (orden, session.get('empresa_id')))
@@ -1183,15 +1183,15 @@ def get_items_orden(orden):
         return jsonify(items)
     except Exception as e:
         return jsonify([])
-    
+
 @bp_bodegas.route('/bodegas/api/get_empleados')
 @login_required_custom
 def get_empleados():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT id, nombre 
-            FROM usuarios 
+            SELECT id, nombre
+            FROM usuarios
             WHERE empresa_id = %s AND perfil = 'operador_logistica'
         """, (session.get('empresa_id'),))
         return jsonify(cur.fetchall())
@@ -1207,17 +1207,17 @@ def bodegas_stats():
     cur.close()
     return jsonify({'ordenes_activas': row[0] or 0, 'items_pendientes': int(row[1] or 0), 'items_finalizados': int(row[2] or 0)})
 
-@bp_bodegas.route('/api/bodegas/productos/crear', methods=['POST']) 
+@bp_bodegas.route('/api/bodegas/productos/crear', methods=['POST'])
 @login_required_custom
 def crear_producto_manual():
     data = request.json
     nit_empresa = str(session.get('empresa_id', ''))
     nombre_empresa = str(session.get('nombre_empresa', session.get('empresa', 'Empresa')))
-    
+
     embalaje = str(data.get('unidad_embalaje', 'UND')).strip().upper()
     if embalaje not in ['CAJA', 'DISPLAY']:
         embalaje = 'UND'
-        
+
     try:
         cur = mysql.connection.cursor()
         cur.execute("SELECT tipo_empresa FROM empresas WHERE nombre_comercial = %s", (nombre_empresa,))
@@ -1229,9 +1229,9 @@ def crear_producto_manual():
                 cur.execute("""
                     INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE 
-                    producto = VALUES(producto), 
-                    fabricante = VALUES(fabricante), 
+                    ON DUPLICATE KEY UPDATE
+                    producto = VALUES(producto),
+                    fabricante = VALUES(fabricante),
                     unidad_embalaje = VALUES(unidad_embalaje)
                 """, (nit_empresa, nombre_empresa, tipo_empresa, data.get('ean'), data.get('ean'), data.get('producto'), data.get('fabricante'), embalaje))
                 break
@@ -1240,25 +1240,25 @@ def crear_producto_manual():
                     time.sleep(0.5)
                     continue
                 raise e
-        
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success'})
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
-        
+
 @bp_bodegas.route('/bodegas/descargar_plantilla')
 @login_required_custom
 def descargar_plantilla_productos():
     nit_sesion = str(session.get('empresa_id', ''))
-    
+
     try:
         cur = mysql.connection.cursor()
         cur.execute("SELECT nombre_comercial, tipo_empresa FROM empresas WHERE nit = %s", (nit_sesion,))
         emp_data = cur.fetchone()
         cur.close()
-        
+
         if emp_data:
             nombre_real = emp_data[0]
             tipo_real = emp_data[1]
@@ -1291,7 +1291,7 @@ def descargar_plantilla_productos():
 
     return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                      as_attachment=True, download_name='Plantilla_Productos.xlsx')
-    
+
 @bp_bodegas.route('/bodegas/upload_productos_masivo', methods=['POST'])
 @login_required_custom
 def upload_productos_masivo():
@@ -1311,14 +1311,14 @@ def upload_productos_masivo():
                 raise e
         else:
             df = pd.read_csv(io.BytesIO(file_bytes), dtype=str, sep=None, engine='python')
-            
+
         df.columns = df.columns.str.strip().str.upper()
         empresa_id = str(session.get('empresa_id'))
-        
+
         cur = mysql.connection.cursor()
         cur.execute("SELECT nombre_comercial, tipo_empresa FROM empresas WHERE nit = %s OR id = %s", (empresa_id, empresa_id))
         emp_data = cur.fetchone()
-        
+
         nombre_empresa = emp_data[0] if emp_data else 'Empresa'
         tipo_empresa = emp_data[1] if emp_data else 'general'
 
@@ -1330,12 +1330,12 @@ def upload_productos_masivo():
             embalaje = str(row.get('UNIDAD_EMBALAJE', 'UND')).strip().upper()
             if embalaje not in ['CAJA', 'DISPLAY']:
                 embalaje = 'UND'
-            
+
             if not ean or not producto or ean.upper() == 'NAN':
                 continue
 
             data_to_upsert.append((
-                empresa_id, nombre_empresa, tipo_empresa, ean, ean, 
+                empresa_id, nombre_empresa, tipo_empresa, ean, ean,
                 producto, fabricante, embalaje
             ))
 
@@ -1345,9 +1345,9 @@ def upload_productos_masivo():
                     cur.executemany("""
                         INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE 
-                        empresa=VALUES(empresa), 
-                        tipo_empresa=VALUES(tipo_empresa), 
+                        ON DUPLICATE KEY UPDATE
+                        empresa=VALUES(empresa),
+                        tipo_empresa=VALUES(tipo_empresa),
                         producto=VALUES(producto),
                         fabricante=VALUES(fabricante),
                         unidad_embalaje=VALUES(unidad_embalaje)
@@ -1359,10 +1359,10 @@ def upload_productos_masivo():
                         time.sleep(0.5)
                         continue
                     raise e
-        
+
         cur.close()
         return jsonify({'message': f'✅ {len(data_to_upsert)} productos procesados y guardados correctamente.'})
-    
+
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({'error': f'Error en el archivo: {str(e)}'}), 500
@@ -1374,8 +1374,8 @@ def get_marcas():
         empresa_id = session.get('empresa_id')
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT DISTINCT IF(fabricante IS NULL OR fabricante = '', 'SIN MARCA', UPPER(fabricante)) as fabricante 
-            FROM productos 
+            SELECT DISTINCT IF(fabricante IS NULL OR fabricante = '', 'SIN MARCA', UPPER(fabricante)) as fabricante
+            FROM productos
             WHERE id_empresa = %s
             ORDER BY fabricante ASC
         """, (empresa_id,))
@@ -1383,29 +1383,29 @@ def get_marcas():
         cur.close()
         return jsonify(marcas)
     except Exception as e: return jsonify([])
-    
+
 @bp_bodegas.route('/api/bodegas/productos_por_marca/<marca>', methods=['GET'])
 @login_required_custom
 def get_productos_por_marca(marca):
     try:
         empresa_id = session.get('empresa_id')
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
+
         if marca == 'SIN MARCA':
             cur.execute("""
-                SELECT ean, producto, fabricante, unidad_embalaje 
-                FROM productos 
+                SELECT ean, producto, fabricante, unidad_embalaje
+                FROM productos
                 WHERE id_empresa = %s AND (fabricante IS NULL OR fabricante = '')
                 ORDER BY producto ASC
             """, (empresa_id,))
         else:
             cur.execute("""
-                SELECT ean, producto, fabricante, unidad_embalaje 
-                FROM productos 
-                WHERE id_empresa = %s AND UPPER(fabricante) = UPPER(%s) 
+                SELECT ean, producto, fabricante, unidad_embalaje
+                FROM productos
+                WHERE id_empresa = %s AND UPPER(fabricante) = UPPER(%s)
                 ORDER BY producto ASC
             """, (empresa_id, marca))
-            
+
         productos = cur.fetchall()
         cur.close()
         return jsonify(productos)
@@ -1424,18 +1424,18 @@ def editar_producto():
         nuevo_embalaje = str(data.get('unidad_embalaje', 'UND')).strip().upper()
         if nuevo_embalaje not in ['CAJA', 'DISPLAY']:
             nuevo_embalaje = 'UND'
-        
-        if not ean_original or not nuevo_ean or not nuevo_nombre: 
+
+        if not ean_original or not nuevo_ean or not nuevo_nombre:
             return jsonify({'status': 'error', 'message': 'Faltan datos obligatorios'})
 
         cur = mysql.connection.cursor()
-        
+
         # REGLA 6: Manejo de fricción y Deadlocks (3 intentos)
         for intento in range(3):
             try:
                 cur.execute("""
-                    UPDATE productos 
-                    SET ean = %s, sku = %s, producto = %s, fabricante = %s, unidad_embalaje = %s 
+                    UPDATE productos
+                    SET ean = %s, sku = %s, producto = %s, fabricante = %s, unidad_embalaje = %s
                     WHERE ean = %s AND id_empresa = %s
                 """, (nuevo_ean, nuevo_ean, nuevo_nombre, nueva_marca, nuevo_embalaje, ean_original, empresa_id))
                 mysql.connection.commit()
@@ -1445,24 +1445,24 @@ def editar_producto():
                     time.sleep(0.5)
                     continue
                 raise db_e
-                
+
         cur.close()
         return jsonify({'status': 'success', 'message': 'Producto actualizado correctamente'})
-        
+
     except Exception as e:
         mysql.connection.rollback()
         error_str = str(e)
-        
+
         # Intercepción específica de colisión de EAN (Error 1062)
         if "1062" in error_str and "Duplicate entry" in error_str:
             return jsonify({
-                'status': 'error', 
+                'status': 'error',
                 'message': f'El EAN {nuevo_ean} ya está asignado a otro producto en el catálogo. Elimina el duplicado primero.'
             })
-            
+
         # Si es otro error de base de datos, lo muestra
         return jsonify({'status': 'error', 'message': f'Error BD: {error_str}'})
-    
+
 @bp_bodegas.route('/api/bodegas/eliminar_producto', methods=['POST'])
 @login_required_custom
 def eliminar_producto():
@@ -1470,11 +1470,11 @@ def eliminar_producto():
         empresa_id = session.get('empresa_id')
         data = request.get_json()
         ean = data.get('ean')
-        
+
         if not ean: return jsonify({'status': 'error', 'message': 'EAN obligatorio'})
 
         cur = mysql.connection.cursor()
-        
+
         # REGLA 6: Manejo de fricción
         for intento in range(3):
             try:
@@ -1487,14 +1487,14 @@ def eliminar_producto():
                     time.sleep(0.5)
                     continue
                 raise db_e
-                
+
         cur.close()
-        
-        if filas_afectadas > 0: 
+
+        if filas_afectadas > 0:
             return jsonify({'status': 'success', 'message': 'Producto eliminado'})
-        else: 
+        else:
             return jsonify({'status': 'error', 'message': 'No se encontró el registro'})
-            
+
     except Exception as e:
         mysql.connection.rollback()
         # SE EXPONE EL ERROR SQL REAL AL FRONTEND
@@ -1508,19 +1508,19 @@ def eliminar_marca():
         empresa_id = session.get('empresa_id')
         data = request.get_json()
         fabricante = data.get('fabricante')
-        
+
         if not fabricante: return jsonify({'status': 'error', 'message': 'Marca obligatoria'})
 
         cur = mysql.connection.cursor()
-        
+
         # REGLA 6: Manejo de fricción
         for intento in range(3):
             try:
-                if fabricante == 'SIN MARCA': 
+                if fabricante == 'SIN MARCA':
                     cur.execute("DELETE FROM productos WHERE (fabricante IS NULL OR fabricante = '') AND id_empresa = %s", (empresa_id,))
-                else: 
+                else:
                     cur.execute("DELETE FROM productos WHERE UPPER(fabricante) = UPPER(%s) AND id_empresa = %s", (fabricante, empresa_id))
-                
+
                 filas_afectadas = cur.rowcount
                 mysql.connection.commit()
                 break
@@ -1529,19 +1529,19 @@ def eliminar_marca():
                     time.sleep(0.5)
                     continue
                 raise db_e
-                
+
         cur.close()
-        
-        if filas_afectadas > 0: 
+
+        if filas_afectadas > 0:
             return jsonify({'status': 'success', 'message': f'Eliminados {filas_afectadas}'})
-        else: 
+        else:
             return jsonify({'status': 'error', 'message': 'No hay productos asociados a esta marca'})
-            
+
     except Exception as e:
         mysql.connection.rollback()
         # SE EXPONE EL ERROR SQL REAL AL FRONTEND
         return jsonify({'status': 'error', 'message': f'Error BD: {str(e)}'})
-    
+
 @bp_bodegas.route('/api/promociones/listar', methods=['GET'])
 @login_required_custom
 def listar_promociones():
@@ -1596,21 +1596,21 @@ def guardar_promocion():
 
         cur = mysql.connection.cursor()
         cur.execute("DELETE FROM promociones_clientes WHERE ean_promo = %s AND id_empresa = %s", (ean_promo, empresa_id))
-        
+
         data_to_insert = []
         for comp in componentes:
             data_to_insert.append((
                 nombre_empresa, empresa_id, ean_promo, nombre_promo,
                 comp['ean'], comp.get('nombre', ''), comp['cajas'], comp['unidades'], 'ACTIVO'
             ))
-        
+
         if data_to_insert:
             cur.executemany("""
-                INSERT INTO promociones_clientes 
+                INSERT INTO promociones_clientes
                 (empresa, id_empresa, ean_promo, nombre_promo, ean_componente, nombre_componente, cajas_componente, fracciones_componente, estado)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, data_to_insert)
-        
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Promoción guardada'})
@@ -1655,49 +1655,136 @@ def get_vehiculos():
         data = cur.fetchall()
         cur.close()
         return jsonify(data)
-    except Exception as e: 
+    except Exception as e:
         return jsonify([])
-    
+
 @bp_bodegas.route('/bodegas/despachar_orden', methods=['POST'])
 @login_required_custom
 def despachar_orden():
     d = request.json
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
+
         cur.execute("SELECT placa FROM vehiculos WHERE id = %s", (d['id_vehiculo'],))
         veh = cur.fetchone()
         placa = veh['placa'] if veh else 'N/A'
-        
+
         cur.execute("""
-            UPDATE picking_importacion_raw 
+            UPDATE picking_importacion_raw
             SET estado_actividad='TERMINADO', id_vehiculo=%s, fecha_despacho=NOW(), id_supervisor_despacho=%s
             WHERE numero_orden_origen=%s AND id_empresa=%s
         """, (d['id_vehiculo'], session.get('usuario_id'), d['numero_orden'], session.get('empresa_id')))
-        
+
         # Verificamos si el verificador ya creó un registro parcial del acta para actualizarlo, o creamos uno nuevo
         cur.execute("SELECT id FROM actas_despacho_flotacarga WHERE numero_orden = %s AND id_empresa = %s", (d['numero_orden'], session.get('empresa_id')))
         acta_existente = cur.fetchone()
 
         if acta_existente:
             cur.execute("""
-                UPDATE actas_despacho_flotacarga 
+                UPDATE actas_despacho_flotacarga
                 SET placa_vehiculo=%s, id_supervisor_despacho=%s, foto_evidencia=%s, firma_evidencia=%s, firma_supervisor=%s
                 WHERE numero_orden=%s AND id_empresa=%s
             """, (placa, session.get('usuario_id'), d.get('foto'), d.get('firma'), d.get('firma_supervisor'), d['numero_orden'], session.get('empresa_id')))
         else:
             cur.execute("""
-                INSERT INTO actas_despacho_flotacarga 
+                INSERT INTO actas_despacho_flotacarga
                 (id_empresa, numero_orden, placa_vehiculo, id_supervisor_despacho, foto_evidencia, firma_evidencia, firma_supervisor)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (session.get('empresa_id'), d['numero_orden'], placa, session.get('usuario_id'), d.get('foto'), d.get('firma'), d.get('firma_supervisor')))
-        
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'message': 'Orden despachada y acta generada correctamente.'})
-    except Exception as e: 
+    except Exception as e:
         mysql.connection.rollback()
         return jsonify({'error': str(e)}), 500
+
+@bp_bodegas.route('/bodegas/imprimir_lista_verificacion/<orden>')
+@login_required_custom
+def imprimir_lista_verificacion(orden):
+    try:
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            SELECT
+                p.codigo_producto, p.descripcion_producto, p.cajas_verificadas, p.unidades_verificadas,
+                p.nombre_auxiliar_asignado, uv.nombre as nombre_verificador_asignado, p.puerta_asignada
+            FROM picking_importacion_raw p
+            LEFT JOIN usuarios uv ON p.id_verificador = uv.id
+            WHERE p.numero_orden_origen = %s AND p.id_empresa = %s
+              AND p.estado_actividad IN ('VERIFICADO', 'DESPACHADO', 'TERMINADO')
+        """, (orden, session.get('empresa_id')))
+        items = cur.fetchall()
+        cur.close()
+
+        if not items: return "Orden no encontrada o no verificada.", 404
+
+        head = items[0]
+        items_normales = [i for i in items if (i['cajas_verificadas']>0 or i['unidades_verificadas']>0)]
+
+        html = f"""
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>Lista de Verificación - {orden}</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; padding: 40px; color: #333; }}
+                h1, h2, h3 {{ color: #000; text-align: center; margin: 5px 0; }}
+                .header-box {{ border: 2px solid #000; padding: 20px; border-radius: 10px; margin-bottom: 30px; }}
+                .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }}
+                th, td {{ border: 1px solid #000; padding: 10px; text-align: left; font-size:14px; }}
+                th {{ background: #f0f0f0; }}
+                .check-box {{ width: 25px; height: 25px; border: 2px solid #000; display: inline-block; border-radius: 4px; }}
+                .btn-print {{ display: block; margin: 0 auto 30px auto; padding: 15px 30px; background: #004e92; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }}
+                @media print {{ .btn-print {{ display: none; }} body {{ padding: 0; }} }}
+            </style>
+        </head>
+        <body>
+            <button class="btn-print" onclick="window.print()">🖨️ Imprimir Lista Física</button>
+            <div class="header-box">
+                <h1>LISTA DE VERIFICACIÓN FÍSICA PARA EL CONDUCTOR</h1>
+                <h3>ORDEN DE PEDIDO: #{orden}</h3>
+                <div class="info-grid">
+                    <div><b>🏢 Muelle/Puerta:</b> {head.get('puerta_asignada', 'SIN PUERTA')}</div>
+                    <div><b>✅ Verificador Autorizado:</b> {head.get('nombre_verificador_asignado', 'N/A')}</div>
+                </div>
+                <p style="margin-top: 15px; font-size: 0.9rem; color: #475569;"><em>Nota: Este documento es para la validación física en muelle. Una vez el transportador confirme estas cantidades, se procederá a recoger las firmas digitales y fotografía en el sistema para confirmar el despacho.</em></p>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código</th><th>Producto</th><th>Alistador</th><th style="text-align:center;">Cajas</th><th style="text-align:center;">Unidades</th><th style="text-align:center;">Validación Conductor</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        if items_normales:
+            for item in items_normales:
+                html += f"<tr><td>{item['codigo_producto'] or 'S/C'}</td><td>{item['descripcion_producto']}</td><td>{item['nombre_auxiliar_asignado'] or 'N/A'}</td><td style='text-align:center; font-weight:bold; font-size: 16px;'>{item['cajas_verificadas']}</td><td style='text-align:center; font-weight:bold; font-size: 16px;'>{item['unidades_verificadas']}</td><td style='text-align:center;'><span class='check-box'></span></td></tr>"
+        else:
+            html += "<tr><td colspan='6' style='text-align:center;'>No hay mercancía conforme</td></tr>"
+
+        html += """
+                </tbody>
+            </table>
+            <div style="margin-top: 50px; text-align: center; display: flex; justify-content: space-around;">
+                <div>
+                    <div style="width: 250px; border-bottom: 2px solid #000; margin-bottom: 10px;"></div>
+                    <b>Firma del Conductor</b>
+                </div>
+                <div>
+                    <div style="width: 250px; border-bottom: 2px solid #000; margin-bottom: 10px;"></div>
+                    <b>Firma del Controlador / Despachador</b>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return html
+    except Exception as e:
+        return str(e), 500
+
 
 @bp_bodegas.route('/bodegas/imprimir_acta/<orden>')
 @login_required_custom
@@ -1705,7 +1792,7 @@ def imprimir_acta(orden):
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT 
+            SELECT
                 p.codigo_producto, p.descripcion_producto, p.cajas_verificadas, p.unidades_verificadas,
                 p.nombre_auxiliar_asignado, uv.nombre as nombre_verificador_asignado, p.puerta_asignada, p.fecha_despacho, p.novedad_alistamiento,
                 v.placa, u.nombre as supervisor, sup_nov.nombre as nombre_supervisor_novedad
@@ -1717,27 +1804,27 @@ def imprimir_acta(orden):
             WHERE p.numero_orden_origen = %s AND p.id_empresa = %s AND p.estado_actividad IN ('VERIFICADO', 'DESPACHADO', 'TERMINADO')
         """, (orden, session.get('empresa_id')))
         items = cur.fetchall()
-        
+
         cur.execute("""
-            SELECT foto_evidencia, firma_evidencia, firma_supervisor, firma_verificador 
-            FROM actas_despacho_flotacarga 
+            SELECT foto_evidencia, firma_evidencia, firma_supervisor, firma_verificador
+            FROM actas_despacho_flotacarga
             WHERE numero_orden = %s AND id_empresa = %s
             ORDER BY id DESC LIMIT 1
         """, (orden, session.get('empresa_id')))
         acta_info = cur.fetchone()
         cur.close()
-        
+
         if not items: return "Orden no encontrada o no verificada.", 404
-            
+
         head = items[0]
         # Conservamos únicamente la mercancía conforme
         items_normales = [i for i in items if i['novedad_alistamiento'] is None and (i['cajas_verificadas']>0 or i['unidades_verificadas']>0)]
-        
+
         firma_cond_img = f"<img src='{acta_info['firma_evidencia']}' />" if acta_info and acta_info['firma_evidencia'] else ""
         firma_sup_img = f"<img src='{acta_info['firma_supervisor']}' />" if acta_info and acta_info['firma_supervisor'] else ""
         firma_verif_img = f"<img src='{acta_info['firma_verificador']}' />" if acta_info and acta_info['firma_verificador'] else ""
-        foto_img = f"<img src='{acta_info['foto_evidencia']}' style='max-width:100%; max-height:300px; display:block; margin: 0 auto; border-radius: 8px;'/>" if acta_info and acta_info['foto_evidencia'] else ""
-        
+        foto_img = f"<img src='{acta_info['foto_evidencia']}' style='max-width:100%; max-height:400px; display:block; margin: 0 auto; border-radius: 8px;'/>" if acta_info and acta_info['foto_evidencia'] else ""
+
         html = f"""
         <!DOCTYPE html>
         <html lang="es">
@@ -1789,13 +1876,11 @@ def imprimir_acta(orden):
                 html += f"<tr><td>{item['codigo_producto'] or 'S/C'}</td><td>{item['descripcion_producto']}</td><td>{item['nombre_auxiliar_asignado'] or 'N/A'}</td><td style='text-align:center; font-weight:bold;'>{item['cajas_verificadas']}</td><td style='text-align:center; font-weight:bold;'>{item['unidades_verificadas']}</td></tr>"
         else:
             html += "<tr><td colspan='5' style='text-align:center;'>No hay mercancía conforme</td></tr>"
-            
-        html += """</tbody></table>"""
-        
-        # Eliminada la sección de Novedades HTML
 
         html += f"""
-            <div class="firmas">
+                </tbody>
+            </table>
+            <div class="firmas" style="page-break-inside: avoid;">
                 <div class="firma-col">
                     <div class="firma-espacio">{firma_verif_img}</div>
                     <div class="firma-linea"><b>Verificador</b><br>{head.get('nombre_verificador_asignado', 'Firma Verificador')}</div>
@@ -1812,8 +1897,8 @@ def imprimir_acta(orden):
                     </div>
                 </div>
             </div>
-            <div style="margin-top: 40px; text-align:center;">
-                <h4 style="color:#64748b;">Evidencia Fotográfica</h4>
+            <div style="margin-top: 40px; text-align:center; page-break-inside: avoid; padding-bottom: 30px;">
+                <h4 style="color:#64748b; margin-bottom: 15px;">Evidencia Fotográfica de Entrega</h4>
                 {foto_img}
             </div>
         </body>
@@ -1829,7 +1914,7 @@ def ordenes_sin_secuencia():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT 
+            SELECT
                 numero_orden_origen as orden,
                 DATE_FORMAT(MAX(fecha_carga), '%%Y-%%m-%%d %%H:%%i:%%s') as fecha_carga,
                 MAX(zona) as zona,
@@ -1845,7 +1930,7 @@ def ordenes_sin_secuencia():
     except Exception as e:
         print(f"Error en ordenes_sin_secuencia: {e}")
         return jsonify([])
-    
+
 @bp_bodegas.route('/bodegas/guardar_secuencia_zona', methods=['POST'])
 @login_required_custom
 def guardar_secuencia_zona():
@@ -1853,14 +1938,14 @@ def guardar_secuencia_zona():
     try:
         cur = mysql.connection.cursor()
         cur.execute("""
-            UPDATE picking_importacion_raw 
+            UPDATE picking_importacion_raw
             SET zona=%s, secuencia_alistamiento=%s
             WHERE numero_orden_origen=%s AND id_empresa=%s
         """, (d['zona'], d['secuencia'], d['orden'], session.get('empresa_id')))
         mysql.connection.commit()
         cur.close()
         return jsonify({'message': 'Zona y orden de secuencia actualizados correctamente.'})
-    except Exception as e: 
+    except Exception as e:
         mysql.connection.rollback()
         return jsonify({'error': str(e)}), 500
 
@@ -1869,9 +1954,9 @@ def guardar_secuencia_zona():
 def kpis_historico():
     empresa_id = session.get('empresa_id')
     lapso = request.args.get('lapso', 'hoy')
-    
+
     hoy = datetime.now()
-    
+
     if lapso == 'hoy':
         fecha_inicio = hoy.date()
         fecha_fin = hoy.date()
@@ -1892,14 +1977,14 @@ def kpis_historico():
         trimestre_anterior = trimestre_actual - 1 if trimestre_actual > 1 else 4
         ano_trimestre = hoy.year if trimestre_actual > 1 else hoy.year - 1
         mes_inicio = (trimestre_anterior - 1) * 3 + 1
-        
+
         fecha_inicio = datetime(ano_trimestre, mes_inicio, 1).date()
-        
+
         if trimestre_anterior == 1: mes_fin, dia_fin = 3, 31
         elif trimestre_anterior == 2: mes_fin, dia_fin = 6, 30
         elif trimestre_anterior == 3: mes_fin, dia_fin = 9, 30
         else: mes_fin, dia_fin = 12, 31
-        
+
         fecha_fin = datetime(ano_trimestre, mes_fin, dia_fin).date()
         formato_grupo = '%Y-%m'
     else:
@@ -1909,35 +1994,35 @@ def kpis_historico():
 
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
+
         # 1. Global (Línea de tiempo)
         query_global = """
-            SELECT 
+            SELECT
                 DATE_FORMAT(fecha_creacion_orden, %s) as etiqueta,
                 COUNT(DISTINCT numero_orden_origen) as total_pedidos,
                 SUM(CASE WHEN estado_actividad IN ('VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_listos,
                 COUNT(*) as total_items,
-                AVG(CASE WHEN fecha_inicio_alistamiento IS NOT NULL AND fecha_fin_alistamiento IS NOT NULL 
+                AVG(CASE WHEN fecha_inicio_alistamiento IS NOT NULL AND fecha_fin_alistamiento IS NOT NULL
                          THEN TIMESTAMPDIFF(MINUTE, fecha_inicio_alistamiento, fecha_fin_alistamiento) ELSE NULL END) as tiempo_promedio_min
             FROM picking_importacion_raw
-            WHERE id_empresa = %s 
+            WHERE id_empresa = %s
               AND DATE(fecha_creacion_orden) BETWEEN %s AND %s
             GROUP BY etiqueta
             ORDER BY etiqueta ASC
         """
         cur.execute(query_global, (formato_grupo, empresa_id, fecha_inicio, fecha_fin))
         datos_globales = list(cur.fetchall())
-        
+
         # 2. Operarios Histórico
         query_operarios = """
-            SELECT 
+            SELECT
                 nombre_auxiliar_asignado as operario,
                 COUNT(id) as items_completados,
                 SUM(CASE WHEN novedad_alistamiento IS NOT NULL THEN 1 ELSE 0 END) as novedades,
-                SUM(CASE WHEN fecha_inicio_alistamiento IS NOT NULL AND fecha_fin_alistamiento IS NOT NULL 
+                SUM(CASE WHEN fecha_inicio_alistamiento IS NOT NULL AND fecha_fin_alistamiento IS NOT NULL
                          THEN TIMESTAMPDIFF(MINUTE, fecha_inicio_alistamiento, fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM picking_importacion_raw
-            WHERE id_empresa = %s 
+            WHERE id_empresa = %s
               AND nombre_auxiliar_asignado IS NOT NULL
               AND estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO')
               AND DATE(fecha_fin_alistamiento) BETWEEN %s AND %s
@@ -1946,27 +2031,27 @@ def kpis_historico():
         """
         cur.execute(query_operarios, (empresa_id, fecha_inicio, fecha_fin))
         ops_raw = cur.fetchall()
-        
+
         operarios_kpis = []
         for op in ops_raw:
             op_d = dict(op)
             completados = int(op_d['items_completados'] or 0)
             novedades = int(op_d['novedades'] or 0)
             mins = float(op_d['minutos_totales'] or 0)
-            
+
             op_d['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
             op_d['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
             operarios_kpis.append(op_d)
-            
+
         # 3. Verificadores Histórico (Modificado para intervalo de 14H en vez de CURDATE)
         query_verificadores = """
-            SELECT 
+            SELECT
                 u.nombre as verificador,
                 COUNT(p.id) as items_verificados,
                 SUM(CASE WHEN p.cajas_alistadas != p.cajas_verificadas OR p.unidades_alistadas != p.unidades_verificadas THEN 1 ELSE 0 END) as discrepancias
             FROM picking_importacion_raw p
             INNER JOIN usuarios u ON p.id_verificador = u.id
-            WHERE p.id_empresa = %s 
+            WHERE p.id_empresa = %s
               AND p.fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
               AND DATE(p.fecha_verificacion) BETWEEN %s AND %s
             GROUP BY u.nombre
@@ -1974,7 +2059,7 @@ def kpis_historico():
         """
         cur.execute(query_verificadores, (empresa_id, fecha_inicio, fecha_fin))
         verif_raw = cur.fetchall()
-        
+
         verificadores_kpis = []
         for v in verif_raw:
             v_d = dict(v)
@@ -1984,7 +2069,7 @@ def kpis_historico():
             verificadores_kpis.append(v_d)
 
         cur.close()
-        
+
         return jsonify({
             'global': datos_globales,
             'operarios': operarios_kpis,
@@ -2028,25 +2113,79 @@ def match_keyword(celda_val, keywords):
             return True
     return False
 
+
+@bp_bodegas.route('/bodegas/prevalidar_excel', methods=['POST'])
+@login_required_custom
+def prevalidar_excel():
+    empresa_id = str(session.get('empresa_id'))
+    archivos = request.files.getlist('file')
+    
+    if not archivos or all(f.filename == '' for f in archivos):
+        return jsonify({'error': 'No se recibieron archivos'}), 400
+
+    try:
+        for file in archivos:
+            if file.filename == '': continue
+            filename = file.filename
+            ext = file.filename.lower()
+            file_bytes = file.read()
+            # Reiniciamos el puntero del archivo por si Flask intenta procesarlo de nuevo, aunque el frontend hará un fetch nuevo
+            file.seek(0)
+            
+            if ext.endswith('.csv'):
+                df_raw = pd.read_csv(io.BytesIO(file_bytes), header=None, sep=None, engine='python', dtype=str, nrows=30)
+            else:
+                engine_val = 'openpyxl' if ext.endswith('.xlsx') else ('xlrd' if ext.endswith('.xls') else None)
+                df_raw = pd.read_excel(io.BytesIO(file_bytes), header=None, dtype=str, engine=engine_val, nrows=30)
+            
+            df_raw = df_raw.fillna('')
+            meta_orden = filename.split('.')[0].replace('_', ' ').strip()
+            
+            pedidos_keywords = ['PEDIDO N°', 'ORDEN NUMERO', 'PEDIDO NUMERO', 'ORDEN N°', 'PEDIDO', 'ORDEN', 'PLANILLA', 'REMISION', 'ENTREGA', 'DOC']
+            
+            for r in range(min(30, len(df_raw))):
+                for c in range(min(30, len(df_raw.columns))):
+                    celda_val = str(df_raw.iloc[r, c]).strip().upper()
+                    if not celda_val or celda_val in ['NAN', 'NULL', 'NONE']: continue
+                    
+                    if any(k == celda_val for k in pedidos_keywords) or any(k in celda_val for k in pedidos_keywords):
+                        if c + 1 < len(df_raw.columns) and str(df_raw.iloc[r, c+1]).strip() and str(df_raw.iloc[r, c+1]).strip().upper() != 'NAN':
+                            meta_orden = str(df_raw.iloc[r, c+1]).strip()
+                        elif r + 1 < len(df_raw) and str(df_raw.iloc[r+1, c]).strip() and str(df_raw.iloc[r+1, c]).strip().upper() != 'NAN':
+                            meta_orden = str(df_raw.iloc[r+1, c]).strip()
+            
+            cur = mysql.connection.cursor()
+            cur.execute("SELECT id FROM picking_importacion_raw WHERE id_empresa = %s AND numero_orden_origen = %s LIMIT 1", (empresa_id, meta_orden))
+            existe = cur.fetchone()
+            cur.close()
+            
+            if existe:
+                return jsonify({'existe': True, 'orden': meta_orden})
+                
+        return jsonify({'existe': False})
+    except Exception as e:
+        return jsonify({'error': f'Error pre-validando el archivo: {str(e)}'}), 500
+
+
 @bp_bodegas.route('/bodegas/upload_excel', methods=['POST'])
 @login_required_custom
 def upload_excel():
     empresa_id = str(session.get('empresa_id'))
-    
+
     archivos = request.files.getlist('file')
-    if not archivos or all(f.filename == '' for f in archivos): 
+    if not archivos or all(f.filename == '' for f in archivos):
         return jsonify({'error': 'No se recibieron archivos'}), 400
 
     try:
         cur = mysql.connection.cursor()
-        
+
         # --- CARGA DE CATÁLOGOS MAESTROS EN MEMORIA ---
         cur.execute("SELECT sku, ean, producto, fabricante, factor_conversion, unidad_embalaje FROM productos WHERE id_empresa = %s", (empresa_id,))
         db_products = cur.fetchall()
-        
+
         maestra_productos_ean = {}
         maestra_productos_nombre = {}
-        maestra_productos_nombre_lista = {} 
+        maestra_productos_nombre_lista = {}
 
         for row in db_products:
             sku_val = normalizar_codigo(row[0])
@@ -2056,12 +2195,12 @@ def upload_excel():
             marca_original = str(row[3]).strip() if row[3] and str(row[3]).upper() != 'NAN' else "GENERICO"
             factor_conversion = int(row[4]) if len(row) > 4 and row[4] else 1
             unidad_embalaje = str(row[5]).strip().upper() if len(row) > 5 and row[5] else 'UND'
-            
+
             item_data = {'desc': desc_original, 'marca': marca_original, 'ean': ean_val or sku_val, 'factor_conversion': factor_conversion, 'unidad_embalaje': unidad_embalaje}
 
             if ean_val: maestra_productos_ean[ean_val] = item_data
             if sku_val: maestra_productos_ean[sku_val] = item_data
-            if desc_limpia: 
+            if desc_limpia:
                 maestra_productos_nombre[desc_limpia] = item_data
                 if desc_limpia not in maestra_productos_nombre_lista:
                     maestra_productos_nombre_lista[desc_limpia] = {}
@@ -2070,23 +2209,23 @@ def upload_excel():
         cur.execute("SELECT ean_promo, nombre_promo, ean_componente, cajas_componente, fracciones_componente FROM promociones_clientes WHERE id_empresa = %s AND estado = 'ACTIVO'", (empresa_id,))
         db_promos = cur.fetchall()
         cur.close()
-        
+
         diccionario_promos = {}
-        maestra_promos_nombre = {} 
+        maestra_promos_nombre = {}
 
         for row in db_promos:
-            p_padre = normalizar_codigo(row[0]).upper() 
+            p_padre = normalizar_codigo(row[0]).upper()
             p_nombre = str(row[1]).strip() if row[1] else "PROMO"
             p_hijo = normalizar_codigo(row[2]).upper()
             p_cajas = int(row[3]) if row[3] is not None else 0
             p_fracc = int(row[4]) if row[4] is not None else 0
-            
-            if p_padre not in diccionario_promos: 
+
+            if p_padre not in diccionario_promos:
                 diccionario_promos[p_padre] = {'nombre': p_nombre, 'componentes': []}
                 nombre_promo_limpio = limpiar_texto(p_nombre)
                 if nombre_promo_limpio:
                     maestra_promos_nombre[nombre_promo_limpio] = p_padre
-                    
+
             diccionario_promos[p_padre]['componentes'].append({'ean': p_hijo, 'cajas': p_cajas, 'fracciones': p_fracc})
 
         resultados_exito = []
@@ -2096,7 +2235,7 @@ def upload_excel():
         for file in archivos:
             if file.filename == '': continue
             filename = file.filename
-            
+
             try:
                 ext = file.filename.lower()
                 file_bytes = file.read()
@@ -2111,37 +2250,37 @@ def upload_excel():
                             resultados_error.append(f"❌ {filename}: Falta la librería 'xlrd' en el servidor para leer archivos .xls antiguos. Por favor instálela y REINICIE EL SERVIDOR.")
                             continue
                         raise e
-                
+
                 df_raw = df_raw.fillna('')
 
                 # 1. Detectar Meta-Data (Zona y Pedido)
                 meta_zona = 'GENERAL'
                 meta_orden = filename.split('.')[0].replace('_', ' ').strip()
-                
+
                 raw_head = [str(x).strip().upper() for x in df_raw.head(20).values.flatten() if pd.notna(x)]
                 text_dump = " ".join(raw_head)
-                
+
                 match_zona = re.search(r'(ZONA|RUTA|UBICACION|DESTINO)\s*[:#]?\s*(\w+)', text_dump)
                 if match_zona: meta_zona = match_zona.group(2)
-                
+
                 meta_fecha = datetime.now().strftime('%Y-%m-%d')
                 match_fecha = re.search(r'(\d{2,4}[-/]\d{2}[-/]\d{2,4})', text_dump)
                 if match_fecha: meta_fecha = match_fecha.group(1)
-                
+
                 pedidos_keywords = ['PEDIDO N°', 'ORDEN NUMERO', 'PEDIDO NUMERO', 'ORDEN N°', 'PEDIDO', 'ORDEN', 'PLANILLA', 'REMISION', 'ENTREGA', 'DOC']
-                
+
                 for r in range(min(30, len(df_raw))):
                     for c in range(min(30, len(df_raw.columns))):
                         celda_val = str(df_raw.iloc[r, c]).strip().upper()
                         if not celda_val or celda_val in ['NAN', 'NULL', 'NONE']: continue
-                        
+
                         if meta_zona == 'GENERAL':
                             if celda_val == 'ZONA' or celda_val == 'RUTA':
                                 if c + 1 < len(df_raw.columns) and str(df_raw.iloc[r, c+1]).strip() and str(df_raw.iloc[r, c+1]).strip().upper() != 'NAN':
                                     meta_zona = str(df_raw.iloc[r, c+1]).strip()
                                 elif r + 1 < len(df_raw) and str(df_raw.iloc[r+1, c]).strip() and str(df_raw.iloc[r+1, c]).strip().upper() != 'NAN':
                                     meta_zona = str(df_raw.iloc[r+1, c]).strip()
-                                
+
                         if any(k == celda_val for k in pedidos_keywords) or any(k in celda_val for k in pedidos_keywords):
                             if c + 1 < len(df_raw.columns) and str(df_raw.iloc[r, c+1]).strip() and str(df_raw.iloc[r, c+1]).strip().upper() != 'NAN':
                                 meta_orden = str(df_raw.iloc[r, c+1]).strip()
@@ -2151,11 +2290,11 @@ def upload_excel():
                 # 2. Extracción por Zonas Estrictas (Zone Mapping)
                 data_to_insert = []
                 fecha_creacion = datetime.now()
-                
+
                 cálculo_total_cajas = 0
                 cálculo_total_unidades = 0
                 cálculo_marcas_presentes = set()
-                
+
                 lineas_detectadas = 0
                 lineas_ignoradas = 0
                 sub_items_generados = 0
@@ -2173,15 +2312,15 @@ def upload_excel():
 
                 for i in range(len(df_raw)):
                     row = df_raw.iloc[i]
-                    
+
                     raw_code = extraer_de_zona(row, 1, 4, is_numeric=False)
                     raw_desc = extraer_de_zona(row, 5, 11, is_numeric=False)
                     cajas = extraer_de_zona(row, 12, 14, is_numeric=True)
                     unidades = extraer_de_zona(row, 15, 18, is_numeric=True)
-                    
+
                     if not raw_desc:
                         continue
-                        
+
                     desc_clean = limpiar_texto(raw_desc)
                     if desc_clean in ['DESCRIPCION', 'PRODUCTO', 'NOMBRE', 'ARTICULO', 'MERCANCIA', 'DETALLE']:
                         continue
@@ -2189,7 +2328,7 @@ def upload_excel():
                     if cajas <= 0 and unidades <= 0:
                         lineas_ignoradas += 1
                         continue
-                        
+
                     lineas_detectadas += 1
                     raw_desc = re.sub(r'[\.\s]+$', '', raw_desc).strip()
                     raw_code = normalizar_codigo(raw_code)
@@ -2197,7 +2336,7 @@ def upload_excel():
                     final_ean = raw_code
                     final_desc = raw_desc
                     final_marca = 'GENERICO'
-                    auth = False 
+                    auth = False
 
                     match_encontrado = False
                     es_promo = False
@@ -2211,7 +2350,7 @@ def upload_excel():
                             final_desc = prod_db['desc']
                             final_marca = prod_db['marca']
                             match_encontrado = True
-                            
+
                             if prod_db['unidad_embalaje'] in ['CAJA', 'CJ', 'CAJAS'] and unidades > 0 and cajas == 0:
                                 cajas = unidades; unidades = 0
                             elif prod_db['unidad_embalaje'] not in ['CAJA', 'CJ', 'CAJAS'] and cajas > 0 and unidades == 0:
@@ -2219,7 +2358,7 @@ def upload_excel():
 
                     if not match_encontrado and final_desc:
                         desc_limpia = limpiar_texto(final_desc)
-                        
+
                         if desc_limpia in maestra_promos_nombre:
                             final_ean = maestra_promos_nombre[desc_limpia]
                             es_promo = True
@@ -2230,14 +2369,14 @@ def upload_excel():
                             final_desc = prod_db['desc']
                             final_marca = prod_db['marca']
                             match_encontrado = True
-                            
+
                             if prod_db['unidad_embalaje'] in ['CAJA', 'CJ', 'CAJAS'] and unidades > 0 and cajas == 0:
                                 cajas = unidades; unidades = 0
                             elif prod_db['unidad_embalaje'] not in ['CAJA', 'CJ', 'CAJAS'] and cajas > 0 and unidades == 0:
                                 unidades = cajas; cajas = 0
 
                     if match_encontrado:
-                        auth = True 
+                        auth = True
                     else:
                         final_marca = 'NO EN BASE DE DATOS'
                         if not final_ean: final_ean = 'SIN_CODIGO'
@@ -2245,26 +2384,26 @@ def upload_excel():
                     if es_promo:
                         promo_info = diccionario_promos[final_ean]
                         nombre_promo = promo_info['nombre']
-                        
+
                         factor_promo = 1
                         if final_ean in maestra_productos_ean:
                             factor_promo = maestra_productos_ean[final_ean].get('factor_conversion', 1)
-                        
-                        total_promos_pedidas = (cajas * factor_promo) + unidades 
-                        
+
+                        total_promos_pedidas = (cajas * factor_promo) + unidades
+
                         for comp in promo_info['componentes']:
                             hijo_code = comp['ean']
-                            hijo_cajas_total = total_promos_pedidas * comp['cajas'] 
-                            hijo_unid_total = total_promos_pedidas * comp['fracciones'] 
+                            hijo_cajas_total = total_promos_pedidas * comp['cajas']
+                            hijo_unid_total = total_promos_pedidas * comp['fracciones']
                             hijo_desc = f"ITEM SIN NOMBRE ({hijo_code})"
                             hijo_marca = 'GENERICO'
-                            
+
                             if hijo_code in maestra_productos_ean:
                                 hijo_desc = maestra_productos_ean[hijo_code]['desc']
                                 hijo_marca = maestra_productos_ean[hijo_code]['marca']
-                            
+
                             hijo_desc_visual = f"{hijo_desc} (Kit: {nombre_promo})"
-                            
+
                             if hijo_cajas_total > 0 or hijo_unid_total > 0:
                                 data_to_insert.append((empresa_id, meta_orden, meta_zona, hijo_code, raw_code, hijo_desc_visual, hijo_marca, hijo_cajas_total, 0, hijo_unid_total, 0, 'PENDIENTE', fecha_creacion, meta_fecha, auth))
                                 cálculo_total_cajas += hijo_cajas_total
@@ -2275,10 +2414,10 @@ def upload_excel():
                         palabras_clave_promo = ['OFE ', 'OFERTA', 'PROMO', 'KIT ', 'COMBO', 'PAGUE ']
                         desc_upper = str(final_desc).upper() if final_desc else ""
                         es_huerfana = any(k in desc_upper for k in palabras_clave_promo)
-                        
+
                         if match_encontrado:
                             es_huerfana = False
-                        
+
                         estado_insert = 'PROMO_HUERFANA' if es_huerfana else 'PENDIENTE'
                         auth_insert = False if es_huerfana else auth
 
@@ -2287,19 +2426,19 @@ def upload_excel():
                             marca_caja = final_marca
                             desc_caja = final_desc
                             auth_caja = auth_insert
-                            
+
                             ean_und = final_ean
                             marca_und = final_marca
                             desc_und = final_desc
                             auth_und = auth_insert
-                            
+
                             desc_limpia_split = limpiar_texto(final_desc)
                             found_caja = False
                             found_und = False
-                            
+
                             if desc_limpia_split in maestra_productos_nombre_lista:
                                 ops = maestra_productos_nombre_lista[desc_limpia_split]
-                                
+
                                 for k in ['CAJA', 'CJ', 'CAJAS']:
                                     if k in ops:
                                         ean_caja = ops[k]['ean']
@@ -2308,7 +2447,7 @@ def upload_excel():
                                         auth_caja = True
                                         found_caja = True
                                         break
-                                        
+
                                 for k in ['UND', 'UNIDADES', 'UNIDAD', '']:
                                     if k in ops:
                                         ean_und = ops[k]['ean']
@@ -2317,22 +2456,22 @@ def upload_excel():
                                         auth_und = True
                                         found_und = True
                                         break
-                            
+
                             if not found_caja:
                                 ean_caja = 'SIN_CODIGO'
                                 marca_caja = 'NO EN BASE DE DATOS'
                                 auth_caja = False
                                 desc_caja = final_desc
-                                
+
                             if not found_und:
                                 ean_und = 'SIN_CODIGO'
                                 marca_und = 'NO EN BASE DE DATOS'
                                 auth_und = False
                                 desc_und = final_desc
-                                
+
                             data_to_insert.append((empresa_id, meta_orden, meta_zona, ean_caja, raw_code, desc_caja, marca_caja, cajas, 0, 0, 0, estado_insert, fecha_creacion, meta_fecha, auth_caja))
                             data_to_insert.append((empresa_id, meta_orden, meta_zona, ean_und, raw_code, desc_und, marca_und, 0, 0, unidades, 0, estado_insert, fecha_creacion, meta_fecha, auth_und))
-                            
+
                             cálculo_total_cajas += cajas
                             cálculo_total_unidades += unidades
                             cálculo_marcas_presentes.add(marca_caja)
@@ -2346,13 +2485,13 @@ def upload_excel():
 
                 if data_to_insert:
                     cur = mysql.connection.cursor()
-                    query = """INSERT INTO picking_importacion_raw 
-                    (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento) 
+                    query = """INSERT INTO picking_importacion_raw
+                    (id_empresa, numero_orden_origen, zona, codigo_producto, ean_leido, descripcion_producto, marca, cajas_calculadas, cajas_alistadas, unidades_calculadas, unidades_alistadas, estado_actividad, fecha_creacion_orden, fecha_entrega_orden, autorizacion_alistamiento)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                     cur.executemany(query, data_to_insert)
                     mysql.connection.commit()
                     cur.close()
-                    
+
                     resultados_exito.append(
                         f"✅ {meta_orden}\n"
                         f"📊 Reporte de Carga Transparente:\n"
@@ -2376,15 +2515,15 @@ def upload_excel():
         return jsonify({'message': mensaje_alerta, 'recargar': len(resultados_exito) > 0})
     except Exception as e:
         return jsonify({'error': f'Error crítico procesando carga: {str(e)}'}), 500
-    
+
 @bp_bodegas.route('/api/bodegas/reportes/importacion')
 @login_required_custom
 def reporte_importacion():
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
-            SELECT 
-                numero_orden_origen as orden, 
+            SELECT
+                numero_orden_origen as orden,
                 MAX(zona) as zona,
                 COUNT(*) as total_items,
                 SUM(CASE WHEN estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_procesados,
@@ -2396,11 +2535,11 @@ def reporte_importacion():
         """, (session.get('empresa_id'),))
         data = cur.fetchall()
         cur.close()
-        
+
         for row in data:
             if isinstance(row['fecha_carga'], datetime):
                 row['fecha_carga'] = row['fecha_carga'].strftime('%Y-%m-%d %H:%M:%S')
-                
+
         return jsonify(data)
     except Exception as e:
         print(f"Error reporte importacion: {e}")
@@ -2412,8 +2551,8 @@ def set_offline():
     try:
         cur = mysql.connection.cursor()
         cur.execute("""
-            UPDATE monitoreo_actividad 
-            SET ultima_actividad = DATE_SUB(NOW(), INTERVAL 1 MINUTE) 
+            UPDATE monitoreo_actividad
+            SET ultima_actividad = DATE_SUB(NOW(), INTERVAL 1 MINUTE)
             WHERE id_usuario = %s
         """, (session.get('usuario_id'),))
         mysql.connection.commit()
@@ -2452,7 +2591,7 @@ def guardar_rutas_picking():
     empresa_id = session.get('empresa_id')
     d = request.json
     rutas = d.get('rutas', [])
-    
+
     try:
         cur = mysql.connection.cursor()
         if rutas:
@@ -2487,8 +2626,8 @@ def listar_usuarios():
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         # Mostrar solo los usuarios del mismo inquilino Y que sean perfiles WMS
         cur.execute("""
-            SELECT id, cedula, nombre, perfil 
-            FROM usuarios 
+            SELECT id, cedula, nombre, perfil
+            FROM usuarios
             WHERE empresa_id = %s AND perfil IN ('operador_logistica', 'controlador_logistica', 'verificador_bodegas')
             ORDER BY id DESC
         """, (session.get('empresa_id'),))
@@ -2504,40 +2643,40 @@ def listar_usuarios():
 def crear_usuario():
     empresa_id = session.get('empresa_id')
     empresa_nombre = session.get('nombre_empresa', session.get('empresa', 'Empresa'))
-    
+
     data = request.json
     perfil = data.get('perfil')
-    
+
     if perfil not in ['operador_logistica', 'controlador_logistica', 'verificador_bodegas']:
         return jsonify({'status': 'error', 'message': 'Perfil no permitido desde este módulo.'})
-    
+
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        
+
         # CANDADO DE INQUILINO: Límite de 8 usuarios WMS por empresa
         cur.execute("SELECT COUNT(*) as total FROM usuarios WHERE empresa_id = %s AND perfil IN ('operador_logistica', 'controlador_logistica', 'verificador_bodegas')", (empresa_id,))
         total = cur.fetchone()['total']
         if total >= 8:
             cur.close()
             return jsonify({'status': 'error', 'message': 'Límite alcanzado: Su empresa ya cuenta con el máximo de 8 usuarios WMS permitidos en este módulo.'})
-        
+
         cedula = data.get('cedula')
         nombre = data.get('nombre')
         password = data.get('password')
-        
+
         if not all([cedula, nombre, password, perfil]):
             cur.close()
             return jsonify({'status': 'error', 'message': 'Faltan datos obligatorios'})
-        
+
         # Verificar que la cédula no exista globalmente
         cur.execute("SELECT id FROM usuarios WHERE cedula = %s", (cedula,))
         if cur.fetchone():
             cur.close()
             return jsonify({'status': 'error', 'message': 'La cédula/usuario ya existe en el sistema.'})
-            
+
         from app import bcrypt
         hash_pw = bcrypt.generate_password_hash(password).decode('utf-8')
-        
+
         # Crear usuario
         for intento in range(3):
             try:
@@ -2552,9 +2691,9 @@ def crear_usuario():
                     time.sleep(0.5)
                     continue
                 raise e
-        
+
         cur.close()
-        
+
         return jsonify({'status': 'success', 'message': 'Usuario creado correctamente.'})
     except Exception as e:
         mysql.connection.rollback()
@@ -2565,26 +2704,26 @@ def crear_usuario():
 def editar_usuario_crud(id_user):
     data = request.json
     empresa_id = session.get('empresa_id')
-    
+
     nombre = data.get('nombre')
     perfil = data.get('perfil')
     password = data.get('password')
-    
+
     if perfil not in ['operador_logistica', 'controlador_logistica', 'verificador_bodegas']:
         return jsonify({'status': 'error', 'message': 'Perfil no permitido desde este módulo.'})
-    
+
     try:
         cur = mysql.connection.cursor()
         # Verificar pertenencia al inquilino implícita en la consulta
         if password:
             from app import bcrypt
             hash_pw = bcrypt.generate_password_hash(password).decode('utf-8')
-            cur.execute("UPDATE usuarios SET nombre=%s, perfil=%s, password=%s WHERE id=%s AND empresa_id=%s", 
+            cur.execute("UPDATE usuarios SET nombre=%s, perfil=%s, password=%s WHERE id=%s AND empresa_id=%s",
                         (nombre, perfil, hash_pw, id_user, empresa_id))
         else:
-            cur.execute("UPDATE usuarios SET nombre=%s, perfil=%s WHERE id=%s AND empresa_id=%s", 
+            cur.execute("UPDATE usuarios SET nombre=%s, perfil=%s WHERE id=%s AND empresa_id=%s",
                         (nombre, perfil, id_user, empresa_id))
-        
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Usuario actualizado correctamente.'})

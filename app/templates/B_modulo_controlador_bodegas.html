@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BQA ONE-CONTROL LOGISTICA | {{ empresa }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <!-- Librerías de Gráficos y PDF -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -229,7 +229,7 @@
             justify-content: center;
             position: relative;
         }
-        
+
         .tooltip .tooltiptext {
             visibility: hidden;
             width: 200px;
@@ -251,7 +251,7 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             pointer-events: none;
         }
-        
+
         .tooltip .tooltiptext::after {
             content: "";
             position: absolute;
@@ -505,7 +505,7 @@
            ======================================================= */
         @media (max-width: 850px) {
             body { flex-direction: column; }
-            
+
             /* Header Móvil y Sidebar Off-Canvas */
             .mobile-header { display: flex; }
             .sidebar {
@@ -532,12 +532,12 @@
             .modal-header { padding: 1rem; }
             .modal-body { padding: 1rem; }
             .modal-footer {
-                flex-direction: column-reverse; 
+                flex-direction: column-reverse;
                 padding: 1rem;
-                padding-bottom: max(1rem, env(safe-area-inset-bottom)); 
+                padding-bottom: max(1rem, env(safe-area-inset-bottom));
             }
             .modal-footer button { width: 100%; padding: 1rem; font-size: 1.05rem; margin: 0; }
-            
+
             /* Ajustes Split Views */
             .split-view { flex-direction: column; overflow-y: auto; }
             .split-view > div { flex: none; height: auto; min-height: 400px; border-right: none !important; padding-right: 0 !important; }
@@ -546,39 +546,39 @@
             /* DATA-CARDS: Transformación de Tablas densas */
             .data-table thead { display: none; }
             .data-table, .data-table tbody, .data-table tr, .data-table td { display: block; width: 100%; }
-            .data-table tr { 
-                margin-bottom: 1rem; 
-                border: 1px solid var(--color-border); 
-                border-radius: 12px; 
-                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+            .data-table tr {
+                margin-bottom: 1rem;
+                border: 1px solid var(--color-border);
+                border-radius: 12px;
+                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
                 overflow: hidden;
                 background: white;
             }
-            .data-table td { 
-                display: flex; 
-                justify-content: space-between; 
-                align-items: center; 
-                padding: 0.85rem 1rem; 
-                border-bottom: 1px solid #f3f4f6; 
-                text-align: right; 
+            .data-table td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.85rem 1rem;
+                border-bottom: 1px solid #f3f4f6;
+                text-align: right;
                 gap: 10px;
             }
             .data-table td:last-child { border-bottom: none; }
-            
+
             /* Etiqueta inyectada vía data-label */
-            .data-table td::before { 
-                content: attr(data-label); 
-                font-weight: 700; 
-                color: var(--color-muted); 
-                font-size: 0.75rem; 
-                text-transform: uppercase; 
-                text-align: left; 
-                flex: 1; 
+            .data-table td::before {
+                content: attr(data-label);
+                font-weight: 700;
+                color: var(--color-muted);
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                text-align: left;
+                flex: 1;
             }
             .data-table td > * { flex: 2; text-align: right; justify-content: flex-end; }
-            
+
             /* Inputs dentro de tablas móviles */
-            .data-table td input[type="text"], .data-table td input[type="number"] { 
+            .data-table td input[type="text"], .data-table td input[type="number"] {
                 width: 100% !important; max-width: 150px; text-align: right; font-size: 1rem !important; padding: 8px !important;
             }
             .data-table td button { width: 100%; justify-content: center; padding: 12px !important; font-size: 1rem; }
@@ -838,7 +838,7 @@
                 <span class="kpi-val" id="kpi-items-finalizados-dash" style="color: #1f2937;">{{ kpis.items_finalizados }}</span>
                 <span class="tooltiptext">Número de ítems que ya completaron su flujo de trabajo (Verificados o Despachados).</span>
             </div>
-            
+
             <div class="kpi-card tooltip" style="border-left: 6px solid #8b5cf6;">
                 <span class="kpi-lbl" style="color: #8b5cf6;">Backlog Auditoría</span>
                 <span class="kpi-val" id="kpi-backlog-dash" style="color: #1f2937;">{{ kpis.backlog_verificacion }}</span>
@@ -907,10 +907,10 @@
             <div class="modal-body">
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Cédula (Usada para Login)</label>
                 <input type="number" id="u-cedula" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                
+
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Nombre Completo</label>
                 <input type="text" id="u-nombre" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                
+
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Perfil Operativo</label>
                 <select id="u-perfil" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;">
                     <option value="operador_logistica">Operador de Bodega (Picking)</option>
@@ -920,7 +920,7 @@
 
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Contraseña <span id="req-pass" style="color:#ef4444;">*</span></label>
                 <input type="password" id="u-password" placeholder="Escriba la clave..." style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                
+
             </div>
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="cerrarFormUsuario()">Cancelar</button>
@@ -955,7 +955,7 @@
                 <div id="reporte-kpi-contenido" style="background: white; padding: 20px; border-radius: 12px; border: 1px solid var(--color-border);">
                     <h2 style="margin-top: 0; color: var(--color-primary);">Reporte de Productividad</h2>
                     <p id="rango-fechas-lbl" style="color: var(--color-muted); font-size: 0.9rem; margin-bottom: 20px;"></p>
-                    
+
                     <div class="grid-2-cols" style="margin-bottom: 30px;">
                         <div class="kpi-card" style="border-left: 5px solid #0284c7;">
                             <span class="kpi-lbl">Total Pedidos Procesados</span>
@@ -970,7 +970,7 @@
                     <div style="height: 300px; width: 100%;">
                         <canvas id="chartKPIs"></canvas>
                     </div>
-                    
+
                     <table class="data-table" style="margin-top: 30px;">
                         <thead>
                             <tr>
@@ -1032,7 +1032,7 @@
             <div class="modal-body">
                 <form id="frmUpload" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    
+
                     <div class="drop-area" onclick="document.getElementById('fi').click()">
                         <span id="fn" style="font-weight: 600; color: #475569;">Toca aquí para seleccionar Excel o CSV</span>
                         <input type="file" id="fi" name="file" multiple accept=".xlsx, .xls, .csv" style="display:none;" onchange="actualizarTextoUpload(this)">
@@ -1041,7 +1041,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="closeUpload()">Cancelar</button>
-                <button class="btn-confirm" onclick="doUpload()">Subir Archivos</button>
+                <button class="btn-confirm" onclick="verificarAntesDeSubir()">Subir Archivos</button>
             </div>
         </div>
     </div>
@@ -1164,20 +1164,20 @@
                     <h4 style="margin-top: 0; color:var(--color-text);">Creación Manual</h4>
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">EAN / Código</label>
                     <input type="text" id="prodEan" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                    
+
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Descripción</label>
                     <input type="text" id="prodDesc" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                    
+
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Marca/Fabricante</label>
                     <input type="text" id="prodMarca" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                    
+
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Unidad Embalaje</label>
                     <select id="prodEmbalaje" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;">
                         <option value="UND">UND</option>
                         <option value="CAJA">CAJA</option>
                         <option value="DISPLAY">DISPLAY</option>
                     </select>
-                    
+
                     <button class="btn-confirm" onclick="guardarProductoManual(this)" style="width:100%; background: #c026d3;">➕ Guardar Manual</button>
                 </div>
                 <!-- Masivo -->
@@ -1210,7 +1210,7 @@
             <div class="modal-body">
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">1. Selecciona la Marca</label>
                 <select id="edit-select-marca" onchange="cargarProductosParaEdicion()" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;"></select>
-                
+
                 <div id="edit-paso2-container" style="display:none;">
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">2. Selecciona el Producto</label>
                     <select id="edit-select-producto" onchange="seleccionarProductoParaEdicion()" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;"></select>
@@ -1218,16 +1218,16 @@
 
                 <div id="edit-form-container" style="display:none; background:#f8fafc; padding:20px; border-radius:12px; border: 1px solid var(--color-border);">
                     <input type="hidden" id="edit-input-ean-original">
-                    
+
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">EAN / Código</label>
                     <input type="text" id="edit-input-ean-nuevo" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; color: var(--color-primary); font-weight: 700;">
-                    
+
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Nuevo Nombre</label>
                     <input type="text" id="edit-input-nombre" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                    
+
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Marca / Fabricante</label>
                     <input type="text" id="edit-input-marca" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                    
+
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Unidad Embalaje</label>
                     <select id="edit-input-embalaje" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:white;">
                         <option value="UND">UND</option>
@@ -1239,7 +1239,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Confirmación Edición -->
     <div id="modal-confirm-edicion" class="modal-overlay" style="z-index: 3010;">
         <div class="modal-card" style="text-align:center;">
@@ -1268,7 +1268,7 @@
             <div class="modal-body">
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Seleccionar Marca</label>
                 <select id="del-select-marca" onchange="evaluarModoEliminacion()" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;"></select>
-                
+
                 <div id="del-opciones-container" style="display:none; margin-bottom:20px;">
                     <div style="display: flex; gap: 10px;">
                         <button id="btn-modo-single" onclick="setModoEliminacion('single')" style="flex:1; padding:12px; border:1px solid #e5e7eb; border-radius:8px; cursor: pointer; font-weight: 700; font-size:0.95rem;">1 Producto</button>
@@ -1331,18 +1331,18 @@
                 <!-- Armador -->
                 <div style="flex:1; overflow-y: auto; height: 100%; padding-right: 10px; display: block; padding-bottom: 40px;">
                     <h4 id="titulo-armador" style="margin-top: 0; color: #db2777;">✨ Armar Nueva Promoción</h4>
-                    
+
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">EAN del Combo/Promo (Padre)</label>
                     <input type="text" id="promo-codigo" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                    
+
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Nombre de la Promoción</label>
                     <input type="text" id="promo-nombre" style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
-                    
+
                     <div style="background:#fdf2f8; padding:20px; border-radius:12px; margin-bottom:20px; border: 1px solid #fbcfe8;">
                         <h5 style="margin-top:0; color: #9d174d; font-size:1.05rem;">Añadir Componente (Hijo)</h5>
                         <select id="promo-select-marca" onchange="cargarProdsPromo()" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid #f9a8d4; font-size:1rem; background:white;"></select>
                         <select id="promo-select-prod" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid #f9a8d4; font-size:1rem; background:white;"><option value="">2. Selecciona Producto...</option></select>
-                        
+
                         <div style="display:flex; gap:15px; margin-bottom:15px;">
                             <div style="flex:1;">
                                 <label style="font-size: 0.8rem; font-weight: 700; color: #9d174d;">Cajas</label>
@@ -1374,7 +1374,7 @@
                             </tbody>
                         </table>
                     </div>
-                    
+
                     <div style="margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
                         <button class="btn-confirm" onclick="guardarPromocionFinal()" style="width:100%; background: #db2777; font-size:1.05rem;">💾 Guardar Promoción Completa</button>
                         <button class="btn-cancel" onclick="limpiarArmador()" style="width:100%; margin-top:10px; font-size:1.05rem;">Limpiar / Nueva</button>
@@ -1474,7 +1474,7 @@
                         <h4 class="section-title" style="border:none; padding:0; background:transparent;">📦 2. Carga por Operario y Verificadores</h4>
                         <button onclick="abrirModalAsignacionMarcas()" class="btn-assign" style="background:#eef2ff; color:#4338ca;">🛠️ Editar Asignaciones</button>
                     </div>
-                    
+
                     <div style="padding: 1.5rem;">
                         <!-- OPERARIOS (Toma todo el ancho superior para los KPIs) -->
                         <div style="margin-bottom: 2rem;">
@@ -1500,7 +1500,7 @@
                                                 </td>
                                                 <td data-label="Marcas">
                                                     {% if op.marcas_asignadas %}
-                                                        <span style="color: var(--color-primary); font-size: 0.85rem;">{{ op.marcas_asignadas }}</span> 
+                                                        <span style="color: var(--color-primary); font-size: 0.85rem;">{{ op.marcas_asignadas }}</span>
                                                         <span class="badge badge-blue">{{ op.total_marcas }}</span>
                                                     {% else %}
                                                         <span style="color: #9ca3af; font-size: 0.85rem;">Sin marcas</span>
@@ -1554,7 +1554,7 @@
                                     </tbody>
                                 </table>
                             </div>
-                            
+
                             <div>
                                 <h5 style="color: #be123c; margin-top: 0; font-size:1rem;">Marcas Huérfanas (Sin asignar)</h5>
                                 <table class="data-table" style="border: 1px solid #fecaca; border-radius: 8px;">
@@ -1630,9 +1630,12 @@
                                 </td>
                                 <td data-label="Acción">
                                     {% if op.estado_visual == 'VERIFICADO' %}
-                                    <button onclick="abrirModalDespacho('${op.orden}')" class="btn-assign" style="background:#10b981; color:white; border:none; width: 100%; padding:12px;">🚚 Vehículo</button>
+                                    <div style="display:flex; flex-direction:column; gap:6px;">
+                                        <button onclick="window.open('/bodegas/imprimir_lista_verificacion/{{ op.orden }}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:10px;">📄 Lista Física</button>
+                                        <button onclick="abrirModalDespacho('{{ op.orden }}')" class="btn-assign" style="background:#10b981; color:white; border:none; width: 100%; padding:10px;">🚚 Vehículo</button>
+                                    </div>
                                     {% elif op.estado_visual == 'DESPACHADO' or op.estado_visual == 'TERMINADO' %}
-                                    <button onclick="window.open('/bodegas/imprimir_acta/${op.orden}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>
+                                    <button onclick="window.open('/bodegas/imprimir_acta/{{ op.orden }}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>
                                     {% elif op.estado_visual == 'ALISTADO' %}
                                     <span style="color:#f59e0b; font-size:0.85rem; display: block; text-align: center; font-weight:700;">En Auditoría</span>
                                     {% else %}
@@ -1669,7 +1672,7 @@
 
                 <div id="nv-form-formalizar">
                     <h5 style="color: #0369a1; margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 5px;">👉 Formalizar Producto para Desbloquear</h5>
-                    
+
                     <div style="position: relative; margin-bottom: 15px;">
                         <label style="font-size: 0.75rem; font-weight: 700; color: #0369a1;">Buscador Catálogo Maestro</label>
                         <input type="text" id="nv-search-catalogo" onkeyup="buscarProductoNovedad(this.value)" placeholder="🔍 Buscar por nombre o EAN..." style="width:100%; padding:10px; border-radius:6px; border:2px solid #38bdf8; font-size:1rem; background: #f0fdfa;">
@@ -1678,10 +1681,10 @@
 
                     <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">EAN Real / Código de Barras (Requerido)</label>
                     <input type="text" id="nv-input-ean" style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px; border:1px solid #cbd5e1; font-size:1rem;">
-                    
+
                     <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Descripción a guardar</label>
                     <input type="text" id="nv-input-desc" style="width:100%; padding:10px; margin-bottom:15px; border-radius:6px; border:1px solid #cbd5e1; font-size:1rem;">
-                    
+
                     <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                         <div style="flex: 1;">
                             <label style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Marca</label>
@@ -1697,10 +1700,10 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <button onclick="ejecutarAccionNovedad('ASIGNAR_EAN')" class="btn-confirm" style="width: 100%; background: #10b981; margin-bottom: 10px; font-size: 1rem;">✅ Guardar y Desbloquear Operario</button>
                 <button onclick="ejecutarAccionNovedad('AUTORIZAR_CIEGAS')" class="btn-cancel" style="width: 100%; color: #d97706; border-color: #fcd34d; background: #fffbeb; margin-bottom: 20px; font-size: 0.95rem; font-weight: 800;">⚠️ Autorizar "A Ciegas" (Excepción)</button>
-                
+
                 <h5 style="color: #b91c1c; margin-top: 0; margin-bottom: 10px; display: flex; align-items: center; gap: 5px;" id="nv-lbl-agotado">👉 El operario indica que no hay stock físico.</h5>
                 <button id="nv-btn-agotado" onclick="ejecutarAccionNovedad('CONFIRMAR_FALTANTE')" class="btn-confirm" style="width: 100%; background: #e11d48; font-size: 1rem;">🚫 Confirmar Agotado (Cerrar en Cero)</button>
                 <input type="hidden" id="nv-id-row">
@@ -1725,16 +1728,16 @@
                         <option value="">Cargando vehículos...</option>
                     </select>
                 </div>
-                
+
                 <div style="margin-top: 10px;">
                     <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">FOTO DE EVIDENCIA</label>
                     <button type="button" id="btn-iniciar-camara-evidencia" class="btn-assign" onclick="iniciarCamaraEvidencia()" style="width: 100%; margin-top: 5px; padding: 12px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size:1.05rem;">📷 Activar Cámara</button>
-                    
+
                     <div id="camara-evidencia-container" style="display: none; flex-direction: column; align-items: center; margin-top: 10px;">
                         <video id="videoEvidencia" autoplay playsinline style="width: 100%; border-radius: 8px; border: 2px solid var(--color-primary); background:#000;"></video>
                         <button type="button" class="btn-confirm" onclick="tomarFotoEvidencia()" style="margin-top: 15px; width: 100%; background: #0284c7; padding:15px; font-size:1.1rem;">📸 Capturar Foto</button>
                     </div>
-                    
+
                     <div id="preview-evidencia-container" style="display: none; flex-direction: column; align-items: center; margin-top: 10px;">
                         <img id="previewFoto" style="max-width: 100%; max-height: 250px; border-radius: 8px; border: 2px solid #10b981;">
                         <button type="button" class="btn-cancel" onclick="reiniciarFotoEvidencia()" style="margin-top: 15px; width: 100%; padding:12px; font-size:1.05rem;">🔄 Tomar Otra Foto</button>
@@ -1744,16 +1747,26 @@
 
                 <!-- FIRMA SUPERVISOR DE DESPACHO -->
                 <div style="margin-top: 30px;">
-                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">FIRMA SUPERVISOR DESPACHO</label>
-                    <canvas id="canvasFirmaSupervisor" width="400" height="200" style="border: 2px dashed #0369a1; border-radius: 12px; width: 100%; touch-action: none; background: #f0f9ff; margin-top:10px;"></canvas>
-                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600;" onclick="limpiarFirmaSupervisor()">Borrar Firma Supervisor</button>
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700; display:block;">FIRMA SUPERVISOR DESPACHO</label>
+                    <p style="font-size: 0.75rem; color:#ef4444; margin: 2px 0 8px 0; font-weight:600;">👉 Usa los márgenes grises laterales para hacer scroll</p>
+                    <div style="display:flex; gap: 8px; align-items: stretch; background: #f8fafc; border-radius: 12px; padding: 5px; border: 1px solid var(--color-border);">
+                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
+                        <canvas id="canvasFirmaSupervisor" height="140" style="border: 2px dashed #0369a1; border-radius: 8px; width: 100%; touch-action: none; background: #f0f9ff;"></canvas>
+                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
+                    </div>
+                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600; width: 100%;" onclick="limpiarFirmaSupervisor()">Borrar Firma Supervisor</button>
                 </div>
-                
+
                 <!-- FIRMA CONDUCTOR -->
                 <div style="margin-top: 30px;">
-                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">FIRMA CONDUCTOR</label>
-                    <canvas id="canvasFirma" width="400" height="200" style="border: 2px dashed #cbd5e1; border-radius: 12px; width: 100%; touch-action: none; background: #f8fafc; margin-top:10px;"></canvas>
-                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600;" onclick="limpiarFirma()">Borrar Firma Conductor</button>
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700; display:block;">FIRMA CONDUCTOR</label>
+                    <p style="font-size: 0.75rem; color:#ef4444; margin: 2px 0 8px 0; font-weight:600;">👉 Usa los márgenes grises laterales para hacer scroll</p>
+                    <div style="display:flex; gap: 8px; align-items: stretch; background: #f8fafc; border-radius: 12px; padding: 5px; border: 1px solid var(--color-border);">
+                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
+                        <canvas id="canvasFirma" height="140" style="border: 2px dashed #cbd5e1; border-radius: 8px; width: 100%; touch-action: none; background: #ffffff;"></canvas>
+                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
+                    </div>
+                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600; width: 100%;" onclick="limpiarFirma()">Borrar Firma Conductor</button>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1800,7 +1813,7 @@
             </div>
 
             <div class="modal-body" style="padding: 1rem; background:#f3f4f6; overflow-y: auto;">
-                
+
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
                     <!-- Faltantes -->
                     <div style="display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #ea580c; overflow: hidden; min-height:40vh; max-height:45vh;">
@@ -1844,9 +1857,9 @@
                 <!-- Promociones y Kits -->
                 <div style="display: flex; flex-direction: column; background: transparent; margin-top: 20px;">
                     <h4 style="margin:0 0 15px 0; color: #475569; font-size:1.1rem;">🎁 Avance de Promociones (Kits)</h4>
-                    
+
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
-                        
+
                         <!-- Huérfanas (Rojo) -->
                         <div style="display: flex; flex-direction: column; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 5px solid #e11d48; overflow: hidden; min-height:30vh; max-height:40vh;">
                             <div style="padding: 15px; border-bottom: 1px solid #f3f4f6; background: #fff1f2; display:flex; justify-content:space-between; align-items:center;">
@@ -1943,7 +1956,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- MODAL NOVEDADES -->
     <div id="modalNovedades" class="modal-overlay">
         <div class="modal-large">
@@ -2023,9 +2036,9 @@
 
         function cerrarSesionInstantanea(e) {
             if (e) e.preventDefault();
-            fetch('/api/bodegas/offline', { 
-                method: 'POST', 
-                headers: { 'X-CSRFToken': '{{ csrf_token() }}' } 
+            fetch('/api/bodegas/offline', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
             })
             .then(() => { window.location.href = '/logout'; })
             .catch(() => { window.location.href = '/logout'; });
@@ -2072,14 +2085,14 @@
         function cargarUsuarios() {
             const tbody = document.getElementById('tbl-usuarios-body');
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando...</td></tr>';
-            
+
             fetch('/api/bodegas/usuarios?t=' + Date.now())
             .then(r => r.json())
             .then(data => {
                 tbody.innerHTML = '';
                 document.getElementById('user-count').textContent = data.length;
                 document.getElementById('user-available').textContent = Math.max(0, 8 - data.length);
-                
+
                 const btnAdd = document.getElementById('btn-add-user');
                 if (data.length >= 8) {
                     btnAdd.disabled = true;
@@ -2102,7 +2115,7 @@
                     let colorBadge = 'badge-blue';
                     if(u.perfil === 'controlador_logistica') colorBadge = 'badge-purple';
                     if(u.perfil === 'verificador_bodegas') colorBadge = 'badge-green';
-                    
+
                     tbody.innerHTML += `
                     <tr>
                         <td><strong>${u.cedula}</strong></td>
@@ -2123,17 +2136,17 @@
         function abrirFormUsuario(isEdit, id=null, cedula='', nombre='', perfil='') {
             isEditUser = isEdit;
             currentUserId = id;
-            
+
             document.getElementById('u-cedula').value = cedula;
-            document.getElementById('u-cedula').disabled = isEdit; 
+            document.getElementById('u-cedula').disabled = isEdit;
             document.getElementById('u-nombre').value = nombre;
             document.getElementById('u-perfil').value = perfil || 'operador_logistica';
             document.getElementById('u-password').value = '';
-            
+
             document.getElementById('title-user-form').textContent = isEdit ? '✏️ Editar Usuario' : '➕ Nuevo Usuario';
             document.getElementById('req-pass').style.display = isEdit ? 'none' : 'inline';
             document.getElementById('u-password').placeholder = isEdit ? 'Déjelo en blanco si no desea cambiar la clave' : 'Escriba la clave...';
-            
+
             document.getElementById('modalUsuarioForm').style.display = 'flex';
         }
 
@@ -2185,8 +2198,8 @@
 
         function eliminarUsuario(id) {
             if(!confirm("⚠️ ¿Estás completamente seguro de que deseas eliminar este usuario del sistema? Esta acción no se puede deshacer.")) return;
-            
-            fetch('/api/bodegas/usuarios/' + id, { 
+
+            fetch('/api/bodegas/usuarios/' + id, {
                 method: 'DELETE',
                 headers: { 'X-CSRFToken': '{{ csrf_token() }}' }
             })
@@ -2215,7 +2228,7 @@
             const tbodyGlobal = document.getElementById('tbl-kpi-body');
             const tbodyOps = document.getElementById('tbl-kpi-operarios');
             const tbodyVerifs = document.getElementById('tbl-kpi-verificadores');
-            
+
             tbodyGlobal.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando datos...</td></tr>';
             tbodyOps.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando datos...</td></tr>';
             tbodyVerifs.innerHTML = '<tr><td colspan="3" style="text-align:center;">Cargando datos...</td></tr>';
@@ -2324,17 +2337,17 @@
             html2pdf().set(opt).from(element).save();
         }
 
-        function openAlistamientoModal() { 
-            sessionStorage.setItem('reabrirAlistamiento', 'true'); 
+        function openAlistamientoModal() {
+            sessionStorage.setItem('reabrirAlistamiento', 'true');
             document.getElementById('modalAlistamiento').style.display = 'flex';
             cargarMonitoreoRealTime();
             if(monitoreoInterval) clearInterval(monitoreoInterval);
             monitoreoInterval = setInterval(cargarMonitoreoRealTime, 3000);
         }
 
-        function closeAlistamientoModal() { 
-            sessionStorage.removeItem('reabrirAlistamiento'); 
-            document.getElementById('modalAlistamiento').style.display = 'none'; 
+        function closeAlistamientoModal() {
+            sessionStorage.removeItem('reabrirAlistamiento');
+            document.getElementById('modalAlistamiento').style.display = 'none';
             if(monitoreoInterval) clearInterval(monitoreoInterval);
         }
 
@@ -2349,7 +2362,7 @@
                 document.getElementById('kpi-items-pendientes').textContent = data.kpis.items_pendientes;
                 document.getElementById('kpi-items-finalizados').textContent = data.kpis.items_finalizados;
                 document.getElementById('kpi-items-finalizados-dash').textContent = data.kpis.items_finalizados;
-                
+
                 if(document.getElementById('kpi-backlog-dash')) {
                     document.getElementById('kpi-backlog-dash').textContent = data.kpis.backlog_verificacion;
                 }
@@ -2389,10 +2402,10 @@
                     data.operarios_marcas.forEach(op => {
                         let dotOp = op.en_linea === 1 ? '<span style="font-size: 10px;" title="En línea">🟢</span>' : '<span style="font-size: 10px;" title="Fuera de línea">⚪</span>';
                         let marcas = op.marcas_asignadas ? `<span style="color: var(--color-primary); font-size: 0.85rem;">${op.marcas_asignadas}</span> <span class="badge badge-blue">${op.total_marcas}</span>` : `<span style="color: #9ca3af; font-size: 0.85rem;">Sin marcas</span>`;
-                        
+
                         let p_color = op.avance_porcentaje === 100 ? '#10b981' : 'var(--color-secondary)';
                         let p_bar = `<div style="display:flex; align-items:center; gap:8px;"><div style="flex:1; background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden;"><div style="width:${op.avance_porcentaje}%; background:${p_color}; height:100%;"></div></div><span style="font-size:0.85rem; font-weight:700;">${op.avance_porcentaje}%</span></div>`;
-                        
+
                         let vel = `<span style="font-weight:700;">${op.velocidad}</span> <small>it/m</small>`;
                         let nov_color = op.indice_novedades > 0 ? '#e11d48' : '#10b981';
                         let nov = `<span style="font-weight:700; color:${nov_color};">${op.indice_novedades}%</span>`;
@@ -2407,7 +2420,7 @@
                     });
                 }
                 tbOperarios.innerHTML = htmlOp;
-                
+
                 const tbVerif = document.getElementById('tbody-verificadores');
                 let htmlVerif = '';
                 if(data.verificadores_kpis && data.verificadores_kpis.length === 0) {
@@ -2443,7 +2456,7 @@
                 } else {
                     data.ordenes_asignadas.forEach(op => {
                         let claseFila = (op.estado_visual === 'TERMINADO' || op.estado_visual === 'DESPACHADO' || op.estado_visual === 'VERIFICADO') ? 'fila-finalizada' : 'fila-normal';
-                        
+
                         let badgeEstado = '';
                         if (op.estado_visual === 'VERIFICADO') badgeEstado = '<span class="badge badge-green">VERIFICADO</span>';
                         else if (op.estado_visual === 'DESPACHADO') badgeEstado = '<span class="badge badge-blue">DESPACHADO</span>';
@@ -2462,7 +2475,11 @@
 
                         let btnHtml = '';
                         if (op.estado_visual === 'VERIFICADO') {
-                            btnHtml = `<button onclick="abrirModalDespacho('${op.orden}')" class="btn-assign" style="background:#10b981; color:white; border:none; width: 100%; padding:12px;">🚚 Vehículo</button>`;
+                            btnHtml = `
+                            <div style="display:flex; flex-direction:column; gap:6px;">
+                                <button onclick="window.open('/bodegas/imprimir_lista_verificacion/${op.orden}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:10px;">📄 Lista Física</button>
+                                <button onclick="abrirModalDespacho('${op.orden}')" class="btn-assign" style="background:#10b981; color:white; border:none; width: 100%; padding:10px;">🚚 Vehículo</button>
+                            </div>`;
                         } else if (op.estado_visual === 'DESPACHADO' || op.estado_visual === 'TERMINADO') {
                             btnHtml = `<button onclick="window.open('/bodegas/imprimir_acta/${op.orden}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>`;
                         } else if (op.estado_visual === 'ALISTADO') {
@@ -2496,7 +2513,7 @@
             .then(novedades => {
                 const secAndon = document.getElementById('section-andon');
                 const tbAndon = document.getElementById('tbody-andon-novedades');
-                
+
                 if (novedades.length > 0) {
                     secAndon.style.display = 'block';
                     let html = '';
@@ -2504,7 +2521,7 @@
                         let tipoNov = n.novedad_alistamiento === 'FALTA_EXISTENCIAS' ? 'FALTA FÍSICA 🚫' : (n.novedad_alistamiento === 'SIN_EAN' ? 'SIN EAN ⚠️' : 'NO EN BD ⚠️');
                         let btnColor = n.novedad_alistamiento === 'FALTA_EXISTENCIAS' ? '#e11d48' : '#d97706';
                         let descClean = (n.descripcion_producto || '').replace(/'/g, "\\'");
-                        
+
                         html += `<tr>
                             <td data-label="Orden"><b>${n.numero_orden_origen}</b></td>
                             <td data-label="Novedad"><span class="badge" style="background:#fee2e2; color:#be123c; border:1px solid #fecaca;">${tipoNov}</span></td>
@@ -2528,16 +2545,16 @@
             document.getElementById('nv-prod-code').textContent = ean || 'Sin código';
             document.getElementById('nv-prod-name').textContent = desc;
             document.getElementById('nv-operario').textContent = operario;
-            
+
             document.getElementById('nv-input-ean').value = ean !== 'SIN_CODIGO' ? ean : '';
             document.getElementById('nv-input-desc').value = desc;
             document.getElementById('nv-input-marca').value = marca && marca !== 'NO EN BASE DE DATOS' ? marca : '';
-            document.getElementById('nv-input-emb').value = 'UND'; 
-            
+            document.getElementById('nv-input-emb').value = 'UND';
+
             const formForm = document.getElementById('nv-form-formalizar');
             const btnAgotado = document.getElementById('nv-btn-agotado');
             const lblAgotado = document.getElementById('nv-lbl-agotado');
-            
+
             if (tipo_novedad === 'FALTA_EXISTENCIAS') {
                 formForm.style.opacity = '0.4';
                 formForm.style.pointerEvents = 'none';
@@ -2549,7 +2566,7 @@
                 btnAgotado.style.display = 'none';
                 lblAgotado.style.display = 'none';
             }
-            
+
             document.getElementById('modalNovedadVivo').style.display = 'flex';
         }
 
@@ -2565,14 +2582,14 @@
             const desc = document.getElementById('nv-input-desc').value.trim();
             const marca = document.getElementById('nv-input-marca').value.trim();
             const emb = document.getElementById('nv-input-emb').value;
-            
+
             if (accion === 'ASIGNAR_EAN') {
                 if (!ean || !desc) {
                     alert("⚠️ Debes ingresar el EAN y la descripción para formalizar el producto.");
                     return;
                 }
             }
-            
+
             const payload = {
                 id_row: id_row,
                 accion: accion,
@@ -2581,10 +2598,10 @@
                 marca: marca || 'GENERICO',
                 unidad_embalaje: emb
             };
-            
+
             fetch('/api/bodegas/resolver_novedad_vivo', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -2606,7 +2623,7 @@
         function buscarProductoNovedad(q) {
             const resDiv = document.getElementById('nv-search-results');
             if (q.length < 3) { resDiv.style.display = 'none'; return; }
-            
+
             fetch('/api/bodegas/buscar_producto_maestro?q=' + encodeURIComponent(q) + '&t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
@@ -2768,7 +2785,7 @@
 
             const filas = document.querySelectorAll('#tbl-rutas-picking-body .row-draggable');
             let rutas = [];
-            
+
             filas.forEach((tr, index) => {
                 rutas.push({
                     marca: tr.dataset.marca,
@@ -2797,7 +2814,7 @@
             document.getElementById('modalAsignacionMarcas').style.display = 'flex';
             const selectOp = document.getElementById('crud-select-operario');
             const contMarcas = document.getElementById('crud-marcas-container');
-            
+
             selectOp.innerHTML = '<option value="">Cargando...</option>';
             contMarcas.innerHTML = 'Cargando marcas...';
 
@@ -2850,7 +2867,7 @@
 
             fetch('/api/bodegas/guardar_asignacion_marcas', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -2882,7 +2899,7 @@
         function resolverPromoHuerfana(idRow, ean, nombre) {
             fetch('/api/bodegas/resolver_promo_huerfana', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -2918,7 +2935,7 @@
         function cargarDatosDetalle(orden) {
             const tbPend = document.getElementById('tblPendientesBody');
             const tbList = document.getElementById('tblListosBody');
-            
+
             // Nuevos contenedores de promos
             const tbHuerfanas = document.getElementById('tblHuerfanasBody');
             const tbKitsProceso = document.getElementById('tblKitsProcesoBody');
@@ -2933,7 +2950,7 @@
                     if(tbKitsListos) tbKitsListos.innerHTML = '';
 
                     let pendientes = []; let alistados = [];
-                    let kits = {}; 
+                    let kits = {};
                     let huerfanas = [];
 
                     items.forEach(i => {
@@ -2949,7 +2966,7 @@
                         // Detectar Promo Huerfana
                         if (estado === 'PROMO_HUERFANA' || (!i.autorizacion_alistamiento && estado === 'PENDIENTE')) {
                             huerfanas.push(i);
-                            return; 
+                            return;
                         }
 
                         // Detectar Kits
@@ -2962,7 +2979,7 @@
                             isKit = true;
                             nombrePromo = matchPromo[1].trim();
                             if (!kits[nombrePromo]) kits[nombrePromo] = [];
-                            
+
                             let itemLimpio = { ...i, descLimpia: desc.replace(/\(Kit:\s*.*?\)/i, '').trim(), reqCajas, pickCajas, reqUnid, pickUnid, faltCajas, faltUnid, estado };
                             kits[nombrePromo].push(itemLimpio);
                         }
@@ -3021,7 +3038,7 @@
                         </tr>`;
                     });
                     if (huerfanas.length === 0) htmlHuerfanas = '<tr><td colspan="2" style="padding:2rem; text-align:center; color:#9ca3af; font-weight:500;">No hay promos sin configurar</td></tr>';
-                    
+
                     if(tbHuerfanas) tbHuerfanas.innerHTML = htmlHuerfanas;
                     if(document.getElementById('countHuerfanas')) document.getElementById('countHuerfanas').textContent = huerfanas.length;
 
@@ -3034,16 +3051,16 @@
                         let componentes = kits[kit];
                         let reqTotal = 0; let pickTotal = 0;
                         let htmlComp = '';
-                        
+
                         componentes.forEach(c => {
-                            let totalReqCmp = c.reqCajas + c.reqUnid; 
+                            let totalReqCmp = c.reqCajas + c.reqUnid;
                             let totalPickCmp = c.pickCajas + c.pickUnid;
                             reqTotal += totalReqCmp;
                             pickTotal += totalPickCmp;
-                            
+
                             let pCmp = totalReqCmp > 0 ? Math.round((totalPickCmp/totalReqCmp)*100) : 0;
                             let colorSemaforo = pCmp === 100 ? '#10b981' : (pCmp > 0 ? '#f59e0b' : '#ef4444');
-                            
+
                             htmlComp += `
                             <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; padding:4px 0; border-bottom:1px solid #f1f5f9;">
                                 <span style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:5px; color:#475569;">${c.descLimpia}</span>
@@ -3080,7 +3097,7 @@
 
                     if(tbKitsProceso) tbKitsProceso.innerHTML = htmlKitsProceso;
                     if(document.getElementById('countKitsProceso')) document.getElementById('countKitsProceso').textContent = countProceso;
-                    
+
                     if(tbKitsListos) tbKitsListos.innerHTML = htmlKitsListos;
                     if(document.getElementById('countKitsListos')) document.getElementById('countKitsListos').textContent = countListosKits;
 
@@ -3089,7 +3106,7 @@
 
         function openUploadModal() { document.getElementById('modalUpload').style.display = 'flex'; }
         function closeUpload() { document.getElementById('modalUpload').style.display = 'none'; }
-        
+
         function actualizarTextoUpload(input) {
             const txt = document.getElementById('fn');
             if (input.files.length === 0) txt.textContent = 'Toca aquí para seleccionar Excel o CSV';
@@ -3097,6 +3114,43 @@
             else txt.textContent = '📚 ' + input.files.length + ' archivos seleccionados';
         }
 
+        
+        function verificarAntesDeSubir() {
+            const fileInput = document.getElementById('fi');
+            if (fileInput.files.length === 0) return alert('⚠️ Selecciona al menos un archivo.');
+
+            const btnSubir = document.querySelector('#modalUpload .btn-confirm');
+            btnSubir.textContent = 'Verificando...'; 
+            btnSubir.disabled = true;
+
+            const fd = new FormData(document.getElementById('frmUpload'));
+
+            fetch('/bodegas/prevalidar_excel', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
+                body: fd
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.error) {
+                    alert(d.error);
+                    btnSubir.textContent = 'Subir Archivos'; 
+                    btnSubir.disabled = false;
+                } else if (d.existe === true) {
+                    alert('ESTA ORDEN YA HA SIDO CARGADA');
+                    btnSubir.textContent = 'Subir Archivos'; 
+                    btnSubir.disabled = false;
+                } else {
+                    doUpload();
+                }
+            })
+            .catch(e => {
+                alert('Error crítico de red o servidor al verificar la orden.');
+                btnSubir.textContent = 'Subir Archivos'; 
+                btnSubir.disabled = false;
+            });
+        }
+        
         function doUpload() {
             const fileInput = document.getElementById('fi');
             if (fileInput.files.length === 0) return alert('⚠️ Selecciona al menos un archivo.');
@@ -3106,10 +3160,10 @@
 
             const fd = new FormData(document.getElementById('frmUpload'));
 
-            fetch('/bodegas/upload_excel', { 
-                method: 'POST', 
+            fetch('/bodegas/upload_excel', {
+                method: 'POST',
                 headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
-                body: fd 
+                body: fd
             })
                 .then(r => r.json())
                 .then(d => {
@@ -3123,15 +3177,15 @@
         function abrirAsignar(orden, btn) {
             curOrden = orden;
             curFilaDOM = btn.closest('tr');
-            
+
             let idZ = "zona_" + orden;
             let idS = "secuencia_" + orden;
             const inputZona = document.getElementById(idZ);
             const inputSecuencia = document.getElementById(idS);
-            
+
             window.curZona = inputZona ? inputZona.value : (window.tempInputs[idZ] || 'GENERAL');
             window.curSecuencia = inputSecuencia ? inputSecuencia.value : (window.tempInputs[idS] || 0);
-            
+
             document.getElementById('targetPuertaOrden').textContent = "Orden #" + orden;
             document.getElementById('modalAsignarPuerta').style.display = 'flex';
         }
@@ -3150,7 +3204,7 @@
 
             fetch('/bodegas/asignar_puerta', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -3199,26 +3253,26 @@
             try {
                 const video = document.getElementById('videoEvidencia');
                 const canvas = document.getElementById('canvasEvidencia');
-                
+
                 const MAX_WIDTH = 800;
                 let scaleSize = 1;
                 if (video.videoWidth > MAX_WIDTH) scaleSize = MAX_WIDTH / video.videoWidth;
-                
+
                 canvas.width = video.videoWidth * scaleSize;
                 canvas.height = video.videoHeight * scaleSize;
-                
+
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
+
                 fotoComprimidaBase64 = canvas.toDataURL('image/jpeg', 0.5);
-                
+
                 if (streamEvidencia) {
                     try {
                         streamEvidencia.getTracks().forEach(track => track.stop());
                     } catch (e) { console.warn("Error deteniendo el stream", e); }
                     streamEvidencia = null;
                 }
-                
+
                 document.getElementById('camara-evidencia-container').style.display = 'none';
                 document.getElementById('previewFoto').src = fotoComprimidaBase64;
                 document.getElementById('preview-evidencia-container').style.display = 'flex';
@@ -3228,7 +3282,7 @@
             }
         }
 
-        
+
         function reiniciarFotoEvidencia() { fotoComprimidaBase64 = null; iniciarCamaraEvidencia(); }
 
         // ======================= CONFIGURACIÓN FIRMAS =======================
@@ -3240,12 +3294,12 @@
             function getMousePos(canvas, evt) {
                 const rect = canvas.getBoundingClientRect();
                 let clientX, clientY;
-                if (evt.touches && evt.touches.length > 0) { 
-                    clientX = evt.touches[0].clientX; 
-                    clientY = evt.touches[0].clientY; 
-                } else { 
-                    clientX = evt.clientX; 
-                    clientY = evt.clientY; 
+                if (evt.touches && evt.touches.length > 0) {
+                    clientX = evt.touches[0].clientX;
+                    clientY = evt.touches[0].clientY;
+                } else {
+                    clientX = evt.clientX;
+                    clientY = evt.clientY;
                 }
                 return {
                     x: (clientX - rect.left) / (rect.right - rect.left) * canvas.width,
@@ -3264,7 +3318,7 @@
             canvas.addEventListener('touchstart', function(e) { e.preventDefault(); startDrawing(e); }, { passive: false });
             canvas.addEventListener('touchmove', function(e) { e.preventDefault(); draw(e); }, { passive: false });
             canvas.addEventListener('touchend', function(e) { e.preventDefault(); stopDrawing(); }, { passive: false });
-            
+
             return { canvas, ctx };
         }
 
@@ -3275,9 +3329,9 @@
         function limpiarFirmaSupervisor() { supervisorSig.ctx.clearRect(0, 0, supervisorSig.canvas.width, supervisorSig.canvas.height); }
 
         function cerrarModalDespacho() {
-            if (streamEvidencia) { 
+            if (streamEvidencia) {
                 try { streamEvidencia.getTracks().forEach(track => track.stop()); } catch(e){}
-                streamEvidencia = null; 
+                streamEvidencia = null;
             }
             document.getElementById('modalDespacho').style.display = 'none';
         }
@@ -3298,33 +3352,33 @@
             ordenParaDespacho = orden;
             document.getElementById('titulo-modal-despacho').textContent = `Despachar Orden #${orden}`;
             cargarVehiculos();
-            
+
             limpiarFirma();
             limpiarFirmaSupervisor();
-            
-            if (streamEvidencia) { 
-                try { streamEvidencia.getTracks().forEach(track => track.stop()); } catch(e){} 
-                streamEvidencia = null; 
+
+            if (streamEvidencia) {
+                try { streamEvidencia.getTracks().forEach(track => track.stop()); } catch(e){}
+                streamEvidencia = null;
             }
             document.getElementById('btn-iniciar-camara-evidencia').style.display = 'block';
             document.getElementById('camara-evidencia-container').style.display = 'none';
             document.getElementById('preview-evidencia-container').style.display = 'none';
             fotoComprimidaBase64 = null;
-            
+
             document.getElementById('modalDespacho').style.display = 'flex';
         }
 
         function ejecutarDespacho() {
             const vehiculoId = document.getElementById('selVehiculos').value;
             if (!vehiculoId) return alert("⚠️ Selecciona un vehículo para poder despachar.");
-            
+
             let firmaBase64 = null;
             let firmaSupervisorBase64 = null;
-            
+
             const blank = document.createElement('canvas');
             blank.width = 400; blank.height = 200;
             const blankURL = blank.toDataURL();
-            
+
             if(conductorSig.canvas.toDataURL() !== blankURL) firmaBase64 = conductorSig.canvas.toDataURL('image/png');
             if(supervisorSig.canvas.toDataURL() !== blankURL) firmaSupervisorBase64 = supervisorSig.canvas.toDataURL('image/png');
 
@@ -3337,16 +3391,16 @@
 
             fetch('/bodegas/despachar_orden', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
-                body: JSON.stringify({ 
-                    numero_orden: ordenParaDespacho, 
-                    id_vehiculo: vehiculoId, 
-                    firma: firmaBase64, 
+                body: JSON.stringify({
+                    numero_orden: ordenParaDespacho,
+                    id_vehiculo: vehiculoId,
+                    firma: firmaBase64,
                     firma_supervisor: firmaSupervisorBase64,
-                    foto: fotoComprimidaBase64 
+                    foto: fotoComprimidaBase64
                 })
             })
                 .then(r => r.json())
@@ -3361,7 +3415,7 @@
                 .catch(e => alert("❌ Error de conexión."))
                 .finally(() => { btn.disabled = false; btn.textContent = 'Confirmar Despacho 🚀'; });
         }
-        
+
         document.addEventListener("DOMContentLoaded", function () {
             if (sessionStorage.getItem('reabrirAlistamiento') === 'true') {
                 if (typeof openAlistamientoModal === "function") openAlistamientoModal();
@@ -3370,11 +3424,11 @@
 
         function actualizarCronometros() {
             const cronometros = document.querySelectorAll('.cronometro');
-            
+
             cronometros.forEach(el => {
                 let segs = parseInt(el.getAttribute('data-segundos'));
                 if (isNaN(segs)) return;
-                
+
                 segs += 1;
                 el.setAttribute('data-segundos', segs);
 
@@ -3382,8 +3436,8 @@
                 const minutos = Math.floor((segs % 3600) / 60);
                 const segundos = segs % 60;
 
-                el.textContent = (horas < 10 ? "0" + horas : horas) + ":" + 
-                                 (minutos < 10 ? "0" + minutos : minutos) + ":" + 
+                el.textContent = (horas < 10 ? "0" + horas : horas) + ":" +
+                                 (minutos < 10 ? "0" + minutos : minutos) + ":" +
                                  (segundos < 10 ? "0" + segundos : segundos);
             });
         }
@@ -3404,7 +3458,7 @@
 
             fetch('/api/bodegas/productos/crear', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -3432,10 +3486,10 @@
 
             const fd = new FormData(document.getElementById('frmUploadProductos'));
 
-            fetch('/bodegas/upload_productos_masivo', { 
+            fetch('/bodegas/upload_productos_masivo', {
                 method: 'POST',
                 headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
-                body: fd 
+                body: fd
             })
                 .then(r => r.json())
                 .then(d => {
@@ -3449,7 +3503,7 @@
                 .finally(() => { btn.textContent = '🚀 Subir Archivo'; btn.disabled = false; });
         }
 
-        let productosEdicionCache = []; 
+        let productosEdicionCache = [];
 
         function abrirModalEditar() {
             document.getElementById('modal-editar-producto').style.display = 'flex';
@@ -3476,7 +3530,7 @@
             const formContainer = document.getElementById('edit-form-container');
             const selectProd = document.getElementById('edit-select-producto');
 
-            formContainer.style.display = 'none'; 
+            formContainer.style.display = 'none';
             if (!marca) { container2.style.display = 'none'; return; }
 
             container2.style.display = 'block';
@@ -3485,7 +3539,7 @@
             fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}?t=` + Date.now())
                 .then(r => r.json())
                 .then(data => {
-                    productosEdicionCache = data; 
+                    productosEdicionCache = data;
                     selectProd.innerHTML = '<option value="">-- Toca para seleccionar --</option>';
                     data.forEach(p => { selectProd.innerHTML += `<option value="${p.ean}">${p.producto} (EAN: ${p.ean})</option>`; });
                 });
@@ -3516,25 +3570,25 @@
             const nombreNuevo = document.getElementById('edit-input-nombre').value.trim();
             const eanNuevo = document.getElementById('edit-input-ean-nuevo').value.trim();
             const marcaNuevo = document.getElementById('edit-input-marca').value.trim();
-            
+
             if (!nombreNuevo || !eanNuevo) return alert("⚠️ El EAN y el nombre no pueden estar vacíos.");
-            
+
             const eanOrig = document.getElementById('edit-input-ean-original').value;
 
             const productoOrig = productosEdicionCache.find(p => p.ean === eanOrig);
             const nombreOrig = productoOrig ? productoOrig.producto : '';
             const marcaOrig = productoOrig ? (productoOrig.fabricante || '') : '';
-            
+
             let txt = `Vas a modificar el siguiente producto:<br><br>`;
             if(eanOrig !== eanNuevo) txt += `<b>EAN:</b> ${eanOrig} ➔ <b style="color:var(--color-primary);">${eanNuevo}</b><br>`;
             else txt += `<b>EAN:</b> ${eanOrig} (Sin cambios)<br>`;
-            
+
             if(nombreOrig !== nombreNuevo) txt += `<b>Nombre:</b> ${nombreOrig} ➔ <b style="color:var(--color-primary);">${nombreNuevo}</b><br>`;
             else txt += `<b>Nombre:</b> ${nombreOrig} (Sin cambios)<br>`;
-            
+
             if(marcaOrig !== marcaNuevo) txt += `<b>Marca:</b> ${marcaOrig} ➔ <b style="color:var(--color-primary);">${marcaNuevo}</b><br>`;
             else txt += `<b>Marca:</b> ${marcaOrig} (Sin cambios)<br>`;
-            
+
             document.getElementById('txt-confirm-edicion').innerHTML = txt;
             document.getElementById('modal-confirm-edicion').style.display = 'flex';
         }
@@ -3548,7 +3602,7 @@
 
             fetch('/api/bodegas/editar_producto', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -3558,10 +3612,10 @@
             .then(res => {
                 document.getElementById('modal-confirm-edicion').style.display = 'none';
                 if (res.status === 'success') {
-                    cerrarModalEditar(); 
+                    cerrarModalEditar();
                     alert('✅ Producto actualizado correctamente');
-                    productosEdicionCache = []; 
-                    cargarProductosParaEdicion(); 
+                    productosEdicionCache = [];
+                    cargarProductosParaEdicion();
                 } else alert("❌ Error: " + res.message);
             })
             .catch(err => {
@@ -3676,13 +3730,13 @@
             const url = tipo === 'single' ? '/api/bodegas/eliminar_producto' : '/api/bodegas/eliminar_marca';
             const payload = tipo === 'single' ? { ean: valor } : { fabricante: valor };
 
-            fetch(url, { 
-                method: 'POST', 
-                headers: { 
+            fetch(url, {
+                method: 'POST',
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
-                }, 
-                body: JSON.stringify(payload) 
+                },
+                body: JSON.stringify(payload)
             })
                 .then(r => r.json())
                 .then(res => {
@@ -3702,7 +3756,7 @@
                 });
         }
 
-        let kitActual = []; 
+        let kitActual = [];
 
         function abrirModalPromociones() {
             document.getElementById('modal-promociones').style.display = 'flex';
@@ -3734,7 +3788,7 @@
                     }
                     data.forEach(p => {
                         const isActivo = p.estado === 'ACTIVO';
-                        const colorBtn = isActivo ? '#10b981' : '#9ca3af'; 
+                        const colorBtn = isActivo ? '#10b981' : '#9ca3af';
                         tbody.innerHTML += `
                             <tr style="border-bottom: 1px solid #f3f4f6;">
                                 <td data-label="Info Promo" style="padding: 12px;">
@@ -3743,7 +3797,7 @@
                                     <div style="font-size: 0.8rem; color: #db2777; font-weight: 700;">${p.total_componentes} Sub-Items</div>
                                 </td>
                                 <td data-label="Estado" style="padding: 12px; text-align: center;">
-                                    <button onclick="toggleEstadoPromo('${p.ean_promo}', '${isActivo ? 'INACTIVO' : 'ACTIVO'}')" 
+                                    <button onclick="toggleEstadoPromo('${p.ean_promo}', '${isActivo ? 'INACTIVO' : 'ACTIVO'}')"
                                             style="background: ${colorBtn}; color: white; border: none; padding: 6px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 700; cursor: pointer;">
                                         ${p.estado}
                                     </button>
@@ -3768,10 +3822,10 @@
                 .then(r => r.json())
                 .then(data => {
                     selectProd.innerHTML = '<option value="">2. Selecciona Producto...</option>';
-                    data.forEach(p => { 
+                    data.forEach(p => {
                         let descClean = p.producto.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                         let marcaClean = (p.fabricante || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                        selectProd.innerHTML += `<option value="${p.ean}" data-nombre="${descClean}" data-marca="${marcaClean}">${p.producto} (${p.unidad_embalaje})</option>`; 
+                        selectProd.innerHTML += `<option value="${p.ean}" data-nombre="${descClean}" data-marca="${marcaClean}">${p.producto} (${p.unidad_embalaje})</option>`;
                     });
                 });
         }
@@ -3780,20 +3834,20 @@
             const selectProd = document.getElementById('promo-select-prod');
             const ean = selectProd.value;
             if (!ean) return alert("⚠️ Selecciona un producto hijo primero.");
-            
+
             const selectedOption = selectProd.options[selectProd.selectedIndex];
             const nombre = selectedOption.getAttribute('data-nombre') || selectedOption.text;
             const marca = selectedOption.getAttribute('data-marca') || 'N/A';
-            
+
             const cajas = parseInt(document.getElementById('promo-cajas').value) || 0;
             const unidades = parseInt(document.getElementById('promo-unidades').value) || 0;
 
             if (cajas === 0 && unidades === 0) return alert("⚠️ Debes indicar la cantidad de cajas o unidades.");
 
             const existente = kitActual.find(k => k.ean === ean);
-            if (existente) { 
-                existente.cajas += cajas; 
-                existente.unidades += unidades; 
+            if (existente) {
+                existente.cajas += cajas;
+                existente.unidades += unidades;
             } else {
                 kitActual.push({ ean, nombre, marca, cajas, unidades });
             }
@@ -3827,7 +3881,7 @@
                 `;
             });
         }
-        
+
         function quitarDeKit(index) { kitActual.splice(index, 1); renderizarCajaKit(); }
 
         // MÓDULO DE PROMOCIONES - FUNCIONES ACTUALIZADAS
@@ -3841,7 +3895,7 @@
 
             fetch('/api/promociones/guardar', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -3851,7 +3905,7 @@
             .then(res => {
                 if (res.status === 'success') {
                     alert("✅ Promoción guardada en la base de datos.");
-                    limpiarArmador(); 
+                    limpiarArmador();
                     cargarTablaPromociones();
                 } else {
                     alert("❌ Error: " + res.message);
@@ -3863,7 +3917,7 @@
         function toggleEstadoPromo(ean_promo, nuevoEstado) {
             fetch('/api/promociones/estado', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -3885,7 +3939,7 @@
             if (pass === 'ELIMINAR') {
                 fetch('/api/promociones/eliminar', {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': '{{ csrf_token() }}'
                     },
@@ -3895,7 +3949,7 @@
                 .then(res => {
                     if(res.status === 'success') {
                         alert("🗑️ Promoción destruida exitosamente.");
-                        cargarTablaPromociones(); 
+                        cargarTablaPromociones();
                         limpiarArmador();
                     } else {
                         alert("❌ Error al eliminar la promoción.");
@@ -3911,7 +3965,7 @@
         function limpiarArmador() {
             document.getElementById('promo-codigo').value = '';
             document.getElementById('promo-nombre').value = '';
-            document.getElementById('promo-codigo').readOnly = false; 
+            document.getElementById('promo-codigo').readOnly = false;
             document.getElementById('titulo-armador').textContent = '✨ Armar Nueva Promoción';
             kitActual = []; renderizarCajaKit();
         }
@@ -3919,7 +3973,7 @@
         function cargarEdicionPromo(ean_promo, nombre_promo) {
             document.getElementById('titulo-armador').textContent = '✏️ Editando Promoción';
             document.getElementById('promo-codigo').value = ean_promo;
-            document.getElementById('promo-codigo').readOnly = true; 
+            document.getElementById('promo-codigo').readOnly = true;
             document.getElementById('promo-nombre').value = nombre_promo;
 
             fetch(`/api/promociones/detalle/${encodeURIComponent(ean_promo)}?t=` + Date.now())
@@ -4050,7 +4104,7 @@
 
             fetch('/api/bodegas/alias/guardar', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -4058,7 +4112,7 @@
             })
                 .then(r => r.json())
                 .then(res => {
-                    if (res.status === 'success') { alert(res.message); cargarPendientesAlias(); } 
+                    if (res.status === 'success') { alert(res.message); cargarPendientesAlias(); }
                     else alert("❌ Error: " + res.message);
                 })
                 .catch(e => alert("Error de conexión."));
@@ -4069,7 +4123,7 @@
 
             fetch('/api/bodegas/alias/permitir', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -4077,7 +4131,7 @@
             })
                 .then(r => r.json())
                 .then(res => {
-                    if (res.status === 'success') { alert(res.message); cargarPendientesAlias(); } 
+                    if (res.status === 'success') { alert(res.message); cargarPendientesAlias(); }
                     else alert("❌ Error: " + res.message);
                 })
                 .catch(e => alert("Error de conexión."));

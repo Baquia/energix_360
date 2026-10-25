@@ -340,22 +340,27 @@ def panel_principal():
     archivo_destino = session.get('archivo_destino', 'A_dashboard_universal.html')
 
     # Mantenimiento del tipo_empresa como Clasificador de Negocio para consolidación de Hubs
-    if archivo_destino in ['panel_principal.html', 'A_dashboard_universal.html']:
-        if tipo_empresa == 'transporte_especial':
+    # Se interceptan los controladores para obligar su paso por el Hub correspondiente,
+    # mientras que los operadores y verificadores siguen su flujo directo (archivo_destino).
+    if tipo_empresa == 'transporte_especial':
+        if nombre_perfil == 'controlador_flotaespecial' or archivo_destino in ['panel_principal.html', 'A_dashboard_universal.html']:
             return redirect('/gestor_flotaespecial/dashboard')
-        elif tipo_empresa == 'transporte_carga':
+    elif tipo_empresa == 'transporte_carga':
+        if nombre_perfil == 'gestor_flotacarga' or archivo_destino in ['panel_principal.html', 'A_dashboard_universal.html']:
             return redirect('/gestor_flota/dashboard')
-        elif tipo_empresa == 'ventas_distribucion':
-            if nombre_perfil in ['gerente_ventasdistribucion', 'gerente']:
-                return redirect('/gerencia_ventas/dashboard')
-            elif nombre_perfil in ['controlador_bodegas', 'controlador_logistica']:
-                return redirect('/hub_bodegas/dashboard')
-            elif nombre_perfil == 'controlador_ventas':
-                return redirect('/hub_ventas/dashboard')
-            elif nombre_perfil in ['controlador_administracion', 'controlador_recurso_humano', 'controlador_contabilidad', 'controlador_facturacion']:
-                return redirect('/hub_administracion/dashboard')
-            return redirect('/hub_ventas_distribucion/dashboard')
-        elif tipo_empresa == 'cria_beneficio_aves_corral':
+    elif tipo_empresa == 'ventas_distribucion':
+        if nombre_perfil in ['gerente_ventasdistribucion', 'gerente']:
+            return redirect('/gerencia_ventas/dashboard')
+        elif nombre_perfil in ['controlador_bodegas', 'controlador_logistica']:
+            archivo_destino = 'B_hub_ventas_distribucion.html'
+        elif nombre_perfil == 'controlador_ventas':
+            return redirect('/hub_ventas/dashboard')
+        elif nombre_perfil in ['controlador_administracion', 'controlador_recurso_humano', 'controlador_contabilidad', 'controlador_facturacion']:
+            return redirect('/hub_administracion/dashboard')
+        elif archivo_destino in ['panel_principal.html', 'A_dashboard_universal.html']:
+            archivo_destino = 'B_hub_ventas_distribucion.html'
+    elif tipo_empresa == 'cria_beneficio_aves_corral':
+        if archivo_destino in ['panel_principal.html', 'A_dashboard_universal.html']:
             return redirect(url_for('router_universal', modulo='avicola'))
 
     # Enrutamiento Automático Dinámico
@@ -495,7 +500,8 @@ def ejecutar_escaneo_introspeccion():
 
     nuevo_mapa = {}
     for endpoint, func in current_app.view_functions.items():
-        if endpoint == 'router_universal':
+        # Se excluyen enrutadores de tráfico que no son dueños finales de plantillas
+        if endpoint in ['router_universal', 'panel_principal']:
             continue
             
         try:
@@ -509,6 +515,7 @@ def ejecutar_escaneo_introspeccion():
 
     current_app.config['MAPA_RUTAS_AUTODESCUBIERTO'] = nuevo_mapa
     return current_app.config['MAPA_RUTAS_AUTODESCUBIERTO']
+
 
 @app.route('/router/<modulo>')
 @login_required_custom
