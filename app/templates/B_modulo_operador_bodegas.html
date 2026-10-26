@@ -555,15 +555,29 @@
             </div>
 
             <!-- Zona del Pulgar (Thumb Zone - Acciones) -->
+            <!-- Zona del Pulgar (Thumb Zone - Acciones) -->
             <div class="picking-bottom-actions">
-                <button id="btn-masivo" class="hidden" onclick="confirmarMasivo()" style="width: 100%; background: var(--primary); color: white; padding: 15px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(0,78,146, 0.3);">⚡ ALISTAMIENTO MASIVO</button>
-                <button class="btn-finish" onclick="intentarTerminarItem()">TERMINAR ITEM</button>
-                <div style="display: flex; gap: 10px; margin-top: 10px;" id="btns-novedades">
-                    <button onclick="declararFaltaExistencias()" style="flex:1; background:#fee2e2; color:#b91c1c; padding:12px; border-radius:10px; border:1px solid #fecaca; font-weight:800; cursor:pointer; font-size: 0.9rem;">🚫 Sin Stock</button>
-                    <button onclick="declararSinEAN()" style="flex:1; background:#fef3c7; color:#b45309; padding:12px; border-radius:10px; border:1px solid #fde68a; font-weight:800; cursor:pointer; font-size: 0.9rem;">⚠️ Sin EAN</button>
-                    <button id="btn-no-bd" onclick="declararNoEnBD()" class="hidden" style="flex:1; background:#f1f5f9; color:#475569; padding:12px; border-radius:10px; border:1px solid #cbd5e1; font-weight:800; cursor:pointer; font-size: 0.9rem;">⚠️ NO EN BD</button>
+                <button id="btn-masivo" class="hidden" onclick="confirmarMasivo()" style="width: 100%; background: var(--primary); color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 8px; box-shadow: 0 4px 15px rgba(0,78,146, 0.3);">⚡ ALISTAMIENTO MASIVO</button>
+                
+                <!-- NUEVO CONTROL DUAL DE CÁMARA (AMBIDIESTRO) -->
+                <div style="display: flex; gap: 10px; margin-bottom: 8px;" id="btns-control-camara">
+                    <button onclick="toggleCamaraInteligente()" style="flex:1; background:#e0f2fe; color:#0369a1; padding:10px; border-radius:10px; border:1px solid #bae6fd; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> CÁM ON/OFF
+                    </button>
+                    <button onclick="toggleCamaraInteligente()" style="flex:1; background:#e0f2fe; color:#0369a1; padding:10px; border-radius:10px; border:1px solid #bae6fd; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        CÁM ON/OFF <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    </button>
                 </div>
-                <button class="btn-reset" id="btn-reset-lectura" onclick="resetearConteo()">🔄 Reiniciar Escaneo</button>
+
+                <button class="btn-finish" onclick="intentarTerminarItem()" style="padding: 14px;">TERMINAR ITEM</button>
+                
+                <div style="display: flex; gap: 10px; margin-top: 8px;" id="btns-novedades">
+                    <button onclick="declararFaltaExistencias()" style="flex:1; background:#fee2e2; color:#b91c1c; padding:10px; border-radius:10px; border:1px solid #fecaca; font-weight:800; cursor:pointer; font-size: 0.85rem;">🚫 Sin Stock</button>
+                    <button onclick="declararSinEAN()" style="flex:1; background:#fef3c7; color:#b45309; padding:10px; border-radius:10px; border:1px solid #fde68a; font-weight:800; cursor:pointer; font-size: 0.85rem;">⚠️ Sin EAN</button>
+                    <button id="btn-no-bd" onclick="declararNoEnBD()" class="hidden" style="flex:1; background:#f1f5f9; color:#475569; padding:10px; border-radius:10px; border:1px solid #cbd5e1; font-weight:800; cursor:pointer; font-size: 0.85rem;">⚠️ NO EN BD</button>
+                </div>
+                
+                <button class="btn-reset" id="btn-reset-lectura" onclick="resetearConteo()" style="padding: 10px; margin-top: 8px; font-size: 0.85rem;">🔄 Reiniciar Escaneo</button>
             </div>
         </div>
     </div>
@@ -1334,6 +1348,27 @@
             document.getElementById('modal-verify').style.display = 'none';
         }
 
+        // =====================================
+        // CONTROL INTELIGENTE DE CÁMARA
+        // =====================================
+        function toggleCamaraInteligente() {
+            if (!itemActivo) return;
+            
+            if (!scanner) {
+                // La cámara no ha sido iniciada o fue detenida por completo
+                iniciarCamaraIncrustada();
+            } else {
+                // La cámara existe, verificamos si está pausada
+                const resumeBtn = document.getElementById('cam-resume-btn');
+                if (resumeBtn.style.display === 'flex' || resumeBtn.style.display === 'block') {
+                    reanudarCamara();
+                } else {
+                    // Si está transmitiendo, la pausamos manualmente
+                    pausarCamaraPorInactividad();
+                }
+            }
+        }
+        
         // =====================================
         // DISPARADOR MASIVO
         // =====================================
