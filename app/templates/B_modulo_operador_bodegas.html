@@ -577,7 +577,7 @@
                     <button id="btn-no-bd" onclick="declararNoEnBD()" class="hidden" style="flex:1; background:#f1f5f9; color:#475569; padding:10px; border-radius:10px; border:1px solid #cbd5e1; font-weight:800; cursor:pointer; font-size: 0.85rem;">⚠️ NO EN BD</button>
                 </div>
                 
-                <button class="btn-reset" id="btn-reset-lectura" onclick="resetearConteo()" style="padding: 10px; margin-top: 8px; font-size: 0.85rem;">🔄 Reiniciar Escaneo</button>
+                <button class="btn-reset" id="btn-reset-lectura" onclick="resetearConteo()" style="padding: 10px; margin-top: 8px; font-size: 0.85rem;">🔄 Resetear Conteo</button>
             </div>
         </div>
     </div>
@@ -1149,10 +1149,18 @@
                 document.getElementById('pk-count-cajas').textContent = "0";
                 document.getElementById('pk-count-unidades').textContent = "0";
 
+                // Recarga la interfaz visual a sus valores por defecto
                 abrirModalPickingId(itemActivo.id);
 
+                // CORRECCIÓN DE ESTADO: Si el escáner ya existe, ocultamos el overlay que abrió 'abrirModalPickingId' y reanudamos la transmisión
                 if (scanner) {
-                    try{ scanner.resume(); document.getElementById('embedded-reader').style.opacity = '1'; document.getElementById('cam-resume-btn').style.display = 'none'; iniciarTemporizadorInactividad(); } catch(e){}
+                    document.getElementById('cam-overlay-btn').style.display = 'none';
+                    try { 
+                        scanner.resume(); 
+                        document.getElementById('embedded-reader').style.opacity = '1'; 
+                        document.getElementById('cam-resume-btn').style.display = 'none'; 
+                        iniciarTemporizadorInactividad(); 
+                    } catch(e) {}
                 }
             }
         }
