@@ -141,10 +141,16 @@
 <!-- VISTA DEL CONTROLADOR: AUDITORÍA DE PREOPERACIONALES -->
 <!-- ======================================================================= -->
 <div class="container-auditoria">
-    <div class="brand-header">
-        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="header-logo-cliente" alt="{{ empresa }}" onerror="this.style.display='none'">
-        <span class="header-divider"></span>
-        <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="header-logo-app" alt="BQA-ONE">
+   <div class="brand-header" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid rgba(1, 82, 73, 0.1);">
+        <div class="brand-area" style="display: flex; align-items: center; gap: 12px; flex-shrink: 1; overflow: hidden;">
+            <img src="{{ url_for('static', filename='BQA_ONE_512.PNG') }}" alt="BQA-ONE" style="max-height: 35px; width: auto; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'">
+            <span class="header-divider" style="width: 1px; height: 28px; background-color: #cbd5e1; display: block; flex-shrink: 0;"></span>
+            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" class="header-logo-cliente" alt="Empresa" style="max-height: 40px; width: auto; object-fit: contain; flex-shrink: 1;" onerror="this.style.display='none'">
+        </div>
+        <div class="user-info" style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; margin-left: 10px;">
+            <span class="user-name" style="font-weight: 800; font-size: 14px; color: #015249;">Hola {{ nombre }}</span>
+            <span class="user-role" style="font-size: 11px; color: #64748b; font-weight: 600;">Auditor / Controlador</span>
+        </div>
     </div>
 
     <div class="action-header">
@@ -230,10 +236,16 @@
 
 <div class="container">
     
-    <div class="brand-header">
-        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="header-logo-cliente" alt="{{ empresa }}" onerror="this.style.display='none'">
-        <span class="header-divider"></span>
-        <img src="{{ url_for('static', filename='logo_energix360.png') }}" class="header-logo-app" alt="BQA-ONE">
+    <div class="brand-header" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid rgba(1, 82, 73, 0.1);">
+        <div class="brand-area" style="display: flex; align-items: center; gap: 12px; flex-shrink: 1; overflow: hidden;">
+            <img src="{{ url_for('static', filename='BQA_ONE_512.PNG') }}" alt="BQA-ONE" style="max-height: 35px; width: auto; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'">
+            <span class="header-divider" style="width: 1px; height: 28px; background-color: #cbd5e1; display: block; flex-shrink: 0;"></span>
+            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" class="header-logo-cliente" alt="Empresa" style="max-height: 40px; width: auto; object-fit: contain; flex-shrink: 1;" onerror="this.style.display='none'">
+        </div>
+        <div class="user-info" style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; margin-left: 10px;">
+            <span class="user-name" style="font-weight: 800; font-size: 14px; color: #015249;">Hola {{ nombre }}</span>
+            <span class="user-role" style="font-size: 11px; color: #64748b; font-weight: 600;">Operador de Flota</span>
+        </div>
     </div>
     
     <div class="text-center mb-4">

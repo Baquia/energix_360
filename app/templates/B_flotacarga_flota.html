@@ -163,11 +163,14 @@
 </head>
 <body>
 
+    <!-- ARCHIVO: B_flotacarga_flota.html -->
+<!-- UBICACIÓN: Buscar y reemplazar todo el bloque que envuelve a `<aside class="sidebar" id="sidebar">` (aproximadamente desde la línea 240 hasta el final del bloque del menú lateral, conservando el overlay y el wrapper). Asegúrate de eliminar la etiqueta `<img class="logo-app">` duplicada del sidebar y reemplazarla por el texto "MENÚ PRINCIPAL". -->
+
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+            <span style="font-weight: 800; color: var(--verde); font-size: 14px; letter-spacing: 1px;">MENÚ PRINCIPAL</span>
         </div>
         
         {% set url_retorno = url_for('controlador_pesv.index_pesv') if session.get('perfil') == 'controlador_pesv' else '/gestor_flota/hub_herramientas/' %}
@@ -196,13 +199,18 @@
     </aside>
 
     <main class="main-wrapper">
+        <!-- ARCHIVO: B_flotacarga_flota.html -->
+        <!-- UBICACIÓN: Buscar la etiqueta <header class="topbar"> (aproximadamente en la línea 197) y reemplazar todo ese bloque <header>...</header> exactamente con el siguiente código. Nota: Se ha preservado intacto el botón "menuToggle" y la lógica condicional del rol del usuario. -->
+
         <header class="topbar">
-            <div class="topbar-left">
-                <button class="menu-toggle" id="menuToggle">☰</button>
-                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            <div class="topbar-left" style="display: flex; align-items: center; gap: 15px; flex-shrink: 1; overflow: hidden;">
+                <button class="menu-toggle" id="menuToggle" style="flex-shrink: 0;">☰</button>
+                <img src="{{ url_for('static', filename='BQA_ONE_512.PNG') }}" alt="BQA-ONE" style="max-height: 35px; width: auto; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'">
+                <span style="width: 1px; height: 28px; background-color: #cbd5e1; display: block; flex-shrink: 0;"></span>
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" class="logo-cliente" alt="Empresa" style="max-height: 40px; width: auto; object-fit: contain; flex-shrink: 1;" onerror="this.style.display='none'">
             </div>
-            <div class="user-info">
-                <span class="user-name">{{ nombre }}</span>
+            <div class="user-info" style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; margin-left: 10px;">
+                <span class="user-name" style="font-weight: 800; font-size: 14px; color: #015249;">Hola {{ nombre }}</span>
                 <span class="user-role">{% if session.get('perfil') == 'controlador_pesv' %}Controlador PESV{% else %}Controlador de Flota{% endif %}</span>
             </div>
         </header>
@@ -663,6 +671,7 @@
                     <div style="flex: 1;">
                         <label>Tipo de Conductor</label>
                         <select name="tipo_conductor" id="crear_tipo_conductor" required onchange="toggleTipoConductor('crear')">
+                            <option value="" disabled selected>Seleccione tipo de conductor...</option>
                             <option value="Propio">Propio</option>
                             <option value="Tercero">Tercero</option>
                         </select>
@@ -670,6 +679,7 @@
                     <div style="flex: 1;">
                         <label>Perfil Asignado</label>
                         <select name="perfil" id="crear_perfil" required>
+                            <option value="" disabled selected>Seleccione perfil asignado...</option>
                             <option value="operador_flotacarga">Conductor Autorizado</option>
                             <option value="auxiliar_transportecarga">Auxiliar de Carga</option>
                         </select>
@@ -679,14 +689,14 @@
                 <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" required placeholder="Nombres y Apellidos"></div>
                 <div class="form-group"><label>Identificación</label><input type="text" name="cedula" required placeholder="Número de Cédula"></div>
                 
-                <div id="crear_credenciales_group">
+                <div id="crear_credenciales_group" style="display: none;">
                     <div class="form-group">
                         <label>Correo Electrónico</label>
-                        <input type="email" name="email" id="crear_email" placeholder="correo@ejemplo.com" required>
+                        <input type="text" name="email" id="crear_email" placeholder="correo@ejemplo.com">
                     </div>
                     <div class="form-group">
                         <label>Contraseña de Acceso (App Conductor)</label>
-                        <input type="password" name="password" id="crear_password" placeholder="Asignar contraseña inicial" required>
+                        <input type="password" name="password" id="crear_password" placeholder="Asignar contraseña inicial">
                         <small style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">Requerida para que el conductor pueda iniciar sesión.</small>
                     </div>
                 </div>
@@ -732,19 +742,18 @@
                 </div>
                 <div class="form-group" style="display: flex; gap: 15px;">
                     <div style="flex: 1;"><label>Fecha Expedición Licencia</label><input type="date" name="fecha_expedicion_licencia" id="crear_fecha_expedicion_licencia" required></div>
-                    <div style="flex: 1;" id="crear_ss_fecha_group"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social" id="crear_ultimo_pago_seguridad_social" required></div>
+                    <div style="flex: 1;" id="crear_ss_fecha_group" style="display: none;"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social" id="crear_ultimo_pago_seguridad_social"></div>
                 </div>
 
                 <div class="form-group"><label>PDF Licencia</label><input type="file" name="archivo_licencia" accept=".pdf"></div>
-                <div class="form-group" id="crear_ss_pdf1_group"><label>PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
-                <div class="form-group" id="crear_ss_pdf2_group"><label>PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
-                <div class="form-group"><label>Foto Facial (Reconocimiento)</label><input type="file" name="archivo_foto_facial" accept=".jpg, .jpeg, .png" required></div>
-
+                <div class="form-group" id="crear_ss_pdf1_group" style="display: none;"><label>PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
+                <div class="form-group" id="crear_ss_pdf2_group" style="display: none;"><label>PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
+                
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalOperador')">Cancelar</button><button type="submit" class="btn-primary">Guardar Registro</button></div>
             </form>
         </div>
     </div>
-
+    
     <div id="modalEditarOperador" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header"><h3>Editar Personal</h3><button class="close-btn" type="button" onclick="closeModal('modalEditarOperador')">&times;</button></div>
@@ -758,6 +767,7 @@
                     <div style="flex: 1;">
                         <label>Tipo de Conductor</label>
                         <select name="tipo_conductor" id="edit_tipo_conductor" required onchange="toggleTipoConductor('edit')">
+                            <option value="" disabled selected>Seleccione tipo de conductor...</option>
                             <option value="Propio">Propio</option>
                             <option value="Tercero">Tercero</option>
                         </select>
@@ -765,6 +775,7 @@
                     <div style="flex: 1;">
                         <label>Perfil Asignado</label>
                         <select name="perfil" id="edit_perfil" required>
+                            <option value="" disabled selected>Seleccione perfil asignado...</option>
                             <option value="operador_flotacarga">Conductor Autorizado</option>
                             <option value="auxiliar_transportecarga">Auxiliar de Carga</option>
                         </select>
@@ -774,10 +785,10 @@
                 <div class="form-group"><label>Nombre Completo</label><input type="text" name="nombre" id="edit_nombre" required></div>
                 <div class="form-group"><label>Identificación</label><input type="text" name="cedula" id="edit_cedula" required></div>
                 
-                <div id="edit_credenciales_group">
+                <div id="edit_credenciales_group" style="display: none;">
                     <div class="form-group">
                         <label>Correo Electrónico</label>
-                        <input type="email" name="email" id="edit_email" placeholder="correo@ejemplo.com">
+                        <input type="text" name="email" id="edit_email" placeholder="correo@ejemplo.com">
                     </div>
                     <div class="form-group">
                         <label>Contraseña Actual</label>
@@ -828,13 +839,12 @@
                 </div>
                 <div class="form-group" style="display: flex; gap: 15px;">
                     <div style="flex: 1;"><label>Fecha Expedición Licencia</label><input type="date" name="fecha_expedicion_licencia" id="edit_fecha_expedicion_licencia" required></div>
-                    <div style="flex: 1;" id="edit_ss_fecha_group"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social" id="edit_ultimo_pago_seguridad_social" required></div>
+                    <div style="flex: 1;" id="edit_ss_fecha_group" style="display: none;"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social" id="edit_ultimo_pago_seguridad_social"></div>
                 </div>
 
                 <div class="form-group"><label>Reemplazar PDF Licencia</label><input type="file" name="archivo_licencia" accept=".pdf"></div>
-                <div class="form-group" id="edit_ss_pdf1_group"><label>Reemplazar PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
-                <div class="form-group" id="edit_ss_pdf2_group"><label>Reemplazar PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
-                <div class="form-group"><label>Reemplazar Foto Facial</label><input type="file" name="archivo_foto_facial" accept=".jpg, .jpeg, .png"></div>
+                <div class="form-group" id="edit_ss_pdf1_group" style="display: none;"><label>Reemplazar PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
+                <div class="form-group" id="edit_ss_pdf2_group" style="display: none;"><label>Reemplazar PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
 
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarOperador')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">Actualizar</button></div>
             </form>
@@ -996,7 +1006,7 @@
                 }
                 vehInput.removeAttribute('required');
                 vehInput.value = '';
-            } else {
+            } else if (tipo === 'Tercero') {
                 credGroup.style.display = 'none';
                 vehGroup.style.display = 'block';
                 
@@ -1008,6 +1018,18 @@
                 passInput.removeAttribute('required');
                 emailInput.removeAttribute('required');
                 vehInput.setAttribute('required', 'required');
+            } else {
+                credGroup.style.display = 'none';
+                vehGroup.style.display = 'none';
+                
+                if(ssFechaGroup) ssFechaGroup.style.display = 'none';
+                if(ssPdf1Group) ssPdf1Group.style.display = 'none';
+                if(ssPdf2Group) ssPdf2Group.style.display = 'none';
+                if(ssFechaInput) ssFechaInput.removeAttribute('required');
+
+                passInput.removeAttribute('required');
+                emailInput.removeAttribute('required');
+                vehInput.removeAttribute('required');
             }
         }
 

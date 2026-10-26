@@ -212,20 +212,26 @@
 <body>
 
   <!-- BARRA SUPERIOR -->
-  <div class="navbar">
-    <div class="navbar-user">
-      <div class="navbar-avatar">
-        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo" style="height: 22px;" onerror="this.style.display='none'">
+  <!-- ARCHIVO: C_hub_herramientas_flotacarga.html -->
+  <!-- UBICACIÓN: Buscar la etiqueta <div class="navbar"> (aproximadamente en la línea 133 bajo el comentario "BARRA SUPERIOR") y reemplazar todo ese bloque <div class="navbar">...</div> exactamente con el siguiente código. Nota: Al igual que en el hub principal, se ajusta el fondo a blanco y se actualizan los estilos de los botones para mantener la cohesión del diseño. -->
+
+  <!-- BARRA SUPERIOR -->
+  <div class="navbar" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; background: #ffffff; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+      <div class="topbar-left" style="display: flex; align-items: center; gap: 15px; flex-shrink: 1; overflow: hidden;">
+          <img src="{{ url_for('static', filename='BQA_ONE_512.PNG') }}" alt="BQA-ONE" style="max-height: 35px; width: auto; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'">
+          <span style="width: 1px; height: 28px; background-color: #cbd5e1; display: block; flex-shrink: 0;"></span>
+          <img src="{{ url_for('static', filename='logo_' ~ session.get('nit') ~ '.png') }}" class="logo-cliente" alt="Empresa" style="max-height: 40px; width: auto; object-fit: contain; flex-shrink: 1;" onerror="this.style.display='none'">
       </div>
-      <div class="navbar-info">
-        <span class="user-name">{{ usuario }}</span>
-        <span class="company-name">{{ empresa }}</span>
+      <div style="display: flex; align-items: center; gap: 20px; flex-shrink: 0;">
+          <div class="user-info" style="display: flex; flex-direction: column; align-items: flex-end;">
+              <span class="user-name" style="font-weight: 800; font-size: 14px; color: #015249;">Hola {{ usuario }}</span>
+              <span class="company-name" style="font-size: 11px; color: #64748b; font-weight: 600;">{{ empresa }}</span>
+          </div>
+          <div style="display: flex; gap: 10px;">
+              <a href="/gestor_flota/dashboard" class="btn-logout" style="background-color: #475569; color: #ffffff; text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;">⬅ Volver al Controlador</a>
+              <a href="/logout" class="btn-logout" style="background-color: #ef4444; color: #ffffff; text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;">Salir</a>
+          </div>
       </div>
-    </div>
-    <div style="display: flex; gap: 10px;">
-        <a href="/gestor_flota/dashboard" class="btn-logout" style="background-color: #334155;">⬅ Volver al Controlador</a>
-        <a href="/logout" class="btn-logout">Salir</a>
-    </div>
   </div>
 
   <!-- CONTENIDO PRINCIPAL -->

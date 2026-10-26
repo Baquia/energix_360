@@ -234,13 +234,18 @@
     </aside>
 
     <main class="main-wrapper">
+        <!-- ARCHIVO: B_flotacarga_operativa.html -->
+        <!-- UBICACIÓN: Buscar la etiqueta <header class="topbar"> (aproximadamente en la línea 125) y reemplazar todo ese bloque <header>...</header> exactamente con el siguiente código. Nota: Se ha preservado intacto el botón "menuToggle". -->
+
         <header class="topbar">
-            <div class="topbar-left">
-                <button class="menu-toggle" id="menuToggle">☰</button>
-                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
+            <div class="topbar-left" style="display: flex; align-items: center; gap: 15px; flex-shrink: 1; overflow: hidden;">
+                <button class="menu-toggle" id="menuToggle" style="flex-shrink: 0;">☰</button>
+                <img src="{{ url_for('static', filename='BQA_ONE_512.PNG') }}" alt="BQA-ONE" style="max-height: 35px; width: auto; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'">
+                <span style="width: 1px; height: 28px; background-color: #cbd5e1; display: block; flex-shrink: 0;"></span>
+                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" class="logo-cliente" alt="Empresa" style="max-height: 40px; width: auto; object-fit: contain; flex-shrink: 1;" onerror="this.style.display='none'">
             </div>
-            <div class="user-info">
-                <span class="user-name">{{ nombre }}</span>
+            <div class="user-info" style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; margin-left: 10px;">
+                <span class="user-name" style="font-weight: 800; font-size: 14px; color: #015249;">Hola {{ nombre }}</span>
                 <span class="user-role">Controlador de Flota</span>
             </div>
         </header>

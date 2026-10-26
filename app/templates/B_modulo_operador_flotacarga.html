@@ -515,15 +515,19 @@
     </div>
 
     <!-- ENCABEZADO SUPERIOR -->
+    <!-- ARCHIVO: B_modulo_operador_flotacarga.html -->
+    <!-- UBICACIÓN: Buscar la etiqueta <header class="header"> (aproximadamente en la línea 276 bajo el comentario "ENCABEZADO SUPERIOR") y reemplazar todo ese bloque <header>...</header> exactamente con el siguiente código. Nota: Se ha cambiado el logo_energix360.png por BQA_ONE_512.PNG, invertido el orden para que BQA-ONE esté a la izquierda y se ha incorporado el saludo "Hola {{ nombre }}". -->
+
+    <!-- ENCABEZADO SUPERIOR -->
     <header class="header">
-        <div class="brand-area">
-            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" class="logo-cliente" alt="Cliente" onerror="this.style.display='none'">
-            <span class="brand-divider"></span>
-            <img class="logo-app" src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix 360">
+        <div class="brand-area" style="display: flex; align-items: center; gap: 12px; flex-shrink: 1; overflow: hidden;">
+            <img src="{{ url_for('static', filename='BQA_ONE_512.PNG') }}" alt="BQA-ONE" style="max-height: 35px; width: auto; object-fit: contain; flex-shrink: 0;" onerror="this.style.display='none'">
+            <span class="brand-divider" style="width: 1px; height: 28px; background-color: #cbd5e1; display: block; flex-shrink: 0;"></span>
+            <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" class="logo-cliente" alt="Empresa" style="max-height: 36px; width: auto; object-fit: contain; flex-shrink: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));" onerror="this.style.display='none'">
         </div>
-        <div class="user-info">
-            <span class="user-name">{{ nombre }}</span>
-            <span class="user-role">Operador de Flota</span>
+        <div class="user-info" style="display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; margin-left: 10px;">
+            <span class="user-name" style="font-weight: 800; font-size: 13px; color: #015249;">Hola {{ nombre }}</span>
+            <span class="user-role" style="font-size: 10px; color: #6b7280; font-weight: 700; margin-top: 2px;">Operador de Flota</span>
         </div>
     </header>
 
