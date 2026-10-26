@@ -565,22 +565,24 @@
       }
 
       window.cargarTablaUsuarios = function() {
-          fetch('/obtener_todos_usuarios').then(r => r.json()).then(d => {
+          fetch(`/obtener_todos_usuarios?t=${new Date().getTime()}`).then(r => r.json()).then(d => {
               const b = document.getElementById('bodyUsuarios'); b.innerHTML = '';
-              d.users.forEach(u => {
-                  const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(u))));
-                  b.innerHTML += `<tr>
-                      <td class="small text-muted">${u.cedula}</td>
-                      <td class="fw-bold">${u.nombre}</td>
-                      <td><span class="badge bg-info text-dark shadow-sm">${u.perfil}</span></td>
-                      <td class="small fw-bold">${u.empresa}</td>
-                      <td>${u.telefono || '-'}</td>
-                      <td>
-                          <button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Usuario', '${dataStr}')">✏️ Editar</button>
-                          <button class="btn btn-sm btn-outline-danger fw-bold ms-1" onclick="eliminarUsuario('${u.cedula}')">🗑️</button>
-                      </td>
-                  </tr>`;
-              });
+              if (d.success && d.users) {
+                  d.users.sort((a, b) => (a.empresa || '').localeCompare(b.empresa || '')).forEach(u => {
+                      const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(u))));
+                      b.innerHTML += `<tr>
+                          <td class="small text-muted">${u.cedula}</td>
+                          <td class="fw-bold">${u.nombre}</td>
+                          <td><span class="badge bg-info text-dark shadow-sm">${u.perfil}</span></td>
+                          <td class="small fw-bold">${u.empresa}</td>
+                          <td>${u.telefono || '-'}</td>
+                          <td>
+                              <button class="btn btn-sm btn-outline-primary fw-bold" onclick="editarRegistro('Usuario', '${dataStr}')">✏️ Editar</button>
+                              <button class="btn btn-sm btn-outline-danger fw-bold ms-1" onclick="eliminarUsuario('${u.cedula}')">🗑️</button>
+                          </td>
+                      </tr>`;
+                  });
+              }
           });
       }
 
