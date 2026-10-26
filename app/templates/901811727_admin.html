@@ -269,9 +269,9 @@
                     <button class="btn btn-outline-danger btn-sm" onclick="cerrarVistasAdmin()">❌ Cerrar</button>
                 </div>
               </div>
-              <div class="table-responsive">
+              <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
                 <table class="table table-sm table-hover table-bordered text-center align-middle">
-                  <thead class="table-dark">
+                  <thead class="table-dark" style="position: sticky; top: 0; z-index: 1;">
                     <tr><th>Cédula</th><th>Nombre</th><th>Perfil</th><th>Empresa</th><th>Teléfono</th><th>Acción</th></tr>
                   </thead>
                   <tbody id="bodyUsuarios"></tbody>
