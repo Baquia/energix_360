@@ -51,9 +51,9 @@ def _obtener_matriz_unidades_negocio():
             "icono": "⚙️",
             "submodulos": [
                 {
-                    "nombre": "INSPECCIONES TÉCNICAS A CLIENTES",
-                    "endpoint": "B_bp_hub_inspecciones_tecnicas.hub_inspecciones",
-                    "icono": "📝",
+                    "nombre": "GESTIÓN DE MANTENIMIENTO CLIENTES",
+                    "endpoint": "controlador_mantenimiento.vista_controlador",
+                    "icono": "🔧",
                     "descripcion": "Programación de visitas en campo, actas de inspección técnica y certificación de clientes.",
                     "estado": "activo"
                 }

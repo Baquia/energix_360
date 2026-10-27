@@ -74,7 +74,7 @@ def create_app():
     from app.blueprints.B_bp_hub_gerencia_baquia import B_bp_hub_gerencia_baquia
     from app.blueprints.B_bp_hub_webmaster_baqone import B_bp_hub_webmaster_baqone
     from app.blueprints.B_bp_hub_gestion_energetica import B_bp_hub_gestion_energetica
-    from app.blueprints.B_bp_hub_inspecciones_tecnicas import B_bp_hub_inspecciones_tecnicas
+    #from app.blueprints.B_bp_hub_inspecciones_tecnicas import B_bp_hub_inspecciones_tecnicas
     from app.blueprints.B_bp_hub_administracion_baquia import B_bp_hub_administracion_baquia
 
     # --- NUEVOS HUBS NATIVOS: VENTAS Y DISTRIBUCIÓN (M3) ---
@@ -93,7 +93,7 @@ def create_app():
     app.register_blueprint(B_bp_hub_gerencia_baquia)
     app.register_blueprint(B_bp_hub_webmaster_baqone)
     app.register_blueprint(B_bp_hub_gestion_energetica)
-    app.register_blueprint(B_bp_hub_inspecciones_tecnicas)
+    #app.register_blueprint(B_bp_hub_inspecciones_tecnicas)
     app.register_blueprint(B_bp_hub_administracion_baquia)
     
     app.register_blueprint(bp_hub_bodegas)
@@ -109,9 +109,11 @@ def create_app():
     from app.blueprints.B_bp_controlador_bodegas import bp_bodegas                     
     from app.blueprints.B_bp_controlador_flotacarga import bp_gestorflota
     from app.blueprints.B_bp_pesaje_carga_avicola import bp_gestion_carga               
-    from app.blueprints.B_bp_comercializador_glp import bp_comercializador_glp
     from app.blueprints.B_bp_validacion_terceros_carga import bp_validacion_terceros_carga
     
+    # --- MANTENIMIENTO ---
+    from app.blueprints.B_bp_controlador_mantenimiento import bp_controlador_mantenimiento
+
     # --- TRANSPORTE ESPECIAL (Blueprints Oficiales) ---
     from app.blueprints.B_bp_controlador_flotaespecial import bp_controlador_flotaespecial
     from app.blueprints.B_bp_flotaespecial_flota import bp_flotaespecial_flota
@@ -141,9 +143,11 @@ def create_app():
     app.register_blueprint(bp_bodegas)
     app.register_blueprint(bp_gestorflota)
     app.register_blueprint(bp_gestion_carga)
-    app.register_blueprint(bp_comercializador_glp)
     app.register_blueprint(bp_validacion_terceros_carga) 
     
+    # Registro Controlador Mantenimiento
+    app.register_blueprint(bp_controlador_mantenimiento)
+
     # Registro Módulo Transporte Especial
     app.register_blueprint(bp_controlador_flotaespecial)
     app.register_blueprint(bp_flotaespecial_flota)
@@ -175,8 +179,10 @@ def create_app():
     from app.blueprints.B_bp_operador_flotacarga import bp_flotacarga
     from app.blueprints.C_bp_combustible_flota import bp_combustible_flota
     from app.blueprints.C_bp_preoperacional import bp_preoperacional
-    from app.blueprints.C_bp_mecanico_glp import bp_mecanico_glp
     from app.blueprints.B_bp_operador_flotaespecial import bp_operador_flotaespecial
+
+    # --- OPERADOR MANTENIMIENTO ---
+    from app.blueprints.B_bp_operador_mantenimiento import bp_operador_mantenimiento
 
     # --- OPERADORES VENTAS Y DISTRIBUCIÓN (M3) ---
     from app.blueprints.B_bp_operador_ventas import bp_operador_ventas
@@ -189,9 +195,11 @@ def create_app():
     app.register_blueprint(bp_flotacarga)
     app.register_blueprint(bp_combustible_flota)
     app.register_blueprint(bp_preoperacional)
-    app.register_blueprint(bp_mecanico_glp)
     app.register_blueprint(bp_operador_flotaespecial)
     
+    # Registro Operador Mantenimiento
+    app.register_blueprint(bp_operador_mantenimiento)
+
     # Registro Operadores Ventas y Distribución
     app.register_blueprint(bp_operador_ventas)
     app.register_blueprint(bp_operador_recursohumano)

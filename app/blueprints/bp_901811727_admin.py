@@ -310,9 +310,9 @@ def gestionar_usuario():
                         id_perfil = int(parts[0])
                         perfil_nombre = parts[1]
                 
-                cur.execute("""INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, id_perfil, empresa_id, empresa, telegram_id, telefono) 
-                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                           (d.get('cedula'), d.get('nombre'), pw, d.get('tipo_usuario'), d.get('clase'), perfil_nombre, id_perfil, empresa_id, d.get('empresa_select'), None, d.get('telefono')))
+                cur.execute("""INSERT INTO usuarios (cedula, nombre, password, perfil, id_perfil, empresa_id, empresa, telegram_id, telefono) 
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                           (d.get('cedula'), d.get('nombre'), pw, perfil_nombre, id_perfil, empresa_id, d.get('empresa_select'), None, d.get('telefono')))
                 msg = "Usuario creado exitosamente con Perfil Inyectado."
                 
             elif d.get('accion') == 'eliminar':

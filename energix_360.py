@@ -166,6 +166,13 @@ MATRIZ_MAESTRA = {
             {'perfil': 'controlador_pesv', 'operacion': 'pesv', 'archivo': 'B_controlador_pesv.html'}
         ]
     },
+    'mantenimiento': {
+        'nombre_comercial': 'Gestión de Mantenimiento',
+        'perfiles': [
+            {'perfil': 'controlador_mantenimiento', 'operacion': 'mantenimiento', 'archivo': 'B_controlador_mantenimiento.html'},
+            {'perfil': 'operador_mantenimiento', 'operacion': 'mantenimiento', 'archivo': 'B_operador_mantenimiento.html'}
+        ]
+    },
     'preoperacional': {
         'nombre_comercial': 'Preoperacionales de Flota',
         'perfiles': []
@@ -329,8 +336,10 @@ def panel_principal():
             return redirect('/hub_webmaster_baqone.html')
         elif nombre_perfil in ['webmaster_gestionenergetica', 'webmaster_energia']:
             return redirect('/hub_gestion_energetica.html')
-        elif nombre_perfil == 'webmaster_inspecciones':
-            return redirect('/hub_inspecciones_tecnicas_clientes.html')
+        elif nombre_perfil in ['webmaster_controlador_mantenimiento', 'controlador_mantenimiento']:
+            return redirect('/B_controlador_mantenimiento.html')
+        elif nombre_perfil == 'operador_mantenimiento':
+            return redirect('/B_operador_mantenimiento.html')
         elif nombre_perfil == 'webmaster_administrador_baquia':
             return redirect('/hub_administracion_baquia.html')
         else:
@@ -545,6 +554,7 @@ def router_universal(modulo):
         'operador_flotaespecial', 'operador_flotacarga', 'operador_bodegas', 
         'verificador_bodegas', 'vendedor', 'operador_ventas', 
         'operador_recursohumano', 'operador_contable', 'operador_facturacion', 'pesv'
+        'mantenimiento'
     ]
     
     if modulo not in modulos_comprados and modulo not in submodulos_activos and not es_nativo and modulo not in modulos_transversales_permitidos:
