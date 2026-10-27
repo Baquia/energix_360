@@ -96,8 +96,10 @@
 
         <div class="content-area">
             <input type="hidden" id="csrf_token" value="{{ csrf_token() }}">
-            <div id="sync-status" class="sync-banner">Trabajando Offline. Hay datos pendientes por sincronizar.</div>
-
+            <div id="sync-status" class="sync-banner">
+                <span id="sync-msg">Trabajando Offline. Hay datos pendientes por sincronizar.</span>
+                <button id="btn-rescate" onclick="forzarSincronizacionRescate()" style="margin-top: 10px; display: none; width: 100%; padding: 8px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Forzar Sincronización (Comprimir Reporte)</button>
+            </div>
             <!-- VISTA: MENÚ PRINCIPAL -->
             <div id="view-menu" class="view-section">
                 <div class="menu-welcome">
@@ -464,6 +466,61 @@
             intentarSincronizacion();
         }
 
+        // --- MOTOR DE RESCATE PARA REPORTES PESADOS (HTTP 413 / 500) ---
+        async function comprimirBase64Existente(base64Str) {
+            if (!base64Str || !base64Str.startsWith('data:image')) return base64Str;
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.src = base64Str;
+                img.onload = () => {
+                    let width = img.width, height = img.height;
+                    const max = 1024;
+                    if (width > height) { if (width > max) { height *= max / width; width = max; } } 
+                    else { if (height > max) { width *= max / height; height = max; } }
+                    const cvs = document.createElement('canvas');
+                    cvs.width = width; cvs.height = height;
+                    cvs.getContext('2d').drawImage(img, 0, 0, width, height);
+                    resolve(cvs.toDataURL('image/jpeg', 0.6)); // Comprime al 60%
+                };
+                img.onerror = () => resolve(base64Str);
+            });
+        }
+
+        async function forzarSincronizacionRescate() {
+            if (!navigator.onLine) { alert("Se requiere conexión a internet para esta acción."); return; }
+            const pendientes = await obtenerPendientes();
+            if (pendientes.length === 0) return;
+            
+            const btn = document.getElementById('btn-rescate');
+            btn.textContent = "Comprimiendo imágenes y subiendo...";
+            btn.disabled = true;
+            
+            let exitos = 0;
+            const csrf = document.getElementById('csrf_token').value;
+
+            for (let insp of pendientes) {
+                try {
+                    if (insp.foto_encargado_base64) insp.foto_encargado_base64 = await comprimirBase64Existente(insp.foto_encargado_base64);
+                    if (insp.items) {
+                        for (let i = 0; i < insp.items.length; i++) {
+                            if (insp.items[i].foto_base64) insp.items[i].foto_base64 = await comprimirBase64Existente(insp.items[i].foto_base64);
+                        }
+                    }
+                    const response = await fetch('/api/mantenimiento/sincronizar_inspeccion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                        body: JSON.stringify(insp)
+                    });
+                    if (response.ok) { await eliminarPendiente(insp.id_local); exitos++; }
+                } catch (err) { console.error("Fallo en rescate:", err); }
+            }
+            
+            alert(`Sincronización forzada completada: ${exitos} reporte(s) rescatado(s).`);
+            btn.style.display = 'none';
+            btn.disabled = false;
+            btn.textContent = "Forzar Sincronización (Comprimir Reporte)";
+            intentarSincronizacion();
+        }
         // --- OFFLINE-FIRST (INDEXEDDB) Y SINCRONIZACIÓN ---
         const DB_NAME = 'BQA_ONE_Mantenimiento';
         const STORE_NAME = 'inspecciones_pendientes';
@@ -516,16 +573,10 @@
         }
 
         async function intentarSincronizacion() {
-            if (!navigator.onLine) {
-                actualizarBannerSync(false);
-                return;
-            }
+            if (!navigator.onLine) { actualizarBannerSync(false); return; }
             
             const pendientes = await obtenerPendientes();
-            if (pendientes.length === 0) {
-                document.getElementById('sync-status').classList.remove('active');
-                return;
-            }
+            if (pendientes.length === 0) { document.getElementById('sync-status').classList.remove('active'); return; }
 
             actualizarBannerSync(true, `Sincronizando ${pendientes.length} inspección(es)...`);
             const csrf = document.getElementById('csrf_token').value;
@@ -534,38 +585,45 @@
                 try {
                     const response = await fetch('/api/mantenimiento/sincronizar_inspeccion', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': csrf
-                        },
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
                         body: JSON.stringify(insp)
                     });
 
                     if (response.ok) {
                         await eliminarPendiente(insp.id_local);
+                    } else if (response.status === 413 || response.status >= 500) {
+                        actualizarBannerSync(false, "Error: Reporte demasiado pesado. Requiere compresión manual.", true);
+                        return;
                     }
                 } catch (err) {
-                    console.error("Error sincronizando inspección:", err);
-                    actualizarBannerSync(false);
-                    return; // Aborta bucle si falla red
+                    console.error("Error sincronizando:", err);
+                    actualizarBannerSync(false, "Error de red. Reintentando luego...");
+                    return;
                 }
             }
             
             const restantes = await obtenerPendientes();
-            if (restantes.length === 0) {
-                document.getElementById('sync-status').classList.remove('active');
-            }
+            if (restantes.length === 0) document.getElementById('sync-status').classList.remove('active');
         }
 
-        function actualizarBannerSync(isSyncing, msg = "") {
+        function actualizarBannerSync(isSyncing, msg = "", isError = false) {
             const banner = document.getElementById('sync-status');
+            const span = document.getElementById('sync-msg');
+            const btn = document.getElementById('btn-rescate');
+            
             banner.classList.add('active');
             if (isSyncing) {
                 banner.classList.add('online');
-                banner.textContent = msg;
+                span.textContent = msg;
+                if(btn) btn.style.display = 'none';
+            } else if (isError) {
+                banner.classList.remove('online');
+                span.textContent = msg;
+                if(btn) btn.style.display = 'block';
             } else {
                 banner.classList.remove('online');
-                banner.textContent = 'Trabajando Offline. Hay datos pendientes por sincronizar.';
+                span.textContent = msg || 'Trabajando Offline. Hay datos pendientes por sincronizar.';
+                if(btn) btn.style.display = 'none';
             }
         }
 
