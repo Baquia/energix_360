@@ -461,6 +461,66 @@
 <!-- ========================================================================= -->
 
 <script>
+
+    // =========================================================================
+// GENERACIÓN Y DESCARGA DE QRs EN PDF (INDIVIDUAL Y MASIVO)
+// =========================================================================
+function descargarPdfQR(empresaId, modalidad, ubicacion) {
+    if (!empresaId) {
+        alert("Error: Identificador de empresa no detectado.");
+        return;
+    }
+
+    const tokenElem = document.getElementById('csrf_token');
+    const csrfToken = tokenElem ? tokenElem.value : '';
+
+    const payload = {
+        empresa_id: empresaId,
+        ubicacion: modalidad === 'individual' ? ubicacion : null
+    };
+
+    // Notificación de inicio de descarga
+    const nombreDescarga = modalidad === 'individual' ? ubicacion : 'General';
+    console.log(`Generando PDF de QR para ${nombreDescarga}...`);
+
+    fetch('/generar_qrs_pdf', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(async (response) => {
+        const contentType = response.headers.get("content-type");
+        
+        // Si el backend responde con JSON en caso de error
+        if (contentType && contentType.includes("application/json")) {
+            const data = await response.json();
+            throw new Error(data.message || "Error procesando el PDF.");
+        }
+
+        if (!response.ok) {
+            throw new Error(`Error en el servidor al generar PDF (${response.status})`);
+        }
+
+        return response.blob();
+    })
+    .then((blob) => {
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `QRs_${nombreDescarga.replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+    })
+    .catch((err) => {
+        console.error("Error en descarga de QRs:", err);
+        alert("⚠️ No se pudo generar el PDF: " + err.message);
+    });
+}
     let chartInstancia = null;
     let datosGlobales = null;
     let idTanqueoSeleccionado = null;

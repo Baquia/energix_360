@@ -1545,35 +1545,46 @@ def obtener_empresas_ure():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@csrf.exempt
+# ==============================================================================
+# GENERACIÓN DE CÓDIGOS QR EN FORMATO PDF (INDIVIDUAL Y MASIVO)
+# ==============================================================================
+
 @bp_energia_glp.route('/generar_qrs_pdf', methods=['POST'])
 @login_required_custom
 def generar_qrs_pdf():
     try:
-        data = request.get_json()
-        empresa_id = data.get('empresa_id')
-        ubicacion_filtro = data.get('ubicacion') 
+        data = request.get_json(silent=True) or {}
+        empresa_id = data.get('empresa_id') or session.get('empresa_id')
+        ubicacion_filtro = data.get('ubicacion')
 
         if not empresa_id:
-            return jsonify({'success': False, 'message': 'Falta el ID de la empresa'}), 400
+            return jsonify({'success': False, 'message': 'Identificador de empresa no detectado o sesión inválida.'}), 400
 
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
         if ubicacion_filtro:
-            query = "SELECT * FROM tanques_sedes WHERE empresa_id = %s AND ubicacion = %s"
+            query = """
+                SELECT * FROM tanques_sedes 
+                WHERE empresa_id = %s AND ubicacion = %s 
+                ORDER BY id ASC
+            """
             cur.execute(query, (empresa_id, ubicacion_filtro))
         else:
-            query = "SELECT * FROM tanques_sedes WHERE empresa_id = %s"
+            query = """
+                SELECT * FROM tanques_sedes 
+                WHERE empresa_id = %s 
+                ORDER BY ubicacion ASC, id ASC
+            """
             cur.execute(query, (empresa_id,))
             
         tanques_data = cur.fetchall()
         cur.close()
 
         if not tanques_data:
-            nombre_lugar = ubicacion_filtro if ubicacion_filtro else "esta empresa"
+            nombre_lugar = f"la granja '{ubicacion_filtro}'" if ubicacion_filtro else "esta empresa"
             return jsonify({
                 'success': False, 
-                'message': f'No hay tanques registrados para {nombre_lugar}. Ve a "Editar Tanques" primero.'
+                'message': f'No hay tanques registrados para {nombre_lugar}. Configure los tanques primero.'
             }), 404
 
         granjas_agrupadas = {}
@@ -1643,8 +1654,8 @@ def generar_qrs_pdf():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({'success': False, 'message': f'Error interno: {str(e)}'}), 500
-
+        return jsonify({'success': False, 'message': f'Error interno generando el PDF: {str(e)}'}), 500
+    
 # ==============================================================================
 # RUTAS DE ADMINISTRACIÓN: OBTENER, ANÁLISIS Y APROBACIÓN
 # ==============================================================================
