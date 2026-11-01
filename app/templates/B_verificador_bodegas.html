@@ -365,7 +365,8 @@
                 </div>
 
                 <!-- CÁMARA BUSCADOR EN LA VISTA PRINCIPAL -->
-                <div class="camera-container" id="main-camera-section" style="display: none; min-height: 200px;">
+                <!-- CÁMARA BUSCADOR EN LA VISTA PRINCIPAL -->
+                <div class="camera-container" id="main-camera-section" style="display: none; min-height: 200px; margin-bottom: 10px;">
                     <div id="main-embedded-reader" class="embedded-reader-class"></div>
                     <div id="main-scanner-mira" class="scanner-mira"></div> 
                     <div id="main-cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraPrincipal()">
@@ -382,6 +383,18 @@
                         <span class="sub">Pausado para ahorrar batería</span>
                     </div>
                 </div>
+
+                <!-- CONTROL DUAL CÁMARA PRINCIPAL -->
+                <div style="display: none; gap: 10px; margin-bottom: 15px;" id="btns-control-camara-main">
+                    <button onclick="toggleCamaraPrincipalInteligente()" style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> CÁM ON/OFF
+                    </button>
+                    <button onclick="toggleCamaraPrincipalInteligente()" style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        CÁM ON/OFF <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    </button>
+                </div>
+
+                <div style="position: sticky; top: 70px; z-index: 40; background: #f8fafc; padding-bottom: 10px;">
 
                 <div style="position: sticky; top: 70px; z-index: 40; background: #f8fafc; padding-bottom: 10px;">
                     <input type="text" id="searchBox" placeholder="🔍 Búsqueda manual por nombre..." onkeyup="filtrarLista()"
@@ -454,8 +467,20 @@
             </div>
 
             <!-- Zona del Pulgar (Acciones) -->
+            <!-- Zona del Pulgar (Acciones) -->
             <div class="picking-bottom-actions">
                 <button id="btn-masivo" class="hidden" onclick="confirmarMasivo()" style="width: 100%; background: var(--primary); color: white; padding: 15px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(67, 56, 202, 0.3);">⚡ VERIFICACIÓN MASIVA</button>
+                
+                <!-- CONTROL DUAL CÁMARA MODAL -->
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;" id="btns-control-camara-modal">
+                    <button onclick="toggleCamaraModalInteligente()" style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> CÁM ON/OFF
+                    </button>
+                    <button onclick="toggleCamaraModalInteligente()" style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        CÁM ON/OFF <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    </button>
+                </div>
+
                 <button class="btn-finish" onclick="intentarVerificarItem()">CONFIRMAR AUDITORÍA</button>
             </div>
         </div>
@@ -913,6 +938,36 @@
         }
 
         // =====================================
+        // CONTROL INTELIGENTE DE CÁMARAS (AMBIDIESTRO)
+        // =====================================
+        function toggleCamaraPrincipalInteligente() {
+            if (!scannerMain) {
+                iniciarCamaraPrincipal();
+            } else {
+                const resumeBtn = document.getElementById('main-cam-resume-btn');
+                if (resumeBtn.style.display === 'flex' || resumeBtn.style.display === 'block') {
+                    reanudarCamaraPrincipal();
+                } else {
+                    pausarCamaraMain();
+                }
+            }
+        }
+
+        function toggleCamaraModalInteligente() {
+            if (!itemActivo) return;
+            if (!scannerModal) {
+                iniciarCamaraModal();
+            } else {
+                const resumeBtn = document.getElementById('modal-cam-resume-btn');
+                if (resumeBtn.style.display === 'flex' || resumeBtn.style.display === 'block') {
+                    reanudarCamaraModal();
+                } else {
+                    pausarCamaraModal();
+                }
+            }
+        }
+        
+        // =====================================
         // NAVEGACIÓN Y VISTAS
         // =====================================
         function mostrarMenu() { toggleView('view-menu'); }
@@ -992,8 +1047,11 @@
             document.getElementById('searchBox').value = '';
             toggleView('view-items');
             
-            // Mostrar y preparar la cámara principal del buscador
+            // Mostrar y preparar la cámara principal del buscador y sus controles
             document.getElementById('main-camera-section').style.display = 'flex';
+            const btnsMain = document.getElementById('btns-control-camara-main');
+            if (btnsMain) btnsMain.style.display = 'flex';
+            
             document.getElementById('main-cam-overlay-btn').style.display = 'flex';
             document.getElementById('main-scanner-mira').style.display = 'none';
             detenerCamaraPrincipal();
