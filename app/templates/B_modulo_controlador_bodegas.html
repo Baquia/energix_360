@@ -1720,7 +1720,7 @@
             </div>
             <div class="modal-body">
                 <p style="color:#6b7280; font-size:0.95rem; margin-top:0; margin-bottom:20px;">
-                    Selecciona el vehículo que transportará la mercancía y registra las firmas.
+                    Sigue el orden: Selecciona vehículo, captura ambas firmas y finalmente toma la fotografía para habilitar el despacho.
                 </p>
                 <div style="text-align:left;">
                     <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">VEHÍCULO / PLACA</label>
@@ -1729,8 +1729,34 @@
                     </select>
                 </div>
 
+                <!-- FIRMA CONDUCTOR -->
                 <div style="margin-top: 10px;">
-                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">FOTO DE EVIDENCIA</label>
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700; display:block;">1. FIRMA CONDUCTOR (QUIEN RECIBE)</label>
+                    <p style="font-size: 0.75rem; color:#ef4444; margin: 2px 0 8px 0; font-weight:600;">👉 Usa los márgenes grises laterales para hacer scroll</p>
+                    <div style="display:flex; gap: 8px; align-items: stretch; background: #f8fafc; border-radius: 12px; padding: 5px; border: 1px solid var(--color-border);">
+                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
+                        <canvas id="canvasFirma" height="140" style="border: 2px dashed #cbd5e1; border-radius: 8px; width: 100%; touch-action: none; background: #ffffff;"></canvas>
+                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
+                    </div>
+                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600; width: 100%;" onclick="limpiarFirma()">Borrar Firma Conductor</button>
+                </div>
+
+                <!-- FIRMA SUPERVISOR DE DESPACHO -->
+                <div style="margin-top: 30px;">
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700; display:block;">2. FIRMA CONTROLADOR / SUPERVISOR</label>
+                    <p style="font-size: 0.75rem; color:#ef4444; margin: 2px 0 8px 0; font-weight:600;">👉 Usa los márgenes grises laterales para hacer scroll</p>
+                    <div style="display:flex; gap: 8px; align-items: stretch; background: #f8fafc; border-radius: 12px; padding: 5px; border: 1px solid var(--color-border);">
+                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
+                        <canvas id="canvasFirmaSupervisor" height="140" style="border: 2px dashed #0369a1; border-radius: 8px; width: 100%; touch-action: none; background: #f0f9ff;"></canvas>
+                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
+                    </div>
+                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600; width: 100%;" onclick="limpiarFirmaSupervisor()">Borrar Firma Supervisor</button>
+                </div>
+
+                <!-- FOTO EVIDENCIA -->
+                <div style="margin-top: 30px;">
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">3. FOTO DE EVIDENCIA</label>
+                    <p style="font-size: 0.75rem; color:#ef4444; margin: 2px 0 8px 0; font-weight:600;">👉 Obligatorio para habilitar el botón de despacho</p>
                     <button type="button" id="btn-iniciar-camara-evidencia" class="btn-assign" onclick="iniciarCamaraEvidencia()" style="width: 100%; margin-top: 5px; padding: 12px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size:1.05rem;">📷 Activar Cámara</button>
 
                     <div id="camara-evidencia-container" style="display: none; flex-direction: column; align-items: center; margin-top: 10px;">
@@ -1745,37 +1771,13 @@
                     <canvas id="canvasEvidencia" style="display: none;"></canvas>
                 </div>
 
-                <!-- FIRMA SUPERVISOR DE DESPACHO -->
-                <div style="margin-top: 30px;">
-                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700; display:block;">FIRMA SUPERVISOR DESPACHO</label>
-                    <p style="font-size: 0.75rem; color:#ef4444; margin: 2px 0 8px 0; font-weight:600;">👉 Usa los márgenes grises laterales para hacer scroll</p>
-                    <div style="display:flex; gap: 8px; align-items: stretch; background: #f8fafc; border-radius: 12px; padding: 5px; border: 1px solid var(--color-border);">
-                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
-                        <canvas id="canvasFirmaSupervisor" height="140" style="border: 2px dashed #0369a1; border-radius: 8px; width: 100%; touch-action: none; background: #f0f9ff;"></canvas>
-                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
-                    </div>
-                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600; width: 100%;" onclick="limpiarFirmaSupervisor()">Borrar Firma Supervisor</button>
-                </div>
-
-                <!-- FIRMA CONDUCTOR -->
-                <div style="margin-top: 30px;">
-                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700; display:block;">FIRMA CONDUCTOR</label>
-                    <p style="font-size: 0.75rem; color:#ef4444; margin: 2px 0 8px 0; font-weight:600;">👉 Usa los márgenes grises laterales para hacer scroll</p>
-                    <div style="display:flex; gap: 8px; align-items: stretch; background: #f8fafc; border-radius: 12px; padding: 5px; border: 1px solid var(--color-border);">
-                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
-                        <canvas id="canvasFirma" height="140" style="border: 2px dashed #cbd5e1; border-radius: 8px; width: 100%; touch-action: none; background: #ffffff;"></canvas>
-                        <div style="width: 25px; background: #e2e8f0; border-radius: 8px; display:flex; align-items:center; justify-content:center; flex-shrink: 0;"><span style="writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.65rem; color:#475569; font-weight:bold; letter-spacing: 2px;">SCROLL ↕</span></div>
-                    </div>
-                    <button type="button" class="btn-cancel" style="padding: 8px 15px; font-size: 0.9rem; margin-top: 10px; font-weight:600; width: 100%;" onclick="limpiarFirma()">Borrar Firma Conductor</button>
-                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-cancel" onclick="cerrarModalDespacho()">Cancelar</button>
-                <button type="button" class="btn-confirm" id="btnConfirmarDespacho" onclick="ejecutarDespacho()">Confirmar Despacho 🚀</button>
+                <button type="button" class="btn-confirm" id="btnConfirmarDespacho" onclick="ejecutarDespacho()" style="display: none;">Confirmar Despacho 🚀</button>
             </div>
         </div>
     </div>
-
     <!-- MODAL HISTORIAL DE ACTAS -->
     <div id="modalHistorialActas" class="modal-overlay">
         <div class="modal-large">
@@ -3276,15 +3278,21 @@
                 document.getElementById('camara-evidencia-container').style.display = 'none';
                 document.getElementById('previewFoto').src = fotoComprimidaBase64;
                 document.getElementById('preview-evidencia-container').style.display = 'flex';
+                
+                // MOSTRAR BOTÓN DE CONFIRMAR SOLO DESPUÉS DE LA FOTO
+                document.getElementById('btnConfirmarDespacho').style.display = 'block';
             } catch (error) {
                 console.error("Error capturando la foto:", error);
                 alert("Ocurrió un error al capturar la foto. Intenta nuevamente.");
             }
         }
 
-
-        function reiniciarFotoEvidencia() { fotoComprimidaBase64 = null; iniciarCamaraEvidencia(); }
-
+        function reiniciarFotoEvidencia() { 
+            fotoComprimidaBase64 = null; 
+            iniciarCamaraEvidencia(); 
+            // OCULTAR BOTÓN SI REINICIA LA FOTO
+            document.getElementById('btnConfirmarDespacho').style.display = 'none';
+        }
         // ======================= CONFIGURACIÓN FIRMAS =======================
         function setupCanvasSignature(canvasId) {
             const canvas = document.getElementById(canvasId);
@@ -3364,6 +3372,9 @@
             document.getElementById('camara-evidencia-container').style.display = 'none';
             document.getElementById('preview-evidencia-container').style.display = 'none';
             fotoComprimidaBase64 = null;
+            
+            // OCULTAR BOTÓN AL INICIAR EL MODAL
+            document.getElementById('btnConfirmarDespacho').style.display = 'none';
 
             document.getElementById('modalDespacho').style.display = 'flex';
         }
@@ -3384,6 +3395,10 @@
 
             if (!firmaBase64 || !firmaSupervisorBase64) {
                 return alert("⚠️ Es obligatorio recolectar tanto la firma del Conductor como la del Supervisor de Despacho antes de enviar.");
+            }
+            
+            if (!fotoComprimidaBase64) {
+                return alert("⚠️ Es obligatorio capturar la fotografía de evidencia antes de enviar.");
             }
 
             const btn = document.getElementById('btnConfirmarDespacho');

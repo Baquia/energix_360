@@ -67,6 +67,15 @@ def control_logistica():
             """)
         except Exception:
             pass # Las columnas ya existen
+        # NUEVO: ASEGURAR QUE LOS CAMPOS DE FOTO SEAN MEDIUMTEXT PARA EVITAR TRUNCAMIENTO EN LA BD
+        try:
+            cur.execute("""
+                ALTER TABLE actas_despacho_flotacarga
+                MODIFY COLUMN foto_evidencia MEDIUMTEXT NULL,
+                MODIFY COLUMN firma_evidencia MEDIUMTEXT NULL;
+            """)
+        except Exception:
+            pass
 
         mysql.connection.commit()
         cur.close()
