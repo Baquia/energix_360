@@ -916,6 +916,58 @@
                 height: 40px;
             }
         }
+
+        /* =========================================
+           SISTEMA DE AUTOCOMPLETADO BQA-ONE
+           ========================================= */
+        .autocomplete-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 4000;
+            list-style: none;
+            padding: 0;
+            margin: 5px 0 0 0;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .autocomplete-item {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.95rem;
+            color: var(--color-text);
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item:hover {
+            background: #f0f9ff;
+            color: var(--color-primary);
+        }
+
+
+        /* Ajuste de Overflow para Autocomplete en Modales */
+        #modal-editar-producto .modal-card,
+        #modal-eliminar-producto .modal-card,
+        #modal-promociones .modal-card {
+            overflow: visible !important;
+        }
     </style>
 </head>
 
@@ -940,13 +992,13 @@
             </button>
             <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="BQA-ONE" class="logo-bqa"
                 onerror="this.style.display='none'">
-            
+
             <!-- Condicional ampliado para atrapar el ID del cliente -->
             {% set render_nit = nit if nit else session.get('empresa_id', '') %}
             {% if render_nit %}
             <div class="logo-divider-bqa"></div>
-            <img src="{{ url_for('static', filename='logo_' ~ render_nit ~ '.PNG') }}" alt="Cliente" class="logo-cliente-bqa"
-                onerror="this.style.display='none'">
+            <img src="{{ url_for('static', filename='logo_' ~ render_nit ~ '.PNG') }}" alt="Cliente"
+                class="logo-cliente-bqa" onerror="this.style.display='none'">
             {% endif %}
         </div>
 
@@ -1683,17 +1735,24 @@
                 <button class="btn-cancel" onclick="cerrarModalEditar()"
                     style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
             </div>
-            <div class="modal-body">
-                <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">1. Selecciona la
-                    Marca</label>
-                <select id="edit-select-marca" onchange="cargarProductosParaEdicion()"
-                    style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;"></select>
+            <div class="modal-body" style="overflow: visible;">
+                <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">1. Buscar Marca</label>
+                <div class="autocomplete-container" style="margin-bottom: 20px;">
+                    <input type="text" id="edit-search-marca" autocomplete="off" placeholder="Ej. AMERICANDY..."
+                        style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;">
+                    <input type="hidden" id="edit-select-marca">
+                    <ul id="edit-list-marca" class="autocomplete-list" style="display:none;"></ul>
+                </div>
 
                 <div id="edit-paso2-container" style="display:none;">
-                    <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">2. Selecciona el
+                    <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">2. Buscar
                         Producto</label>
-                    <select id="edit-select-producto" onchange="seleccionarProductoParaEdicion()"
-                        style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;"></select>
+                    <div class="autocomplete-container" style="margin-bottom: 20px;">
+                        <input type="text" id="edit-search-producto" autocomplete="off" placeholder="Buscar producto..."
+                            style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;">
+                        <input type="hidden" id="edit-select-producto">
+                        <ul id="edit-list-producto" class="autocomplete-list" style="display:none;"></ul>
+                    </div>
                 </div>
 
                 <div id="edit-form-container"
@@ -1755,11 +1814,14 @@
                 <button class="btn-cancel" onclick="cerrarModalEliminar()"
                     style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="overflow: visible;">
                 <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Seleccionar Marca</label>
-                <select id="del-select-marca" onchange="evaluarModoEliminacion()"
-                    style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;"></select>
-
+                <div class="autocomplete-container" style="margin-bottom: 20px;">
+                    <input type="text" id="del-search-marca" autocomplete="off" placeholder="Buscar marca a eliminar..."
+                        style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;">
+                    <input type="hidden" id="del-select-marca">
+                    <ul id="del-list-marca" class="autocomplete-list" style="display:none;"></ul>
+                </div>
                 <div id="del-opciones-container" style="display:none; margin-bottom:20px;">
                     <div style="display: flex; gap: 10px;">
                         <button id="btn-modo-single" onclick="setModoEliminacion('single')"
@@ -1774,8 +1836,12 @@
                 <div id="del-single-container" style="display:none;">
                     <label style="font-size: 0.8rem; font-weight: 700; color: var(--color-muted);">Producto a
                         Eliminar</label>
-                    <select id="del-select-producto"
-                        style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;"></select>
+                    <div class="autocomplete-container" style="margin-bottom: 20px;">
+                        <input type="text" id="del-search-producto" autocomplete="off" placeholder="Buscar producto..."
+                            style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc;">
+                        <input type="hidden" id="del-select-producto">
+                        <ul id="del-list-producto" class="autocomplete-list" style="display:none;"></ul>
+                    </div>
                     <button class="btn-confirm" onclick="ejecutarDestruccionFinal()"
                         style="width:100%; background:#e11d48;">Eliminar 1 Producto</button>
                 </div>
@@ -1849,15 +1915,23 @@
                     <input type="text" id="promo-nombre"
                         style="width:100%; padding:12px; margin-bottom:20px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem;">
 
-                    <div
-                        style="background:#fdf2f8; padding:20px; border-radius:12px; margin-bottom:20px; border: 1px solid #fbcfe8;">
-                        <h5 style="margin-top:0; color: #9d174d; font-size:1.05rem;">Añadir Componente (Hijo)</h5>
-                        <select id="promo-select-marca" onchange="cargarProdsPromo()"
-                            style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid #f9a8d4; font-size:1rem; background:white;"></select>
-                        <select id="promo-select-prod"
-                            style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid #f9a8d4; font-size:1rem; background:white;">
-                            <option value="">2. Selecciona Producto...</option>
-                        </select>
+                    <div <h5 style="margin-top:0; color: #9d174d; font-size:1.05rem;">Añadir Componente (Hijo)</h5>
+
+                        <div class="autocomplete-container" style="margin-bottom: 10px;">
+                            <input type="text" id="promo-search-marca" autocomplete="off"
+                                placeholder="1. Filtra por Marca..."
+                                style="width:100%; padding:12px; border-radius:8px; border:1px solid #f9a8d4; font-size:1rem; background:white;">
+                            <input type="hidden" id="promo-select-marca">
+                            <ul id="promo-list-marca" class="autocomplete-list" style="display:none;"></ul>
+                        </div>
+
+                        <div class="autocomplete-container" style="margin-bottom: 15px;">
+                            <input type="text" id="promo-search-prod" autocomplete="off"
+                                placeholder="2. Busca y Selecciona Producto..."
+                                style="width:100%; padding:12px; border-radius:8px; border:1px solid #f9a8d4; font-size:1rem; background:white;">
+                            <input type="hidden" id="promo-select-prod" data-nombre="" data-marca="">
+                            <ul id="promo-list-prod" class="autocomplete-list" style="display:none;"></ul>
+                        </div>
 
                         <div style="display:flex; gap:15px; margin-bottom:15px;">
                             <div style="flex:1;">
@@ -2776,6 +2850,74 @@
         </div>
     </div>
     <script>
+
+        // ==============================================
+        // MOTOR NATIVO AUTOCOMPLETADO BQA-ONE
+        // ==============================================
+        let cacheConsultas = { marcas: [], productosEdit: [], productosDel: [], productosPromo: [] };
+
+        function initAutocomplete(inputId, hiddenId, listId, dataArray, textKey, valKey, callback) {
+            const input = document.getElementById(inputId);
+            const hidden = document.getElementById(hiddenId);
+            const list = document.getElementById(listId);
+
+            // Resetea listeners previos clonando el input
+            const nuevoInput = input.cloneNode(true);
+            input.parentNode.replaceChild(nuevoInput, input);
+
+            nuevoInput.addEventListener('input', function () {
+                const val = this.value.toLowerCase().trim();
+                list.innerHTML = '';
+                if (!val) {
+                    list.style.display = 'none';
+                    hidden.value = '';
+                    if (callback) callback();
+                    return;
+                }
+                const filtrados = dataArray.filter(item => (item[textKey] || '').toLowerCase().includes(val)).slice(0, 50); // Limite de 50 para rendimiento
+
+                if (filtrados.length === 0) {
+                    list.innerHTML = '<li class="autocomplete-item" style="color:#9ca3af;">Sin coincidencias</li>';
+                    list.style.display = 'block';
+                    return;
+                }
+
+                filtrados.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = 'autocomplete-item';
+
+                    // Render condicional para productos (EAN + Nombre) o solo Marca
+                    if (item.ean && item.producto) {
+                        li.innerHTML = `${item.producto} <br><small style="color:#6b7280;">EAN: ${item.ean}</small>`;
+                    } else {
+                        li.textContent = item[textKey];
+                    }
+
+                    li.onclick = () => {
+                        nuevoInput.value = item[textKey];
+                        hidden.value = item[valKey];
+
+                        // Si es un producto de promo, guardar data attributes para extraer luego
+                        if (hidden.id === 'promo-select-prod') {
+                            hidden.dataset.nombre = item.producto.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                            hidden.dataset.marca = (item.fabricante || 'N/A').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                        }
+
+                        list.style.display = 'none';
+                        if (callback) callback();
+                    };
+                    list.appendChild(li);
+                });
+                list.style.display = 'block';
+            });
+
+            document.addEventListener('click', function (e) {
+                if (e.target !== nuevoInput && e.target !== list) {
+                    list.style.display = 'none';
+                }
+            });
+        }
+
         // VARIABLE GLOBAL PARA EL POLLING
         let intervaloDetalle = null;
         let monitoreoInterval = null;
@@ -4461,16 +4603,17 @@
 
         let productosEdicionCache = [];
 
+        // --- REFACTORIZACIÓN MODAL EDITAR ---
         function abrirModalEditar() {
             document.getElementById('modal-editar-producto').style.display = 'flex';
+            document.getElementById('edit-search-marca').value = '';
+            document.getElementById('edit-select-marca').value = '';
+
             fetch('/api/bodegas/marcas?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
-                    const select = document.getElementById('edit-select-marca');
-                    select.innerHTML = '<option value="">-- Toca para seleccionar --</option>';
-                    data.forEach(m => {
-                        if (m.fabricante) select.innerHTML += `<option value="${m.fabricante}">${m.fabricante}</option>`;
-                    });
+                    cacheConsultas.marcas = data.filter(m => m.fabricante);
+                    initAutocomplete('edit-search-marca', 'edit-select-marca', 'edit-list-marca', cacheConsultas.marcas, 'fabricante', 'fabricante', cargarProductosParaEdicion);
                 });
         }
         function cerrarModalEditar() {
@@ -4484,20 +4627,19 @@
             const marca = document.getElementById('edit-select-marca').value;
             const container2 = document.getElementById('edit-paso2-container');
             const formContainer = document.getElementById('edit-form-container');
-            const selectProd = document.getElementById('edit-select-producto');
 
+            document.getElementById('edit-search-producto').value = '';
+            document.getElementById('edit-select-producto').value = '';
             formContainer.style.display = 'none';
-            if (!marca) { container2.style.display = 'none'; return; }
 
+            if (!marca) { container2.style.display = 'none'; return; }
             container2.style.display = 'block';
-            selectProd.innerHTML = '<option value="">Cargando productos...</option>';
 
             fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}?t=` + Date.now())
                 .then(r => r.json())
                 .then(data => {
-                    productosEdicionCache = data;
-                    selectProd.innerHTML = '<option value="">-- Toca para seleccionar --</option>';
-                    data.forEach(p => { selectProd.innerHTML += `<option value="${p.ean}">${p.producto} (EAN: ${p.ean})</option>`; });
+                    productosEdicionCache = data; // Mantiene compatibilidad con lógica original
+                    initAutocomplete('edit-search-producto', 'edit-select-producto', 'edit-list-producto', data, 'producto', 'ean', seleccionarProductoParaEdicion);
                 });
         }
 
@@ -4584,16 +4726,17 @@
 
         let modoEliminacionActual = '';
 
+        // --- REFACTORIZACIÓN MODAL ELIMINAR ---
         function abrirModalEliminar() {
             document.getElementById('modal-eliminar-producto').style.display = 'flex';
+            document.getElementById('del-search-marca').value = '';
+            document.getElementById('del-select-marca').value = '';
+
             fetch('/api/bodegas/marcas?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
-                    const select = document.getElementById('del-select-marca');
-                    select.innerHTML = '<option value="">-- Toca para seleccionar --</option>';
-                    data.forEach(m => {
-                        if (m.fabricante) select.innerHTML += `<option value="${m.fabricante}">${m.fabricante}</option>`;
-                    });
+                    cacheConsultas.marcas = data.filter(m => m.fabricante);
+                    initAutocomplete('del-search-marca', 'del-select-marca', 'del-list-marca', cacheConsultas.marcas, 'fabricante', 'fabricante', evaluarModoEliminacion);
                 });
         }
         function cerrarModalEliminar() {
@@ -4618,14 +4761,13 @@
 
         function cargarProductosParaEliminacion() {
             const marca = document.getElementById('del-select-marca').value;
-            const selectProd = document.getElementById('del-select-producto');
-            selectProd.innerHTML = '<option value="">Cargando productos...</option>';
+            document.getElementById('del-search-producto').value = '';
+            document.getElementById('del-select-producto').value = '';
 
             fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}?t=` + Date.now())
                 .then(r => r.json())
                 .then(data => {
-                    selectProd.innerHTML = '<option value="">-- Selecciona el producto --</option>';
-                    data.forEach(p => { selectProd.innerHTML += `<option value="${p.ean}">${p.producto} (EAN: ${p.ean})</option>`; });
+                    initAutocomplete('del-search-producto', 'del-select-producto', 'del-list-producto', data, 'producto', 'ean', null);
                 });
         }
 
@@ -4707,15 +4849,15 @@
 
         function abrirModalPromociones() {
             document.getElementById('modal-promociones').style.display = 'flex';
+            document.getElementById('promo-search-marca').value = '';
+            document.getElementById('promo-select-marca').value = '';
             cargarTablaPromociones();
+
             fetch('/api/bodegas/marcas?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
-                    const select = document.getElementById('promo-select-marca');
-                    select.innerHTML = '<option value="">1. Filtra por Marca...</option>';
-                    data.forEach(m => {
-                        if (m.fabricante) select.innerHTML += `<option value="${m.fabricante}">${m.fabricante}</option>`;
-                    });
+                    cacheConsultas.marcas = data.filter(m => m.fabricante);
+                    initAutocomplete('promo-search-marca', 'promo-select-marca', 'promo-list-marca', cacheConsultas.marcas, 'fabricante', 'fabricante', cargarProdsPromo);
                 });
         }
         function cerrarModalPromociones() {
@@ -4761,30 +4903,30 @@
 
         function cargarProdsPromo() {
             const marca = document.getElementById('promo-select-marca').value;
-            const selectProd = document.getElementById('promo-select-prod');
-            if (!marca) { selectProd.innerHTML = '<option value="">2. Selecciona Producto...</option>'; return; }
+            document.getElementById('promo-search-prod').value = '';
+            document.getElementById('promo-select-prod').value = '';
+            document.getElementById('promo-select-prod').dataset.nombre = '';
+            document.getElementById('promo-select-prod').dataset.marca = '';
 
-            selectProd.innerHTML = '<option value="">Cargando...</option>';
+            if (!marca) return;
+
             fetch(`/api/bodegas/productos_por_marca/${encodeURIComponent(marca)}?t=` + Date.now())
                 .then(r => r.json())
                 .then(data => {
-                    selectProd.innerHTML = '<option value="">2. Selecciona Producto...</option>';
-                    data.forEach(p => {
-                        let descClean = p.producto.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                        let marcaClean = (p.fabricante || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                        selectProd.innerHTML += `<option value="${p.ean}" data-nombre="${descClean}" data-marca="${marcaClean}">${p.producto} (${p.unidad_embalaje})</option>`;
-                    });
+                    initAutocomplete('promo-search-prod', 'promo-select-prod', 'promo-list-prod', data, 'producto', 'ean', null);
                 });
         }
 
         function agregarComponenteAKit() {
-            const selectProd = document.getElementById('promo-select-prod');
-            const ean = selectProd.value;
-            if (!ean) return alert("⚠️ Selecciona un producto hijo primero.");
+            const hiddenProd = document.getElementById('promo-select-prod');
+            const inputSearch = document.getElementById('promo-search-prod');
+            const ean = hiddenProd.value;
 
-            const selectedOption = selectProd.options[selectProd.selectedIndex];
-            const nombre = selectedOption.getAttribute('data-nombre') || selectedOption.text;
-            const marca = selectedOption.getAttribute('data-marca') || 'N/A';
+            if (!ean) return alert("⚠️ Busca y selecciona un producto hijo primero desde la lista.");
+
+            // Se lee desde los data-attributes que inyectó el autocompletado
+            const nombre = hiddenProd.dataset.nombre || 'Desconocido';
+            const marca = hiddenProd.dataset.marca || 'N/A';
 
             const cajas = parseInt(document.getElementById('promo-cajas').value) || 0;
             const unidades = parseInt(document.getElementById('promo-unidades').value) || 0;
@@ -4801,7 +4943,13 @@
 
             document.getElementById('promo-cajas').value = '0';
             document.getElementById('promo-unidades').value = '0';
-            selectProd.value = '';
+
+            // Limpieza UI para el próximo componente
+            inputSearch.value = '';
+            hiddenProd.value = '';
+            hiddenProd.dataset.nombre = '';
+            hiddenProd.dataset.marca = '';
+
             renderizarCajaKit();
         }
 
@@ -5130,4 +5278,5 @@
             };
             html2pdf().set(opt).from(element).save();
         }
+
     </script>
