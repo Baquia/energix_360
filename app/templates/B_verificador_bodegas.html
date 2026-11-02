@@ -435,7 +435,7 @@
             width: 100%;
             height: 100%;
             background: rgba(15, 23, 42, 0.98);
-            z-index: 100;
+            z-index: 2000; /* Elevado para sobreponerse a la cabecera (1050) */
             display: none;
             justify-content: center;
             align-items: flex-end;
@@ -1082,7 +1082,7 @@
         </div>
 
         <!-- Modal Confirmación Verificación Final (Sellar) -->
-        <div id="modal-verify" class="modal-wrap" style="z-index: 105;">
+        <div id="modal-verify" class="modal-wrap" style="z-index: 2005;">
             <div class="verify-sheet">
                 <div style="font-size: 3.5rem; margin-bottom: 10px;">✅</div>
                 <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">¿Sellar Verificación?</h3>
@@ -1097,7 +1097,7 @@
         </div>
 
         <!-- Modal Confirmación Verificación Masiva -->
-        <div id="modal-confirm-masivo" class="modal-wrap" style="z-index: 115;">
+        <div id="modal-confirm-masivo" class="modal-wrap" style="z-index: 2010;">
             <div class="verify-sheet">
                 <div style="font-size: 3.5rem; margin-bottom: 10px;">⚡</div>
                 <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">Verificación Masiva</h3>
@@ -1113,7 +1113,7 @@
         </div>
 
         <!-- Modal Sellar Orden (Firma Verificador) -->
-        <div id="modal-sellar-orden" class="modal-wrap" style="z-index: 120;">
+        <div id="modal-sellar-orden" class="modal-wrap" style="z-index: 2015;">
             <div class="verify-sheet" style="max-width: 400px;">
                 <div style="font-size: 3.5rem; margin-bottom: 10px;">✍️</div>
                 <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">Firma de Auditoría</h3>
@@ -1301,6 +1301,10 @@
                 document.getElementById('main-cam-overlay-btn').style.display = 'none';
                 document.getElementById('main-cam-resume-btn').style.display = 'none';
 
+                // Ocultar cabecera universal para liberar espacio de cámara
+                const cabecera = document.querySelector('.app-header-bqa');
+                if (cabecera) cabecera.style.display = 'none';
+                
                 initAudio();
                 requestWakeLock();
 
@@ -1372,6 +1376,11 @@
 
             function detenerCamaraPrincipal(callback) {
                 clearTimeout(sleepTimerMain);
+
+                // Restaurar cabecera universal
+                const cabecera = document.querySelector('.app-header-bqa');
+                if (cabecera) cabecera.style.display = 'flex';
+                
                 if (scannerMain) {
                     scannerMain.stop().then(() => {
                         scannerMain.clear();
