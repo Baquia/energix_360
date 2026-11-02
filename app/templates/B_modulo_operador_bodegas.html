@@ -4,7 +4,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>WMS Operaciones</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
@@ -39,7 +40,11 @@
         }
 
         @media (min-width: 768px) {
-            .app-container { max-width: 600px; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
+            .app-container {
+                max-width: 600px;
+                border-left: 1px solid #e2e8f0;
+                border-right: 1px solid #e2e8f0;
+            }
         }
 
         /* --- COLORES --- */
@@ -75,8 +80,17 @@
             width: 100%;
         }
 
-        .logo-img { height: 38px; width: auto; object-fit: contain; }
-        .logo-divider { width: 1px; height: 28px; background-color: #cbd5e1; }
+        .logo-img {
+            height: 38px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .logo-divider {
+            width: 1px;
+            height: 28px;
+            background-color: #cbd5e1;
+        }
 
         /* --- CONTENIDO --- */
         .content-area {
@@ -97,7 +111,12 @@
             padding-left: 15px;
         }
 
-        .menu-welcome h2 { font-size: 1.6rem; margin: 0; color: var(--primary-dark); font-weight: 800; }
+        .menu-welcome h2 {
+            font-size: 1.6rem;
+            margin: 0;
+            color: var(--primary-dark);
+            font-weight: 800;
+        }
 
         /* Estilos de las Tarjetas KPI y Tooltips */
         .kpi-container {
@@ -115,13 +134,28 @@
             text-align: center;
             position: relative;
             cursor: help;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
             transition: 0.2s;
         }
-        .kpi-box:hover { background: #f1f5f9; border-color: #cbd5e1; }
 
-        .kpi-val { font-size: 1.4rem; font-weight: 900; line-height: 1.1; }
-        .kpi-lbl { font-size: 0.65rem; font-weight: 800; color: var(--text-gray); text-transform: uppercase; margin-top: 5px; }
+        .kpi-box:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        .kpi-val {
+            font-size: 1.4rem;
+            font-weight: 900;
+            line-height: 1.1;
+        }
+
+        .kpi-lbl {
+            font-size: 0.65rem;
+            font-weight: 800;
+            color: var(--text-gray);
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
 
         .tooltip .tooltiptext {
             visibility: hidden;
@@ -133,7 +167,8 @@
             padding: 10px;
             position: absolute;
             z-index: 1000;
-            top: 110%; /* Posicionado debajo para móviles */
+            top: 110%;
+            /* Posicionado debajo para móviles */
             left: 50%;
             transform: translateX(-50%);
             opacity: 0;
@@ -141,14 +176,15 @@
             font-size: 0.75rem;
             font-weight: 500;
             line-height: 1.4;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
             pointer-events: none;
         }
-        
+
         .tooltip .tooltiptext::after {
             content: "";
             position: absolute;
-            bottom: 100%; /* Flecha apuntando arriba */
+            bottom: 100%;
+            /* Flecha apuntando arriba */
             left: 50%;
             margin-left: -5px;
             border-width: 5px;
@@ -156,130 +192,387 @@
             border-color: transparent transparent #1e293b transparent;
         }
 
-        .tooltip:hover .tooltiptext, .tooltip:active .tooltiptext {
+        .tooltip:hover .tooltiptext,
+        .tooltip:active .tooltiptext {
             visibility: visible;
             opacity: 1;
         }
 
-        .menu-grid { display: grid; gap: 15px; }
+        .menu-grid {
+            display: grid;
+            gap: 15px;
+        }
 
         .menu-card {
-            background: white; border: 1px solid var(--border); border-radius: 12px;
-            padding: 25px 20px; text-align: center; cursor: pointer; position: relative;
-            overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px 20px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
             transition: 0.2s;
         }
 
-        .menu-card:active { transform: scale(0.98); background: #f1f5f9; }
-        .menu-card.opt-picking { border-left: 5px solid var(--primary); }
-        .menu-card.opt-alistamiento { border-left: 5px solid var(--secondary); }
+        .menu-card:active {
+            transform: scale(0.98);
+            background: #f1f5f9;
+        }
 
-        .menu-icon { font-size: 2.5rem; display: block; margin-bottom: 10px; }
-        .menu-title { font-size: 1.1rem; font-weight: 900; color: var(--primary-dark); text-transform: uppercase; }
+        .menu-card.opt-picking {
+            border-left: 5px solid var(--primary);
+        }
+
+        .menu-card.opt-alistamiento {
+            border-left: 5px solid var(--secondary);
+        }
+
+        .menu-icon {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .menu-title {
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: var(--primary-dark);
+            text-transform: uppercase;
+        }
 
         .btn-manual-menu {
-            margin-top: 40px; width: 100%; padding: 16px; background: #f8fafc; border: 1px solid var(--border);
-            color: #334155; font-weight: 700; border-radius: 12px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; text-decoration: none;
+            margin-top: 40px;
+            width: 100%;
+            padding: 16px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            color: #334155;
+            font-weight: 700;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
         }
 
         .btn-logout-menu {
-            margin-top: 20px; width: 100%; padding: 16px; background: white; border: 1px solid #fee2e2;
-            color: #ef4444; font-weight: 700; border-radius: 12px; cursor: pointer; display: flex; justify-content: center; gap: 8px;
+            margin-top: 20px;
+            width: 100%;
+            padding: 16px;
+            background: white;
+            border: 1px solid #fee2e2;
+            color: #ef4444;
+            font-weight: 700;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
         }
 
         /* --- LISTAS --- */
         .nav-back {
-            display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; cursor: pointer;
-            font-weight: 700; color: var(--text-gray); background: none; border: none; font-size: 1rem; padding: 10px 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            font-weight: 700;
+            color: var(--text-gray);
+            background: none;
+            border: none;
+            font-size: 1rem;
+            padding: 10px 0;
         }
 
         /* Responsive Grid para listas (Landscape Mobile) */
         .responsive-grid {
-            display: grid; grid-template-columns: 1fr; gap: 15px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
         }
+
         @media (orientation: landscape) and (max-height: 600px) {
-            .responsive-grid { grid-template-columns: 1fr 1fr; }
+            .responsive-grid {
+                grid-template-columns: 1fr 1fr;
+            }
         }
 
         .order-card {
-            background: white; border-radius: 12px; padding: 20px; margin-bottom: 0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); border-left: 5px solid var(--primary);
-            cursor: pointer; transition: 0.2s;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border-left: 5px solid var(--primary);
+            cursor: pointer;
+            transition: 0.2s;
         }
-        .order-card:active { transform: scale(0.98); background:#f8fafc; }
 
-        .oc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .oc-number { font-size: 1.25rem; font-weight: 800; color: #1e293b; }
-        .oc-badge { background: #e0f2fe; color: var(--primary-dark); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+        .order-card:active {
+            transform: scale(0.98);
+            background: #f8fafc;
+        }
 
-        .p-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 5px; }
-        .p-fill { height: 100%; background: linear-gradient(90deg, var(--success), #27ae60); transition: width 0.4s ease; }
+        .oc-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .oc-number {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .oc-badge {
+            background: #e0f2fe;
+            color: var(--primary-dark);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+
+        .p-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .p-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), #27ae60);
+            transition: width 0.4s ease;
+        }
 
         .item-row {
-            display: flex; align-items: center; background: white; padding: 15px; border-radius: 12px;
-            gap: 15px; border-left: 4px solid transparent; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            gap: 15px;
+            border-left: 4px solid transparent;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
             cursor: pointer;
         }
-        .item-row:active { background: #f8fafc; }
-        .item-row.active { border-left-color: var(--secondary); }
-        .item-row.done { display: none !important; }
-        .item-row.completed { border-left-color: var(--success); opacity: 0.6; }
 
-        .qty-indicator {
-            min-width: 55px; height: 55px; background: var(--bg-light); color: var(--primary-dark);
-            border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            font-size: 1.1rem; font-weight: 900; border: 1px solid var(--border); flex-shrink: 0;
+        .item-row:active {
+            background: #f8fafc;
         }
 
-        .item-details { flex: 1; overflow: hidden; }
-        .id-name { font-size: 0.95rem; font-weight: 700; color: #334155; word-break: break-word; line-height: 1.2; }
-        .id-code { font-size: 0.75rem; color: var(--text-gray); font-weight: 600; margin-bottom: 4px; }
+        .item-row.active {
+            border-left-color: var(--secondary);
+        }
+
+        .item-row.done {
+            display: none !important;
+        }
+
+        .item-row.completed {
+            border-left-color: var(--success);
+            opacity: 0.6;
+        }
+
+        .qty-indicator {
+            min-width: 55px;
+            height: 55px;
+            background: var(--bg-light);
+            color: var(--primary-dark);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 900;
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .item-details {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .id-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #334155;
+            word-break: break-word;
+            line-height: 1.2;
+        }
+
+        .id-code {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
 
         /* --- MODAL TRABAJO (PICKING) THUMB-ZONE OPTIMIZED --- */
         .modal-wrap {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.98); z-index: 100; display: none;
-            justify-content: center; align-items: flex-end; /* Mobile bottom sheet feel */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.98);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+            /* Mobile bottom sheet feel */
             backdrop-filter: blur(5px);
         }
 
         .picking-sheet {
-            width: 100%; max-width: 600px; height: 100dvh; background: white;
-            display: flex; flex-direction: column; position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 100dvh;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            position: relative;
             animation: slideUp 0.3s ease-out;
         }
-        
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        @keyframes pulseAlert { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulseAlert {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
 
         .btn-close-modal {
-            position: absolute; top: 15px; right: 15px; background: #f1f5f9; width: 36px; height: 36px;
-            border-radius: 50%; border: none; font-weight: bold; color: #64748b; font-size: 1.3rem;
-            cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #f1f5f9;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            font-weight: bold;
+            color: #64748b;
+            font-size: 1.3rem;
+            cursor: pointer;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .picking-scroll-area {
-            flex: 1; overflow-y: auto; padding: 20px; padding-top: 25px; display: flex; flex-direction: column;
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-top: 25px;
+            display: flex;
+            flex-direction: column;
         }
 
         .picking-bottom-actions {
-            background: white; padding: 15px 20px; padding-bottom: max(15px, env(safe-area-inset-bottom));
-            border-top: 1px solid var(--border); box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+            background: white;
+            padding: 15px 20px;
+            padding-bottom: max(15px, env(safe-area-inset-bottom));
+            border-top: 1px solid var(--border);
+            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.05);
         }
 
-        .pick-header { margin-bottom: 15px; padding-right: 35px; }
-        .pick-prod { font-size: 1.2rem; font-weight: 900; color: var(--primary-dark); line-height: 1.2; margin-bottom: 8px; }
-        .pick-code-pill { background: #f1f5f9; padding: 4px 10px; border-radius: 6px; font-family: monospace; color: var(--text-gray); font-size: 0.9rem; font-weight: 700; }
+        .pick-header {
+            margin-bottom: 15px;
+            padding-right: 35px;
+        }
 
-        .pick-stats { display: flex; gap: 10px; margin-bottom: 15px; }
-        .stat-box { flex: 1; border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; background: #f8fafc;}
-        .stat-lbl { font-size: 0.7rem; color: var(--text-gray); font-weight: 800; text-transform: uppercase; }
-        .stat-val { font-size: 1.2rem; font-weight: 900; color: #1e293b; }
-        .stat-val.loc { color: var(--secondary); }
+        .pick-prod {
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: var(--primary-dark);
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
+
+        .pick-code-pill {
+            background: #f1f5f9;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            color: var(--text-gray);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .pick-stats {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+            background: #f8fafc;
+        }
+
+        .stat-lbl {
+            font-size: 0.7rem;
+            color: var(--text-gray);
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .stat-val {
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: #1e293b;
+        }
+
+        .stat-val.loc {
+            color: var(--secondary);
+        }
 
         .camera-container {
-            flex: 1; background: #000; border-radius: 12px; overflow: hidden; position: relative;
-            display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
+            flex: 1;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-bottom: 15px;
             min-height: 250px;
         }
 
@@ -289,13 +582,14 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            border: 4px solid rgba(255,255,255,0.6);
+            border: 4px solid rgba(255, 255, 255, 0.6);
             border-radius: 12px;
             z-index: 10;
             pointer-events: none;
             display: none;
             transition: all 0.1s ease-in-out;
         }
+
         .scanner-mira.success {
             border-color: #10b981;
             background-color: rgba(16, 185, 129, 0.4);
@@ -303,71 +597,354 @@
             box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
         }
 
-        #embedded-reader { width: 100%; height: 100%; transition: opacity 0.3s ease; }
+        #embedded-reader {
+            width: 100%;
+            height: 100%;
+            transition: opacity 0.3s ease;
+        }
 
         .btn-start-cam {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white;
-            padding: 15px 25px; border-radius: 30px; font-weight: 800; font-size:1.1rem;
-            display: flex; align-items: center; gap: 10px; cursor: pointer; backdrop-filter: blur(4px); z-index: 5;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 30px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            z-index: 5;
         }
-        .btn-start-cam:active { background: rgba(255, 255, 255, 0.4); }
+
+        .btn-start-cam:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
 
         /* Botón de reanudar inteligente (Ahorro de batería) */
         .btn-resume-cam {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.6); color: white; display: none;
-            flex-direction: column; justify-content: center; align-items: center;
-            z-index: 20; cursor: pointer; text-align: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            cursor: pointer;
+            text-align: center;
         }
-        .btn-resume-cam span.icon { font-size: 3rem; margin-bottom: 10px; }
-        .btn-resume-cam span.text { font-size: 1.2rem; font-weight: 800; }
-        .btn-resume-cam span.sub { font-size: 0.85rem; color: #cbd5e1; margin-top: 5px; }
 
-        .action-area { background: #fff7ed; border-radius: 16px; padding: 15px; border: 1px solid #ffedd5; text-align: center; margin-bottom: 15px; flex-shrink: 0; }
-        .counter-big { font-size: 3.5rem; font-weight: 900; color: var(--secondary); line-height: 1; display: block; margin-bottom: 5px; }
-        .counter-lbl { font-size: 0.85rem; color: #c2410c; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-resume-cam span.icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+
+        .btn-resume-cam span.text {
+            font-size: 1.2rem;
+            font-weight: 800;
+        }
+
+        .btn-resume-cam span.sub {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            margin-top: 5px;
+        }
+
+        .action-area {
+            background: #fff7ed;
+            border-radius: 16px;
+            padding: 15px;
+            border: 1px solid #ffedd5;
+            text-align: center;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+
+        .counter-big {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: var(--secondary);
+            line-height: 1;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .counter-lbl {
+            font-size: 0.85rem;
+            color: #c2410c;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
 
         .btn-finish {
-            width: 100%; background: var(--success); color: white; padding: 18px; border-radius: 12px;
-            font-weight: 900; font-size: 1.1rem; border: none; cursor: pointer;
-            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3); transition: 0.2s;
+            width: 100%;
+            background: var(--success);
+            color: white;
+            padding: 18px;
+            border-radius: 12px;
+            font-weight: 900;
+            font-size: 1.1rem;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+            transition: 0.2s;
         }
-        .btn-finish:active { transform: scale(0.98); }
+
+        .btn-finish:active {
+            transform: scale(0.98);
+        }
 
         .btn-reset {
-            margin-top: 10px; background: #f1f5f9; border: 1px solid #cbd5e1; padding: 12px; border-radius: 10px;
-            color: #475569; font-size: 0.95rem; font-weight: 700; cursor: pointer; width: 100%;
+            margin-top: 10px;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 12px;
+            border-radius: 10px;
+            color: #475569;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
         }
 
         /* Modal Verificación Final */
-        .verify-sheet { background: white; width: 90%; max-width: 350px; border-radius: 20px; padding: 30px 20px; text-align: center; margin: auto; }
-        .verify-btns { display: flex; gap: 10px; margin-top: 25px; }
-        .btn-v-cancel { flex: 1; padding: 15px; border: 1px solid var(--border); background: white; border-radius: 12px; font-weight: 800; color: #64748b; font-size:1rem;}
-        .btn-v-confirm { flex: 1; padding: 15px; border: none; background: var(--success); border-radius: 12px; font-weight: 800; color: white; font-size:1rem;}
+        .verify-sheet {
+            background: white;
+            width: 90%;
+            max-width: 350px;
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+            margin: auto;
+        }
 
-        .hidden { display: none !important; }
+        .verify-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .btn-v-cancel {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 12px;
+            font-weight: 800;
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .btn-v-confirm {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            background: var(--success);
+            border-radius: 12px;
+            font-weight: 800;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
 
         /* =======================================================
            LANDSCAPE OPTIMIZATION FOR BARCODE SCANNING
            ======================================================= */
         @media (orientation: landscape) and (max-height: 600px) {
             .picking-sheet {
-                flex-direction: row; flex-wrap: wrap; height: 100dvh; overflow: hidden; padding: 0;
+                flex-direction: row;
+                flex-wrap: wrap;
+                height: 100dvh;
+                overflow: hidden;
+                padding: 0;
             }
+
             .picking-scroll-area {
-                flex: 1; height: 100dvh; padding: 15px;
+                flex: 1;
+                height: 100dvh;
+                padding: 15px;
             }
+
             .camera-container {
-                position: absolute; top: 0; left: 0; width: 50%; height: 100dvh; margin: 0; border-radius: 0; z-index: 1;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 50%;
+                height: 100dvh;
+                margin: 0;
+                border-radius: 0;
+                z-index: 1;
             }
+
             .picking-scroll-area {
-                margin-left: 50%; width: 50%; padding-bottom: 90px;
+                margin-left: 50%;
+                width: 50%;
+                padding-bottom: 90px;
             }
+
             .picking-bottom-actions {
-                position: absolute; bottom: 0; right: 0; width: 50%; z-index: 2; padding: 10px 15px;
+                position: absolute;
+                bottom: 0;
+                right: 0;
+                width: 50%;
+                z-index: 2;
+                padding: 10px 15px;
             }
-            .btn-close-modal { top: 10px; right: 10px; }
+
+            .btn-close-modal {
+                top: 10px;
+                right: 10px;
+            }
+        }
+
+        /* =========================================
+   ESTILOS CABECERA UNIVERSAL BQA-ONE
+   ========================================= */
+        .app-header-bqa {
+            background-color: #ffffff;
+            padding: 12px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-bottom: 2px solid #e2e8f0;
+            width: 100%;
+            z-index: 1050;
+            flex-shrink: 0;
+        }
+
+        .brand-area-bqa {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo-bqa {
+            height: 48px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .logo-divider-bqa {
+            width: 2px;
+            height: 40px;
+            background-color: #cbd5e1;
+        }
+
+        .logo-cliente-bqa {
+            height: 48px;
+            max-width: 160px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .user-info-bqa {
+            display: flex;
+            flex-direction: column;
+            text-align: right;
+            margin-left: auto;
+            margin-right: 25px;
+        }
+
+        .user-greeting-bqa {
+            color: #015249;
+            font-weight: 800;
+            font-size: 17px;
+        }
+
+        .user-company-bqa {
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .actions-bqa {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn-bqa-volver {
+            background-color: #475569;
+            color: white;
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            transition: 0.2s;
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-bqa-volver:hover {
+            background-color: #334155;
+        }
+
+        .btn-bqa-salir {
+            background-color: #ef4444;
+            color: white;
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            transition: 0.2s;
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-bqa-salir:hover {
+            background-color: #dc2626;
+        }
+
+        /* Adaptación responsiva estricta para celular (Operador/Verificador) */
+        @media (max-width: 850px) {
+            .app-header-bqa {
+                flex-direction: column;
+                gap: 12px;
+                padding: 15px;
+                position: sticky;
+                top: 0;
+            }
+
+            .user-info-bqa {
+                text-align: center;
+                margin: 0;
+            }
+
+            .brand-area-bqa {
+                justify-content: center;
+                width: 100%;
+            }
+
+            .actions-bqa {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .logo-bqa,
+            .logo-cliente-bqa {
+                height: 40px;
+            }
         }
     </style>
 </head>
@@ -375,12 +952,30 @@
 <body>
 
     <div class="app-container">
-        <header class="app-header">
-            <div class="brand-area">
-                <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix360" class="logo-img">
-                <div class="logo-divider"></div>
-                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" alt="Cliente" class="logo-img"
+        <!-- BARRA SUPERIOR UNIVERSAL -->
+        <!-- BARRA SUPERIOR UNIVERSAL -->
+        <header class="app-header-bqa">
+            <div class="brand-area-bqa">
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="BQA-ONE" class="logo-bqa"
                     onerror="this.style.display='none'">
+
+                {% set render_nit = nit if nit else session.get('empresa_id', '') %}
+                {% if render_nit %}
+                <div class="logo-divider-bqa"></div>
+                <img src="{{ url_for('static', filename='logo_' ~ render_nit ~ '.PNG') }}" alt="Cliente"
+                    class="logo-cliente-bqa" onerror="this.style.display='none'">
+                {% endif %}
+            </div>
+
+            <div class="user-info-bqa">
+                <span class="user-greeting-bqa">Hola {{ usuario if usuario else session.get('nombre', 'Usuario')
+                    }}</span>
+                <span class="user-company-bqa">{{ empresa if empresa else session.get('empresa', 'Empresa') }}</span>
+            </div>
+
+            <div class="actions-bqa">
+                <a href="{{ url_for('hub_ventas_distribucion.dashboard') }}" class="btn-bqa-volver">⬅ Volver</a>
+                <a href="#" onclick="cerrarSesionInstantanea(event)" class="btn-bqa-salir">Salir</a>
             </div>
         </header>
 
@@ -391,7 +986,7 @@
                     <h2>Hola: {{ usuario }}</h2>
                     <p style="color:var(--text-gray); font-weight:500;">Bienvenido a tu turno operativo</p>
                 </div>
-                
+
                 <!-- KPIs Operador -->
                 <div class="kpi-container">
                     <div class="kpi-box tooltip">
@@ -400,14 +995,18 @@
                         <span class="tooltiptext">Mide tu progreso de hoy.</span>
                     </div>
                     <div class="kpi-box tooltip">
-                        <div class="kpi-val" style="color: #10b981;" id="kpi-velocidad">{{ kpis.velocidad_picking }}</div>
+                        <div class="kpi-val" style="color: #10b981;" id="kpi-velocidad">{{ kpis.velocidad_picking }}
+                        </div>
                         <div class="kpi-lbl">Ítems/Min</div>
-                        <span class="tooltiptext">Velocidad de alistamiento. Indica cuántos ítems alcanzas a confirmar correctamente por cada minuto trabajado.</span>
+                        <span class="tooltiptext">Velocidad de alistamiento. Indica cuántos ítems alcanzas a confirmar
+                            correctamente por cada minuto trabajado.</span>
                     </div>
                     <div class="kpi-box tooltip">
-                        <div class="kpi-val" style="color: #e11d48;" id="kpi-novedades">{{ kpis.indice_novedades }}%</div>
+                        <div class="kpi-val" style="color: #e11d48;" id="kpi-novedades">{{ kpis.indice_novedades }}%
+                        </div>
                         <div class="kpi-lbl">Novedades</div>
-                        <span class="tooltiptext">Porcentaje de error/ausencia. Muestra cuántos ítems tuviste que marcar sin stock o sin código.</span>
+                        <span class="tooltiptext">Porcentaje de error/ausencia. Muestra cuántos ítems tuviste que marcar
+                            sin stock o sin código.</span>
                     </div>
                 </div>
 
@@ -421,7 +1020,7 @@
                         <span class="menu-title">Conteo de Inventario</span>
                     </div>
                 </div>
-                
+
                 <a href="/bodegas/manual_operacion" target="_blank" class="btn-manual-menu">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
                         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
@@ -435,7 +1034,11 @@
 
             <div id="view-orders" class="hidden">
                 <button class="nav-back" onclick="volverAlMenu()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
                     Volver al Menú
                 </button>
                 <h2 style="margin: 0 0 15px 0; color: var(--primary-dark);">Mis Pedidos Asignados</h2>
@@ -444,18 +1047,27 @@
 
             <div id="view-brands" class="hidden">
                 <button class="nav-back" onclick="cargarOrdenes()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
                     Volver a Pedidos
                 </button>
 
-                <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">Orden Activa</div>
-                    <div style="font-size: 2.2rem; font-weight: 900; margin-bottom: 5px;" id="lblOrdenTitleBrands">#0000</div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 700; font-size:1.1rem;">
+                <div
+                    style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">Orden
+                        Activa</div>
+                    <div style="font-size: 2.2rem; font-weight: 900; margin-bottom: 5px;" id="lblOrdenTitleBrands">#0000
+                    </div>
+                    <div
+                        style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 700; font-size:1.1rem;">
                         <span>Progreso General</span><span id="lblProgressBrands">0/0</span>
                     </div>
                     <div class="p-bar" style="height: 10px; background: rgba(255,255,255,0.2);">
-                        <div id="header-progress-bar-brands" class="p-fill" style="width: 0%; background: #2ecc71;"></div>
+                        <div id="header-progress-bar-brands" class="p-fill" style="width: 0%; background: #2ecc71;">
+                        </div>
                     </div>
                 </div>
 
@@ -465,17 +1077,25 @@
 
             <div id="view-items" class="hidden">
                 <button class="nav-back" onclick="volverAMarcas()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
                     Volver a Marcas
                 </button>
 
-                <div style="background: linear-gradient(135deg, var(--secondary) 0%, #d97706 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">Marca Actual</div>
-                    <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 5px;" id="lblMarcaTitleItems">MARCA</div>
+                <div
+                    style="background: linear-gradient(135deg, var(--secondary) 0%, #d97706 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">Marca
+                        Actual</div>
+                    <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 5px;" id="lblMarcaTitleItems">MARCA
+                    </div>
                 </div>
 
                 <div style="position: sticky; top: 70px; z-index: 40; background: #f8fafc; padding-bottom: 10px;">
-                    <input type="text" id="searchBox" placeholder="🔍 Buscar producto, EAN o SKU..." onkeyup="filtrarLista()"
+                    <input type="text" id="searchBox" placeholder="🔍 Buscar producto, EAN o SKU..."
+                        onkeyup="filtrarLista()"
                         style="width: 100%; padding: 16px; border-radius: 12px; border: 2px solid var(--border); font-size: 1.05rem; font-weight:500; outline:none; transition: 0.2s;">
                 </div>
                 <div id="items-container" class="responsive-grid"></div>
@@ -508,7 +1128,7 @@
                     </svg>
                     ENCENDER CÁMARA
                 </div>
-                
+
                 <!-- Botón de reanudar cuando la cámara está en modo suspensión -->
                 <div id="cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamara()">
                     <span class="icon">▶️</span>
@@ -536,48 +1156,81 @@
 
                 <div class="action-area" id="area-conteo-cajas">
                     <span class="counter-lbl" style="color:#0369a1;">📦 CAJAS COMPLETAS</span>
-                    <div style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 10px;">
-                        <button id="btn-minus-cajas" onclick="cambiarCajas(-1)" class="hidden" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #bae6fd; color: #0369a1; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
-                        <span id="pk-count-cajas" class="counter-big" style="color:#0284c7; margin: 0; min-width: 70px;">0</span>
-                        <button id="btn-plus-cajas" onclick="cambiarCajas(1)" class="hidden" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #0284c7; color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
+                    <div
+                        style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 10px;">
+                        <button id="btn-minus-cajas" onclick="cambiarCajas(-1)" class="hidden"
+                            style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #bae6fd; color: #0369a1; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
+                        <span id="pk-count-cajas" class="counter-big"
+                            style="color:#0284c7; margin: 0; min-width: 70px;">0</span>
+                        <button id="btn-plus-cajas" onclick="cambiarCajas(1)" class="hidden"
+                            style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #0284c7; color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
                     </div>
                 </div>
 
-                <div class="action-area hidden" id="area-teclado-fracciones" style="background: #fdf2f8; border-color: #fbcfe8;">
+                <div class="action-area hidden" id="area-teclado-fracciones"
+                    style="background: #fdf2f8; border-color: #fbcfe8;">
                     <span class="counter-lbl" style="color:#be185d;">🍬 UNIDADES SUELTAS (FRACC)</span>
-                    <div style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 15px;">
-                        <button onclick="cambiarFraccion(-1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #f9a8d4; color: #831843; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
-                        <span id="pk-count-unidades" class="counter-big" style="color:#be185d; margin: 0; min-width: 70px;">0</span>
-                        <button onclick="cambiarFraccion(1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #f472b6; color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
+                    <div
+                        style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 15px;">
+                        <button onclick="cambiarFraccion(-1)"
+                            style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #f9a8d4; color: #831843; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
+                        <span id="pk-count-unidades" class="counter-big"
+                            style="color:#be185d; margin: 0; min-width: 70px;">0</span>
+                        <button onclick="cambiarFraccion(1)"
+                            style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #f472b6; color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
                     </div>
-                    <small id="lbl-val-ean" style="color:#9d174d; display:block; margin-top:12px; font-weight:600;">Lectura validada con EAN 🔑</small>
+                    <small id="lbl-val-ean"
+                        style="color:#9d174d; display:block; margin-top:12px; font-weight:600;">Lectura validada con EAN
+                        🔑</small>
                 </div>
             </div>
 
             <!-- Zona del Pulgar (Thumb Zone - Acciones) -->
             <!-- Zona del Pulgar (Thumb Zone - Acciones) -->
             <div class="picking-bottom-actions">
-                <button id="btn-masivo" class="hidden" onclick="confirmarMasivo()" style="width: 100%; background: var(--primary); color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 8px; box-shadow: 0 4px 15px rgba(0,78,146, 0.3);">⚡ ALISTAMIENTO MASIVO</button>
-                
+                <button id="btn-masivo" class="hidden" onclick="confirmarMasivo()"
+                    style="width: 100%; background: var(--primary); color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 8px; box-shadow: 0 4px 15px rgba(0,78,146, 0.3);">⚡
+                    ALISTAMIENTO MASIVO</button>
+
                 <!-- NUEVO CONTROL DUAL DE CÁMARA (AMBIDIESTRO) -->
                 <div style="display: flex; gap: 10px; margin-bottom: 8px;" id="btns-control-camara">
-                    <button onclick="toggleCamaraInteligente()" style="flex:1; background:#e0f2fe; color:#0369a1; padding:10px; border-radius:10px; border:1px solid #bae6fd; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> CÁM ON/OFF
+                    <button onclick="toggleCamaraInteligente()"
+                        style="flex:1; background:#e0f2fe; color:#0369a1; padding:10px; border-radius:10px; border:1px solid #bae6fd; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                            </path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg> CÁM ON/OFF
                     </button>
-                    <button onclick="toggleCamaraInteligente()" style="flex:1; background:#e0f2fe; color:#0369a1; padding:10px; border-radius:10px; border:1px solid #bae6fd; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
-                        CÁM ON/OFF <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <button onclick="toggleCamaraInteligente()"
+                        style="flex:1; background:#e0f2fe; color:#0369a1; padding:10px; border-radius:10px; border:1px solid #bae6fd; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        CÁM ON/OFF <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                            </path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
                     </button>
                 </div>
 
-                <button class="btn-finish" onclick="intentarTerminarItem()" style="padding: 14px;">TERMINAR ITEM</button>
-                
+                <button class="btn-finish" onclick="intentarTerminarItem()" style="padding: 14px;">TERMINAR
+                    ITEM</button>
+
                 <div style="display: flex; gap: 10px; margin-top: 8px;" id="btns-novedades">
-                    <button onclick="declararFaltaExistencias()" style="flex:1; background:#fee2e2; color:#b91c1c; padding:10px; border-radius:10px; border:1px solid #fecaca; font-weight:800; cursor:pointer; font-size: 0.85rem;">🚫 Sin Stock</button>
-                    <button onclick="declararSinEAN()" style="flex:1; background:#fef3c7; color:#b45309; padding:10px; border-radius:10px; border:1px solid #fde68a; font-weight:800; cursor:pointer; font-size: 0.85rem;">⚠️ Sin EAN</button>
-                    <button id="btn-no-bd" onclick="declararNoEnBD()" class="hidden" style="flex:1; background:#f1f5f9; color:#475569; padding:10px; border-radius:10px; border:1px solid #cbd5e1; font-weight:800; cursor:pointer; font-size: 0.85rem;">⚠️ NO EN BD</button>
+                    <button onclick="declararFaltaExistencias()"
+                        style="flex:1; background:#fee2e2; color:#b91c1c; padding:10px; border-radius:10px; border:1px solid #fecaca; font-weight:800; cursor:pointer; font-size: 0.85rem;">🚫
+                        Sin Stock</button>
+                    <button onclick="declararSinEAN()"
+                        style="flex:1; background:#fef3c7; color:#b45309; padding:10px; border-radius:10px; border:1px solid #fde68a; font-weight:800; cursor:pointer; font-size: 0.85rem;">⚠️
+                        Sin EAN</button>
+                    <button id="btn-no-bd" onclick="declararNoEnBD()" class="hidden"
+                        style="flex:1; background:#f1f5f9; color:#475569; padding:10px; border-radius:10px; border:1px solid #cbd5e1; font-weight:800; cursor:pointer; font-size: 0.85rem;">⚠️
+                        NO EN BD</button>
                 </div>
-                
-                <button class="btn-reset" id="btn-reset-lectura" onclick="resetearConteo()" style="padding: 10px; margin-top: 8px; font-size: 0.85rem;">🔄 Resetear Conteo</button>
+
+                <button class="btn-reset" id="btn-reset-lectura" onclick="resetearConteo()"
+                    style="padding: 10px; margin-top: 8px; font-size: 0.85rem;">🔄 Resetear Conteo</button>
             </div>
         </div>
     </div>
@@ -588,7 +1241,8 @@
             <div style="font-size: 3.5rem; margin-bottom: 10px;">🤔</div>
             <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">¿Confirmar Cantidades?</h3>
             <p style="color:#475569; line-height:1.5; font-size:1.05rem;">
-                Alistaste <b id="vf-count" style="color:var(--secondary); font-size:1.3rem;">0</b> de <b id="vf-req" style="color:#1e293b;">0</b> solicitadas.
+                Alistaste <b id="vf-count" style="color:var(--secondary); font-size:1.3rem;">0</b> de <b id="vf-req"
+                    style="color:#1e293b;">0</b> solicitadas.
             </p>
             <div class="verify-btns">
                 <button class="btn-v-cancel" onclick="cancelarVerificacion()">Volver</button>
@@ -607,7 +1261,8 @@
             </p>
             <div class="verify-btns">
                 <button class="btn-v-cancel" onclick="cerrarConfirmacionStock()">No</button>
-                <button class="btn-v-confirm" style="background: #e11d48;" onclick="ejecutarFaltaExistencias()">Sí, No hay</button>
+                <button class="btn-v-confirm" style="background: #e11d48;" onclick="ejecutarFaltaExistencias()">Sí, No
+                    hay</button>
             </div>
         </div>
     </div>
@@ -622,18 +1277,23 @@
             </p>
             <div class="verify-btns">
                 <button class="btn-v-cancel" onclick="cerrarMasivo()">No, Volver</button>
-                <button class="btn-v-confirm" style="background: var(--primary);" onclick="ejecutarMasivo()">Sí, Confirmo</button>
+                <button class="btn-v-confirm" style="background: var(--primary);" onclick="ejecutarMasivo()">Sí,
+                    Confirmo</button>
             </div>
         </div>
     </div>
 
     <!-- OVERLAY BLOQUEO ANDON (PANTALLA CONGELADA) -->
-    <div id="overlay-bloqueo-andon" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.95); z-index:9999; display:none; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px; backdrop-filter:blur(8px);">
+    <div id="overlay-bloqueo-andon"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.95); z-index:9999; display:none; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px; backdrop-filter:blur(8px);">
         <div style="font-size:5rem; margin-bottom:20px; animation: pulseAlert 1.5s infinite;">🚨</div>
         <h2 style="color:#f87171; font-size:2rem; margin:0 0 15px 0;">OPERACIÓN DETENIDA</h2>
-        <p style="color:#cbd5e1; font-size:1.2rem; line-height:1.5;">Has reportado una novedad.<br>Tu pantalla está bloqueada temporalmente.</p>
-        <div style="margin-top:30px; padding:15px; background:#1e293b; border-radius:12px; border:1px solid #334155; max-width:400px;">
-            <p style="color:#94a3b8; font-size:1rem; margin:0;">El Controlador de Bodega ha sido notificado y está resolviendo el problema. <b>No cierres esta pantalla.</b></p>
+        <p style="color:#cbd5e1; font-size:1.2rem; line-height:1.5;">Has reportado una novedad.<br>Tu pantalla está
+            bloqueada temporalmente.</p>
+        <div
+            style="margin-top:30px; padding:15px; background:#1e293b; border-radius:12px; border:1px solid #334155; max-width:400px;">
+            <p style="color:#94a3b8; font-size:1rem; margin:0;">El Controlador de Bodega ha sido notificado y está
+                resolviendo el problema. <b>No cierres esta pantalla.</b></p>
         </div>
     </div>
 
@@ -643,10 +1303,10 @@
         let idSupervisorAutorizado = null;
 
         let ordenActual = null, marcaActual = null, listaItems = [], itemActivo = null, scanner = null;
-        let lastScanTime = 0; 
+        let lastScanTime = 0;
         let audioCtx = null;
         let wakeLock = null;
-        let sleepTimer = null; 
+        let sleepTimer = null;
 
         const observerCamara = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
@@ -665,8 +1325,8 @@
         function cerrarSesionInstantanea(e) {
             if (e) e.preventDefault();
             fetch('/api/bodegas/offline', { method: 'POST' })
-            .then(() => { window.location.href = '/logout'; })
-            .catch(() => { window.location.href = '/logout'; });
+                .then(() => { window.location.href = '/logout'; })
+                .catch(() => { window.location.href = '/logout'; });
         }
 
         async function requestWakeLock() {
@@ -702,20 +1362,20 @@
         function playBeep(isSuccess = true) {
             try {
                 if (navigator.vibrate) {
-                    navigator.vibrate(isSuccess ? 150 : [50, 100, 50]); 
+                    navigator.vibrate(isSuccess ? 150 : [50, 100, 50]);
                 }
-                
+
                 if (audioCtx) {
                     if (audioCtx.state === 'suspended') audioCtx.resume();
                     const oscillator = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
                     oscillator.type = isSuccess ? 'square' : 'sawtooth';
-                    oscillator.frequency.setValueAtTime(isSuccess ? 1800 : 300, audioCtx.currentTime); 
-                    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); 
+                    oscillator.frequency.setValueAtTime(isSuccess ? 1800 : 300, audioCtx.currentTime);
+                    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
                     oscillator.connect(gainNode);
                     gainNode.connect(audioCtx.destination);
                     oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + (isSuccess ? 0.2 : 0.4)); 
+                    oscillator.stop(audioCtx.currentTime + (isSuccess ? 0.2 : 0.4));
                 }
             } catch (e) { console.log("Audio play error", e); }
         }
@@ -744,9 +1404,9 @@
             }
             toast.innerHTML = '❌ ' + mensaje;
             toast.style.opacity = '1';
-            
+
             const mira = document.getElementById('scanner-mira');
-            if(mira) {
+            if (mira) {
                 mira.style.borderColor = '#e11d48';
                 mira.style.backgroundColor = 'rgba(225, 29, 72, 0.4)';
                 mira.style.boxShadow = '0 0 20px rgba(225, 29, 72, 0.8)';
@@ -768,11 +1428,11 @@
         function pausarCamaraPorInactividad() {
             if (scanner) {
                 try {
-                    scanner.pause(true); 
+                    scanner.pause(true);
                     document.getElementById('embedded-reader').style.opacity = '0.3';
                     document.getElementById('scanner-mira').style.display = 'none';
                     document.getElementById('cam-resume-btn').style.display = 'flex';
-                } catch(e) {}
+                } catch (e) { }
             }
         }
 
@@ -784,7 +1444,7 @@
                     document.getElementById('cam-resume-btn').style.display = 'none';
                     document.getElementById('scanner-mira').style.display = 'block';
                     iniciarTemporizadorInactividad();
-                } catch(e) {}
+                } catch (e) { }
             }
         }
 
@@ -793,7 +1453,7 @@
         function mostrarMenu() { toggleView('view-menu'); }
         function iniciarApp(op) { op === 'picking' ? cargarOrdenes() : toggleView('view-alistamiento'); }
         function volverAlMenu() { mostrarMenu(); }
-        
+
         function toggleView(id) {
             ['view-menu', 'view-orders', 'view-brands', 'view-items', 'view-alistamiento'].forEach(v => {
                 const el = document.getElementById(v);
@@ -825,14 +1485,14 @@
                 if (cOrd && cOrd.innerHTML !== html) cOrd.innerHTML = html;
             }).catch(e => console.log(e));
         }
-        
+
         function cargarKPIsOperador() {
             fetch('/api/operario/mis_kpis?t=' + Date.now())
                 .then(r => r.json())
                 .then(d => {
-                    if(document.getElementById('kpi-avance')) document.getElementById('kpi-avance').textContent = d.avance_porcentaje + '%';
-                    if(document.getElementById('kpi-velocidad')) document.getElementById('kpi-velocidad').textContent = d.velocidad_picking;
-                    if(document.getElementById('kpi-novedades')) document.getElementById('kpi-novedades').textContent = d.indice_novedades + '%';
+                    if (document.getElementById('kpi-avance')) document.getElementById('kpi-avance').textContent = d.avance_porcentaje + '%';
+                    if (document.getElementById('kpi-velocidad')) document.getElementById('kpi-velocidad').textContent = d.velocidad_picking;
+                    if (document.getElementById('kpi-novedades')) document.getElementById('kpi-novedades').textContent = d.indice_novedades + '%';
                 })
                 .catch(e => console.log(e));
         }
@@ -840,10 +1500,10 @@
         function cargarItemsSilencioso() {
             if (!ordenActual) return;
             const url = `/api/operario/items_orden/${encodeURIComponent(ordenActual)}`;
-            
+
             fetch(url + '?v=' + new Date().getTime()).then(r => r.json()).then(d => {
                 listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
-                
+
                 if (itemActivo !== null && document.getElementById('overlay-bloqueo-andon').style.display === 'flex') {
                     const itemActualizado = listaItems.find(i => i.id === itemActivo.id);
                     if (itemActualizado) {
@@ -852,7 +1512,7 @@
                             alert("✅ Novedad resuelta por el Controlador. Ítem cerrado.");
                             cerrarModalPicking();
                             renderizarItems();
-                        } 
+                        }
                         else if (itemActualizado.novedad_alistamiento === 'AUTORIZADO_CIEGAS') {
                             document.getElementById('overlay-bloqueo-andon').style.display = 'none';
                             alert("✅ El Controlador autorizó el ingreso manual a ciegas. Por favor cuenta las cantidades físicas manualmente.");
@@ -889,18 +1549,18 @@
         function cargarOrdenes() {
             toggleView('view-orders');
             const cOrd = document.getElementById('orders-container');
-            cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>'; 
-            cargarOrdenesSilencioso(); 
+            cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>';
+            cargarOrdenesSilencioso();
         }
 
         function abrirOrden(ord) {
             ordenActual = ord;
             document.getElementById('lblOrdenTitleBrands').textContent = '#' + ord;
             toggleView('view-brands');
-            
+
             const c = document.getElementById('brands-container');
             c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando marcas...</div>';
-            
+
             fetch(`/api/operario/items_orden/${encodeURIComponent(ordenActual)}`).then(r => r.json()).then(d => {
                 listaItems = d.map(i => ({ ...i, alistado: i.cantidad_alistada || 0 }));
                 renderizarMarcas();
@@ -969,9 +1629,9 @@
 
         function renderizarItems() {
             const c = document.getElementById('items-container');
-            let htmlInner = ''; 
+            let htmlInner = '';
             const txt = document.getElementById('searchBox').value.toLowerCase();
-            
+
             let itemsDeMarca = listaItems.filter(i => (i.marca || 'GENÉRICO') === marcaActual);
             let pendientesMarca = itemsDeMarca.filter(i => !(i.estado_actividad === 'ALISTADO' || i.estado_actividad === 'VERIFICADO' || i.estado_actividad === 'DESPACHADO' || i.estado_actividad === 'FINALIZADO' || i.estado_actividad === 'TERMINADO'));
 
@@ -996,8 +1656,8 @@
 
                 const matchPromo = nombre.match(/\(Kit:\s*(.*?)\)/i);
                 if (matchPromo) {
-                    const nombrePromo = matchPromo[1]; 
-                    nombre = nombre.replace(/\(Kit:\s*.*?\)/i, '').trim(); 
+                    const nombrePromo = matchPromo[1];
+                    nombre = nombre.replace(/\(Kit:\s*.*?\)/i, '').trim();
                     badgeHtml = `<div style="display:inline-block; background-color:#fef08a; color:#92400e; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fde68a;">🎁 KIT: ${nombrePromo}</div><br>`;
                 }
 
@@ -1020,7 +1680,7 @@
                 if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.95rem;">📦 ${i.req_cajas} <span style="font-size:0.7rem;">CJ</span></div>`;
                 if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.95rem; color: var(--secondary);">🍬 ${i.req_unidades} <span style="font-size:0.7rem;">UN</span></div>`;
                 if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.95rem;">📦 0</div>`;
-                
+
                 let bgBorder = isLocked ? 'border-left: 5px solid #e11d48; background: #fff1f2;' : '';
 
                 htmlInner += `
@@ -1044,7 +1704,7 @@
             if (!item || item.estado_actividad === 'FINALIZADO' || item.estado_actividad === 'ALISTADO' || item.estado_actividad === 'VERIFICADO') return;
 
             itemActivo = item;
-            lastScanTime = 0; 
+            lastScanTime = 0;
             novedadPendiente = null;
 
             requestWakeLock();
@@ -1087,7 +1747,7 @@
                 document.getElementById('btn-plus-cajas').classList.remove('hidden');
                 document.getElementById('btns-novedades').style.display = 'none';
                 document.getElementById('btn-reset-lectura').style.display = 'none';
-                
+
                 const lblVal = document.getElementById('lbl-val-ean');
                 if (lblVal) {
                     lblVal.textContent = 'Ingreso Manual Autorizado 🔓';
@@ -1101,14 +1761,14 @@
                 document.getElementById('btn-plus-cajas').classList.add('hidden');
                 document.getElementById('btns-novedades').style.display = 'flex';
                 document.getElementById('btn-reset-lectura').style.display = 'block';
-                
+
                 const lblVal = document.getElementById('lbl-val-ean');
                 if (lblVal) {
                     lblVal.textContent = 'Lectura validada con EAN 🔑';
                     lblVal.style.color = '#9d174d';
                 }
             }
-            
+
             if (itemActivo.req_cajas > 10 || itemActivo.req_unidades > 10) {
                 document.getElementById('btn-masivo').classList.remove('hidden');
             } else {
@@ -1155,12 +1815,12 @@
                 // CORRECCIÓN DE ESTADO: Si el escáner ya existe, ocultamos el overlay que abrió 'abrirModalPickingId' y reanudamos la transmisión
                 if (scanner) {
                     document.getElementById('cam-overlay-btn').style.display = 'none';
-                    try { 
-                        scanner.resume(); 
-                        document.getElementById('embedded-reader').style.opacity = '1'; 
-                        document.getElementById('cam-resume-btn').style.display = 'none'; 
-                        iniciarTemporizadorInactividad(); 
-                    } catch(e) {}
+                    try {
+                        scanner.resume();
+                        document.getElementById('embedded-reader').style.opacity = '1';
+                        document.getElementById('cam-resume-btn').style.display = 'none';
+                        iniciarTemporizadorInactividad();
+                    } catch (e) { }
                 }
             }
         }
@@ -1177,12 +1837,12 @@
                 evaluarBotonTerminar();
 
                 if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
-                    if(scanner) {
+                    if (scanner) {
                         document.getElementById('embedded-reader').style.opacity = '0.5';
                         detenerCamara();
                     }
                 } else {
-                    if(scanner) { document.getElementById('embedded-reader').style.opacity = '1'; document.getElementById('cam-resume-btn').style.display = 'none'; iniciarTemporizadorInactividad(); }
+                    if (scanner) { document.getElementById('embedded-reader').style.opacity = '1'; document.getElementById('cam-resume-btn').style.display = 'none'; iniciarTemporizadorInactividad(); }
                 }
             }
         }
@@ -1199,12 +1859,12 @@
                 evaluarBotonTerminar();
 
                 if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
-                    if(scanner) {
+                    if (scanner) {
                         document.getElementById('embedded-reader').style.opacity = '0.5';
                         detenerCamara();
                     }
                 } else {
-                    if(scanner) { document.getElementById('embedded-reader').style.opacity = '1'; document.getElementById('cam-resume-btn').style.display = 'none'; iniciarTemporizadorInactividad(); }
+                    if (scanner) { document.getElementById('embedded-reader').style.opacity = '1'; document.getElementById('cam-resume-btn').style.display = 'none'; iniciarTemporizadorInactividad(); }
                 }
             }
         }
@@ -1213,7 +1873,7 @@
             if (!itemActivo) return;
             const btn = document.querySelector('.btn-finish');
             btn.disabled = false;
-            
+
             if (itemActivo.act_cajas >= itemActivo.req_cajas && itemActivo.act_unidades >= itemActivo.req_unidades) {
                 btn.style.background = '#10b981';
                 btn.textContent = 'TERMINAR ÍTEM ✓';
@@ -1239,7 +1899,7 @@
 
             const isPortrait = window.innerHeight > window.innerWidth;
             const screenWidth = window.innerWidth;
-            
+
             // Calculamos el área de lectura en pantalla con trunc
             const targetWidth = isPortrait ? Math.trunc(screenWidth * 0.8) : Math.trunc(screenWidth * 0.35);
             const targetHeight = Math.trunc(targetWidth * 0.45);
@@ -1266,7 +1926,7 @@
                 (decodedText) => {
                     iniciarTemporizadorInactividad(); // Reinicia el timer por lectura
                     const now = Date.now();
-                    if (now - lastScanTime < 1500) return; 
+                    if (now - lastScanTime < 1500) return;
 
                     const scanned = decodedText.trim().toUpperCase();
                     const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
@@ -1296,7 +1956,7 @@
                         } else if (itemActivo.req_unidades > 0 && itemActivo.act_unidades < itemActivo.req_unidades) {
                             itemActivo.act_unidades++;
                             document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
-                            
+
                             document.getElementById('pk-count-unidades').style.color = '#10b981';
                             setTimeout(() => document.getElementById('pk-count-unidades').style.color = '#be185d', 300);
 
@@ -1327,41 +1987,34 @@
         function detenerCamara() {
             clearTimeout(sleepTimer);
             if (scanner) {
-                scanner.stop().then(() => { 
-                    scanner.clear(); 
-                    scanner = null; 
+                scanner.stop().then(() => {
+                    scanner.clear();
+                    scanner = null;
                 }).catch(e => console.log(e));
             }
-            
+
             // Apagado real de pistas de video para Safari
             if (window.localStream) {
                 window.localStream.getTracks().forEach(track => track.stop());
             }
-            
+
             const mira = document.getElementById('scanner-mira');
-            if(mira) mira.style.display = 'none';
+            if (mira) mira.style.display = 'none';
             document.getElementById('cam-resume-btn').style.display = 'none';
         }
 
         function intentarTerminarItem() {
             if (!itemActivo) return;
-
-            document.getElementById('vf-count').innerHTML = `📦 ${itemActivo.act_cajas} | 🍬 ${itemActivo.act_unidades}`;
-            document.getElementById('vf-req').innerHTML = `📦 ${itemActivo.req_cajas} | 🍬 ${itemActivo.req_unidades}`;
-
-            document.getElementById('modal-verify').style.display = 'flex';
+            confirmarVerificacion();
         }
 
-        function cancelarVerificacion() {
-            document.getElementById('modal-verify').style.display = 'none';
-        }
 
         // =====================================
         // CONTROL INTELIGENTE DE CÁMARA
         // =====================================
         function toggleCamaraInteligente() {
             if (!itemActivo) return;
-            
+
             if (!scanner) {
                 // La cámara no ha sido iniciada o fue detenida por completo
                 iniciarCamaraIncrustada();
@@ -1376,44 +2029,36 @@
                 }
             }
         }
-        
+
         // =====================================
         // DISPARADOR MASIVO
         // =====================================
-        function confirmarMasivo() {
+
+        function ejecutarMasivo() {
             if (!itemActivo) return;
             const nombre = (itemActivo.descripcion_producto || 'Producto').replace(/\.{2,}/g, '').trim();
             let texto = '¿Seguro alistaste ';
-            if (itemActivo.req_cajas > 0) texto += `<b>${itemActivo.req_cajas} cajas</b> `;
+            if (itemActivo.req_cajas > 0) texto += `${itemActivo.req_cajas} cajas `;
             if (itemActivo.req_cajas > 0 && itemActivo.req_unidades > 0) texto += 'y ';
-            if (itemActivo.req_unidades > 0) texto += `<b>${itemActivo.req_unidades} unidades</b> `;
-            texto += `del producto <b>${nombre}</b>?`;
-            
-            document.getElementById('txt-confirm-masivo').innerHTML = texto;
-            document.getElementById('modal-confirm-masivo').style.display = 'flex';
-        }
-        
-        function cerrarMasivo() {
-            document.getElementById('modal-confirm-masivo').style.display = 'none';
-        }
-        
-        function ejecutarMasivo() {
-            if (!itemActivo) return;
-            itemActivo.act_cajas = itemActivo.req_cajas;
-            itemActivo.act_unidades = itemActivo.req_unidades;
-            
-            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
-            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
-            
-            cerrarMasivo();
-            playBeep(true);
-            evaluarBotonTerminar();
-            
-            if (scanner) {
-                try {
-                    document.getElementById('embedded-reader').style.opacity = '0.5';
-                    detenerCamara();
-                } catch(e) {}
+            if (itemActivo.req_unidades > 0) texto += `${itemActivo.req_unidades} unidades `;
+            texto += `del producto ${nombre}?`;
+
+            if (window.confirm(texto)) {
+                itemActivo.act_cajas = itemActivo.req_cajas;
+                itemActivo.act_unidades = itemActivo.req_unidades;
+
+                document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+                document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+
+                playBeep(true);
+                evaluarBotonTerminar();
+
+                if (scanner) {
+                    try {
+                        document.getElementById('embedded-reader').style.opacity = '0.5';
+                        detenerCamara();
+                    } catch (e) { }
+                }
             }
         }
 
@@ -1422,45 +2067,58 @@
         // =====================================
         function declararFaltaExistencias() {
             if (!itemActivo) return;
-            document.getElementById('modal-confirm-stock').style.display = 'flex';
+            if (window.confirm("¿Está seguro de que no hay unidades del producto en stock? (Se marcará como Agotado)")) {
+                novedadPendiente = 'FALTA_EXISTENCIAS';
+                idSupervisorAutorizado = null;
+                itemActivo.act_cajas = 0;
+                itemActivo.act_unidades = 0;
+                confirmarVerificacion();
+            }
         }
 
-        function cerrarConfirmacionStock() {
-            document.getElementById('modal-confirm-stock').style.display = 'none';
-        }
 
         function ejecutarFaltaExistencias() {
             cerrarConfirmacionStock();
             novedadPendiente = 'FALTA_EXISTENCIAS';
-            idSupervisorAutorizado = null; 
+            idSupervisorAutorizado = null;
             itemActivo.act_cajas = 0;
             itemActivo.act_unidades = 0;
-            intentarTerminarItem(); 
+            intentarTerminarItem();
         }
 
         function declararSinEAN() {
             if (!itemActivo) return;
-            novedadPendiente = 'SIN_EAN';
-            idSupervisorAutorizado = null; 
-            itemActivo.act_cajas = itemActivo.req_cajas;
-            itemActivo.act_unidades = itemActivo.req_unidades;
-            intentarTerminarItem(); 
+            if (window.confirm("¿Está seguro de enviar este ítem sin EAN? El controlador deberá validarlo.")) {
+                novedadPendiente = 'SIN_EAN';
+                idSupervisorAutorizado = null;
+                itemActivo.act_cajas = itemActivo.req_cajas;
+                itemActivo.act_unidades = itemActivo.req_unidades;
+                confirmarVerificacion();
+            }
         }
 
         function declararNoEnBD() {
             if (!itemActivo) return;
-            novedadPendiente = 'NO_EN_BD';
-            idSupervisorAutorizado = null; 
-            itemActivo.act_cajas = itemActivo.req_cajas;
-            itemActivo.act_unidades = itemActivo.req_unidades;
-            intentarTerminarItem(); 
+            if (window.confirm("¿Está seguro de reportar que este producto no existe en Base de Datos?")) {
+                novedadPendiente = 'NO_EN_BD';
+                idSupervisorAutorizado = null;
+                itemActivo.act_cajas = itemActivo.req_cajas;
+                itemActivo.act_unidades = itemActivo.req_unidades;
+                confirmarVerificacion();
+            }
         }
 
         // =====================================
-        // ENVÍO DE DATOS Y BLOQUEO ANDON
+        // ENVÍO DE DATOS Y BLOQUEO ANDON (CON WINDOW.CONFIRM)
         // =====================================
         function confirmarVerificacion() {
-            const btn = document.querySelector('.btn-v-confirm');
+            if (!itemActivo) return;
+
+            if (!window.confirm(`¿Confirmar Cantidades?\nAlistaste:\n📦 ${itemActivo.act_cajas} Cajas\n🍬 ${itemActivo.act_unidades} Unidades\n\n¿Está seguro de confirmar este alistamiento?`)) {
+                return;
+            }
+
+            const btn = document.querySelector('.btn-finish');
             const textoOriginal = btn.textContent;
             btn.textContent = 'Guardando...';
             btn.disabled = true;
@@ -1468,18 +2126,18 @@
             const idParaBorrar = itemActivo.id;
             const cajasGuardar = itemActivo.act_cajas;
             const unidadesGuardar = itemActivo.act_unidades;
-            
+
             let novedadAEnviar = novedadPendiente;
             let supervisorAEnviar = idSupervisorAutorizado;
 
             if (!novedadPendiente && itemActivo.novedad_alistamiento === 'AUTORIZADO_CIEGAS') {
                 novedadAEnviar = 'AUTORIZADO_CIEGAS';
-                supervisorAEnviar = itemActivo.id_supervisor_novedad || null; 
+                supervisorAEnviar = itemActivo.id_supervisor_novedad || null;
             }
 
             fetch('/api/operario/confirmar_item', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
@@ -1487,47 +2145,46 @@
                     id_row: idParaBorrar,
                     cajas_alistadas: cajasGuardar,
                     unidades_alistadas: unidadesGuardar,
-                    novedad: novedadAEnviar,          
-                    id_supervisor: supervisorAEnviar 
+                    novedad: novedadAEnviar,
+                    id_supervisor: supervisorAEnviar
                 })
             })
-            .then(r => {
-                if (!r.ok) throw new Error("Error en servidor");
-                return r.json();
-            })
-            .then(d => {
-                if (d.status === 'ok') {
-                    cancelarVerificacion(); // Cerramos solo el modal de confirmación
-                    
-                    if (novedadPendiente) {
-                        // SI HAY NOVEDAD: Bloqueo Andon de pantalla completa
-                        document.getElementById('overlay-bloqueo-andon').style.display = 'flex';
-                        // El polling de cargarItemsSilencioso() lo liberará
-                    } else {
-                        // SI NO HAY NOVEDAD: Flujo normal (cerrar y seguir)
-                        cerrarModalPicking();
-                        const idx = listaItems.findIndex(i => i.id === idParaBorrar);
-                        if (idx > -1) {
-                            listaItems[idx].estado_actividad = d.message && d.message.includes('parcial') ? 'EN_PROCESO' : 'ALISTADO';
-                            listaItems[idx].act_cajas = cajasGuardar;
-                            listaItems[idx].act_unidades = unidadesGuardar;
+                .then(r => {
+                    if (!r.ok) throw new Error("Error en servidor");
+                    return r.json();
+                })
+                .then(d => {
+                    if (d.status === 'ok') {
+                        if (novedadPendiente) {
+                            // SI HAY NOVEDAD: Bloqueo Andon de pantalla completa
+                            document.getElementById('overlay-bloqueo-andon').style.display = 'flex';
+                            // El polling de cargarItemsSilencioso() lo liberará
+                        } else {
+                            // SI NO HAY NOVEDAD: Flujo normal (cerrar y seguir)
+                            cerrarModalPicking();
+                            const idx = listaItems.findIndex(i => i.id === idParaBorrar);
+                            if (idx > -1) {
+                                listaItems[idx].estado_actividad = d.message && d.message.includes('parcial') ? 'EN_PROCESO' : 'ALISTADO';
+                                listaItems[idx].act_cajas = cajasGuardar;
+                                listaItems[idx].act_unidades = unidadesGuardar;
+                            }
+                            renderizarItems();
+                            playBeep(true);
                         }
-                        renderizarItems();
-                        playBeep(true);
+                    } else {
+                        alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
                     }
-                } else {
-                    alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
-                }
-            })
-            .catch(e => {
-                console.error(e);
-                alert("❌ Error de Conexión.");
-            })
-            .finally(() => {
-                btn.textContent = textoOriginal;
-                btn.disabled = false;
-            });
+                })
+                .catch(e => {
+                    console.error(e);
+                    alert("❌ Error de Conexión.");
+                })
+                .finally(() => {
+                    btn.textContent = textoOriginal;
+                    btn.disabled = false;
+                });
         }
     </script>
 </body>
+
 </html>

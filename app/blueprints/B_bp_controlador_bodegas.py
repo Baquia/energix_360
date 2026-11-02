@@ -10,6 +10,7 @@ import unicodedata
 import math
 import time
 from app.utils import login_required_custom
+import json
 
 bp_bodegas = Blueprint('bodegas', __name__)
 
@@ -472,6 +473,14 @@ def resolver_novedad_vivo():
                     id_supervisor_novedad = %s
                 WHERE id = %s AND id_empresa = %s
             """, (session.get('usuario_id'), id_row, session.get('empresa_id')))
+            
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload = json.dumps(data)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'RESOLVER_NOVEDAD_VIVO', payload))
 
         mysql.connection.commit()
         cur.close()
@@ -1107,7 +1116,13 @@ def guardar_asignacion_marcas():
                         time.sleep(0.5)
                         continue
                     raise e
-
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload = json.dumps(d)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'GUARDAR_ASIGNACION_MARCAS', payload))
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Asignación guardada correctamente.'})
@@ -1161,7 +1176,13 @@ def asignar_puerta():
             SET puerta_asignada=%s, secuencia_alistamiento=%s, zona=%s, estado_actividad='ASIGNADO', fecha_inicio_alistamiento=NOW()
             WHERE numero_orden_origen=%s AND id_empresa=%s AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL)
         """, (puerta, secuencia, zona, orden, empresa_id))
-
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload = json.dumps(d)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'ASIGNAR_PUERTA', payload))
         mysql.connection.commit()
         cur.close()
         return jsonify({'message': 'Muelle asignado y novedades repartidas equitativamente.'})
@@ -1249,7 +1270,13 @@ def crear_producto_manual():
                     time.sleep(0.5)
                     continue
                 raise e
-
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload = json.dumps(data)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (session.get('empresa', 'Sistema'), nit_empresa, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'CREAR_PRODUCTO_MANUAL', payload))
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success'})
@@ -1361,6 +1388,14 @@ def upload_productos_masivo():
                         fabricante=VALUES(fabricante),
                         unidad_embalaje=VALUES(unidad_embalaje)
                     """, data_to_upsert)
+                    
+                    # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+                    payload = json.dumps({"cantidad_insertada": len(data_to_upsert)})
+                    cur.execute("""
+                        INSERT INTO registro_operaciones_bqa_one 
+                        (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'UPLOAD_PRODUCTOS_MASIVO', payload))
                     mysql.connection.commit()
                     break
                 except Exception as e:
@@ -1447,6 +1482,15 @@ def editar_producto():
                     SET ean = %s, sku = %s, producto = %s, fabricante = %s, unidad_embalaje = %s
                     WHERE ean = %s AND id_empresa = %s
                 """, (nuevo_ean, nuevo_ean, nuevo_nombre, nueva_marca, nuevo_embalaje, ean_original, empresa_id))
+                
+                # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+                payload = json.dumps(data)
+                cur.execute("""
+                    INSERT INTO registro_operaciones_bqa_one 
+                    (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'EDITAR_PRODUCTO', payload))
+                
                 mysql.connection.commit()
                 break
             except Exception as db_e:
@@ -1489,6 +1533,15 @@ def eliminar_producto():
             try:
                 cur.execute("DELETE FROM productos WHERE ean = %s AND id_empresa = %s", (ean, empresa_id))
                 filas_afectadas = cur.rowcount
+                
+                # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+                payload = json.dumps(data)
+                cur.execute("""
+                    INSERT INTO registro_operaciones_bqa_one 
+                    (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'ELIMINAR_PRODUCTO', payload))
+                
                 mysql.connection.commit()
                 break
             except Exception as db_e:
@@ -1531,6 +1584,15 @@ def eliminar_marca():
                     cur.execute("DELETE FROM productos WHERE UPPER(fabricante) = UPPER(%s) AND id_empresa = %s", (fabricante, empresa_id))
 
                 filas_afectadas = cur.rowcount
+                
+                # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+                payload = json.dumps(data)
+                cur.execute("""
+                    INSERT INTO registro_operaciones_bqa_one 
+                    (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'ELIMINAR_MARCA', payload))
+                
                 mysql.connection.commit()
                 break
             except Exception as db_e:
@@ -1620,6 +1682,14 @@ def guardar_promocion():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, data_to_insert)
 
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload = json.dumps(data)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'GUARDAR_PROMOCION', payload))
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Promoción guardada'})
@@ -1634,6 +1704,15 @@ def cambiar_estado_promocion():
         data = request.json
         cur = mysql.connection.cursor()
         cur.execute("UPDATE promociones_clientes SET estado = %s WHERE ean_promo = %s AND id_empresa = %s", (data['estado'], data['ean_promo'], session.get('empresa_id')))
+        
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload = json.dumps(data)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'ESTADO_PROMOCION', payload))
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success'})
@@ -1648,6 +1727,15 @@ def eliminar_promocion():
         data = request.json
         cur = mysql.connection.cursor()
         cur.execute("DELETE FROM promociones_clientes WHERE ean_promo = %s AND id_empresa = %s", (data['ean_promo'], session.get('empresa_id')))
+        
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload = json.dumps(data)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'ELIMINAR_PROMOCION', payload))
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success'})
@@ -1700,6 +1788,15 @@ def despachar_orden():
                 (id_empresa, numero_orden, placa_vehiculo, id_supervisor_despacho, foto_evidencia, firma_evidencia, firma_supervisor)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (session.get('empresa_id'), d['numero_orden'], placa, session.get('usuario_id'), d.get('foto'), d.get('firma'), d.get('firma_supervisor')))
+
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        log_data = {k: v for k, v in d.items() if k not in ['foto', 'firma', 'firma_supervisor']}
+        payload = json.dumps(log_data)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'DESPACHAR_ORDEN', payload))
 
         mysql.connection.commit()
         cur.close()
@@ -1951,6 +2048,15 @@ def guardar_secuencia_zona():
             SET zona=%s, secuencia_alistamiento=%s
             WHERE numero_orden_origen=%s AND id_empresa=%s
         """, (d['zona'], d['secuencia'], d['orden'], session.get('empresa_id')))
+        
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload = json.dumps(d)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'GUARDAR_SECUENCIA', payload))
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'message': 'Zona y orden de secuencia actualizados correctamente.'})
@@ -2174,6 +2280,156 @@ def prevalidar_excel():
         return jsonify({'existe': False})
     except Exception as e:
         return jsonify({'error': f'Error pre-validando el archivo: {str(e)}'}), 500
+
+
+# ==============================================================================
+# PRE-VALIDACIÓN Y CREACIÓN DE PRODUCTOS FALTANTES (INTERCEPCIÓN DE EXCEL)
+# ==============================================================================
+@bp_bodegas.route('/api/bodegas/prevalidar_productos_excel', methods=['POST'])
+@login_required_custom
+def prevalidar_productos_excel():
+    empresa_id = str(session.get('empresa_id'))
+    archivos = request.files.getlist('file')
+    
+    if not archivos or all(f.filename == '' for f in archivos):
+        return jsonify({'error': 'No se recibieron archivos'}), 400
+
+    try:
+        eans_desc_map = {} # Ahora usamos un diccionario para guardar EAN y Nombre
+        for file in archivos:
+            if file.filename == '': continue
+            ext = file.filename.lower()
+            file_bytes = file.read()
+            file.seek(0)
+            
+            if ext.endswith('.csv'):
+                df_raw = pd.read_csv(io.BytesIO(file_bytes), header=None, sep=None, engine='python', dtype=str)
+            else:
+                engine_val = 'openpyxl' if ext.endswith('.xlsx') else ('xlrd' if ext.endswith('.xls') else None)
+                df_raw = pd.read_excel(io.BytesIO(file_bytes), header=None, dtype=str, engine=engine_val)
+            
+            df_raw = df_raw.fillna('')
+            
+            def extraer_de_zona_temp(row, start_idx, end_idx):
+                for col_idx in range(start_idx, min(end_idx + 1, len(row))):
+                    val = str(row[col_idx]).strip()
+                    if val.upper() not in ['NAN', 'NULL', 'NONE', '']: return val
+                return ""
+
+            for i in range(len(df_raw)):
+                row = df_raw.iloc[i]
+                raw_code = extraer_de_zona_temp(row, 1, 4)
+                raw_desc = extraer_de_zona_temp(row, 5, 11)
+                
+                if not raw_desc: continue
+                desc_clean = limpiar_texto(raw_desc)
+                if desc_clean in ['DESCRIPCION', 'PRODUCTO', 'NOMBRE', 'ARTICULO', 'MERCANCIA', 'DETALLE']: continue
+                
+                code_norm = normalizar_codigo(raw_code)
+                if code_norm and es_cadena_numerica(code_norm):
+                    # Limpiamos los puntos suspensivos aquí antes de mandarlo
+                    desc_sugerida = re.sub(r'\.{2,}', '', str(raw_desc)).strip()
+                    if code_norm not in eans_desc_map:
+                        eans_desc_map[code_norm] = desc_sugerida
+
+        if not eans_desc_map:
+            return jsonify({'faltantes': []})
+
+        cur = mysql.connection.cursor()
+        format_strings = ','.join(['%s'] * len(eans_desc_map))
+        # Validar existencia multi-tenant
+        query = f"SELECT ean, sku FROM productos WHERE id_empresa = %s AND (ean IN ({format_strings}) OR sku IN ({format_strings}))"
+        params = [empresa_id] + list(eans_desc_map.keys()) + list(eans_desc_map.keys())
+        
+        cur.execute(query, params)
+        db_prods = cur.fetchall()
+        cur.close()
+
+        eans_en_bd = set()
+        for p in db_prods:
+            if p[0]: eans_en_bd.add(p[0])
+            if p[1]: eans_en_bd.add(p[1])
+
+        # Enviar lista de objetos con EAN y Nombre
+        faltantes = []
+        for ean, desc in eans_desc_map.items():
+            if ean not in eans_en_bd:
+                faltantes.append({'ean': ean, 'nombre': desc})
+                
+        return jsonify({'faltantes': faltantes})
+
+    except Exception as e:
+        return jsonify({'error': f'Error validando productos: {str(e)}'}), 500
+
+@bp_bodegas.route('/api/bodegas/guardar_faltantes_excel', methods=['POST'])
+@login_required_custom
+def guardar_faltantes_excel():
+    empresa_id = str(session.get('empresa_id'))
+    empresa_nombre = str(session.get('nombre_empresa', session.get('empresa', 'Empresa')))
+    data = request.json
+    productos_nuevos = data.get('productos', [])
+
+    if not productos_nuevos:
+        return jsonify({'status': 'error', 'message': 'No se enviaron productos para guardar.'})
+
+    try:
+        cur = mysql.connection.cursor()
+        
+        # Bloque Antificción (Deadlocks / Retries)
+        for intento in range(3):
+            try:
+                for p in productos_nuevos:
+                    ean = p.get('ean')
+                    fabricante = str(p.get('fabricante', 'GENERICO')).strip().upper()
+                    producto = str(p.get('producto', 'SIN NOMBRE')).strip().upper()
+                    embalaje = str(p.get('unidad_embalaje', 'UND')).strip().upper()
+                    
+                    if embalaje not in ['CAJA', 'DISPLAY']:
+                        embalaje = 'UND'
+
+                    cur.execute("""
+                        INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
+                        VALUES (%s, %s, 'general', %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                        producto = VALUES(producto),
+                        fabricante = VALUES(fabricante),
+                        unidad_embalaje = VALUES(unidad_embalaje)
+                    """, (empresa_id, empresa_nombre, ean, ean, producto, fabricante, embalaje))
+
+                # Registro Obligatorio de Auditoría BQA-ONE
+                payload = json.dumps(productos_nuevos)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        empresa VARCHAR(150),
+                        empresa_id VARCHAR(50),
+                        backend_emisor VARCHAR(100),
+                        usuario VARCHAR(100),
+                        cedula VARCHAR(50),
+                        accion VARCHAR(100),
+                        datos JSON
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                """)
+                cur.execute("""
+                    INSERT INTO registro_operaciones_bqa_one 
+                    (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (empresa_nombre, empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'INSERCION_MASIVA_FALTANTES_EXCEL', payload))
+
+                mysql.connection.commit()
+                break
+            except Exception as db_e:
+                if "deadlock" in str(db_e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                raise db_e
+                
+        cur.close()
+        return jsonify({'status': 'success', 'message': 'Productos guardados exitosamente.'})
+    except Exception as e:
+        mysql.connection.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @bp_bodegas.route('/bodegas/upload_excel', methods=['POST'])
@@ -2612,6 +2868,15 @@ def guardar_rutas_picking():
                         VALUES (%s, %s, %s)
                         ON DUPLICATE KEY UPDATE secuencia_picking = VALUES(secuencia_picking)
                     """, data_to_insert)
+                    
+                    # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+                    payload = json.dumps(d)
+                    cur.execute("""
+                        INSERT INTO registro_operaciones_bqa_one 
+                        (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'GUARDAR_RUTAS_PICKING', payload))
+
                     mysql.connection.commit()
                     break
                 except Exception as e:
@@ -2693,6 +2958,15 @@ def crear_usuario():
                     INSERT INTO usuarios (cedula, nombre, password, tipo_usuario, clase, perfil, empresa_id, empresa)
                     VALUES (%s, %s, %s, 'cliente', 'op', %s, %s, %s)
                 """, (cedula, nombre, hash_pw, perfil, empresa_id, empresa_nombre))
+                
+                # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+                payload = json.dumps(data)
+                cur.execute("""
+                    INSERT INTO registro_operaciones_bqa_one 
+                    (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'CREAR_USUARIO_WMS', payload))
+
                 mysql.connection.commit()
                 break
             except Exception as e:
@@ -2733,6 +3007,16 @@ def editar_usuario_crud(id_user):
             cur.execute("UPDATE usuarios SET nombre=%s, perfil=%s WHERE id=%s AND empresa_id=%s",
                         (nombre, perfil, id_user, empresa_id))
 
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload_dict = data.copy() if request.is_json and data else {}
+        payload_dict['id_usuario_afectado'] = id_user
+        payload = json.dumps(payload_dict)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'MODIFICAR_USUARIO_WMS', payload))
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Usuario actualizado correctamente.'})
@@ -2747,6 +3031,16 @@ def eliminar_usuario_crud(id_user):
         cur = mysql.connection.cursor()
         # El AND empresa_id garantiza la seguridad multiempresa
         cur.execute("DELETE FROM usuarios WHERE id=%s AND empresa_id=%s", (id_user, session.get('empresa_id')))
+        
+        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
+        payload_dict = {'id_usuario_afectado': id_user}
+        payload = json.dumps(payload_dict)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'MODIFICAR_USUARIO_WMS', payload))
+
         mysql.connection.commit()
         cur.close()
         return jsonify({'status': 'success', 'message': 'Usuario eliminado del sistema.'})

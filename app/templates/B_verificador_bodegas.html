@@ -4,7 +4,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>WMS Verificación</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
@@ -39,7 +40,11 @@
         }
 
         @media (min-width: 768px) {
-            .app-container { max-width: 600px; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; }
+            .app-container {
+                max-width: 600px;
+                border-left: 1px solid #e2e8f0;
+                border-right: 1px solid #e2e8f0;
+            }
         }
 
         /* --- COLORES VERIFICADOR --- */
@@ -75,8 +80,17 @@
             width: 100%;
         }
 
-        .logo-img { height: 38px; width: auto; object-fit: contain; }
-        .logo-divider { width: 1px; height: 28px; background-color: #cbd5e1; }
+        .logo-img {
+            height: 38px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .logo-divider {
+            width: 1px;
+            height: 28px;
+            background-color: #cbd5e1;
+        }
 
         /* --- CONTENIDO --- */
         .content-area {
@@ -97,84 +111,235 @@
             padding-left: 15px;
         }
 
-        .menu-welcome h2 { font-size: 1.6rem; margin: 0; color: var(--primary-dark); font-weight: 800; }
+        .menu-welcome h2 {
+            font-size: 1.6rem;
+            margin: 0;
+            color: var(--primary-dark);
+            font-weight: 800;
+        }
 
-        .menu-grid { display: grid; gap: 15px; }
+        .menu-grid {
+            display: grid;
+            gap: 15px;
+        }
 
         .menu-card {
-            background: white; border: 1px solid var(--border); border-radius: 12px;
-            padding: 25px 20px; text-align: center; cursor: pointer; position: relative;
-            overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px 20px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
             transition: 0.2s;
         }
 
-        .menu-card:active { transform: scale(0.98); background: #f1f5f9; }
-        .menu-card.opt-picking { border-left: 5px solid var(--primary); }
+        .menu-card:active {
+            transform: scale(0.98);
+            background: #f1f5f9;
+        }
 
-        .menu-icon { font-size: 2.5rem; display: block; margin-bottom: 10px; }
-        .menu-title { font-size: 1.1rem; font-weight: 900; color: var(--primary-dark); text-transform: uppercase; }
+        .menu-card.opt-picking {
+            border-left: 5px solid var(--primary);
+        }
+
+        .menu-icon {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .menu-title {
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: var(--primary-dark);
+            text-transform: uppercase;
+        }
 
         .btn-manual-menu {
-            margin-top: 40px; width: 100%; padding: 16px; background: #f8fafc; border: 1px solid var(--border);
-            color: #334155; font-weight: 700; border-radius: 12px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; text-decoration: none;
+            margin-top: 40px;
+            width: 100%;
+            padding: 16px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            color: #334155;
+            font-weight: 700;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
         }
 
         .btn-logout-menu {
-            margin-top: 20px; width: 100%; padding: 16px; background: white; border: 1px solid #fee2e2;
-            color: #ef4444; font-weight: 700; border-radius: 12px; cursor: pointer; display: flex; justify-content: center; gap: 8px;
+            margin-top: 20px;
+            width: 100%;
+            padding: 16px;
+            background: white;
+            border: 1px solid #fee2e2;
+            color: #ef4444;
+            font-weight: 700;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
         }
 
         /* --- LISTAS --- */
         .nav-back {
-            display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; cursor: pointer;
-            font-weight: 700; color: var(--text-gray); background: none; border: none; font-size: 1rem; padding: 10px 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            font-weight: 700;
+            color: var(--text-gray);
+            background: none;
+            border: none;
+            font-size: 1rem;
+            padding: 10px 0;
         }
 
         /* Responsive Grid para listas (Landscape Mobile) */
         .responsive-grid {
-            display: grid; grid-template-columns: 1fr; gap: 15px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
         }
+
         @media (orientation: landscape) and (max-height: 600px) {
-            .responsive-grid { grid-template-columns: 1fr 1fr; }
+            .responsive-grid {
+                grid-template-columns: 1fr 1fr;
+            }
         }
 
         .order-card {
-            background: white; border-radius: 12px; padding: 20px; margin-bottom: 0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); border-left: 5px solid var(--primary);
-            cursor: pointer; transition: 0.2s;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border-left: 5px solid var(--primary);
+            cursor: pointer;
+            transition: 0.2s;
         }
-        .order-card:active { transform: scale(0.98); background:#f8fafc; }
 
-        .oc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .oc-number { font-size: 1.25rem; font-weight: 800; color: #1e293b; }
-        .oc-badge { background: #e0e7ff; color: var(--primary-dark); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+        .order-card:active {
+            transform: scale(0.98);
+            background: #f8fafc;
+        }
 
-        .p-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 5px; }
-        .p-fill { height: 100%; background: linear-gradient(90deg, var(--success), #27ae60); transition: width 0.4s ease; }
+        .oc-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .oc-number {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .oc-badge {
+            background: #e0e7ff;
+            color: var(--primary-dark);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+
+        .p-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .p-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success), #27ae60);
+            transition: width 0.4s ease;
+        }
 
         .item-row {
-            display: flex; align-items: center; background: white; padding: 15px; border-radius: 12px;
-            gap: 15px; border-left: 4px solid transparent; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            gap: 15px;
+            border-left: 4px solid transparent;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
             cursor: pointer;
         }
-        .item-row:active { background: #f8fafc; }
-        .item-row.active { border-left-color: var(--secondary); }
-        .item-row.done { display: none !important; }
 
-        .qty-indicator {
-            min-width: 55px; height: 55px; background: var(--bg-light); color: var(--primary-dark);
-            border-radius: 10px; display: flex; align-items: center; justify-content: center;
-            font-size: 1.1rem; font-weight: 900; border: 1px solid var(--border); flex-shrink: 0;
+        .item-row:active {
+            background: #f8fafc;
         }
 
-        .item-details { flex: 1; overflow: hidden; }
-        .id-name { font-size: 0.95rem; font-weight: 700; color: #334155; word-break: break-word; line-height: 1.2; }
-        .id-code { font-size: 0.75rem; color: var(--text-gray); font-weight: 600; margin-bottom: 4px; }
+        .item-row.active {
+            border-left-color: var(--secondary);
+        }
+
+        .item-row.done {
+            display: none !important;
+        }
+
+        .qty-indicator {
+            min-width: 55px;
+            height: 55px;
+            background: var(--bg-light);
+            color: var(--primary-dark);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 900;
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .item-details {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .id-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #334155;
+            word-break: break-word;
+            line-height: 1.2;
+        }
+
+        .id-code {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
 
         /* --- ESTILOS COMPARTIDOS DE CÁMARA (BUSCADOR Y MODAL) --- */
         .camera-container {
-            flex: 1; background: #000; border-radius: 12px; overflow: hidden; position: relative;
-            display: flex; flex-direction: column; justify-content: center; margin-bottom: 15px;
+            flex: 1;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-bottom: 15px;
             min-height: 250px;
         }
 
@@ -183,13 +348,14 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            border: 4px solid rgba(255,255,255,0.6);
+            border: 4px solid rgba(255, 255, 255, 0.6);
             border-radius: 12px;
             z-index: 10;
             pointer-events: none;
             display: none;
             transition: all 0.1s ease-in-out;
         }
+
         .scanner-mira.success {
             border-color: #10b981;
             background-color: rgba(16, 185, 129, 0.4);
@@ -197,106 +363,464 @@
             box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
         }
 
-        .embedded-reader-class { width: 100%; height: 100%; transition: opacity 0.3s ease; }
+        .embedded-reader-class {
+            width: 100%;
+            height: 100%;
+            transition: opacity 0.3s ease;
+        }
 
         .btn-start-cam {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white;
-            padding: 15px 25px; border-radius: 30px; font-weight: 800; font-size:1.1rem;
-            display: flex; align-items: center; gap: 10px; cursor: pointer; backdrop-filter: blur(4px); z-index: 5;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 30px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            z-index: 5;
         }
-        .btn-start-cam:active { background: rgba(255, 255, 255, 0.4); }
+
+        .btn-start-cam:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
 
         .btn-resume-cam {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.6); color: white; display: none;
-            flex-direction: column; justify-content: center; align-items: center;
-            z-index: 20; cursor: pointer; text-align: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            cursor: pointer;
+            text-align: center;
         }
-        .btn-resume-cam span.icon { font-size: 3rem; margin-bottom: 10px; }
-        .btn-resume-cam span.text { font-size: 1.2rem; font-weight: 800; }
-        .btn-resume-cam span.sub { font-size: 0.85rem; color: #cbd5e1; margin-top: 5px; }
+
+        .btn-resume-cam span.icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+
+        .btn-resume-cam span.text {
+            font-size: 1.2rem;
+            font-weight: 800;
+        }
+
+        .btn-resume-cam span.sub {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            margin-top: 5px;
+        }
 
 
         /* --- MODAL TRABAJO (VERIFICACIÓN) --- */
         .modal-wrap {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.98); z-index: 100; display: none;
-            justify-content: center; align-items: flex-end;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.98);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
             backdrop-filter: blur(5px);
         }
 
         .picking-sheet {
-            width: 100%; max-width: 600px; height: 100dvh; background: white;
-            display: flex; flex-direction: column; position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 100dvh;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            position: relative;
             animation: slideUp 0.3s ease-out;
         }
 
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
 
         .btn-close-modal {
-            position: absolute; top: 15px; right: 15px; background: #f1f5f9; width: 36px; height: 36px;
-            border-radius: 50%; border: none; font-weight: bold; color: #64748b; font-size: 1.3rem;
-            cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #f1f5f9;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            font-weight: bold;
+            color: #64748b;
+            font-size: 1.3rem;
+            cursor: pointer;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .picking-scroll-area {
-            flex: 1; overflow-y: auto; padding: 20px; padding-top: 25px; display: flex; flex-direction: column;
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-top: 25px;
+            display: flex;
+            flex-direction: column;
         }
 
         .picking-bottom-actions {
-            background: white; padding: 15px 20px; padding-bottom: max(15px, env(safe-area-inset-bottom));
-            border-top: 1px solid var(--border); box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+            background: white;
+            padding: 15px 20px;
+            padding-bottom: max(15px, env(safe-area-inset-bottom));
+            border-top: 1px solid var(--border);
+            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.05);
         }
 
-        .pick-header { margin-bottom: 15px; padding-right: 35px; }
-        .pick-prod { font-size: 1.2rem; font-weight: 900; color: var(--primary-dark); line-height: 1.2; margin-bottom: 8px; }
-        .pick-code-pill { background: #f1f5f9; padding: 4px 10px; border-radius: 6px; font-family: monospace; color: var(--text-gray); font-size: 0.9rem; font-weight: 700; }
+        .pick-header {
+            margin-bottom: 15px;
+            padding-right: 35px;
+        }
 
-        .pick-stats { display: flex; gap: 10px; margin-bottom: 15px; }
-        .stat-box { flex: 1; border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; background: #faf5ff;}
-        .stat-lbl { font-size: 0.7rem; color: var(--secondary); font-weight: 800; text-transform: uppercase; }
-        .stat-val { font-size: 1.2rem; font-weight: 900; color: #1e293b; }
+        .pick-prod {
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: var(--primary-dark);
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
 
-        .action-area { background: #eef2ff; border-radius: 16px; padding: 15px; border: 1px solid #e0e7ff; text-align: center; margin-bottom: 15px; flex-shrink: 0; }
-        .counter-big { font-size: 3.5rem; font-weight: 900; color: var(--primary); line-height: 1; display: block; margin-bottom: 5px; }
-        .counter-lbl { font-size: 0.85rem; color: var(--primary-dark); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+        .pick-code-pill {
+            background: #f1f5f9;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            color: var(--text-gray);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .pick-stats {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+            background: #faf5ff;
+        }
+
+        .stat-lbl {
+            font-size: 0.7rem;
+            color: var(--secondary);
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .stat-val {
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: #1e293b;
+        }
+
+        .action-area {
+            background: #eef2ff;
+            border-radius: 16px;
+            padding: 15px;
+            border: 1px solid #e0e7ff;
+            text-align: center;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+
+        .counter-big {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: var(--primary);
+            line-height: 1;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .counter-lbl {
+            font-size: 0.85rem;
+            color: var(--primary-dark);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
 
         .btn-finish {
-            width: 100%; background: var(--success); color: white; padding: 18px; border-radius: 12px;
-            font-weight: 900; font-size: 1.1rem; border: none; cursor: pointer;
-            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3); transition: 0.2s;
+            width: 100%;
+            background: var(--success);
+            color: white;
+            padding: 18px;
+            border-radius: 12px;
+            font-weight: 900;
+            font-size: 1.1rem;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+            transition: 0.2s;
         }
-        .btn-finish:active { transform: scale(0.98); }
+
+        .btn-finish:active {
+            transform: scale(0.98);
+        }
 
         /* Modal Verificación Final */
-        .verify-sheet { background: white; width: 90%; max-width: 350px; border-radius: 20px; padding: 30px 20px; text-align: center; margin: auto; }
-        .verify-btns { display: flex; gap: 10px; margin-top: 25px; }
-        .btn-v-cancel { flex: 1; padding: 15px; border: 1px solid var(--border); background: white; border-radius: 12px; font-weight: 800; color: #64748b; font-size:1rem;}
-        .btn-v-confirm { flex: 1; padding: 15px; border: none; background: var(--success); border-radius: 12px; font-weight: 800; color: white; font-size:1rem;}
+        .verify-sheet {
+            background: white;
+            width: 90%;
+            max-width: 350px;
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+            margin: auto;
+        }
 
-        .hidden { display: none !important; }
+        .verify-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .btn-v-cancel {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 12px;
+            font-weight: 800;
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .btn-v-confirm {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            background: var(--success);
+            border-radius: 12px;
+            font-weight: 800;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
 
         /* =======================================================
            LANDSCAPE OPTIMIZATION FOR BARCODE SCANNING
            ======================================================= */
         @media (orientation: landscape) and (max-height: 600px) {
             .picking-sheet {
-                flex-direction: row; flex-wrap: wrap; height: 100dvh; overflow: hidden; padding: 0;
+                flex-direction: row;
+                flex-wrap: wrap;
+                height: 100dvh;
+                overflow: hidden;
+                padding: 0;
             }
+
             .picking-scroll-area {
-                flex: 1; height: 100dvh; padding: 15px;
+                flex: 1;
+                height: 100dvh;
+                padding: 15px;
             }
+
             #modal-camera-section {
-                position: absolute; top: 0; left: 0; width: 50%; height: 100dvh; margin: 0; border-radius: 0; z-index: 1;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 50%;
+                height: 100dvh;
+                margin: 0;
+                border-radius: 0;
+                z-index: 1;
             }
+
             .picking-scroll-area {
-                margin-left: 50%; width: 50%; padding-bottom: 90px;
+                margin-left: 50%;
+                width: 50%;
+                padding-bottom: 90px;
             }
+
             .picking-bottom-actions {
-                position: absolute; bottom: 0; right: 0; width: 50%; z-index: 2; padding: 10px 15px;
+                position: absolute;
+                bottom: 0;
+                right: 0;
+                width: 50%;
+                z-index: 2;
+                padding: 10px 15px;
             }
-            .btn-close-modal { top: 10px; right: 10px; }
+
+            .btn-close-modal {
+                top: 10px;
+                right: 10px;
+            }
+        }
+
+        /* =========================================
+   ESTILOS CABECERA UNIVERSAL BQA-ONE
+   ========================================= */
+        .app-header-bqa {
+            background-color: #ffffff;
+            padding: 12px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-bottom: 2px solid #e2e8f0;
+            width: 100%;
+            z-index: 1050;
+            flex-shrink: 0;
+        }
+
+        .brand-area-bqa {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo-bqa {
+            height: 48px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .logo-divider-bqa {
+            width: 2px;
+            height: 40px;
+            background-color: #cbd5e1;
+        }
+
+        .logo-cliente-bqa {
+            height: 48px;
+            max-width: 160px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .user-info-bqa {
+            display: flex;
+            flex-direction: column;
+            text-align: right;
+            margin-left: auto;
+            margin-right: 25px;
+        }
+
+        .user-greeting-bqa {
+            color: #015249;
+            font-weight: 800;
+            font-size: 17px;
+        }
+
+        .user-company-bqa {
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .actions-bqa {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn-bqa-volver {
+            background-color: #475569;
+            color: white;
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            transition: 0.2s;
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-bqa-volver:hover {
+            background-color: #334155;
+        }
+
+        .btn-bqa-salir {
+            background-color: #ef4444;
+            color: white;
+            text-decoration: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            transition: 0.2s;
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-bqa-salir:hover {
+            background-color: #dc2626;
+        }
+
+        /* Adaptación responsiva estricta para celular (Operador/Verificador) */
+        @media (max-width: 850px) {
+            .app-header-bqa {
+                flex-direction: column;
+                gap: 12px;
+                padding: 15px;
+                position: sticky;
+                top: 0;
+            }
+
+            .user-info-bqa {
+                text-align: center;
+                margin: 0;
+            }
+
+            .brand-area-bqa {
+                justify-content: center;
+                width: 100%;
+            }
+
+            .actions-bqa {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .logo-bqa,
+            .logo-cliente-bqa {
+                height: 40px;
+            }
         }
     </style>
 </head>
@@ -304,12 +828,30 @@
 <body>
 
     <div class="app-container">
-        <header class="app-header">
-            <div class="brand-area">
-                <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Energix360" class="logo-img">
-                <div class="logo-divider"></div>
-                <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.PNG') }}" alt="Cliente" class="logo-img"
+        <!-- BARRA SUPERIOR UNIVERSAL -->
+        <!-- BARRA SUPERIOR UNIVERSAL -->
+        <header class="app-header-bqa">
+            <div class="brand-area-bqa">
+                <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="BQA-ONE" class="logo-bqa"
                     onerror="this.style.display='none'">
+
+                {% set render_nit = nit if nit else session.get('empresa_id', '') %}
+                {% if render_nit %}
+                <div class="logo-divider-bqa"></div>
+                <img src="{{ url_for('static', filename='logo_' ~ render_nit ~ '.PNG') }}" alt="Cliente"
+                    class="logo-cliente-bqa" onerror="this.style.display='none'">
+                {% endif %}
+            </div>
+
+            <div class="user-info-bqa">
+                <span class="user-greeting-bqa">Hola {{ usuario if usuario else session.get('nombre', 'Usuario')
+                    }}</span>
+                <span class="user-company-bqa">{{ empresa if empresa else session.get('empresa', 'Empresa') }}</span>
+            </div>
+
+            <div class="actions-bqa">
+                <a href="{{ url_for('hub_ventas_distribucion.dashboard') }}" class="btn-bqa-volver">⬅ Volver</a>
+                <a href="#" onclick="cerrarSesionInstantanea(event)" class="btn-bqa-salir">Salir</a>
             </div>
         </header>
 
@@ -318,7 +860,8 @@
             <div id="view-menu">
                 <div class="menu-welcome">
                     <h2>Hola: {{ usuario }}</h2>
-                    <p style="color: var(--secondary); font-weight: 700; margin-top:5px;">Módulo de Verificador de Bodega</p>
+                    <p style="color: var(--secondary); font-weight: 700; margin-top:5px;">Módulo de Verificador de
+                        Bodega</p>
                 </div>
                 <div class="menu-grid responsive-grid">
                     <div class="menu-card opt-picking" onclick="cargarOrdenes()">
@@ -326,7 +869,7 @@
                         <span class="menu-title">Auditar Picking</span>
                     </div>
                 </div>
-                
+
                 <a href="/bodegas/manual_operacion" target="_blank" class="btn-manual-menu">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
                         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
@@ -340,7 +883,11 @@
 
             <div id="view-orders" class="hidden">
                 <button class="nav-back" onclick="volverAlMenu()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
                     Volver al Menú
                 </button>
                 <h2 style="margin: 5px 0 15px 0; color: var(--primary-dark);">Pedidos Listos (Por Auditar)</h2>
@@ -349,14 +896,21 @@
 
             <div id="view-items" class="hidden">
                 <button class="nav-back" onclick="cargarOrdenes()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
                     Volver a Órdenes
                 </button>
 
-                <div style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">ORDEN A VERIFICAR</div>
+                <div
+                    style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                    <div style="font-size: 0.8rem; font-weight:700; opacity: 0.9; text-transform:uppercase;">ORDEN A
+                        VERIFICAR</div>
                     <div style="font-size: 2.2rem; font-weight: 900; margin-bottom: 5px;" id="lblOrdenTitle">#0000</div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 700; font-size:1.1rem;">
+                    <div
+                        style="display: flex; justify-content: space-between; margin-top: 10px; font-weight: 700; font-size:1.1rem;">
                         <span>Por auditar</span><span id="lblProgress">0/0</span>
                     </div>
                     <div class="p-bar" style="height: 10px; background: rgba(255,255,255,0.2);">
@@ -366,17 +920,19 @@
 
                 <!-- CÁMARA BUSCADOR EN LA VISTA PRINCIPAL -->
                 <!-- CÁMARA BUSCADOR EN LA VISTA PRINCIPAL -->
-                <div class="camera-container" id="main-camera-section" style="display: none; min-height: 200px; margin-bottom: 10px;">
+                <div class="camera-container" id="main-camera-section"
+                    style="display: none; min-height: 200px; margin-bottom: 10px;">
                     <div id="main-embedded-reader" class="embedded-reader-class"></div>
-                    <div id="main-scanner-mira" class="scanner-mira"></div> 
+                    <div id="main-scanner-mira" class="scanner-mira"></div>
                     <div id="main-cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraPrincipal()">
                         <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <path
+                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                             <circle cx="12" cy="13" r="4" />
                         </svg>
                         ACTIVAR BUSCADOR
                     </div>
-                    
+
                     <div id="main-cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamaraPrincipal()">
                         <span class="icon">▶️</span>
                         <span class="text">Tocar para reanudar</span>
@@ -386,612 +942,656 @@
 
                 <!-- CONTROL DUAL CÁMARA PRINCIPAL -->
                 <div style="display: none; gap: 10px; margin-bottom: 15px;" id="btns-control-camara-main">
-                    <button onclick="toggleCamaraPrincipalInteligente()" style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> CÁM ON/OFF
+                    <button onclick="toggleCamaraPrincipalInteligente()"
+                        style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                            </path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg> CÁM ON/OFF
                     </button>
-                    <button onclick="toggleCamaraPrincipalInteligente()" style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
-                        CÁM ON/OFF <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <button onclick="toggleCamaraPrincipalInteligente()"
+                        style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        CÁM ON/OFF <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                            </path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
                     </button>
                 </div>
 
                 <div style="position: sticky; top: 70px; z-index: 40; background: #f8fafc; padding-bottom: 10px;">
 
-                <div style="position: sticky; top: 70px; z-index: 40; background: #f8fafc; padding-bottom: 10px;">
-                    <input type="text" id="searchBox" placeholder="🔍 Búsqueda manual por nombre..." onkeyup="filtrarLista()"
-                        style="width: 100%; padding: 16px; border-radius: 12px; border: 2px solid var(--border); font-size: 1.05rem; font-weight:500; outline:none; transition: 0.2s;">
+                    <div style="position: sticky; top: 70px; z-index: 40; background: #f8fafc; padding-bottom: 10px;">
+                        <input type="text" id="searchBox" placeholder="🔍 Búsqueda manual por nombre..."
+                            onkeyup="filtrarLista()"
+                            style="width: 100%; padding: 16px; border-radius: 12px; border: 2px solid var(--border); font-size: 1.05rem; font-weight:500; outline:none; transition: 0.2s;">
+                    </div>
+                    <div id="items-container" class="responsive-grid"></div>
                 </div>
-                <div id="items-container" class="responsive-grid"></div>
             </div>
         </div>
-    </div>
 
-    <!-- MODAL TRABAJO (VERIFICACIÓN) -->
-    <div id="modal-picking" class="modal-wrap">
-        <div class="picking-sheet">
-            <button class="btn-close-modal" onclick="cerrarModalVerificacion()">✕</button>
+        <!-- MODAL TRABAJO (VERIFICACIÓN) -->
+        <div id="modal-picking" class="modal-wrap">
+            <div class="picking-sheet">
+                <button class="btn-close-modal" onclick="cerrarModalVerificacion()">✕</button>
 
-            <!-- Cámara Modal (Verificación 1 a 1) -->
-            <div class="camera-container" id="modal-camera-section">
-                <div id="modal-embedded-reader" class="embedded-reader-class"></div>
-                <div id="modal-scanner-mira" class="scanner-mira"></div> 
-                <div id="modal-cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraModal()">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                    </svg>
-                    ACTIVAR LECTOR
-                </div>
-                
-                <div id="modal-cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamaraModal()">
-                    <span class="icon">▶️</span>
-                    <span class="text">Tocar para reanudar</span>
-                    <span class="sub">Pausado para ahorrar batería</span>
-                </div>
-            </div>
+                <!-- Cámara Modal (Verificación 1 a 1) -->
+                <div class="camera-container" id="modal-camera-section">
+                    <div id="modal-embedded-reader" class="embedded-reader-class"></div>
+                    <div id="modal-scanner-mira" class="scanner-mira"></div>
+                    <div id="modal-cam-overlay-btn" class="btn-start-cam" onclick="iniciarCamaraModal()">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path
+                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        ACTIVAR LECTOR
+                    </div>
 
-            <div class="picking-scroll-area">
-                <div class="pick-header">
-                    <div id="pk-name" class="pick-prod">Nombre del Producto Completo</div>
-                    <span id="pk-code" class="pick-code-pill">EAN / SKU</span>
-                </div>
-
-                <div id="novedad-alert" class="hidden"
-                    style="background:#fef2f2; color:#be123c; border:1px solid #fecdd3; padding:12px; border-radius:10px; font-size:0.95rem; font-weight:800; margin-bottom:15px; text-align:center;">
-                    ⚠️ NOVEDAD REPORTADA POR ALISTADOR
-                </div>
-
-                <div class="pick-stats">
-                    <div class="stat-box">
-                        <div class="stat-lbl">Cantidades Entregadas</div>
-                        <div id="pk-req" class="stat-val" style="font-size:1.4rem;">0</div>
+                    <div id="modal-cam-resume-btn" class="btn-resume-cam" onclick="reanudarCamaraModal()">
+                        <span class="icon">▶️</span>
+                        <span class="text">Tocar para reanudar</span>
+                        <span class="sub">Pausado para ahorrar batería</span>
                     </div>
                 </div>
 
-                <div class="action-area" id="area-conteo-cajas">
-                    <span class="counter-lbl" style="color:var(--primary-dark);">📦 CAJAS VERIFICADAS</span>
-                    <div style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 15px;">
-                        <button onclick="cambiarCajas(-1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #e0e7ff; color: var(--primary-dark); font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
-                        <span id="pk-count-cajas" class="counter-big" style="color:var(--primary); margin: 0; min-width: 70px;">0</span>
-                        <button onclick="cambiarCajas(1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: var(--primary); color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
+                <div class="picking-scroll-area">
+                    <div class="pick-header">
+                        <div id="pk-name" class="pick-prod">Nombre del Producto Completo</div>
+                        <span id="pk-code" class="pick-code-pill">EAN / SKU</span>
+                    </div>
+
+                    <div id="novedad-alert" class="hidden"
+                        style="background:#fef2f2; color:#be123c; border:1px solid #fecdd3; padding:12px; border-radius:10px; font-size:0.95rem; font-weight:800; margin-bottom:15px; text-align:center;">
+                        ⚠️ NOVEDAD REPORTADA POR ALISTADOR
+                    </div>
+
+                    <div class="pick-stats">
+                        <div class="stat-box">
+                            <div class="stat-lbl">Cantidades Entregadas</div>
+                            <div id="pk-req" class="stat-val" style="font-size:1.4rem;">0</div>
+                        </div>
+                    </div>
+
+                    <div class="action-area" id="area-conteo-cajas">
+                        <span class="counter-lbl" style="color:var(--primary-dark);">📦 CAJAS VERIFICADAS</span>
+                        <div
+                            style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 15px;">
+                            <button onclick="cambiarCajas(-1)"
+                                style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #e0e7ff; color: var(--primary-dark); font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
+                            <span id="pk-count-cajas" class="counter-big"
+                                style="color:var(--primary); margin: 0; min-width: 70px;">0</span>
+                            <button onclick="cambiarCajas(1)"
+                                style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: var(--primary); color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
+                        </div>
+                    </div>
+
+                    <div class="action-area hidden" id="area-teclado-fracciones"
+                        style="background: #f3e8ff; border-color: #e9d5ff;">
+                        <span class="counter-lbl" style="color:#7e22ce;">🍬 UNIDADES VERIFICADAS</span>
+                        <div
+                            style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 15px;">
+                            <button onclick="cambiarFraccion(-1)"
+                                style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #e9d5ff; color: #581c87; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
+                            <span id="pk-count-unidades" class="counter-big"
+                                style="color:#7e22ce; margin: 0; min-width: 70px;">0</span>
+                            <button onclick="cambiarFraccion(1)"
+                                style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #a855f7; color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="action-area hidden" id="area-teclado-fracciones" style="background: #f3e8ff; border-color: #e9d5ff;">
-                    <span class="counter-lbl" style="color:#7e22ce;">🍬 UNIDADES VERIFICADAS</span>
-                    <div style="display: flex; justify-content: center; align-items: center; gap: 25px; margin-top: 15px;">
-                        <button onclick="cambiarFraccion(-1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #e9d5ff; color: #581c87; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">-</button>
-                        <span id="pk-count-unidades" class="counter-big" style="color:#7e22ce; margin: 0; min-width: 70px;">0</span>
-                        <button onclick="cambiarFraccion(1)" style="width: 55px; height: 55px; border-radius: 50%; font-size: 2.2rem; border: none; background: #a855f7; color: white; font-weight: bold; cursor: pointer; box-shadow:0 2px 5px rgba(0,0,0,0.1);">+</button>
+                <!-- Zona del Pulgar (Acciones) -->
+                <!-- Zona del Pulgar (Acciones) -->
+                <div class="picking-bottom-actions">
+                    <button id="btn-masivo" class="hidden" onclick="ejecutarMasivo()"
+                        style="width: 100%; background: var(--primary); color: white; padding: 15px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(67, 56, 202, 0.3);">⚡
+                        VERIFICACIÓN MASIVA</button>
+
+                    <!-- CONTROL DUAL CÁMARA MODAL -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;" id="btns-control-camara-modal">
+                        <button onclick="toggleCamaraModalInteligente()"
+                            style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                                viewBox="0 0 24 24">
+                                <path
+                                    d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                                </path>
+                                <circle cx="12" cy="13" r="4"></circle>
+                            </svg> CÁM ON/OFF
+                        </button>
+                        <button onclick="toggleCamaraModalInteligente()"
+                            style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
+                            CÁM ON/OFF <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                                viewBox="0 0 24 24">
+                                <path
+                                    d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                                </path>
+                                <circle cx="12" cy="13" r="4"></circle>
+                            </svg>
+                        </button>
                     </div>
+
+                    <button class="btn-finish" onclick="intentarVerificarItem()">CONFIRMAR AUDITORÍA</button>
                 </div>
             </div>
+        </div>
 
-            <!-- Zona del Pulgar (Acciones) -->
-            <!-- Zona del Pulgar (Acciones) -->
-            <div class="picking-bottom-actions">
-                <button id="btn-masivo" class="hidden" onclick="confirmarMasivo()" style="width: 100%; background: var(--primary); color: white; padding: 15px; border-radius: 12px; font-weight: 900; font-size: 1rem; border: none; cursor: pointer; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(67, 56, 202, 0.3);">⚡ VERIFICACIÓN MASIVA</button>
-                
-                <!-- CONTROL DUAL CÁMARA MODAL -->
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;" id="btns-control-camara-modal">
-                    <button onclick="toggleCamaraModalInteligente()" style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> CÁM ON/OFF
-                    </button>
-                    <button onclick="toggleCamaraModalInteligente()" style="flex:1; background:#e0e7ff; color:#312e81; padding:10px; border-radius:10px; border:1px solid #c7d2fe; font-weight:800; cursor:pointer; font-size: 0.9rem; display:flex; justify-content:center; align-items:center; gap:8px;">
-                        CÁM ON/OFF <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-                    </button>
+        <!-- Modal Confirmación Verificación Final (Sellar) -->
+        <div id="modal-verify" class="modal-wrap" style="z-index: 105;">
+            <div class="verify-sheet">
+                <div style="font-size: 3.5rem; margin-bottom: 10px;">✅</div>
+                <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">¿Sellar Verificación?</h3>
+                <p style="color:#475569; line-height:1.5; font-size:1.05rem;">
+                    Auditoría Física: <b id="vf-count" style="color:var(--secondary); font-size:1.3rem;">0</b>
+                </p>
+                <div class="verify-btns">
+                    <button class="btn-v-cancel" onclick="cancelarConfirmacion()">Volver</button>
+                    <button class="btn-v-confirm" onclick="ejecutarVerificacionFinal()">SELLAR</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Confirmación Verificación Masiva -->
+        <div id="modal-confirm-masivo" class="modal-wrap" style="z-index: 115;">
+            <div class="verify-sheet">
+                <div style="font-size: 3.5rem; margin-bottom: 10px;">⚡</div>
+                <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">Verificación Masiva</h3>
+                <p id="txt-confirm-masivo" style="color:#475569; line-height:1.5; font-size:1.05rem;">
+                    ¿Seguro verificaste X unidades del producto Y?
+                </p>
+                <div class="verify-btns">
+                    <button class="btn-v-cancel" onclick="cerrarMasivo()">No, Volver</button>
+                    <button class="btn-v-confirm" style="background: var(--primary);" onclick="ejecutarMasivo()">Sí,
+                        Confirmo</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Sellar Orden (Firma Verificador) -->
+        <div id="modal-sellar-orden" class="modal-wrap" style="z-index: 120;">
+            <div class="verify-sheet" style="max-width: 400px;">
+                <div style="font-size: 3.5rem; margin-bottom: 10px;">✍️</div>
+                <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">Firma de Auditoría</h3>
+                <p style="color:#475569; line-height:1.5; font-size:0.95rem; margin-bottom:15px;">
+                    La orden <b id="so-orden" style="color:var(--primary);"></b> ha sido verificada completamente. Por
+                    favor, registra tu firma para sellar el acta.
+                </p>
+
+                <div style="margin-top: 10px; text-align: left;">
+                    <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">TU FIRMA (VERIFICADOR)</label>
+                    <canvas id="canvasFirmaVerificador" width="350" height="200"
+                        style="border: 2px dashed #cbd5e1; border-radius: 12px; width: 100%; touch-action: none; background: #f8fafc; margin-top:5px;"></canvas>
+                    <button type="button"
+                        style="background:transparent; border:none; color:#ef4444; font-weight:700; cursor:pointer; margin-top:5px; width:100%; text-align:right;"
+                        onclick="limpiarFirmaVerificador()">Borrar firma</button>
                 </div>
 
-                <button class="btn-finish" onclick="intentarVerificarItem()">CONFIRMAR AUDITORÍA</button>
+                <div class="verify-btns">
+                    <button type="button" class="btn-v-cancel" onclick="cerrarSellarOrden()">Más tarde</button>
+                    <button type="button" class="btn-v-confirm" onclick="ejecutarSellarOrden()">GUARDAR FIRMA</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Modal Confirmación Verificación Final (Sellar) -->
-    <div id="modal-verify" class="modal-wrap" style="z-index: 105;">
-        <div class="verify-sheet">
-            <div style="font-size: 3.5rem; margin-bottom: 10px;">✅</div>
-            <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">¿Sellar Verificación?</h3>
-            <p style="color:#475569; line-height:1.5; font-size:1.05rem;">
-                Auditoría Física: <b id="vf-count" style="color:var(--secondary); font-size:1.3rem;">0</b>
-            </p>
-            <div class="verify-btns">
-                <button class="btn-v-cancel" onclick="cancelarConfirmacion()">Volver</button>
-                <button class="btn-v-confirm" onclick="ejecutarVerificacionFinal()">SELLAR</button>
-            </div>
-        </div>
-    </div>
+        <script>
+            let ordenActual = null, listaItems = [], itemActivo = null;
+            let lastScanTime = 0;
+            let audioCtx = null;
+            let wakeLock = null;
 
-    <!-- Modal Confirmación Verificación Masiva -->
-    <div id="modal-confirm-masivo" class="modal-wrap" style="z-index: 115;">
-        <div class="verify-sheet">
-            <div style="font-size: 3.5rem; margin-bottom: 10px;">⚡</div>
-            <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">Verificación Masiva</h3>
-            <p id="txt-confirm-masivo" style="color:#475569; line-height:1.5; font-size:1.05rem;">
-                ¿Seguro verificaste X unidades del producto Y?
-            </p>
-            <div class="verify-btns">
-                <button class="btn-v-cancel" onclick="cerrarMasivo()">No, Volver</button>
-                <button class="btn-v-confirm" style="background: var(--primary);" onclick="ejecutarMasivo()">Sí, Confirmo</button>
-            </div>
-        </div>
-    </div>
+            let scannerMain = null;
+            let sleepTimerMain = null;
 
-    <!-- Modal Sellar Orden (Firma Verificador) -->
-    <div id="modal-sellar-orden" class="modal-wrap" style="z-index: 120;">
-        <div class="verify-sheet" style="max-width: 400px;">
-            <div style="font-size: 3.5rem; margin-bottom: 10px;">✍️</div>
-            <h3 style="margin:0 0 10px 0; color:#1e293b; font-size:1.4rem;">Firma de Auditoría</h3>
-            <p style="color:#475569; line-height:1.5; font-size:0.95rem; margin-bottom:15px;">
-                La orden <b id="so-orden" style="color:var(--primary);"></b> ha sido verificada completamente. Por favor, registra tu firma para sellar el acta.
-            </p>
-            
-            <div style="margin-top: 10px; text-align: left;">
-                <label style="font-size:0.8rem; color:#6b7280; font-weight:700;">TU FIRMA (VERIFICADOR)</label>
-                <canvas id="canvasFirmaVerificador" width="350" height="200" style="border: 2px dashed #cbd5e1; border-radius: 12px; width: 100%; touch-action: none; background: #f8fafc; margin-top:5px;"></canvas>
-                <button type="button" style="background:transparent; border:none; color:#ef4444; font-weight:700; cursor:pointer; margin-top:5px; width:100%; text-align:right;" onclick="limpiarFirmaVerificador()">Borrar firma</button>
-            </div>
+            let scannerModal = null;
+            let sleepTimerModal = null;
 
-            <div class="verify-btns">
-                <button type="button" class="btn-v-cancel" onclick="cerrarSellarOrden()">Más tarde</button>
-                <button type="button" class="btn-v-confirm" onclick="ejecutarSellarOrden()">GUARDAR FIRMA</button>
-            </div>
-        </div>
-    </div>
+            // Interceptor asíncrono para blindaje WebKit / iOS
+            const observerCamara = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.tagName && node.tagName.toUpperCase() === 'VIDEO') {
+                            node.setAttribute('playsinline', 'true');
+                            node.setAttribute('webkit-playsinline', 'true');
+                            node.setAttribute('muted', 'true');
+                            node.muted = true;
+                        }
+                    });
+                });
+            });
+            observerCamara.observe(document.body, { childList: true, subtree: true });
 
-    <script>
-        let ordenActual = null, listaItems = [], itemActivo = null;
-        let lastScanTime = 0;
-        let audioCtx = null;
-        let wakeLock = null;
-        
-        let scannerMain = null;
-        let sleepTimerMain = null;
-        
-        let scannerModal = null;
-        let sleepTimerModal = null;
+            function cerrarSesionInstantanea(e) {
+                if (e) e.preventDefault();
+                fetch('/api/bodegas/offline', { method: 'POST' })
+                    .then(() => { window.location.href = '/logout'; })
+                    .catch(() => { window.location.href = '/logout'; });
+            }
 
-        // Interceptor asíncrono para blindaje WebKit / iOS
-        const observerCamara = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.tagName && node.tagName.toUpperCase() === 'VIDEO') {
-                        node.setAttribute('playsinline', 'true');
-                        node.setAttribute('webkit-playsinline', 'true');
-                        node.setAttribute('muted', 'true');
-                        node.muted = true;
+            async function requestWakeLock() {
+                try {
+                    if ('wakeLock' in navigator) {
+                        wakeLock = await navigator.wakeLock.request('screen');
+                    }
+                } catch (err) {
+                    console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+                }
+            }
+
+            function releaseWakeLock() {
+                if (wakeLock !== null) {
+                    wakeLock.release().then(() => {
+                        wakeLock = null;
+                    });
+                }
+            }
+
+            function initAudio() {
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (!audioCtx && AudioContext) {
+                        audioCtx = new AudioContext();
+                    }
+                    if (audioCtx && audioCtx.state === 'suspended') {
+                        audioCtx.resume();
+                    }
+                } catch (e) { console.error("Audio init error", e); }
+            }
+
+            function playBeep(isSuccess = true) {
+                try {
+                    if (navigator.vibrate) {
+                        navigator.vibrate(isSuccess ? 150 : [50, 100, 50]);
+                    }
+
+                    if (audioCtx) {
+                        if (audioCtx.state === 'suspended') audioCtx.resume();
+                        const oscillator = audioCtx.createOscillator();
+                        const gainNode = audioCtx.createGain();
+                        oscillator.type = isSuccess ? 'square' : 'sawtooth';
+                        oscillator.frequency.setValueAtTime(isSuccess ? 1800 : 300, audioCtx.currentTime);
+                        gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioCtx.destination);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + (isSuccess ? 0.2 : 0.4));
+                    }
+                } catch (e) { console.log("Audio play error", e); }
+            }
+
+            function mostrarToastError(mensaje) {
+                let toast = document.getElementById('toast-error-scanner');
+                if (!toast) {
+                    toast = document.createElement('div');
+                    toast.id = 'toast-error-scanner';
+                    toast.style.position = 'fixed';
+                    toast.style.bottom = '120px'; // Thumb zone visibility
+                    toast.style.left = '50%';
+                    toast.style.transform = 'translateX(-50%)';
+                    toast.style.background = 'rgba(225, 29, 72, 0.95)';
+                    toast.style.color = 'white';
+                    toast.style.padding = '12px 24px';
+                    toast.style.borderRadius = '30px';
+                    toast.style.fontWeight = '900';
+                    toast.style.fontSize = '1.1rem';
+                    toast.style.zIndex = '9999';
+                    toast.style.boxShadow = '0 10px 25px rgba(225, 29, 72, 0.5)';
+                    toast.style.transition = 'opacity 0.3s ease';
+                    toast.style.backdropFilter = 'blur(4px)';
+                    toast.style.pointerEvents = 'none';
+                    document.body.appendChild(toast);
+                }
+                toast.innerHTML = '❌ ' + mensaje;
+                toast.style.opacity = '1';
+
+                // Destello rojo en la mira activa
+                const miras = document.querySelectorAll('.scanner-mira');
+                miras.forEach(mira => {
+                    if (mira.style.display === 'block') {
+                        mira.style.borderColor = '#e11d48';
+                        mira.style.backgroundColor = 'rgba(225, 29, 72, 0.4)';
+                        mira.style.boxShadow = '0 0 20px rgba(225, 29, 72, 0.8)';
+                        setTimeout(() => {
+                            mira.style.borderColor = 'rgba(255,255,255,0.6)';
+                            mira.style.backgroundColor = 'transparent';
+                            mira.style.boxShadow = 'none';
+                        }, 500);
                     }
                 });
-            });
-        });
-        observerCamara.observe(document.body, { childList: true, subtree: true });
 
-        function cerrarSesionInstantanea(e) {
-            if (e) e.preventDefault();
-            fetch('/api/bodegas/offline', { method: 'POST' })
-            .then(() => { window.location.href = '/logout'; })
-            .catch(() => { window.location.href = '/logout'; });
-        }
-
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                }
-            } catch (err) {
-                console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+                setTimeout(() => { toast.style.opacity = '0'; }, 2500);
             }
-        }
 
-        function releaseWakeLock() {
-            if (wakeLock !== null) {
-                wakeLock.release().then(() => {
-                    wakeLock = null;
-                });
+            // =====================================
+            // CONTROL CAMARA PRINCIPAL (BUSCADOR EN LISTA)
+            // =====================================
+            function iniciarTemporizadorMain() {
+                clearTimeout(sleepTimerMain);
+                sleepTimerMain = setTimeout(pausarCamaraMain, 20000);
             }
-        }
 
-        function initAudio() {
-            try {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (!audioCtx && AudioContext) {
-                    audioCtx = new AudioContext();
+            function pausarCamaraMain() {
+                if (scannerMain && scannerMain.getState() === 2) {
+                    try {
+                        scannerMain.pause(true);
+                        document.getElementById('main-embedded-reader').style.opacity = '0.3';
+                        document.getElementById('main-scanner-mira').style.display = 'none';
+                        document.getElementById('main-cam-resume-btn').style.display = 'flex';
+                    } catch (e) { }
                 }
-                if (audioCtx && audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
-            } catch (e) { console.error("Audio init error", e); }
-        }
-
-        function playBeep(isSuccess = true) {
-            try {
-                if (navigator.vibrate) {
-                    navigator.vibrate(isSuccess ? 150 : [50, 100, 50]); 
-                }
-                
-                if (audioCtx) {
-                    if (audioCtx.state === 'suspended') audioCtx.resume();
-                    const oscillator = audioCtx.createOscillator();
-                    const gainNode = audioCtx.createGain();
-                    oscillator.type = isSuccess ? 'square' : 'sawtooth';
-                    oscillator.frequency.setValueAtTime(isSuccess ? 1800 : 300, audioCtx.currentTime); 
-                    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); 
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + (isSuccess ? 0.2 : 0.4)); 
-                }
-            } catch (e) { console.log("Audio play error", e); }
-        }
-
-        function mostrarToastError(mensaje) {
-            let toast = document.getElementById('toast-error-scanner');
-            if (!toast) {
-                toast = document.createElement('div');
-                toast.id = 'toast-error-scanner';
-                toast.style.position = 'fixed';
-                toast.style.bottom = '120px'; // Thumb zone visibility
-                toast.style.left = '50%';
-                toast.style.transform = 'translateX(-50%)';
-                toast.style.background = 'rgba(225, 29, 72, 0.95)';
-                toast.style.color = 'white';
-                toast.style.padding = '12px 24px';
-                toast.style.borderRadius = '30px';
-                toast.style.fontWeight = '900';
-                toast.style.fontSize = '1.1rem';
-                toast.style.zIndex = '9999';
-                toast.style.boxShadow = '0 10px 25px rgba(225, 29, 72, 0.5)';
-                toast.style.transition = 'opacity 0.3s ease';
-                toast.style.backdropFilter = 'blur(4px)';
-                toast.style.pointerEvents = 'none';
-                document.body.appendChild(toast);
             }
-            toast.innerHTML = '❌ ' + mensaje;
-            toast.style.opacity = '1';
-            
-            // Destello rojo en la mira activa
-            const miras = document.querySelectorAll('.scanner-mira');
-            miras.forEach(mira => {
-                if(mira.style.display === 'block') {
-                    mira.style.borderColor = '#e11d48';
-                    mira.style.backgroundColor = 'rgba(225, 29, 72, 0.4)';
-                    mira.style.boxShadow = '0 0 20px rgba(225, 29, 72, 0.8)';
-                    setTimeout(() => {
-                        mira.style.borderColor = 'rgba(255,255,255,0.6)';
-                        mira.style.backgroundColor = 'transparent';
-                        mira.style.boxShadow = 'none';
-                    }, 500);
+
+            function reanudarCamaraPrincipal() {
+                if (scannerMain) {
+                    try {
+                        scannerMain.resume();
+                        document.getElementById('main-embedded-reader').style.opacity = '1';
+                        document.getElementById('main-cam-resume-btn').style.display = 'none';
+                        document.getElementById('main-scanner-mira').style.display = 'block';
+                        iniciarTemporizadorMain();
+                    } catch (e) { }
                 }
-            });
+            }
 
-            setTimeout(() => { toast.style.opacity = '0'; }, 2500);
-        }
+            function iniciarCamaraPrincipal() {
+                document.getElementById('main-cam-overlay-btn').style.display = 'none';
+                document.getElementById('main-cam-resume-btn').style.display = 'none';
 
-        // =====================================
-        // CONTROL CAMARA PRINCIPAL (BUSCADOR EN LISTA)
-        // =====================================
-        function iniciarTemporizadorMain() {
-            clearTimeout(sleepTimerMain);
-            sleepTimerMain = setTimeout(pausarCamaraMain, 20000);
-        }
+                initAudio();
+                requestWakeLock();
 
-        function pausarCamaraMain() {
-            if (scannerMain && scannerMain.getState() === 2) { 
-                try {
-                    scannerMain.pause(true); 
-                    document.getElementById('main-embedded-reader').style.opacity = '0.3';
+                const isPortrait = window.innerHeight > window.innerWidth;
+                const screenWidth = window.innerWidth;
+                const targetWidth = isPortrait ? Math.trunc(screenWidth * 0.8) : Math.trunc(screenWidth * 0.35);
+                const targetHeight = Math.trunc(targetWidth * 0.45);
+
+                const mira = document.getElementById('main-scanner-mira');
+                mira.style.width = targetWidth + 'px';
+                mira.style.height = targetHeight + 'px';
+                mira.style.display = 'block';
+
+                const configScanner = {
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.QR_CODE
+                    ]
+                };
+
+                scannerMain = new Html5Qrcode("main-embedded-reader", configScanner);
+                scannerMain.start(
+                    { facingMode: "environment" },
+                    { fps: 4, qrbox: { width: targetWidth, height: targetHeight } },
+                    (decodedText) => {
+                        iniciarTemporizadorMain();
+                        const now = Date.now();
+                        if (now - lastScanTime < 1500) return;
+
+                        const scanned = decodedText.trim().toUpperCase();
+
+                        let targetItem = listaItems.find(i =>
+                            (i.codigo_producto || '').trim().toUpperCase() === scanned &&
+                            i.estado_actividad === 'ALISTADO'
+                        );
+
+                        if (targetItem) {
+                            lastScanTime = now;
+                            playBeep(true);
+
+                            if (mira) {
+                                mira.classList.add('success');
+                                setTimeout(() => mira.classList.remove('success'), 300);
+                            }
+
+                            // Detenemos la cámara principal antes de abrir el modal para evitar colisiones
+                            detenerCamaraPrincipal(() => {
+                                abrirModalVerificarId(targetItem.id);
+                            });
+
+                        } else {
+                            lastScanTime = now;
+                            playBeep(false);
+                            mostrarToastError(`Código incorrecto o el producto ya fue verificado.`);
+                        }
+                    },
+                    (err) => { }
+                ).then(() => {
+                    iniciarTemporizadorMain();
+                }).catch(err => {
+                    console.error(err);
+                    alert("Error cámara buscador: " + (err.message || err));
+                    document.getElementById('main-cam-overlay-btn').style.display = 'flex';
                     document.getElementById('main-scanner-mira').style.display = 'none';
-                    document.getElementById('main-cam-resume-btn').style.display = 'flex';
-                } catch(e) {}
+                });
             }
-        }
 
-        function reanudarCamaraPrincipal() {
-            if (scannerMain) {
-                try {
-                    scannerMain.resume();
-                    document.getElementById('main-embedded-reader').style.opacity = '1';
-                    document.getElementById('main-cam-resume-btn').style.display = 'none';
-                    document.getElementById('main-scanner-mira').style.display = 'block';
-                    iniciarTemporizadorMain();
-                } catch(e) {}
-            }
-        }
+            function detenerCamaraPrincipal(callback) {
+                clearTimeout(sleepTimerMain);
+                if (scannerMain) {
+                    scannerMain.stop().then(() => {
+                        scannerMain.clear();
+                        scannerMain = null;
+                        if (callback) callback();
+                    }).catch(e => {
+                        console.log(e);
+                        scannerMain = null;
+                        if (callback) callback();
+                    });
+                } else {
+                    if (callback) callback();
+                }
 
-        function iniciarCamaraPrincipal() {
-            document.getElementById('main-cam-overlay-btn').style.display = 'none';
-            document.getElementById('main-cam-resume-btn').style.display = 'none';
+                // Apagado real de pistas de video para Safari
+                if (window.localStream) {
+                    window.localStream.getTracks().forEach(track => track.stop());
+                }
 
-            initAudio();
-            requestWakeLock();
-
-            const isPortrait = window.innerHeight > window.innerWidth;
-            const screenWidth = window.innerWidth;
-            const targetWidth = isPortrait ? Math.trunc(screenWidth * 0.8) : Math.trunc(screenWidth * 0.35);
-            const targetHeight = Math.trunc(targetWidth * 0.45);
-
-            const mira = document.getElementById('main-scanner-mira');
-            mira.style.width = targetWidth + 'px';
-            mira.style.height = targetHeight + 'px';
-            mira.style.display = 'block';
-
-            const configScanner = {
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13, 
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128, 
-                    Html5QrcodeSupportedFormats.QR_CODE
-                ]
-            };
-
-            scannerMain = new Html5Qrcode("main-embedded-reader", configScanner);
-            scannerMain.start(
-                { facingMode: "environment" },
-                { fps: 4, qrbox: { width: targetWidth, height: targetHeight } },
-                (decodedText) => {
-                    iniciarTemporizadorMain();
-                    const now = Date.now();
-                    if (now - lastScanTime < 1500) return; 
-
-                    const scanned = decodedText.trim().toUpperCase();
-                    
-                    let targetItem = listaItems.find(i => 
-                        (i.codigo_producto || '').trim().toUpperCase() === scanned && 
-                        i.estado_actividad === 'ALISTADO'
-                    );
-
-                    if (targetItem) {
-                        lastScanTime = now;
-                        playBeep(true);
-
-                        if (mira) {
-                            mira.classList.add('success');
-                            setTimeout(() => mira.classList.remove('success'), 300);
-                        }
-
-                        // Detenemos la cámara principal antes de abrir el modal para evitar colisiones
-                        detenerCamaraPrincipal(() => {
-                            abrirModalVerificarId(targetItem.id);
-                        });
-
-                    } else {
-                        lastScanTime = now;
-                        playBeep(false);
-                        mostrarToastError(`Código incorrecto o el producto ya fue verificado.`);
-                    }
-                },
-                (err) => {}
-            ).then(() => {
-                iniciarTemporizadorMain();
-            }).catch(err => {
-                console.error(err);
-                alert("Error cámara buscador: " + (err.message || err));
+                const mira = document.getElementById('main-scanner-mira');
+                if (mira) mira.style.display = 'none';
+                document.getElementById('main-cam-resume-btn').style.display = 'none';
                 document.getElementById('main-cam-overlay-btn').style.display = 'flex';
-                document.getElementById('main-scanner-mira').style.display = 'none';
-            });
-        }
-
-        function detenerCamaraPrincipal(callback) {
-            clearTimeout(sleepTimerMain);
-            if (scannerMain) {
-                scannerMain.stop().then(() => { 
-                    scannerMain.clear(); 
-                    scannerMain = null; 
-                    if(callback) callback();
-                }).catch(e => { 
-                    console.log(e); 
-                    scannerMain = null;
-                    if(callback) callback();
-                });
-            } else {
-                if(callback) callback();
-            }
-            
-            // Apagado real de pistas de video para Safari
-            if (window.localStream) {
-                window.localStream.getTracks().forEach(track => track.stop());
+                document.getElementById('main-embedded-reader').style.opacity = '1';
             }
 
-            const mira = document.getElementById('main-scanner-mira');
-            if(mira) mira.style.display = 'none';
-            document.getElementById('main-cam-resume-btn').style.display = 'none';
-            document.getElementById('main-cam-overlay-btn').style.display = 'flex';
-            document.getElementById('main-embedded-reader').style.opacity = '1';
-        }
+            // =====================================
+            // CONTROL CAMARA MODAL (AUDITORÍA 1 a 1)
+            // =====================================
+            function iniciarTemporizadorModal() {
+                clearTimeout(sleepTimerModal);
+                sleepTimerModal = setTimeout(pausarCamaraModal, 20000);
+            }
 
-        // =====================================
-        // CONTROL CAMARA MODAL (AUDITORÍA 1 a 1)
-        // =====================================
-        function iniciarTemporizadorModal() {
-            clearTimeout(sleepTimerModal);
-            sleepTimerModal = setTimeout(pausarCamaraModal, 20000);
-        }
+            function pausarCamaraModal() {
+                if (scannerModal && scannerModal.getState() === 2) {
+                    try {
+                        scannerModal.pause(true);
+                        document.getElementById('modal-embedded-reader').style.opacity = '0.3';
+                        document.getElementById('modal-scanner-mira').style.display = 'none';
+                        document.getElementById('modal-cam-resume-btn').style.display = 'flex';
+                    } catch (e) { }
+                }
+            }
 
-        function pausarCamaraModal() {
-            if (scannerModal && scannerModal.getState() === 2) { 
-                try {
-                    scannerModal.pause(true); 
-                    document.getElementById('modal-embedded-reader').style.opacity = '0.3';
+            function reanudarCamaraModal() {
+                if (scannerModal) {
+                    try {
+                        scannerModal.resume();
+                        document.getElementById('modal-embedded-reader').style.opacity = '1';
+                        document.getElementById('modal-cam-resume-btn').style.display = 'none';
+                        document.getElementById('modal-scanner-mira').style.display = 'block';
+                        iniciarTemporizadorModal();
+                    } catch (e) { }
+                }
+            }
+
+            function iniciarCamaraModal() {
+                if (!itemActivo) return;
+                document.getElementById('modal-cam-overlay-btn').style.display = 'none';
+                document.getElementById('modal-cam-resume-btn').style.display = 'none';
+
+                initAudio();
+
+                const isPortrait = window.innerHeight > window.innerWidth;
+                const screenWidth = window.innerWidth;
+                const targetWidth = isPortrait ? Math.trunc(screenWidth * 0.8) : Math.trunc(screenWidth * 0.35);
+                const targetHeight = Math.trunc(targetWidth * 0.45);
+
+                const mira = document.getElementById('modal-scanner-mira');
+                mira.style.width = targetWidth + 'px';
+                mira.style.height = targetHeight + 'px';
+                mira.style.display = 'block';
+
+                const configScanner = {
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.QR_CODE
+                    ]
+                };
+
+                scannerModal = new Html5Qrcode("modal-embedded-reader", configScanner);
+                scannerModal.start(
+                    { facingMode: "environment" },
+                    { fps: 4, qrbox: { width: targetWidth, height: targetHeight } },
+                    (decodedText) => {
+                        iniciarTemporizadorModal();
+                        const now = Date.now();
+                        if (now - lastScanTime < 1500) return;
+
+                        const scanned = decodedText.trim().toUpperCase();
+                        const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
+
+                        if (target && scanned === target) {
+                            lastScanTime = now;
+                            playBeep(true);
+
+                            if (mira) {
+                                mira.classList.add('success');
+                                setTimeout(() => mira.classList.remove('success'), 300);
+                            }
+
+                            if (itemActivo.req_cajas > 0 && itemActivo.act_cajas < itemActivo.req_cajas) {
+                                itemActivo.act_cajas++;
+                                document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+
+                                document.getElementById('pk-count-cajas').style.color = '#10b981';
+                                setTimeout(() => document.getElementById('pk-count-cajas').style.color = 'var(--primary)', 300);
+
+                            } else if (itemActivo.req_unidades > 0 && itemActivo.act_unidades < itemActivo.req_unidades) {
+                                itemActivo.act_unidades++;
+                                document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
+
+                                document.getElementById('pk-count-unidades').style.color = '#10b981';
+                                setTimeout(() => document.getElementById('pk-count-unidades').style.color = '#7e22ce', 300);
+                            }
+
+                            evaluarBotonTerminar();
+                        } else {
+                            lastScanTime = now;
+                            playBeep(false);
+                            mostrarToastError(`Código incorrecto. Esperado: ${itemActivo.codigo_producto}`);
+                        }
+                    },
+                    (err) => { }
+                ).then(() => {
+                    iniciarTemporizadorModal();
+                }).catch(err => {
+                    console.error(err);
+                    alert("Error cámara verificación: " + (err.message || err));
+                    document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
                     document.getElementById('modal-scanner-mira').style.display = 'none';
-                    document.getElementById('modal-cam-resume-btn').style.display = 'flex';
-                } catch(e) {}
-            }
-        }
-
-        function reanudarCamaraModal() {
-            if (scannerModal) {
-                try {
-                    scannerModal.resume();
-                    document.getElementById('modal-embedded-reader').style.opacity = '1';
-                    document.getElementById('modal-cam-resume-btn').style.display = 'none';
-                    document.getElementById('modal-scanner-mira').style.display = 'block';
-                    iniciarTemporizadorModal();
-                } catch(e) {}
-            }
-        }
-
-        function iniciarCamaraModal() {
-            if (!itemActivo) return;
-            document.getElementById('modal-cam-overlay-btn').style.display = 'none';
-            document.getElementById('modal-cam-resume-btn').style.display = 'none';
-
-            initAudio();
-
-            const isPortrait = window.innerHeight > window.innerWidth;
-            const screenWidth = window.innerWidth;
-            const targetWidth = isPortrait ? Math.trunc(screenWidth * 0.8) : Math.trunc(screenWidth * 0.35);
-            const targetHeight = Math.trunc(targetWidth * 0.45);
-
-            const mira = document.getElementById('modal-scanner-mira');
-            mira.style.width = targetWidth + 'px';
-            mira.style.height = targetHeight + 'px';
-            mira.style.display = 'block';
-
-            const configScanner = {
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13, 
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128, 
-                    Html5QrcodeSupportedFormats.QR_CODE
-                ]
-            };
-
-            scannerModal = new Html5Qrcode("modal-embedded-reader", configScanner);
-            scannerModal.start(
-                { facingMode: "environment" }, 
-                { fps: 4, qrbox: { width: targetWidth, height: targetHeight } }, 
-                (decodedText) => {
-                    iniciarTemporizadorModal();
-                    const now = Date.now();
-                    if (now - lastScanTime < 1500) return; 
-
-                    const scanned = decodedText.trim().toUpperCase();
-                    const target = (itemActivo.codigo_producto || '').trim().toUpperCase();
-
-                    if (target && scanned === target) {
-                        lastScanTime = now;
-                        playBeep(true);
-
-                        if (mira) {
-                            mira.classList.add('success');
-                            setTimeout(() => mira.classList.remove('success'), 300);
-                        }
-
-                        if (itemActivo.req_cajas > 0 && itemActivo.act_cajas < itemActivo.req_cajas) {
-                            itemActivo.act_cajas++;
-                            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
-                            
-                            document.getElementById('pk-count-cajas').style.color = '#10b981';
-                            setTimeout(() => document.getElementById('pk-count-cajas').style.color = 'var(--primary)', 300);
-
-                        } else if (itemActivo.req_unidades > 0 && itemActivo.act_unidades < itemActivo.req_unidades) {
-                            itemActivo.act_unidades++;
-                            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
-
-                            document.getElementById('pk-count-unidades').style.color = '#10b981';
-                            setTimeout(() => document.getElementById('pk-count-unidades').style.color = '#7e22ce', 300);
-                        }
-
-                        evaluarBotonTerminar();
-                    } else {
-                        lastScanTime = now;
-                        playBeep(false);
-                        mostrarToastError(`Código incorrecto. Esperado: ${itemActivo.codigo_producto}`);
-                    }
-                },
-                (err) => { }
-            ).then(() => {
-                iniciarTemporizadorModal();
-            }).catch(err => {
-                console.error(err);
-                alert("Error cámara verificación: " + (err.message || err));
-                document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
-                document.getElementById('modal-scanner-mira').style.display = 'none';
-            });
-        }
-
-        function detenerCamaraModal(callback) {
-            clearTimeout(sleepTimerModal);
-            if (scannerModal) {
-                scannerModal.stop().then(() => { 
-                    scannerModal.clear(); 
-                    scannerModal = null; 
-                    if(callback) callback();
-                }).catch(e => { 
-                    console.log(e); 
-                    scannerModal = null;
-                    if(callback) callback();
                 });
-            } else {
-                if(callback) callback();
-            }
-            
-            // Apagado real de pistas de video para Safari
-            if (window.localStream) {
-                window.localStream.getTracks().forEach(track => track.stop());
             }
 
-            const mira = document.getElementById('modal-scanner-mira');
-            if(mira) mira.style.display = 'none';
-            document.getElementById('modal-cam-resume-btn').style.display = 'none';
-            document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
-            document.getElementById('modal-embedded-reader').style.opacity = '1';
-        }
-
-        // =====================================
-        // CONTROL INTELIGENTE DE CÁMARAS (AMBIDIESTRO)
-        // =====================================
-        function toggleCamaraPrincipalInteligente() {
-            if (!scannerMain) {
-                iniciarCamaraPrincipal();
-            } else {
-                const resumeBtn = document.getElementById('main-cam-resume-btn');
-                if (resumeBtn.style.display === 'flex' || resumeBtn.style.display === 'block') {
-                    reanudarCamaraPrincipal();
+            function detenerCamaraModal(callback) {
+                clearTimeout(sleepTimerModal);
+                if (scannerModal) {
+                    scannerModal.stop().then(() => {
+                        scannerModal.clear();
+                        scannerModal = null;
+                        if (callback) callback();
+                    }).catch(e => {
+                        console.log(e);
+                        scannerModal = null;
+                        if (callback) callback();
+                    });
                 } else {
-                    pausarCamaraMain();
+                    if (callback) callback();
+                }
+
+                // Apagado real de pistas de video para Safari
+                if (window.localStream) {
+                    window.localStream.getTracks().forEach(track => track.stop());
+                }
+
+                const mira = document.getElementById('modal-scanner-mira');
+                if (mira) mira.style.display = 'none';
+                document.getElementById('modal-cam-resume-btn').style.display = 'none';
+                document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
+                document.getElementById('modal-embedded-reader').style.opacity = '1';
+            }
+
+            // =====================================
+            // CONTROL INTELIGENTE DE CÁMARAS (AMBIDIESTRO)
+            // =====================================
+            function toggleCamaraPrincipalInteligente() {
+                if (!scannerMain) {
+                    iniciarCamaraPrincipal();
+                } else {
+                    const resumeBtn = document.getElementById('main-cam-resume-btn');
+                    if (resumeBtn.style.display === 'flex' || resumeBtn.style.display === 'block') {
+                        reanudarCamaraPrincipal();
+                    } else {
+                        pausarCamaraMain();
+                    }
                 }
             }
-        }
 
-        function toggleCamaraModalInteligente() {
-            if (!itemActivo) return;
-            if (!scannerModal) {
-                iniciarCamaraModal();
-            } else {
-                const resumeBtn = document.getElementById('modal-cam-resume-btn');
-                if (resumeBtn.style.display === 'flex' || resumeBtn.style.display === 'block') {
-                    reanudarCamaraModal();
+            function toggleCamaraModalInteligente() {
+                if (!itemActivo) return;
+                if (!scannerModal) {
+                    iniciarCamaraModal();
                 } else {
-                    pausarCamaraModal();
+                    const resumeBtn = document.getElementById('modal-cam-resume-btn');
+                    if (resumeBtn.style.display === 'flex' || resumeBtn.style.display === 'block') {
+                        reanudarCamaraModal();
+                    } else {
+                        pausarCamaraModal();
+                    }
                 }
             }
-        }
-        
-        // =====================================
-        // NAVEGACIÓN Y VISTAS
-        // =====================================
-        function mostrarMenu() { toggleView('view-menu'); }
-        
-        function volverAlMenu() { 
-            detenerCamaraPrincipal();
-            detenerCamaraModal();
-            mostrarMenu(); 
-        }
 
-        function toggleView(id) {
-            ['view-menu', 'view-orders', 'view-items'].forEach(v => document.getElementById(v).classList.add('hidden'));
-            document.getElementById(id).classList.remove('hidden');
-        }
+            // =====================================
+            // NAVEGACIÓN Y VISTAS
+            // =====================================
+            function mostrarMenu() { toggleView('view-menu'); }
 
-        function cargarOrdenesSilencioso() {
-            fetch('/api/verificador/ordenes?v=' + new Date().getTime())
-                .then(r => r.json())
-                .then(d => {
-                    let html = '';
-                    if (d.length === 0) html = '<div style="grid-column: 1 / -1; text-align:center; color:#94a3b8; font-weight:600; padding:20px;">No hay órdenes listas para auditar</div>';
-                    d.forEach(o => {
-                        const p = o.total_items > 0 ? Math.round((o.items_verificados / o.total_items) * 100) : 0;
-                        html += `
+            function volverAlMenu() {
+                detenerCamaraPrincipal();
+                detenerCamaraModal();
+                mostrarMenu();
+            }
+
+            function toggleView(id) {
+                ['view-menu', 'view-orders', 'view-items'].forEach(v => document.getElementById(v).classList.add('hidden'));
+                document.getElementById(id).classList.remove('hidden');
+            }
+
+            function cargarOrdenesSilencioso() {
+                fetch('/api/verificador/ordenes?v=' + new Date().getTime())
+                    .then(r => r.json())
+                    .then(d => {
+                        let html = '';
+                        if (d.length === 0) html = '<div style="grid-column: 1 / -1; text-align:center; color:#94a3b8; font-weight:600; padding:20px;">No hay órdenes listas para auditar</div>';
+                        d.forEach(o => {
+                            const p = o.total_items > 0 ? Math.round((o.items_verificados / o.total_items) * 100) : 0;
+                            html += `
                         <div class="order-card" onclick="abrirOrden('${o.orden}')">
                             <div class="oc-top"><span class="oc-number">#${o.orden}</span><span class="oc-badge">${o.zona || 'General'}</span></div>
                             <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#64748b; font-weight:700;">
@@ -999,77 +1599,77 @@
                             </div>
                             <div class="p-bar"><div class="p-fill" style="width:${p}%"></div></div>
                         </div>`;
-                    });
-                    const cOrd = document.getElementById('orders-container');
-                    if (cOrd && cOrd.innerHTML !== html) cOrd.innerHTML = html;
-                }).catch(e => console.log(e));
-        }
+                        });
+                        const cOrd = document.getElementById('orders-container');
+                        if (cOrd && cOrd.innerHTML !== html) cOrd.innerHTML = html;
+                    }).catch(e => console.log(e));
+            }
 
-        function cargarItemsSilencioso() {
-            if (!ordenActual) return;
-            fetch(`/api/verificador/items_orden/${ordenActual}?v=` + new Date().getTime())
-                .then(r => r.json())
-                .then(d => {
-                    if (itemActivo === null) {
-                        listaItems = d.filter(i => i.estado_actividad === 'ALISTADO');
-                        renderizarItems();
-                    }
-                }).catch(e => console.log(e));
-        }
+            function cargarItemsSilencioso() {
+                if (!ordenActual) return;
+                fetch(`/api/verificador/items_orden/${ordenActual}?v=` + new Date().getTime())
+                    .then(r => r.json())
+                    .then(d => {
+                        if (itemActivo === null) {
+                            listaItems = d.filter(i => i.estado_actividad === 'ALISTADO');
+                            renderizarItems();
+                        }
+                    }).catch(e => console.log(e));
+            }
 
-        function enviarPingVerificador() {
-            fetch('/api/verificador/ping?v=' + new Date().getTime(), { method: 'POST' })
-                .catch(e => console.log('Error ping silencioso:', e));
-        }
+            function enviarPingVerificador() {
+                fetch('/api/verificador/ping?v=' + new Date().getTime(), { method: 'POST' })
+                    .catch(e => console.log('Error ping silencioso:', e));
+            }
 
-        setInterval(() => {
-            if (!document.getElementById('view-menu').classList.contains('hidden')) {
-                enviarPingVerificador(); 
-            } else if (!document.getElementById('view-orders').classList.contains('hidden')) {
+            setInterval(() => {
+                if (!document.getElementById('view-menu').classList.contains('hidden')) {
+                    enviarPingVerificador();
+                } else if (!document.getElementById('view-orders').classList.contains('hidden')) {
+                    cargarOrdenesSilencioso();
+                } else if (!document.getElementById('view-items').classList.contains('hidden')) {
+                    cargarItemsSilencioso();
+                }
+            }, 3000);
+
+            function cargarOrdenes() {
+                detenerCamaraPrincipal();
+                detenerCamaraModal();
+                toggleView('view-orders');
+                const cOrd = document.getElementById('orders-container');
+                cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>';
                 cargarOrdenesSilencioso();
-            } else if (!document.getElementById('view-items').classList.contains('hidden')) {
+            }
+
+            function abrirOrden(ord) {
+                ordenActual = ord;
+                document.getElementById('lblOrdenTitle').textContent = '#' + ord;
+                document.getElementById('searchBox').value = '';
+                toggleView('view-items');
+
+                // Mostrar y preparar la cámara principal del buscador y sus controles
+                document.getElementById('main-camera-section').style.display = 'flex';
+                const btnsMain = document.getElementById('btns-control-camara-main');
+                if (btnsMain) btnsMain.style.display = 'flex';
+
+                document.getElementById('main-cam-overlay-btn').style.display = 'flex';
+                document.getElementById('main-scanner-mira').style.display = 'none';
+                detenerCamaraPrincipal();
+                detenerCamaraModal();
+
+                document.getElementById('items-container').innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando inventario alistado...</div>';
                 cargarItemsSilencioso();
             }
-        }, 3000);
 
-        function cargarOrdenes() {
-            detenerCamaraPrincipal();
-            detenerCamaraModal();
-            toggleView('view-orders');
-            const cOrd = document.getElementById('orders-container');
-            cOrd.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Cargando...</p>';
-            cargarOrdenesSilencioso();
-        }
+            function renderizarItems() {
+                const c = document.getElementById('items-container');
+                let htmlInner = '';
 
-        function abrirOrden(ord) {
-            ordenActual = ord;
-            document.getElementById('lblOrdenTitle').textContent = '#' + ord;
-            document.getElementById('searchBox').value = '';
-            toggleView('view-items');
-            
-            // Mostrar y preparar la cámara principal del buscador y sus controles
-            document.getElementById('main-camera-section').style.display = 'flex';
-            const btnsMain = document.getElementById('btns-control-camara-main');
-            if (btnsMain) btnsMain.style.display = 'flex';
-            
-            document.getElementById('main-cam-overlay-btn').style.display = 'flex';
-            document.getElementById('main-scanner-mira').style.display = 'none';
-            detenerCamaraPrincipal();
-            detenerCamaraModal();
+                const txt = document.getElementById('searchBox').value.toLowerCase();
+                document.getElementById('lblProgress').textContent = `Por auditar: ${listaItems.length}`;
 
-            document.getElementById('items-container').innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:20px; font-weight:600;">Cargando inventario alistado...</div>';
-            cargarItemsSilencioso();
-        }
-
-        function renderizarItems() {
-            const c = document.getElementById('items-container');
-            let htmlInner = '';
-
-            const txt = document.getElementById('searchBox').value.toLowerCase();
-            document.getElementById('lblProgress').textContent = `Por auditar: ${listaItems.length}`;
-
-            if (listaItems.length === 0) {
-                c.innerHTML = `
+                if (listaItems.length === 0) {
+                    c.innerHTML = `
             <div style="grid-column: 1/-1; text-align:center; padding:40px 20px; background: white; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
                 <div style="font-size:5rem; margin-bottom:10px;">✅</div>
                 <h3 style="color:#10b981; font-size:1.5rem; margin:0 0 10px 0;">¡Orden Auditada!</h3>
@@ -1077,62 +1677,62 @@
                 <button type="button" onclick="abrirSellarOrden()" style="padding:18px 30px; background:var(--secondary); color:white; border:none; border-radius:12px; margin-top:10px; font-weight:900; font-size:1.1rem; width:100%; cursor:pointer; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);">✍️ Firmar y Sellar Orden</button>
                 <button type="button" onclick="cargarOrdenes()" style="padding:15px 30px; background:#f1f5f9; color:#475569; border:none; border-radius:12px; margin-top:15px; font-weight:800; font-size:1rem; width:100%; cursor:pointer;">Volver a Mis Órdenes</button>
             </div>`;
-                document.getElementById('header-progress-bar').style.width = '100%';
-                detenerCamaraPrincipal();
-                return;
-            }
-
-            const visibles = listaItems.filter(i =>
-                (i.descripcion_producto || '').toLowerCase().includes(txt) ||
-                (i.codigo_producto || '').toLowerCase().includes(txt)
-            );
-
-            if (visibles.length === 0) {
-                c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:#94a3b8; font-weight:600;">No se encontraron productos.</div>';
-                return;
-            }
-
-            let marcaActual = null;
-
-            visibles.forEach(i => {
-                let marcaItem = i.marca || 'GENÉRICO';
-                if (marcaItem !== marcaActual) {
-                    htmlInner += `<div style="grid-column: 1/-1; margin-top: 15px; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 2px solid var(--border); color: var(--primary-dark); font-weight: 900; font-size: 1.1rem; text-transform: uppercase;">🏷️ ${marcaItem}</div>`;
-                    marcaActual = marcaItem;
+                    document.getElementById('header-progress-bar').style.width = '100%';
+                    detenerCamaraPrincipal();
+                    return;
                 }
 
-                let nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
-                let badgeHtml = '';
+                const visibles = listaItems.filter(i =>
+                    (i.descripcion_producto || '').toLowerCase().includes(txt) ||
+                    (i.codigo_producto || '').toLowerCase().includes(txt)
+                );
 
-                const matchPromo = nombre.match(/\(Kit:\s*(.*?)\)/i);
-                if (matchPromo) {
-                    const nombrePromo = matchPromo[1];
-                    nombre = nombre.replace(/\(Kit:\s*.*?\)/i, '').trim();
-                    badgeHtml += `<div style="display:inline-block; background-color:#fef08a; color:#92400e; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fde68a;">
+                if (visibles.length === 0) {
+                    c.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:#94a3b8; font-weight:600;">No se encontraron productos.</div>';
+                    return;
+                }
+
+                let marcaActual = null;
+
+                visibles.forEach(i => {
+                    let marcaItem = i.marca || 'GENÉRICO';
+                    if (marcaItem !== marcaActual) {
+                        htmlInner += `<div style="grid-column: 1/-1; margin-top: 15px; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 2px solid var(--border); color: var(--primary-dark); font-weight: 900; font-size: 1.1rem; text-transform: uppercase;">🏷️ ${marcaItem}</div>`;
+                        marcaActual = marcaItem;
+                    }
+
+                    let nombre = (i.descripcion_producto || '').replace(/\.{2,}/g, '').trim();
+                    let badgeHtml = '';
+
+                    const matchPromo = nombre.match(/\(Kit:\s*(.*?)\)/i);
+                    if (matchPromo) {
+                        const nombrePromo = matchPromo[1];
+                        nombre = nombre.replace(/\(Kit:\s*.*?\)/i, '').trim();
+                        badgeHtml += `<div style="display:inline-block; background-color:#fef08a; color:#92400e; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fde68a;">
                                     🎁 KIT: ${nombrePromo}
                                  </div><br>`;
-                }
+                    }
 
-                if (i.novedad_alistamiento) {
-                    badgeHtml += `<div style="display:inline-block; background-color:#fee2e2; color:#b91c1c; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fecaca;">
+                    if (i.novedad_alistamiento) {
+                        badgeHtml += `<div style="display:inline-block; background-color:#fee2e2; color:#b91c1c; font-size:0.7rem; padding:4px 8px; border-radius:6px; font-weight:900; margin-bottom:6px; border:1px solid #fecaca;">
                                     ⚠️ NOVEDAD: ${i.novedad_alistamiento.replace('_', ' ')}
                                  </div><br>`;
-                }
+                    }
 
-                let htmlCantidades = '';
-                if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.95rem;">📦 ${i.req_cajas}</div>`;
-                if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.95rem; color: var(--secondary);">🍬 ${i.req_unidades}</div>`;
-                if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.95rem;">0</div>`;
+                    let htmlCantidades = '';
+                    if (i.req_cajas > 0) htmlCantidades += `<div style="font-size: 0.95rem;">📦 ${i.req_cajas}</div>`;
+                    if (i.req_unidades > 0) htmlCantidades += `<div style="font-size: 0.95rem; color: var(--secondary);">🍬 ${i.req_unidades}</div>`;
+                    if (htmlCantidades === '') htmlCantidades = `<div style="font-size: 0.95rem;">0</div>`;
 
-                let botonCiegas = '';
-                let esCiegasSinCodigo = (i.novedad_alistamiento === 'AUTORIZADO_CIEGAS' && i.codigo_producto === 'SIN_CODIGO');
-                if (esCiegasSinCodigo) {
-                    botonCiegas = `<div style="margin-top: 10px;">
+                    let botonCiegas = '';
+                    let esCiegasSinCodigo = (i.novedad_alistamiento === 'AUTORIZADO_CIEGAS' && i.codigo_producto === 'SIN_CODIGO');
+                    if (esCiegasSinCodigo) {
+                        botonCiegas = `<div style="margin-top: 10px;">
                         <button onclick="event.stopPropagation(); detenerCamaraPrincipal(() => abrirModalVerificarId(${i.id}))" style="background:#d97706; color:white; border:none; width:100%; padding:10px; border-radius:8px; font-weight:800; font-size:0.95rem; box-shadow: 0 2px 4px rgba(217, 119, 6, 0.3); cursor:pointer;">👀 VERIFICAR A CIEGAS</button>
                     </div>`;
-                }
+                    }
 
-                htmlInner += `
+                    htmlInner += `
             <div id="card_${i.id}" class="item-row active" onclick="detenerCamaraPrincipal(() => abrirModalVerificarId(${i.id}))">
                 <div class="qty-indicator" style="flex-direction: column; gap: 4px; padding: 0 10px; width: auto; font-size: 0.95rem;">
                     ${htmlCantidades}
@@ -1143,326 +1743,322 @@
                     ${botonCiegas}
                 </div>
             </div>`;
-            });
-            c.innerHTML = htmlInner;
-        }
-
-        function filtrarLista() { renderizarItems(); }
-
-        // =====================================
-        // LÓGICA DEL MODAL DE VERIFICACIÓN
-        // =====================================
-        function abrirModalVerificarId(id) {
-            const item = listaItems.find(i => i.id === id);
-            if (!item) return;
-
-            itemActivo = item;
-            lastScanTime = 0;
-            requestWakeLock();
-
-            const pickHeader = document.querySelector('.pick-header');
-            const oldAlert = document.getElementById('kit-alert-msg');
-            if (oldAlert) oldAlert.remove();
-
-            let nombreDisplay = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
-            const matchPromo = (item.descripcion_producto || '').match(/\(Kit:\s*(.*?)\)/i);
-            
-            if (matchPromo) {
-                const nombrePromo = matchPromo[1];
-                nombreDisplay = nombreDisplay.replace(/\(Kit:\s*.*?\)/i, '').trim();
-                
-                const alertHtml = `<div id="kit-alert-msg" style="background:#fef08a; color:#92400e; border:1px solid #fde68a; padding:12px; border-radius:10px; font-size:0.95rem; font-weight:800; margin-top:10px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
-                    🎁 ESTE PRODUCTO ES PARTE DEL KIT:<br><span style="font-size:1.1rem; display:block; margin-top:5px; color:#713f12;">${nombrePromo}</span>
-                </div>`;
-                pickHeader.insertAdjacentHTML('beforeend', alertHtml);
+                });
+                c.innerHTML = htmlInner;
             }
 
-            document.getElementById('pk-name').textContent = nombreDisplay;
-            document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
+            function filtrarLista() { renderizarItems(); }
 
-            // Para el verificador, lo "solicitado" es lo que el operador "entregó"
-            itemActivo.req_cajas = parseInt(item.req_cajas) || 0;
-            itemActivo.req_unidades = parseInt(item.req_unidades) || 0;
+            // =====================================
+            // LÓGICA DEL MODAL DE VERIFICACIÓN
+            // =====================================
+            function abrirModalVerificarId(id) {
+                const item = listaItems.find(i => i.id === id);
+                if (!item) return;
 
-            // Cantidades verificadas inician en cero
-            itemActivo.act_cajas = 0;
-            itemActivo.act_unidades = 0;
+                itemActivo = item;
+                lastScanTime = 0;
+                requestWakeLock();
 
-            let htmlReqModal = '';
-            if (itemActivo.req_cajas > 0) htmlReqModal += `<span style="display:inline-block; margin-right:15px;">📦 ${itemActivo.req_cajas} CAJAS</span>`;
-            if (itemActivo.req_unidades > 0) htmlReqModal += `<span style="display:inline-block;">🍬 ${itemActivo.req_unidades} UNIDADES</span>`;
-            document.getElementById('pk-req').innerHTML = htmlReqModal || '0';
+                const pickHeader = document.querySelector('.pick-header');
+                const oldAlert = document.getElementById('kit-alert-msg');
+                if (oldAlert) oldAlert.remove();
 
-            document.getElementById('pk-count-cajas').textContent = "0";
-            document.getElementById('pk-count-unidades').textContent = "0";
+                let nombreDisplay = (item.descripcion_producto || '').replace(/\.{2,}/g, '').replace(/\.+$/, '').trim();
+                const matchPromo = (item.descripcion_producto || '').match(/\(Kit:\s*(.*?)\)/i);
 
-            // Mostrar Novedad si existe
-            const novAlert = document.getElementById('novedad-alert');
-            if (item.novedad_alistamiento) {
-                novAlert.textContent = `⚠️ NOVEDAD DEL OPERADOR: ${item.novedad_alistamiento.replace('_', ' ')}`;
-                novAlert.classList.remove('hidden');
+                if (matchPromo) {
+                    const nombrePromo = matchPromo[1];
+                    nombreDisplay = nombreDisplay.replace(/\(Kit:\s*.*?\)/i, '').trim();
 
-                if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS' || item.novedad_alistamiento === 'SIN_EAN') {
-                    document.getElementById('modal-cam-overlay-btn').style.display = 'none';
-                    document.getElementById('modal-cam-resume-btn').style.display = 'none';
+                    const alertHtml = `<div id="kit-alert-msg" style="background:#fef08a; color:#92400e; border:1px solid #fde68a; padding:12px; border-radius:10px; font-size:0.95rem; font-weight:800; margin-top:10px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                    🎁 ESTE PRODUCTO ES PARTE DEL KIT:<br><span style="font-size:1.1rem; display:block; margin-top:5px; color:#713f12;">${nombrePromo}</span>
+                </div>`;
+                    pickHeader.insertAdjacentHTML('beforeend', alertHtml);
+                }
 
-                    if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS') {
-                        itemActivo.act_cajas = 0;
-                        itemActivo.act_unidades = 0;
-                    } else {
-                        itemActivo.act_cajas = itemActivo.req_cajas;
-                        itemActivo.act_unidades = itemActivo.req_unidades;
+                document.getElementById('pk-name').textContent = nombreDisplay;
+                document.getElementById('pk-code').textContent = item.codigo_producto || 'N/A';
+
+                // Para el verificador, lo "solicitado" es lo que el operador "entregó"
+                itemActivo.req_cajas = parseInt(item.req_cajas) || 0;
+                itemActivo.req_unidades = parseInt(item.req_unidades) || 0;
+
+                // Cantidades verificadas inician en cero
+                itemActivo.act_cajas = 0;
+                itemActivo.act_unidades = 0;
+
+                let htmlReqModal = '';
+                if (itemActivo.req_cajas > 0) htmlReqModal += `<span style="display:inline-block; margin-right:15px;">📦 ${itemActivo.req_cajas} CAJAS</span>`;
+                if (itemActivo.req_unidades > 0) htmlReqModal += `<span style="display:inline-block;">🍬 ${itemActivo.req_unidades} UNIDADES</span>`;
+                document.getElementById('pk-req').innerHTML = htmlReqModal || '0';
+
+                document.getElementById('pk-count-cajas').textContent = "0";
+                document.getElementById('pk-count-unidades').textContent = "0";
+
+                // Mostrar Novedad si existe
+                const novAlert = document.getElementById('novedad-alert');
+                if (item.novedad_alistamiento) {
+                    novAlert.textContent = `⚠️ NOVEDAD DEL OPERADOR: ${item.novedad_alistamiento.replace('_', ' ')}`;
+                    novAlert.classList.remove('hidden');
+
+                    if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS' || item.novedad_alistamiento === 'SIN_EAN') {
+                        document.getElementById('modal-cam-overlay-btn').style.display = 'none';
+                        document.getElementById('modal-cam-resume-btn').style.display = 'none';
+
+                        if (item.novedad_alistamiento === 'FALTA_EXISTENCIAS') {
+                            itemActivo.act_cajas = 0;
+                            itemActivo.act_unidades = 0;
+                        } else {
+                            itemActivo.act_cajas = itemActivo.req_cajas;
+                            itemActivo.act_unidades = itemActivo.req_unidades;
+                        }
+
+                        document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
+                        document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
                     }
+                } else {
+                    novAlert.classList.add('hidden');
+                    document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
+                    document.getElementById('modal-cam-resume-btn').style.display = 'none';
+                }
+
+                // --- NUEVA LÓGICA VERIFICAR A CIEGAS ---
+                const esCiegasSinCodigo = (item.novedad_alistamiento === 'AUTORIZADO_CIEGAS' && item.codigo_producto === 'SIN_CODIGO');
+                if (esCiegasSinCodigo) {
+                    document.getElementById('modal-camera-section').style.display = 'none';
+                } else {
+                    document.getElementById('modal-camera-section').style.display = 'flex';
+                    document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
+                    document.getElementById('modal-cam-resume-btn').style.display = 'none';
+                    document.getElementById('modal-embedded-reader').style.opacity = '1';
+                }
+                // ---------------------------------------
+
+                if (itemActivo.req_cajas > 0) document.getElementById('area-conteo-cajas').classList.remove('hidden');
+                else document.getElementById('area-conteo-cajas').classList.add('hidden');
+
+                if (itemActivo.req_unidades > 0) document.getElementById('area-teclado-fracciones').classList.remove('hidden');
+                else document.getElementById('area-teclado-fracciones').classList.add('hidden');
+
+                if (itemActivo.req_cajas > 10 || itemActivo.req_unidades > 10) {
+                    document.getElementById('btn-masivo').classList.remove('hidden');
+                } else {
+                    document.getElementById('btn-masivo').classList.add('hidden');
+                }
+
+                evaluarBotonTerminar();
+                document.getElementById('modal-picking').style.display = 'flex';
+            }
+
+            function cerrarModalVerificacion() {
+                detenerCamaraModal(() => {
+                    document.getElementById('modal-picking').style.display = 'none';
+                    itemActivo = null;
+                    // Al cerrar el modal, restauramos el buscador en la vista principal
+                    iniciarCamaraPrincipal();
+                });
+            }
+
+            function cambiarCajas(valor) {
+                if (!itemActivo) return;
+                let actual = itemActivo.act_cajas;
+                let nuevo = actual + valor;
+
+                if (nuevo >= 0 && nuevo <= itemActivo.req_cajas) {
+                    itemActivo.act_cajas = nuevo;
+                    document.getElementById('pk-count-cajas').textContent = nuevo;
+                    playBeep(true);
+                    evaluarBotonTerminar();
+                }
+            }
+
+            function cambiarFraccion(valor) {
+                if (!itemActivo) return;
+                let actual = itemActivo.act_unidades;
+                let nuevo = actual + valor;
+
+                if (nuevo >= 0 && nuevo <= itemActivo.req_unidades) {
+                    itemActivo.act_unidades = nuevo;
+                    document.getElementById('pk-count-unidades').textContent = nuevo;
+                    playBeep(true);
+                    evaluarBotonTerminar();
+                }
+            }
+
+            function evaluarBotonTerminar() {
+                if (!itemActivo) return;
+                const btn = document.querySelector('.btn-finish');
+                if (itemActivo.act_cajas === itemActivo.req_cajas && itemActivo.act_unidades === itemActivo.req_unidades) {
+                    btn.style.background = '#10b981';
+                    btn.textContent = 'CONFIRMAR AUDITORÍA ✓';
+                    btn.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.3)';
+                } else {
+                    btn.style.background = '#374151';
+                    btn.textContent = 'HAY DISCREPANCIA (GUARDAR ASÍ)';
+                    btn.style.boxShadow = 'none';
+                }
+            }
+
+            function intentarVerificarItem() {
+                if (!itemActivo) return;
+                if (window.confirm(`Auditoría Física:\n📦 ${itemActivo.act_cajas} Cajas\n🍬 ${itemActivo.act_unidades} Unidades\n\n¿Está seguro de confirmar esta auditoría?`)) {
+                    ejecutarVerificacionFinal();
+                }
+            }
+
+            function cancelarConfirmacion() {
+                document.getElementById('modal-verify').style.display = 'none';
+            }
+
+            // =====================================
+            // DISPARADOR MASIVO
+            // =====================================
+            function ejecutarMasivo() {
+                if (!itemActivo) return;
+                const nombre = (itemActivo.descripcion_producto || 'Producto').replace(/\.{2,}/g, '').trim();
+                let texto = '¿Seguro verificaste ';
+                if (itemActivo.req_cajas > 0) texto += `${itemActivo.req_cajas} cajas `;
+                if (itemActivo.req_cajas > 0 && itemActivo.req_unidades > 0) texto += 'y ';
+                if (itemActivo.req_unidades > 0) texto += `${itemActivo.req_unidades} unidades `;
+                texto += `del producto ${nombre}?`;
+
+                if (window.confirm(texto)) {
+                    itemActivo.act_cajas = itemActivo.req_cajas;
+                    itemActivo.act_unidades = itemActivo.req_unidades;
 
                     document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
                     document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
-                }
-            } else {
-                novAlert.classList.add('hidden');
-                document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
-                document.getElementById('modal-cam-resume-btn').style.display = 'none';
-            }
 
-            // --- NUEVA LÓGICA VERIFICAR A CIEGAS ---
-            const esCiegasSinCodigo = (item.novedad_alistamiento === 'AUTORIZADO_CIEGAS' && item.codigo_producto === 'SIN_CODIGO');
-            if (esCiegasSinCodigo) {
-                document.getElementById('modal-camera-section').style.display = 'none';
-            } else {
-                document.getElementById('modal-camera-section').style.display = 'flex';
-                document.getElementById('modal-cam-overlay-btn').style.display = 'flex';
-                document.getElementById('modal-cam-resume-btn').style.display = 'none';
-                document.getElementById('modal-embedded-reader').style.opacity = '1';
-            }
-            // ---------------------------------------
-
-            if (itemActivo.req_cajas > 0) document.getElementById('area-conteo-cajas').classList.remove('hidden');
-            else document.getElementById('area-conteo-cajas').classList.add('hidden');
-
-            if (itemActivo.req_unidades > 0) document.getElementById('area-teclado-fracciones').classList.remove('hidden');
-            else document.getElementById('area-teclado-fracciones').classList.add('hidden');
-
-            if (itemActivo.req_cajas > 10 || itemActivo.req_unidades > 10) {
-                document.getElementById('btn-masivo').classList.remove('hidden');
-            } else {
-                document.getElementById('btn-masivo').classList.add('hidden');
-            }
-
-            evaluarBotonTerminar();
-            document.getElementById('modal-picking').style.display = 'flex';
-        }
-
-        function cerrarModalVerificacion() {
-            detenerCamaraModal(() => {
-                document.getElementById('modal-picking').style.display = 'none';
-                itemActivo = null;
-                // Al cerrar el modal, restauramos el buscador en la vista principal
-                iniciarCamaraPrincipal();
-            });
-        }
-
-        function cambiarCajas(valor) {
-            if (!itemActivo) return;
-            let actual = itemActivo.act_cajas;
-            let nuevo = actual + valor;
-
-            if (nuevo >= 0 && nuevo <= itemActivo.req_cajas) {
-                itemActivo.act_cajas = nuevo;
-                document.getElementById('pk-count-cajas').textContent = nuevo;
-                playBeep(true);
-                evaluarBotonTerminar();
-            }
-        }
-
-        function cambiarFraccion(valor) {
-            if (!itemActivo) return;
-            let actual = itemActivo.act_unidades;
-            let nuevo = actual + valor;
-
-            if (nuevo >= 0 && nuevo <= itemActivo.req_unidades) {
-                itemActivo.act_unidades = nuevo;
-                document.getElementById('pk-count-unidades').textContent = nuevo;
-                playBeep(true);
-                evaluarBotonTerminar();
-            }
-        }
-
-        function evaluarBotonTerminar() {
-            if (!itemActivo) return;
-            const btn = document.querySelector('.btn-finish');
-            if (itemActivo.act_cajas === itemActivo.req_cajas && itemActivo.act_unidades === itemActivo.req_unidades) {
-                btn.style.background = '#10b981';
-                btn.textContent = 'CONFIRMAR AUDITORÍA ✓';
-                btn.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.3)';
-            } else {
-                btn.style.background = '#374151';
-                btn.textContent = 'HAY DISCREPANCIA (GUARDAR ASÍ)';
-                btn.style.boxShadow = 'none';
-            }
-        }
-
-        function intentarVerificarItem() {
-            if (!itemActivo) return;
-            document.getElementById('vf-count').innerHTML = `📦 ${itemActivo.act_cajas} | 🍬 ${itemActivo.act_unidades}`;
-            document.getElementById('modal-verify').style.display = 'flex';
-        }
-
-        function cancelarConfirmacion() {
-            document.getElementById('modal-verify').style.display = 'none';
-        }
-
-        // =====================================
-        // DISPARADOR MASIVO
-        // =====================================
-        function confirmarMasivo() {
-            if (!itemActivo) return;
-            const nombre = (itemActivo.descripcion_producto || 'Producto').replace(/\.{2,}/g, '').trim();
-            let texto = '¿Seguro verificaste ';
-            if (itemActivo.req_cajas > 0) texto += `<b>${itemActivo.req_cajas} cajas</b> `;
-            if (itemActivo.req_cajas > 0 && itemActivo.req_unidades > 0) texto += 'y ';
-            if (itemActivo.req_unidades > 0) texto += `<b>${itemActivo.req_unidades} unidades</b> `;
-            texto += `del producto <b>${nombre}</b>?`;
-            
-            document.getElementById('txt-confirm-masivo').innerHTML = texto;
-            document.getElementById('modal-confirm-masivo').style.display = 'flex';
-        }
-        
-        function cerrarMasivo() {
-            document.getElementById('modal-confirm-masivo').style.display = 'none';
-        }
-        
-        function ejecutarMasivo() {
-            if (!itemActivo) return;
-            itemActivo.act_cajas = itemActivo.req_cajas;
-            itemActivo.act_unidades = itemActivo.req_unidades;
-            
-            document.getElementById('pk-count-cajas').textContent = itemActivo.act_cajas;
-            document.getElementById('pk-count-unidades').textContent = itemActivo.act_unidades;
-            
-            cerrarMasivo();
-            playBeep(true);
-            evaluarBotonTerminar();
-        }
-
-        function ejecutarVerificacionFinal() {
-            const btn = document.querySelector('.btn-v-confirm');
-            btn.textContent = 'Sellando...';
-            btn.disabled = true;
-
-            const idParaBorrar = itemActivo.id;
-
-            fetch('/api/verificador/confirmar_item', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify({
-                    id_row: idParaBorrar,
-                    cajas_verificadas: itemActivo.act_cajas,
-                    unidades_verificadas: itemActivo.act_unidades
-                })
-            })
-            .then(r => r.json())
-            .then(d => {
-                if (d.status === 'ok') {
-                    cancelarConfirmacion();
-                    cerrarModalVerificacion(); // Esto ya cierra y reabre la cámara principal
-                    listaItems = listaItems.filter(i => i.id !== idParaBorrar);
-                    renderizarItems();
                     playBeep(true);
-                } else {
-                    alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
+                    evaluarBotonTerminar();
                 }
-            })
-            .catch(e => alert("❌ Error de Conexión."))
-            .finally(() => {
-                btn.textContent = 'SELLAR';
-                btn.disabled = false;
-            });
-        }
-
-        // =====================================
-        // FIRMA DEL VERIFICADOR Y CIERRE DE ORDEN
-        // =====================================
-        const canvasFirmaVerificador = document.getElementById('canvasFirmaVerificador');
-        const ctxFirmaVerificador = canvasFirmaVerificador ? canvasFirmaVerificador.getContext('2d') : null;
-        let isDrawingVerificador = false;
-
-        function getMousePosVerif(canvas, evt) {
-            const rect = canvas.getBoundingClientRect();
-            let clientX, clientY;
-            if (evt.touches && evt.touches.length > 0) { 
-                clientX = evt.touches[0].clientX; 
-                clientY = evt.touches[0].clientY; 
-            } else { 
-                clientX = evt.clientX; 
-                clientY = evt.clientY; 
             }
-            return {
-                x: (clientX - rect.left) / (rect.right - rect.left) * canvas.width,
-                y: (clientY - rect.top) / (rect.bottom - rect.top) * canvas.height
-            };
-        }
 
-        function startDrawingVerif(e) { isDrawingVerificador = true; const pos = getMousePosVerif(canvasFirmaVerificador, e); ctxFirmaVerificador.beginPath(); ctxFirmaVerificador.moveTo(pos.x, pos.y); }
-        function drawVerif(e) { if (!isDrawingVerificador) return; const pos = getMousePosVerif(canvasFirmaVerificador, e); ctxFirmaVerificador.lineTo(pos.x, pos.y); ctxFirmaVerificador.stroke(); }
-        function stopDrawingVerif() { isDrawingVerificador = false; }
+            function ejecutarVerificacionFinal() {
+                const btn = document.querySelector('.btn-finish');
+                btn.textContent = 'Sellando...';
+                btn.disabled = true;
 
-        if (canvasFirmaVerificador) {
-            canvasFirmaVerificador.addEventListener('mousedown', startDrawingVerif);
-            canvasFirmaVerificador.addEventListener('mousemove', drawVerif);
-            canvasFirmaVerificador.addEventListener('mouseup', stopDrawingVerif);
-            canvasFirmaVerificador.addEventListener('mouseout', stopDrawingVerif);
-            canvasFirmaVerificador.addEventListener('touchstart', function(e) { e.preventDefault(); startDrawingVerif(e); }, { passive: false });
-            canvasFirmaVerificador.addEventListener('touchmove', function(e) { e.preventDefault(); drawVerif(e); }, { passive: false });
-            canvasFirmaVerificador.addEventListener('touchend', function(e) { e.preventDefault(); stopDrawingVerif(); }, { passive: false });
-        }
+                const idParaBorrar = itemActivo.id;
 
-        function limpiarFirmaVerificador() { if(ctxFirmaVerificador) ctxFirmaVerificador.clearRect(0, 0, canvasFirmaVerificador.width, canvasFirmaVerificador.height); }
-
-        function abrirSellarOrden() {
-            document.getElementById('so-orden').textContent = ordenActual;
-            limpiarFirmaVerificador();
-            document.getElementById('modal-sellar-orden').style.display = 'flex';
-        }
-
-        function cerrarSellarOrden() {
-            document.getElementById('modal-sellar-orden').style.display = 'none';
-        }
-
-        function ejecutarSellarOrden() {
-            const blank = document.createElement('canvas');
-            blank.width = canvasFirmaVerificador.width; blank.height = canvasFirmaVerificador.height;
-            
-            if(canvasFirmaVerificador.toDataURL() === blank.toDataURL()) {
-                return alert("⚠️ Debes registrar tu firma antes de sellar la orden.");
+                fetch('/api/verificador/confirmar_item', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        id_row: idParaBorrar,
+                        cajas_verificadas: itemActivo.act_cajas,
+                        unidades_verificadas: itemActivo.act_unidades
+                    })
+                })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.status === 'ok') {
+                            cerrarModalVerificacion();
+                            listaItems = listaItems.filter(i => i.id !== idParaBorrar);
+                            renderizarItems();
+                            playBeep(true);
+                        } else {
+                            alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
+                        }
+                    })
+                    .catch(e => alert("❌ Error de Conexión."))
+                    .finally(() => {
+                        btn.textContent = 'CONFIRMAR AUDITORÍA';
+                        btn.disabled = false;
+                    });
             }
-            
-            const firmaBase64 = canvasFirmaVerificador.toDataURL('image/png');
-            const btn = document.querySelector('#modal-sellar-orden .btn-v-confirm');
-            btn.textContent = 'Guardando...'; btn.disabled = true;
 
-            fetch('/api/verificador/sellar_orden', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify({ orden: ordenActual, firma_verificador: firmaBase64 })
-            })
-            .then(r => r.json())
-            .then(d => {
-                if(d.status === 'ok') {
-                    alert("✅ Orden sellada correctamente. Firma registrada para el Manifiesto.");
-                    cerrarSellarOrden();
-                    cargarOrdenes();
+            // =====================================
+            // FIRMA DEL VERIFICADOR Y CIERRE DE ORDEN
+            // =====================================
+            const canvasFirmaVerificador = document.getElementById('canvasFirmaVerificador');
+            const ctxFirmaVerificador = canvasFirmaVerificador ? canvasFirmaVerificador.getContext('2d') : null;
+            let isDrawingVerificador = false;
+
+            function getMousePosVerif(canvas, evt) {
+                const rect = canvas.getBoundingClientRect();
+                let clientX, clientY;
+                if (evt.touches && evt.touches.length > 0) {
+                    clientX = evt.touches[0].clientX;
+                    clientY = evt.touches[0].clientY;
                 } else {
-                    alert("❌ Error: " + d.error);
+                    clientX = evt.clientX;
+                    clientY = evt.clientY;
                 }
-            })
-            .catch(e => alert("Error de conexión al guardar la firma."))
-            .finally(() => { btn.textContent = 'GUARDAR FIRMA'; btn.disabled = false; });
-        }
-    </script>
+                return {
+                    x: (clientX - rect.left) / (rect.right - rect.left) * canvas.width,
+                    y: (clientY - rect.top) / (rect.bottom - rect.top) * canvas.height
+                };
+            }
+
+            function startDrawingVerif(e) { isDrawingVerificador = true; const pos = getMousePosVerif(canvasFirmaVerificador, e); ctxFirmaVerificador.beginPath(); ctxFirmaVerificador.moveTo(pos.x, pos.y); }
+            function drawVerif(e) { if (!isDrawingVerificador) return; const pos = getMousePosVerif(canvasFirmaVerificador, e); ctxFirmaVerificador.lineTo(pos.x, pos.y); ctxFirmaVerificador.stroke(); }
+            function stopDrawingVerif() { isDrawingVerificador = false; }
+
+            if (canvasFirmaVerificador) {
+                canvasFirmaVerificador.addEventListener('mousedown', startDrawingVerif);
+                canvasFirmaVerificador.addEventListener('mousemove', drawVerif);
+                canvasFirmaVerificador.addEventListener('mouseup', stopDrawingVerif);
+                canvasFirmaVerificador.addEventListener('mouseout', stopDrawingVerif);
+                canvasFirmaVerificador.addEventListener('touchstart', function (e) { e.preventDefault(); startDrawingVerif(e); }, { passive: false });
+                canvasFirmaVerificador.addEventListener('touchmove', function (e) { e.preventDefault(); drawVerif(e); }, { passive: false });
+                canvasFirmaVerificador.addEventListener('touchend', function (e) { e.preventDefault(); stopDrawingVerif(); }, { passive: false });
+            }
+
+            function limpiarFirmaVerificador() { if (ctxFirmaVerificador) ctxFirmaVerificador.clearRect(0, 0, canvasFirmaVerificador.width, canvasFirmaVerificador.height); }
+
+            function abrirSellarOrden() {
+                document.getElementById('so-orden').textContent = ordenActual;
+                limpiarFirmaVerificador();
+                document.getElementById('modal-sellar-orden').style.display = 'flex';
+            }
+
+            function cerrarSellarOrden() {
+                document.getElementById('modal-sellar-orden').style.display = 'none';
+            }
+
+            function ejecutarSellarOrden() {
+                const blank = document.createElement('canvas');
+                blank.width = canvasFirmaVerificador.width; blank.height = canvasFirmaVerificador.height;
+
+                if (canvasFirmaVerificador.toDataURL() === blank.toDataURL()) {
+                    return alert("⚠️ Debes registrar tu firma antes de sellar la orden.");
+                }
+
+                if (!window.confirm(`¿Está seguro de GUARDAR LA FIRMA y sellar definitivamente la orden ${ordenActual}?`)) {
+                    return;
+                }
+
+                const firmaBase64 = canvasFirmaVerificador.toDataURL('image/png');
+                const btn = document.querySelector('#modal-sellar-orden .btn-v-confirm');
+                btn.textContent = 'Guardando...'; btn.disabled = true;
+
+                fetch('/api/verificador/sellar_orden', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ orden: ordenActual, firma_verificador: firmaBase64 })
+                })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.status === 'ok') {
+                            alert("✅ Orden sellada correctamente. Firma registrada para el Manifiesto.");
+                            cerrarSellarOrden();
+                            cargarOrdenes();
+                        } else {
+                            alert("❌ Error: " + d.error);
+                        }
+                    })
+                    .catch(e => alert("Error de conexión al guardar la firma."))
+                    .finally(() => { btn.textContent = 'GUARDAR FIRMA'; btn.disabled = false; });
+            }
+        </script>
 </body>
+
 </html>

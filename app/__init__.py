@@ -81,6 +81,7 @@ def create_app():
     from app.blueprints.B_bp_hub_bodegas import bp_hub_bodegas
     from app.blueprints.B_bp_hub_ventas import bp_hub_ventas
     from app.blueprints.B_bp_hub_administracion import bp_hub_administracion
+    from app.blueprints.B_bp_hub_ventas_distribucion import bp_hub_ventas_distribucion
 
     app.register_blueprint(gestionavicola_bp)
     
@@ -99,6 +100,7 @@ def create_app():
     app.register_blueprint(bp_hub_bodegas)
     app.register_blueprint(bp_hub_ventas)
     app.register_blueprint(bp_hub_administracion)
+    app.register_blueprint(bp_hub_ventas_distribucion)
 
     # ---------------------------------------------------------
     #  GRUPO B: MÓDULOS FUNCIONALES / SERVICIOS / CONTROLADORES

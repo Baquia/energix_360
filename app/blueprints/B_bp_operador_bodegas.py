@@ -236,24 +236,10 @@ def operario_confirmar_item():
             # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
             payload = json.dumps(d)
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    empresa VARCHAR(150),
-                    empresa_id VARCHAR(50),
-                    backend_emisor VARCHAR(100),
-                    usuario VARCHAR(100),
-                    cedula VARCHAR(50),
-                    accion VARCHAR(100),
-                    datos JSON
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-            """)
-            cur.execute("""
                 INSERT INTO registro_operaciones_bqa_one 
                 (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_operador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'CONFIRMAR_ITEM_PICKING', payload))
-
             mysql.connection.commit()
             cur.close()
             
