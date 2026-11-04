@@ -630,6 +630,11 @@ def monitoreo_realtime():
             novedades = int(op_dict['novedades'] or 0)
             mins = float(op_dict['minutos_totales'] or 0)
 
+            # FORZANDO CONVERSIÓN DE DECIMAL A NATIVOS
+            op_dict['items_completados'] = completados
+            op_dict['novedades'] = novedades
+            op_dict['minutos_totales'] = mins
+            
             op_dict['avance_porcentaje'] = round((completados / asignados) * 100) if asignados > 0 else 0
             op_dict['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
             op_dict['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
@@ -658,6 +663,10 @@ def monitoreo_realtime():
             v_dict = dict(v)
             verificados = int(v_dict['total_verificados'] or 0)
             discrepancias = int(v_dict['discrepancias'] or 0)
+            
+            # FORZANDO CONVERSIÓN DE DECIMAL A NATIVOS
+            v_dict['discrepancias'] = discrepancias
+            
             v_dict['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
             v_dict['en_linea'] = int(v_dict.get('en_linea', 0))
 
@@ -813,8 +822,12 @@ def monitoreo_realtime():
             else:
                 o['inicio_str'] = None
 
+            # FORZANDO CONVERSIÓN DE DECIMAL A NATIVOS PARA TODAS LAS MÉTRICAS
             o['total_items'] = total_it
             o['items_listos'] = it_listos
+            o['items_verificados'] = it_verif
+            o['items_despachados'] = it_desp
+            o['minutos_totales'] = mins
             o.pop('inicio', None)
             o.pop('fin', None)
 
