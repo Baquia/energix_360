@@ -4427,13 +4427,22 @@
         function cargarVehiculos() {
             const sel = document.getElementById('selVehiculos');
             sel.innerHTML = '<option value="">Cargando...</option>';
-            fetch('/api/bodegas/vehiculos')
+            
+            // Se inyecta Date.now() para forzar el refresco y evadir la caché del móvil
+            fetch('/api/bodegas/vehiculos?t=' + Date.now())
                 .then(r => r.json())
                 .then(data => {
                     sel.innerHTML = '<option value="">-- Toca para seleccionar --</option>';
-                    data.forEach(v => { sel.innerHTML += `<option value="${v.id}">${v.placa}</option>`; });
+                    if (data && data.length > 0) {
+                        data.forEach(v => { sel.innerHTML += `<option value="${v.id}">${v.placa}</option>`; });
+                    }
+                    // Fallback inyectado como última opción válida (desbloquea el flujo si falta el vehículo)
+                    sel.innerHTML += '<option value="0">Sin Vehículo Registrado (Continuar)</option>';
                 })
-                .catch(e => sel.innerHTML = '<option value="">Error cargando vehículos</option>');
+                .catch(e => {
+                    // Fallback de rescate si la petición falla o la caché bloquea la lectura
+                    sel.innerHTML = '<option value="0">Sin Vehículo Registrado (Continuar)</option>';
+                });
         }
 
         function abrirModalDespacho(orden) {
