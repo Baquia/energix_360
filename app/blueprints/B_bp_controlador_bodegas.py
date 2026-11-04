@@ -884,28 +884,41 @@ def alias_catalogo():
     except Exception as e:
         return jsonify([])
 
+
 @bp_bodegas.route('/api/bodegas/alias/guardar', methods=['POST'])
 @login_required_custom
 def alias_guardar():
     data = request.json
     desc_origen = data.get('descripcion_origen')
     ean_correcto = data.get('ean_correcto')
+    empresa_id = session.get('empresa_id')
 
-    if not desc_origen or not ean_correcto: return jsonify({'status': 'error', 'message': 'Faltan datos'})
+    if not desc_origen or not ean_correcto: 
+        return jsonify({'status': 'error', 'message': 'Faltan datos'})
 
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-        cur.execute("SELECT producto, fabricante FROM productos WHERE id_empresa = %s AND ean = %s", (session.get('empresa_id'), ean_correcto))
+        cur.execute("SELECT producto, fabricante FROM productos WHERE id_empresa = %s AND ean = %s", (empresa_id, ean_correcto))
         prod_db = cur.fetchone()
 
-        if not prod_db: return jsonify({'status': 'error', 'message': 'Producto no encontrado en catálogo'})
+        if not prod_db: 
+            cur.close()
+            return jsonify({'status': 'error', 'message': 'Producto no encontrado en catálogo'})
 
         cur.execute("""
             UPDATE picking_importacion_raw
             SET codigo_producto = %s, descripcion_producto = %s, marca = %s, autorizacion_alistamiento = TRUE
             WHERE id_empresa = %s AND descripcion_producto = %s AND autorizacion_alistamiento = FALSE
-        """, (ean_correcto, prod_db['producto'], prod_db['fabricante'], session.get('empresa_id'), desc_origen))
+        """, (ean_correcto, prod_db['producto'], prod_db['fabricante'], empresa_id, desc_origen))
+
+        # Auditoría BQA-ONE
+        payload = json.dumps(data)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'ALIAS_GUARDAR', payload))
 
         mysql.connection.commit()
         cur.close()
@@ -919,8 +932,10 @@ def alias_guardar():
 def alias_permitir():
     data = request.json
     desc_origen = data.get('descripcion_origen')
+    empresa_id = session.get('empresa_id')
 
-    if not desc_origen: return jsonify({'status': 'error', 'message': 'Faltan datos'})
+    if not desc_origen: 
+        return jsonify({'status': 'error', 'message': 'Faltan datos'})
 
     try:
         cur = mysql.connection.cursor()
@@ -928,7 +943,15 @@ def alias_permitir():
             UPDATE picking_importacion_raw
             SET autorizacion_alistamiento = TRUE
             WHERE id_empresa = %s AND descripcion_producto = %s AND autorizacion_alistamiento = FALSE
-        """, (session.get('empresa_id'), desc_origen))
+        """, (empresa_id, desc_origen))
+
+        # Auditoría BQA-ONE
+        payload = json.dumps(data)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'ALIAS_PERMITIR_BYPASS', payload))
 
         mysql.connection.commit()
         cur.close()
@@ -936,7 +959,6 @@ def alias_permitir():
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
-
 
 @bp_bodegas.route('/api/bodegas/resolver_promo_huerfana', methods=['POST'])
 @login_required_custom
@@ -951,6 +973,7 @@ def resolver_promo_huerfana():
         cur.execute("SELECT * FROM picking_importacion_raw WHERE id = %s AND id_empresa = %s AND estado_actividad = 'PROMO_HUERFANA'", (id_row, empresa_id))
         orphan = cur.fetchone()
         if not orphan:
+            cur.close()
             return jsonify({'status': 'error', 'message': 'No se encontró la promoción huérfana en la orden.'})
 
         ean_promo = orphan['codigo_producto']
@@ -960,9 +983,11 @@ def resolver_promo_huerfana():
         if not componentes:
             cur.execute("SELECT * FROM promociones_clientes WHERE nombre_promo = %s AND id_empresa = %s AND estado = 'ACTIVO'", (orphan['descripcion_producto'], empresa_id))
             componentes = cur.fetchall()
-            if componentes: ean_promo = componentes[0]['ean_promo']
+            if componentes: 
+                ean_promo = componentes[0]['ean_promo']
 
         if not componentes:
+            cur.close()
             return jsonify({'status': 'error', 'message': 'El combo aún no existe en el módulo de Promociones. Configúralo primero y luego presiona este botón.'})
 
         nombre_promo = componentes[0]['nombre_promo']
@@ -999,7 +1024,16 @@ def resolver_promo_huerfana():
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
             cur.executemany(query, data_to_insert)
 
-        cur.execute("DELETE FROM picking_importacion_raw WHERE id = %s", (id_row,))
+        cur.execute("DELETE FROM picking_importacion_raw WHERE id = %s AND id_empresa = %s", (id_row, empresa_id))
+
+        # Auditoría BQA-ONE
+        payload = json.dumps(data)
+        cur.execute("""
+            INSERT INTO registro_operaciones_bqa_one 
+            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'RESOLVER_PROMO_HUERFANA', payload))
+
         mysql.connection.commit()
         cur.close()
 
@@ -1765,46 +1799,68 @@ def get_vehiculos():
 @login_required_custom
 def despachar_orden():
     d = request.json
+    empresa_id = session.get('empresa_id')
+    usuario_id = session.get('usuario_id')
+    numero_orden = d.get('numero_orden')
+    id_vehiculo = d.get('id_vehiculo')
+
     try:
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-        cur.execute("SELECT placa FROM vehiculos WHERE id = %s", (d['id_vehiculo'],))
-        veh = cur.fetchone()
-        placa = veh['placa'] if veh else 'N/A'
+        # Filtro estricto multi-tenant sobre vehiculos
+        placa = 'N/A'
+        if id_vehiculo and str(id_vehiculo) != '0':
+            cur.execute("SELECT placa FROM vehiculos WHERE id = %s AND id_empresa = %s", (id_vehiculo, empresa_id))
+            veh = cur.fetchone()
+            if veh:
+                placa = veh['placa']
 
-        cur.execute("""
-            UPDATE picking_importacion_raw
-            SET estado_actividad='TERMINADO', id_vehiculo=%s, fecha_despacho=NOW(), id_supervisor_despacho=%s
-            WHERE numero_orden_origen=%s AND id_empresa=%s
-        """, (d['id_vehiculo'], session.get('usuario_id'), d['numero_orden'], session.get('empresa_id')))
+        # Transacción con reintentos para mitigar colisiones
+        for intento in range(3):
+            try:
+                cur.execute("""
+                    UPDATE picking_importacion_raw
+                    SET estado_actividad='TERMINADO', id_vehiculo=%s, fecha_despacho=NOW(), id_supervisor_despacho=%s
+                    WHERE numero_orden_origen=%s AND id_empresa=%s
+                """, (id_vehiculo, usuario_id, numero_orden, empresa_id))
 
-        # Verificamos si el verificador ya creó un registro parcial del acta para actualizarlo, o creamos uno nuevo
-        cur.execute("SELECT id FROM actas_despacho_flotacarga WHERE numero_orden = %s AND id_empresa = %s", (d['numero_orden'], session.get('empresa_id')))
-        acta_existente = cur.fetchone()
+                cur.execute("""
+                    SELECT id FROM actas_despacho_flotacarga 
+                    WHERE numero_orden = %s AND id_empresa = %s 
+                    FOR UPDATE
+                """, (numero_orden, empresa_id))
+                acta_existente = cur.fetchone()
 
-        if acta_existente:
-            cur.execute("""
-                UPDATE actas_despacho_flotacarga
-                SET placa_vehiculo=%s, id_supervisor_despacho=%s, foto_evidencia=%s, firma_evidencia=%s, firma_supervisor=%s
-                WHERE numero_orden=%s AND id_empresa=%s
-            """, (placa, session.get('usuario_id'), d.get('foto'), d.get('firma'), d.get('firma_supervisor'), d['numero_orden'], session.get('empresa_id')))
-        else:
-            cur.execute("""
-                INSERT INTO actas_despacho_flotacarga
-                (id_empresa, numero_orden, placa_vehiculo, id_supervisor_despacho, foto_evidencia, firma_evidencia, firma_supervisor)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (session.get('empresa_id'), d['numero_orden'], placa, session.get('usuario_id'), d.get('foto'), d.get('firma'), d.get('firma_supervisor')))
+                if acta_existente:
+                    cur.execute("""
+                        UPDATE actas_despacho_flotacarga
+                        SET placa_vehiculo=%s, id_supervisor_despacho=%s, foto_evidencia=%s, firma_evidencia=%s, firma_supervisor=%s
+                        WHERE numero_orden=%s AND id_empresa=%s
+                    """, (placa, usuario_id, d.get('foto'), d.get('firma'), d.get('firma_supervisor'), numero_orden, empresa_id))
+                else:
+                    cur.execute("""
+                        INSERT INTO actas_despacho_flotacarga
+                        (id_empresa, numero_orden, placa_vehiculo, id_supervisor_despacho, foto_evidencia, firma_evidencia, firma_supervisor)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (empresa_id, numero_orden, placa, usuario_id, d.get('foto'), d.get('firma'), d.get('firma_supervisor')))
 
-        # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
-        log_data = {k: v for k, v in d.items() if k not in ['foto', 'firma', 'firma_supervisor']}
-        payload = json.dumps(log_data)
-        cur.execute("""
-            INSERT INTO registro_operaciones_bqa_one 
-            (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (session.get('empresa', 'Sistema'), session.get('empresa_id'), 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'DESPACHAR_ORDEN', payload))
+                # Auditoría Global BQA-ONE
+                log_data = {k: v for k, v in d.items() if k not in ['foto', 'firma', 'firma_supervisor']}
+                payload = json.dumps(log_data)
+                cur.execute("""
+                    INSERT INTO registro_operaciones_bqa_one 
+                    (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'DESPACHAR_ORDEN', payload))
 
-        mysql.connection.commit()
+                mysql.connection.commit()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                raise e
+
         cur.close()
         return jsonify({'message': 'Orden despachada y acta generada correctamente.'})
     except Exception as e:
@@ -2973,11 +3029,11 @@ def crear_usuario():
             cur.close()
             return jsonify({'status': 'error', 'message': 'Faltan datos obligatorios'})
 
-        # Verificar que la cédula no exista globalmente
-        cur.execute("SELECT id FROM usuarios WHERE cedula = %s", (cedula,))
+        # Verificar que la cédula no exista para la misma empresa
+        cur.execute("SELECT id FROM usuarios WHERE cedula = %s AND empresa_id = %s", (cedula, empresa_id))
         if cur.fetchone():
             cur.close()
-            return jsonify({'status': 'error', 'message': 'La cédula/usuario ya existe en el sistema.'})
+            return jsonify({'status': 'error', 'message': 'La cédula/usuario ya existe para esta empresa.'})
 
         from app import bcrypt
         hash_pw = bcrypt.generate_password_hash(password).decode('utf-8')

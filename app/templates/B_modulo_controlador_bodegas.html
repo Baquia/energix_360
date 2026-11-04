@@ -1286,6 +1286,9 @@
                 <b>Gestión Logística</b> en el menú y haz clic en <b>"Alistamiento en Vivo"</b>.
             </p>
         </div>
+        <footer style="margin-top: auto; padding: 20px 0 10px 0; text-align: center; color: #64748b; font-size: 0.85rem; border-top: 1px solid var(--color-border);">
+            BQA-ONE © 2026 |
+        </footer>
     </main>
 
 
@@ -3488,6 +3491,8 @@
                 }
             }
 
+            if (!window.confirm("¿Está seguro de resolver novedad en vivo?")) return;
+
             const payload = {
                 id_row: id_row,
                 accion: accion,
@@ -3800,6 +3805,8 @@
         }
 
         function resolverPromoHuerfana(idRow, ean, nombre) {
+            if (!window.confirm("¿Está seguro de resolver promoción huérfana?")) return;
+
             fetch('/api/bodegas/resolver_promo_huerfana', {
                 method: 'POST',
                 headers: {
@@ -5030,6 +5037,8 @@
         }
 
         function toggleEstadoPromo(ean_promo, nuevoEstado) {
+            if (!window.confirm("¿Está seguro de cambiar estado de la promoción?")) return;
+
             fetch('/api/promociones/estado', {
                 method: 'POST',
                 headers: {
@@ -5233,7 +5242,7 @@
         }
 
         function permitirAlistarBypass(descOrigen) {
-            if (!window.confirm(`¿Estás seguro de enviar "${descOrigen}" a piso sin código de barras? El operario tendrá que confirmarlo manualmente.`)) return;
+            if (!window.confirm("¿Está seguro de autorizar bypass sin código de barras?")) return;
 
             fetch('/api/bodegas/alias/permitir', {
                 method: 'POST',
