@@ -522,43 +522,41 @@ def buscar_producto_maestro():
 @bp_bodegas.route('/api/bodegas/monitoreo_realtime')
 @login_required_custom
 def monitoreo_realtime():
-    empresa_id = session.get('empresa_id')
-    usuario_id = session.get('usuario_id')
-
-    # --- HEARTBEAT CONTROLADOR ---
-    for intento in range(3):
-        try:
-            cur_hb = mysql.connection.cursor()
-            cur_hb.execute("""
-                INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
-                VALUES (%s, NOW())
-                ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
-            """, (usuario_id,))
-            mysql.connection.commit()
-            cur_hb.close()
-            break
-        except Exception as e:
-            if "deadlock" in str(e).lower() and intento < 2:
-                time.sleep(0.5)
-                continue
-            print(f"Error heartbeat controlador: {e}")
-            break
-    # -----------------------------
-    mysql.connection.commit() # Refresco forzado de la caché de transacción
-    kpis = {
-        'pedidos_totales': 0,
-        'items_pendientes': 0,
-        'items_finalizados': 0,
-        'pedidos_pendientes_reales': 0,
-        'velocidad_promedio': 0.0,
-        'requiere_alias': 0,
-        'backlog_verificacion': 0
-    }
-
-    operarios_marcas = []
-    verificadores_kpis = []
-
     try:
+        empresa_id = session.get('empresa_id')
+        usuario_id = session.get('usuario_id')
+
+        # --- HEARTBEAT CONTROLADOR ---
+        for intento in range(3):
+            try:
+                cur_hb = mysql.connection.cursor()
+                cur_hb.execute("""
+                    INSERT INTO monitoreo_actividad (id_usuario, ultima_actividad)
+                    VALUES (%s, NOW())
+                    ON DUPLICATE KEY UPDATE ultima_actividad = NOW()
+                """, (usuario_id,))
+                mysql.connection.commit()
+                cur_hb.close()
+                break
+            except Exception as e:
+                if "deadlock" in str(e).lower() and intento < 2:
+                    time.sleep(0.5)
+                    continue
+                break
+        
+        # Refresco forzado de transacción para datos en vivo
+        mysql.connection.commit()
+
+        kpis = {
+            'pedidos_totales': 0, 'items_pendientes': 0, 'items_finalizados': 0,
+            'pedidos_pendientes_reales': 0, 'velocidad_promedio': 0.0,
+            'requiere_alias': 0, 'backlog_verificacion': 0
+        }
+
+        operarios_marcas = []
+        verificadores_kpis = []
+        marcas_huerfanas = []
+
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
         cur.execute("""
@@ -580,35 +578,38 @@ def monitoreo_realtime():
         """, (empresa_id,))
         row_alias = cur.fetchone()
         if row_alias:
-            kpis['requiere_alias'] = int(row_alias['requiere_alias'])
+            kpis['requiere_alias'] = int(row_alias['requiere_alias'] or 0)
 
         cur.execute("""
             SELECT
-                numero_orden_origen as orden,
-                MAX(puerta_asignada) as puerta_asignada,
-                MAX(zona) as zona,
-                MAX(secuencia_alistamiento) as secuencia,
-                COUNT(*) as total_items,
-                MAX(fecha_carga) as fecha
+                numero_orden_origen as orden, MAX(puerta_asignada) as puerta_asignada, MAX(zona) as zona,
+                MAX(secuencia_alistamiento) as secuencia, COUNT(*) as total_items, MAX(fecha_carga) as fecha
             FROM picking_importacion_raw
             WHERE id_empresa = %s AND puerta_asignada IS NULL AND (estado_actividad = 'PENDIENTE' OR estado_actividad IS NULL) AND autorizacion_alistamiento = TRUE
             GROUP BY numero_orden_origen
             ORDER BY MAX(secuencia_alistamiento) ASC, MAX(fecha_carga) DESC
         """, (empresa_id,))
-        ordenes_sin_asignar = list(cur.fetchall())
-        for o in ordenes_sin_asignar:
-            if isinstance(o['fecha'], datetime): o['fecha'] = o['fecha'].strftime('%Y-%m-%d %H:%M:%S')
-
-        kpis['items_pendientes'] = sum(int(o['total_items']) for o in ordenes_sin_asignar)
+        
+        ordenes_sin_asignar = []
+        for o in cur.fetchall():
+            o_clean = {
+                'orden': str(o['orden']),
+                'puerta_asignada': str(o['puerta_asignada']) if o['puerta_asignada'] else None,
+                'zona': str(o['zona']) if o['zona'] else 'GENERAL',
+                'secuencia': int(o['secuencia']) if o['secuencia'] is not None else 0,
+                'total_items': int(o['total_items']),
+                'fecha': o['fecha'].strftime('%Y-%m-%d %H:%M:%S') if isinstance(o['fecha'], datetime) else str(o['fecha'] or '')
+            }
+            ordenes_sin_asignar.append(o_clean)
+            
+        kpis['items_pendientes'] += sum(o['total_items'] for o in ordenes_sin_asignar)
 
         cur.execute("""
             SELECT
-                u.id as id_operario,
-                u.nombre as nombre_operario,
+                u.id as id_operario, u.nombre as nombre_operario,
                 IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
                 GROUP_CONCAT(DISTINCT fp.marca SEPARATOR ', ') as marcas_asignadas,
-                COUNT(DISTINCT fp.marca) as total_marcas,
-                COUNT(p.id) as total_asignados,
+                COUNT(DISTINCT fp.marca) as total_marcas, COUNT(p.id) as total_asignados,
                 SUM(CASE WHEN p.estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'FINALIZADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_completados,
                 SUM(CASE WHEN p.novedad_alistamiento IS NOT NULL THEN 1 ELSE 0 END) as novedades,
                 SUM(CASE WHEN p.fecha_inicio_alistamiento IS NOT NULL AND p.fecha_fin_alistamiento IS NOT NULL
@@ -621,55 +622,44 @@ def monitoreo_realtime():
             GROUP BY u.id, u.nombre, ma.ultima_actividad
             ORDER BY en_linea DESC, u.nombre ASC
         """, (empresa_id, empresa_id, empresa_id))
-        operarios_marcas_raw = cur.fetchall()
+        
+        for op in cur.fetchall():
+            asignados = int(op['total_asignados'] or 0)
+            completados = int(op['items_completados'] or 0)
+            novedades = int(op['novedades'] or 0)
+            mins = float(op['minutos_totales'] or 0)
 
-        for op in operarios_marcas_raw:
-            op_dict = dict(op)
-            asignados = int(op_dict['total_asignados'] or 0)
-            completados = int(op_dict['items_completados'] or 0)
-            novedades = int(op_dict['novedades'] or 0)
-            mins = float(op_dict['minutos_totales'] or 0)
-
-            # FORZANDO CONVERSIÓN DE DECIMAL A NATIVOS
-            op_dict['items_completados'] = completados
-            op_dict['novedades'] = novedades
-            op_dict['minutos_totales'] = mins
-            
-            op_dict['avance_porcentaje'] = round((completados / asignados) * 100) if asignados > 0 else 0
-            op_dict['velocidad'] = round(completados / mins, 2) if mins > 0 else 0.0
-            op_dict['indice_novedades'] = round((novedades / completados) * 100, 1) if completados > 0 else 0.0
-            op_dict['en_linea'] = int(op_dict.get('en_linea', 0))
-
+            op_dict = {
+                'id_operario': int(op['id_operario']),
+                'nombre_operario': str(op['nombre_operario']),
+                'en_linea': int(op.get('en_linea', 0)),
+                'marcas_asignadas': str(op['marcas_asignadas']) if op['marcas_asignadas'] else None,
+                'total_marcas': int(op['total_marcas'] or 0),
+                'items_completados': completados,
+                'avance_porcentaje': round((completados / asignados) * 100) if asignados > 0 else 0,
+                'velocidad': round(completados / mins, 2) if mins > 0 else 0.0,
+                'indice_novedades': round((novedades / completados) * 100, 1) if completados > 0 else 0.0
+            }
             operarios_marcas.append(op_dict)
 
         cur.execute("""
             SELECT
-                u.id as id_verificador,
-                u.nombre as nombre_verificador,
+                u.id as id_verificador, u.nombre as nombre_verificador,
                 IF(TIMESTAMPDIFF(SECOND, ma.ultima_actividad, NOW()) <= 15, 1, 0) as en_linea,
                 COUNT(p.id) as total_verificados,
                 SUM(CASE WHEN p.cajas_alistadas != p.cajas_verificadas OR p.unidades_alistadas != p.unidades_verificadas THEN 1 ELSE 0 END) as discrepancias
             FROM usuarios u
             LEFT JOIN monitoreo_actividad ma ON u.id = ma.id_usuario
             LEFT JOIN picking_importacion_raw p ON p.id_verificador = u.id AND p.id_empresa = %s AND p.fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
-            WHERE u.empresa_id = %s
-              AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
+            WHERE u.empresa_id = %s AND u.perfil IN ('verificador', 'supervisor', 'controlador_logistica')
             GROUP BY u.id, u.nombre, ma.ultima_actividad
             ORDER BY en_linea DESC, total_verificados DESC
         """, (empresa_id, empresa_id))
-        verificadores_raw = cur.fetchall()
-
-        for v in verificadores_raw:
-            v_dict = dict(v)
-            verificados = int(v_dict['total_verificados'] or 0)
-            discrepancias = int(v_dict['discrepancias'] or 0)
+        
+        for v in cur.fetchall():
+            verificados = int(v['total_verificados'] or 0)
+            discrepancias = int(v['discrepancias'] or 0)
             
-            # FORZANDO CONVERSIÓN DE DECIMAL A NATIVOS
-            v_dict['discrepancias'] = discrepancias
-            
-            v_dict['indice_discrepancia'] = round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0
-            v_dict['en_linea'] = int(v_dict.get('en_linea', 0))
-
             cur.execute("""
                 SELECT COUNT(p2.id) as total_items_ordenes_tocadas
                 FROM picking_importacion_raw p2
@@ -679,13 +669,19 @@ def monitoreo_realtime():
                       FROM picking_importacion_raw
                       WHERE id_verificador = %s AND fecha_verificacion >= DATE_SUB(NOW(), INTERVAL 14 HOUR)
                   )
-            """, (empresa_id, v_dict['id_verificador']))
+            """, (empresa_id, v['id_verificador']))
             row_total = cur.fetchone()
-            total_items_ordenes = row_total['total_items_ordenes_tocadas'] if row_total else 0
+            total_items_ordenes = int(row_total['total_items_ordenes_tocadas']) if row_total else 0
 
-            v_dict['avance_porcentaje'] = round((verificados / total_items_ordenes) * 100) if total_items_ordenes > 0 else 0
-            v_dict['items_verificados'] = verificados
-
+            v_dict = {
+                'id_verificador': int(v['id_verificador']),
+                'nombre_verificador': str(v['nombre_verificador']),
+                'en_linea': int(v.get('en_linea', 0)),
+                'items_verificados': verificados,
+                'discrepancias': discrepancias,
+                'indice_discrepancia': round((discrepancias / verificados) * 100, 1) if verificados > 0 else 0.0,
+                'avance_porcentaje': round((verificados / total_items_ordenes) * 100) if total_items_ordenes > 0 else 0
+            }
             verificadores_kpis.append(v_dict)
 
         cur.execute("""
@@ -705,50 +701,48 @@ def monitoreo_realtime():
             GROUP BY p.marca
             ORDER BY total_items DESC
         """, (empresa_id,))
-        marcas_huerfanas = list(cur.fetchall())
+        
+        for mh in cur.fetchall():
+            marcas_huerfanas.append({
+                'marca': str(mh['marca']),
+                'total_items': int(mh['total_items'])
+            })
 
         cur.execute("""
             SELECT
-                numero_orden_origen as orden,
-                MAX(puerta_asignada) as puerta_asignada,
-                MAX(id_vehiculo) as id_vehiculo,
-                MAX(zona) as zona,
-                MAX(secuencia_alistamiento) as secuencia,
-                COUNT(*) as total_items,
+                numero_orden_origen as orden, MAX(puerta_asignada) as puerta_asignada,
+                MAX(secuencia_alistamiento) as secuencia, COUNT(*) as total_items,
                 SUM(CASE WHEN estado_actividad IN ('ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_listos,
                 SUM(CASE WHEN estado_actividad IN ('VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_verificados,
                 SUM(CASE WHEN estado_actividad IN ('DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) as items_despachados,
-                MIN(fecha_inicio_alistamiento) as inicio,
-                MAX(fecha_fin_alistamiento) as fin,
+                MIN(fecha_inicio_alistamiento) as inicio, MAX(fecha_fin_alistamiento) as fin,
                 SUM(CASE WHEN fecha_inicio_alistamiento IS NOT NULL AND fecha_fin_alistamiento IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, fecha_inicio_alistamiento, fecha_fin_alistamiento) ELSE 0 END) as minutos_totales
             FROM picking_importacion_raw
             WHERE id_empresa = %s AND puerta_asignada IS NOT NULL AND autorizacion_alistamiento = TRUE
             GROUP BY numero_orden_origen
             HAVING SUM(CASE WHEN estado_actividad IN ('ASIGNADO', 'EN_PROCESO', 'ALISTADO', 'VERIFICADO', 'DESPACHADO', 'TERMINADO') THEN 1 ELSE 0 END) > 0
         """, (empresa_id,))
-        raw_ordenes = list(cur.fetchall())
-
+        
         activos = []
         finalizados = []
         ahora = datetime.now()
-
         total_items_speed = 0
         total_mins_speed = 0
 
-        for o in raw_ordenes:
+        for o in cur.fetchall():
             total_it = int(o['total_items'] or 0)
             it_listos = int(o['items_listos'] or 0)
             it_verif = int(o['items_verificados'] or 0)
             it_desp = int(o['items_despachados'] or 0)
+            mins = float(o['minutos_totales'] or 0)
 
             es_alistado = (it_listos == total_it) and (total_it > 0)
             es_verificado = (it_verif == total_it) and (total_it > 0)
             es_despachado = (it_desp == total_it) and (total_it > 0)
 
-            o['velocidad'] = 0.0
-            mins = float(o['minutos_totales'] or 0)
+            velocidad = 0.0
             if mins > 0:
-                o['velocidad'] = round(float(it_listos) / mins, 2)
+                velocidad = round(float(it_listos) / mins, 2)
                 total_items_speed += float(it_listos)
                 total_mins_speed += mins
             elif float(it_listos) > 0 and o['inicio']:
@@ -756,13 +750,12 @@ def monitoreo_realtime():
                     inicio_dt = o['inicio'] if isinstance(o['inicio'], datetime) else datetime.strptime(str(o['inicio']), '%Y-%m-%d %H:%M:%S')
                     elapsed = (ahora - inicio_dt).total_seconds() / 60.0
                     if elapsed > 0:
-                        o['velocidad'] = round(float(it_listos) / elapsed, 2)
+                        velocidad = round(float(it_listos) / elapsed, 2)
                         total_items_speed += float(it_listos)
                         total_mins_speed += elapsed
-                except Exception:
-                    pass
+                except: pass
 
-            o['duracion_str'] = "--:--"
+            duracion_str = "--:--"
             if es_alistado and o['inicio'] and o['fin']:
                 try:
                     inicio_dt = o['inicio'] if isinstance(o['inicio'], datetime) else datetime.strptime(str(o['inicio']), '%Y-%m-%d %H:%M:%S')
@@ -771,79 +764,63 @@ def monitoreo_realtime():
                     horas = int(diff.total_seconds()) // 3600
                     minutos = (int(diff.total_seconds()) % 3600) // 60
                     segundos = int(diff.total_seconds()) % 60
-                    o['duracion_str'] = f"{horas:02}:{minutos:02}:{segundos:02}"
-                except Exception:
-                    pass
+                    duracion_str = f"{horas:02}:{minutos:02}:{segundos:02}"
+                except: pass
 
+            estado_visual = 'EN_PROCESO'
+            is_finalizado = False
+            
             if es_despachado:
-                o['estado_visual'] = 'DESPACHADO'
-                o['color_fila'] = '#f0fdf4'
-                try:
-                    fecha_cierre = o['fin'] if isinstance(o['fin'], datetime) else (datetime.strptime(str(o['fin']), '%Y-%m-%d %H:%M:%S') if o['fin'] else ahora)
-                    if (ahora - fecha_cierre) < timedelta(hours=24):
-                        finalizados.append(o)
-                except:
-                    finalizados.append(o)
+                estado_visual = 'DESPACHADO'
+                is_finalizado = True
             elif es_verificado:
-                o['estado_visual'] = 'VERIFICADO'
-                o['color_fila'] = '#f0fdf4'
-                try:
-                    fecha_cierre = o['fin'] if isinstance(o['fin'], datetime) else (datetime.strptime(str(o['fin']), '%Y-%m-%d %H:%M:%S') if o['fin'] else ahora)
-                    if (ahora - fecha_cierre) < timedelta(hours=24):
-                        finalizados.append(o)
-                except:
-                    finalizados.append(o)
+                estado_visual = 'VERIFICADO'
+                is_finalizado = True
             elif es_alistado:
-                o['estado_visual'] = 'ALISTADO'
-                o['color_fila'] = '#eff6ff'
-                activos.append(o)
+                estado_visual = 'ALISTADO'
             else:
-                o['estado_visual'] = 'EN_PROCESO'
                 kpis['items_pendientes'] += (total_it - it_listos)
-                if o['velocidad'] > 0 and o['velocidad'] < 1.0:
-                    o['color_fila'] = '#fef2f2'
-                elif o['velocidad'] >= 1.0:
-                    o['color_fila'] = '#fefce8'
-                else:
-                    o['color_fila'] = '#ffffff'
-                activos.append(o)
 
-            if o['inicio'] and o['estado_visual'] not in ['TERMINADO', 'DESPACHADO', 'VERIFICADO', 'ALISTADO']:
+            segundos_transcurridos = None
+            if o['inicio'] and estado_visual not in ['TERMINADO', 'DESPACHADO', 'VERIFICADO', 'ALISTADO']:
                 try:
                     inicio_dt = o['inicio'] if isinstance(o['inicio'], datetime) else datetime.strptime(str(o['inicio']), '%Y-%m-%d %H:%M:%S')
-                    o['segundos_transcurridos'] = int((ahora - inicio_dt).total_seconds())
-                except Exception:
-                    o['segundos_transcurridos'] = 0
-            else:
-                o['segundos_transcurridos'] = None
+                    segundos_transcurridos = int((ahora - inicio_dt).total_seconds())
+                except: segundos_transcurridos = 0
 
-            if o['inicio']:
-                o['inicio_str'] = o['inicio'].strftime('%Y-%m-%d %H:%M:%S') if isinstance(o['inicio'], datetime) else str(o['inicio'])
-            else:
-                o['inicio_str'] = None
+            inicio_str = o['inicio'].strftime('%Y-%m-%d %H:%M:%S') if isinstance(o['inicio'], datetime) else str(o['inicio'] or '')
 
-            # FORZANDO CONVERSIÓN DE DECIMAL A NATIVOS PARA TODAS LAS MÉTRICAS
-            o['total_items'] = total_it
-            o['items_listos'] = it_listos
-            o['items_verificados'] = it_verif
-            o['items_despachados'] = it_desp
-            o['minutos_totales'] = mins
-            o.pop('inicio', None)
-            o.pop('fin', None)
+            o_clean = {
+                'orden': str(o['orden']),
+                'puerta_asignada': str(o['puerta_asignada']) if o['puerta_asignada'] else '',
+                'total_items': total_it,
+                'items_listos': it_listos,
+                'duracion_str': duracion_str,
+                'estado_visual': estado_visual,
+                'segundos_transcurridos': segundos_transcurridos,
+                'secuencia': int(o['secuencia'] or 0),
+                'inicio_str': inicio_str
+            }
+
+            if is_finalizado:
+                try:
+                    fecha_cierre = o['fin'] if isinstance(o['fin'], datetime) else (datetime.strptime(str(o['fin']), '%Y-%m-%d %H:%M:%S') if o['fin'] else ahora)
+                    if (ahora - fecha_cierre) < timedelta(hours=24):
+                        finalizados.append(o_clean)
+                except:
+                    finalizados.append(o_clean)
+            else:
+                activos.append(o_clean)
 
         kpis['pedidos_pendientes_reales'] = len(ordenes_sin_asignar) + len(activos)
         kpis['pedidos_totales'] = kpis['pedidos_pendientes_reales']
+        if total_mins_speed > 0: kpis['velocidad_promedio'] = round(total_items_speed / total_mins_speed, 2)
 
-        if total_mins_speed > 0:
-            kpis['velocidad_promedio'] = round(total_items_speed / total_mins_speed, 2)
-
-        activos.sort(key=lambda x: (x['secuencia'] or 99999, x['inicio_str'] or ''), reverse=False)
-        finalizados.sort(key=lambda x: x['duracion_str'] or '', reverse=True)
+        activos.sort(key=lambda x: (x['secuencia'], x['inicio_str']), reverse=False)
+        finalizados.sort(key=lambda x: x['duracion_str'], reverse=True)
         ordenes_procesadas = activos + finalizados
-
-        cur.close()
         
-        mysql.connection.commit()
+        cur.close()
 
         return jsonify({
             'kpis': kpis,
@@ -853,12 +830,11 @@ def monitoreo_realtime():
             'marcas_huerfanas': marcas_huerfanas,
             'ordenes_asignadas': ordenes_procesadas
         })
-
     except Exception as e:
-        mysql.connection.rollback()
-        print(f"Error en realtime: {e}")
-        return jsonify({'error': str(e)})
-
+        import traceback
+        traceback.print_exc()
+        # Blindaje anti-500: Si falla, forzamos un 200 con el error atrapado en texto.
+        return jsonify({'error': str(e)}), 200
 # ==============================================================================
 # ALIAS Y EXCEPCIONES IA
 # ==============================================================================
