@@ -2313,7 +2313,7 @@
                                     {% if op.estado_visual == 'VERIFICADO' %}
                                     <div style="display:flex; flex-direction:column; gap:6px;">
                                         <button
-                                            onclick="window.open('/bodegas/imprimir_lista_verificacion/{{ op.orden }}', '_blank')"
+                                            onclick="window.location.href='/bodegas/imprimir_lista_verificacion/{{ op.orden }}'"
                                             class="btn-assign"
                                             style="background:#3b82f6; color:white; border:none; width: 100%; padding:10px;">📄
                                             Lista Física</button>
@@ -2322,7 +2322,8 @@
                                             Vehículo</button>
                                     </div>
                                     {% elif op.estado_visual == 'DESPACHADO' or op.estado_visual == 'TERMINADO' %}
-                                    <button onclick="window.open('/bodegas/imprimir_acta/{{ op.orden }}', '_blank')"
+                                    <button 
+                                        onclick="window.location.href='/bodegas/imprimir_acta/{{ op.orden }}'"
                                         class="btn-assign"
                                         style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️
                                         Acta</button>
@@ -3375,11 +3376,11 @@
                             if (op.estado_visual === 'VERIFICADO') {
                                 btnHtml = `
                             <div style="display:flex; flex-direction:column; gap:6px;">
-                                <button onclick="window.open('/bodegas/imprimir_lista_verificacion/${op.orden}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:10px;">📄 Lista Física</button>
+                                <button onclick="window.location.href='/bodegas/imprimir_lista_verificacion/${op.orden}'" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:10px;">📄 Lista Física</button>
                                 <button onclick="abrirModalDespacho('${op.orden}')" class="btn-assign" style="background:#10b981; color:white; border:none; width: 100%; padding:10px;">🚚 Vehículo</button>
                             </div>`;
                             } else if (op.estado_visual === 'DESPACHADO' || op.estado_visual === 'TERMINADO') {
-                                btnHtml = `<button onclick="window.open('/bodegas/imprimir_acta/${op.orden}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>`;
+                                btnHtml = `<button onclick="window.location.href='/bodegas/imprimir_acta/${op.orden}'" class="btn-assign" style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️ Acta</button>`;
                             } else if (op.estado_visual === 'ALISTADO') {
                                 btnHtml = `<span style="color:#f59e0b; font-size:0.85rem; display: block; text-align: center; font-weight:700;">En Auditoría</span>`;
                             } else {
@@ -3581,7 +3582,7 @@
                             <td data-label="Supervisor" style="font-weight:600;">${a.supervisor}</td>
                             <td data-label="Fecha Gen." style="font-size:0.85rem; color:#6b7280;">${a.fecha_generacion}</td>
                             <td data-label="Acción">
-                                <button onclick="window.open('/bodegas/imprimir_acta/${a.numero_orden}', '_blank')" class="btn-assign" style="background:#3b82f6; color:white; border:none; width:100%; padding:10px;">
+                                <button onclick="window.location.href='/bodegas/imprimir_acta/${a.numero_orden}'" class="btn-assign" style="background:#3b82f6; color:white; border:none; width:100%; padding:10px;">
                                     🖨️ Descargar
                                 </button>
                             </td>

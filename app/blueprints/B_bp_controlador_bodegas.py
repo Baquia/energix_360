@@ -397,6 +397,7 @@ def control_logistica():
 @login_required_custom
 def novedades_en_vivo():
     try:
+        mysql.connection.commit() # Refresco forzado de la caché de transacción
         cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("""
             SELECT p.id, p.numero_orden_origen, p.codigo_producto, p.descripcion_producto,
@@ -540,7 +541,7 @@ def monitoreo_realtime():
             print(f"Error heartbeat controlador: {e}")
             break
     # -----------------------------
-
+    mysql.connection.commit() # Refresco forzado de la caché de transacción
     kpis = {
         'pedidos_totales': 0,
         'items_pendientes': 0,
@@ -1847,7 +1848,11 @@ def imprimir_lista_verificacion(orden):
             </style>
         </head>
         <body>
-            <button class="btn-print" onclick="window.print()">🖨️ Imprimir Lista Física</button>
+            <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 30px;" class="no-print">
+                <button class="btn-print" style="margin: 0; background: #475569;" onclick="window.location.href='/B_modulo_controlador_bodegas.html'">⬅ Volver al Dashboard</button>
+                <button class="btn-print" style="margin: 0;" onclick="window.print()">🖨️ Imprimir Lista Física</button>
+            </div>
+            <style>@media print {{ .no-print {{ display: none !important; }} }}</style>
             <div class="header-box">
                 <h1>LISTA DE VERIFICACIÓN FÍSICA PARA EL CONDUCTOR</h1>
                 <h3>ORDEN DE PEDIDO: #{orden}</h3>
@@ -1890,7 +1895,6 @@ def imprimir_lista_verificacion(orden):
         return html
     except Exception as e:
         return str(e), 500
-
 
 @bp_bodegas.route('/bodegas/imprimir_acta/<orden>')
 @login_required_custom
@@ -1964,7 +1968,11 @@ def imprimir_acta(orden):
             </style>
         </head>
         <body>
-            <button class="btn-print" onclick="window.print()">🖨️ Imprimir Manifiesto</button>
+            <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 30px;" class="no-print">
+                <button class="btn-print" style="margin: 0; background: #475569;" onclick="window.location.href='/B_modulo_controlador_bodegas.html'">⬅ Volver al Dashboard</button>
+                <button class="btn-print" style="margin: 0;" onclick="window.print()">🖨️ Imprimir Manifiesto</button>
+            </div>
+            <style>@media print {{ .no-print {{ display: none !important; }} }}</style>
             <div class="header-box">
                 <div class="header-brand">
                     <h2>{empresa_actual}</h2>
@@ -2031,7 +2039,7 @@ def imprimir_acta(orden):
         return html
     except Exception as e:
         return str(e), 500
-
+    
 @bp_bodegas.route('/bodegas/api/ordenes_sin_secuencia')
 @login_required_custom
 def ordenes_sin_secuencia():
