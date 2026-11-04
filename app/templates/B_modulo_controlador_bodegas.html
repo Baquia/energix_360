@@ -1996,8 +1996,11 @@
         <div class="modal-large">
             <div class="modal-header">
                 <h3>📋 Alistamiento en Vivo</h3>
-                <button class="btn-cancel" onclick="closeAlistamientoModal()"
-                    style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <button class="btn-assign" onclick="cargarMonitoreoRealTime()" style="background:#e0f2fe; color:#0284c7; padding: 6px 12px; font-size: 0.95rem; border-color: #bae6fd; display: flex; align-items: center; gap: 5px;" title="Sincronizar forzadamente con la base de datos">🔄 Actualizar</button>
+                    <button class="btn-cancel" onclick="closeAlistamientoModal()"
+                        style="border:none; background:transparent; padding:0; font-size:1.8rem; color:#9ca3af;">&times;</button>
+                </div>
             </div>
             <div class="modal-body" style="background: #f3f4f6;">
 
@@ -3242,6 +3245,8 @@
             sessionStorage.setItem('reabrirAlistamiento', 'true');
             document.getElementById('modalAlistamiento').style.display = 'flex';
             cargarMonitoreoRealTime();
+            if (monitoreoInterval) clearInterval(monitoreoInterval);
+            monitoreoInterval = setInterval(cargarMonitoreoRealTime, 3000);
         }
 
         function closeAlistamientoModal() {
@@ -4537,12 +4542,22 @@
             if (monitoreoInterval) clearInterval(monitoreoInterval);
             monitoreoInterval = setInterval(cargarMonitoreoRealTime, 3000);
 
+            // Restauración del Temporizador y Detección de Foco (Watchdog anti-suspensión)
             document.addEventListener("visibilitychange", function () {
                 if (!document.hidden) {
                     cargarMonitoreoRealTime();
+                    if (monitoreoInterval) clearInterval(monitoreoInterval);
+                    monitoreoInterval = setInterval(cargarMonitoreoRealTime, 3000);
                 }
             });
+
+            window.addEventListener("focus", function () {
+                cargarMonitoreoRealTime();
+                if (monitoreoInterval) clearInterval(monitoreoInterval);
+                monitoreoInterval = setInterval(cargarMonitoreoRealTime, 3000);
+            });
         });
+
         function actualizarCronometros() {
             const cronometros = document.querySelectorAll('.cronometro');
 
