@@ -1931,6 +1931,9 @@ def imprimir_acta(orden):
         firma_verif_img = f"<img src='{acta_info['firma_verificador']}' />" if acta_info and acta_info['firma_verificador'] else ""
         foto_img = f"<img src='{acta_info['foto_evidencia']}' style='max-width:100%; max-height:400px; display:block; margin: 0 auto; border-radius: 8px;'/>" if acta_info and acta_info['foto_evidencia'] else ""
 
+        empresa_actual = session.get('empresa', 'Empresa')
+        nit_actual = session.get('empresa_id', '')
+
         html = f"""
         <!DOCTYPE html>
         <html lang="es">
@@ -1941,6 +1944,9 @@ def imprimir_acta(orden):
                 body {{ font-family: Arial, sans-serif; padding: 40px; color: #333; }}
                 h1, h2, h3 {{ color: #000; text-align: center; margin: 5px 0; }}
                 .header-box {{ border: 2px solid #000; padding: 20px; border-radius: 10px; margin-bottom: 30px; }}
+                .header-brand {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 15px; }}
+                .header-brand h2 {{ margin: 0; font-size: 24px; color: #0f172a; text-align: left; }}
+                .logo-cliente {{ max-height: 60px; max-width: 200px; object-fit: contain; }}
                 .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }}
                 table {{ width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }}
                 th, td {{ border: 1px solid #000; padding: 10px; text-align: left; font-size:14px; }}
@@ -1951,12 +1957,19 @@ def imprimir_acta(orden):
                 .firma-espacio img {{ max-height: 100px; max-width: 100%; object-fit: contain; }}
                 .firma-linea {{ border-top: 2px solid #000; width: 100%; text-align: center; padding-top: 10px; font-size:15px; }}
                 .btn-print {{ display: block; margin: 0 auto 30px auto; padding: 15px 30px; background: #004e92; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }}
+                .footer-bqa {{ margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px; display: flex; justify-content: center; align-items: center; gap: 15px; page-break-inside: avoid; }}
+                .footer-bqa p {{ margin: 0; color: #64748b; font-size: 12px; font-weight: bold; }}
+                .logo-bqa {{ height: 25px; }}
                 @media print {{ .btn-print {{ display: none; }} body {{ padding: 0; }} }}
             </style>
         </head>
         <body>
             <button class="btn-print" onclick="window.print()">🖨️ Imprimir Manifiesto</button>
             <div class="header-box">
+                <div class="header-brand">
+                    <h2>{empresa_actual}</h2>
+                    <img src="/static/logo_{nit_actual}.PNG" alt="Logo Cliente" class="logo-cliente" onerror="this.style.display='none'">
+                </div>
                 <h1>MANIFIESTO DE CARGA Y ENTREGA (VERIFICADO)</h1>
                 <h3>ORDEN DE PEDIDO: #{orden}</h3>
                 <div class="info-grid">
@@ -2003,9 +2016,14 @@ def imprimir_acta(orden):
                     </div>
                 </div>
             </div>
-            <div style="margin-top: 40px; text-align:center; page-break-inside: avoid; padding-bottom: 30px;">
+            <div style="margin-top: 40px; text-align:center; page-break-inside: avoid;">
                 <h4 style="color:#64748b; margin-bottom: 15px;">Evidencia Fotográfica de Entrega</h4>
                 {foto_img}
+            </div>
+            
+            <div class="footer-bqa">
+                <p>Documento desarrollado por BQA-ONE</p>
+                <img src="/static/logo_energix360.png" alt="BQA-ONE" class="logo-bqa">
             </div>
         </body>
         </html>

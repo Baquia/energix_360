@@ -1272,7 +1272,7 @@
             <div class="kpi-card tooltip" style="border-left: 6px solid #e11d48;"
                 onclick="abrirModalConsolaAprendizaje()">
                 <span class="kpi-lbl" style="color: #be123c;">⚠️ Alertas de Mapeo (Alias)</span>
-                <span class="kpi-val" style="color: #e11d48;">{{ kpis.requiere_alias }}</span>
+                <span class="kpi-val" id="kpi-alertas-dash" style="color: #e11d48;">{{ kpis.requiere_alias }}</span>
                 <span class="tooltiptext">Textos del Excel cargado que no cruzaron con la base de datos y requieren ser
                     enlazados manualmente.</span>
             </div>
@@ -3239,14 +3239,11 @@
             sessionStorage.setItem('reabrirAlistamiento', 'true');
             document.getElementById('modalAlistamiento').style.display = 'flex';
             cargarMonitoreoRealTime();
-            if (monitoreoInterval) clearInterval(monitoreoInterval);
-            monitoreoInterval = setInterval(cargarMonitoreoRealTime, 3000);
         }
 
         function closeAlistamientoModal() {
             sessionStorage.removeItem('reabrirAlistamiento');
             document.getElementById('modalAlistamiento').style.display = 'none';
-            if (monitoreoInterval) clearInterval(monitoreoInterval);
         }
 
         function cargarMonitoreoRealTime() {
@@ -3263,6 +3260,9 @@
 
                     if (document.getElementById('kpi-backlog-dash')) {
                         document.getElementById('kpi-backlog-dash').textContent = data.kpis.backlog_verificacion;
+                    }
+                    if (document.getElementById('kpi-alertas-dash')) {
+                        document.getElementById('kpi-alertas-dash').textContent = data.kpis.requiere_alias;
                     }
 
                     const tbMuelles = document.getElementById('tbody-ordenes-pendientes');
@@ -4516,6 +4516,10 @@
             if (sessionStorage.getItem('reabrirAlistamiento') === 'true') {
                 if (typeof openAlistamientoModal === "function") openAlistamientoModal();
             }
+            // Sincronización Global Continua BQA-ONE (Polling en segundo plano)
+            cargarMonitoreoRealTime();
+            if (monitoreoInterval) clearInterval(monitoreoInterval);
+            monitoreoInterval = setInterval(cargarMonitoreoRealTime, 3000);
         });
 
         function actualizarCronometros() {

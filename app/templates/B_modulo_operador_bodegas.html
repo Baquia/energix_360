@@ -2033,17 +2033,11 @@
         // =====================================
         // DISPARADOR MASIVO
         // =====================================
-
         function ejecutarMasivo() {
             if (!itemActivo) return;
-            const nombre = (itemActivo.descripcion_producto || 'Producto').replace(/\.{2,}/g, '').trim();
-            let texto = '¿Seguro alistaste ';
-            if (itemActivo.req_cajas > 0) texto += `${itemActivo.req_cajas} cajas `;
-            if (itemActivo.req_cajas > 0 && itemActivo.req_unidades > 0) texto += 'y ';
-            if (itemActivo.req_unidades > 0) texto += `${itemActivo.req_unidades} unidades `;
-            texto += `del producto ${nombre}?`;
-
-            if (window.confirm(texto)) {
+            
+            // Cumplimiento estricto de la regla de seguridad BQA-ONE
+            if (window.confirm("¿Está seguro de Alistamiento Masivo?")) {
                 itemActivo.act_cajas = itemActivo.req_cajas;
                 itemActivo.act_unidades = itemActivo.req_unidades;
 
@@ -2059,6 +2053,9 @@
                         detenerCamara();
                     } catch (e) { }
                 }
+                
+                // Automatización del guardado directo sin clics adicionales
+                ejecutarGuardadoBD();
             }
         }
 
@@ -2067,57 +2064,58 @@
         // =====================================
         function declararFaltaExistencias() {
             if (!itemActivo) return;
-            if (window.confirm("¿Está seguro de que no hay unidades del producto en stock? (Se marcará como Agotado)")) {
+            if (window.confirm("¿Está seguro de Reportar Sin Stock?")) {
                 novedadPendiente = 'FALTA_EXISTENCIAS';
                 idSupervisorAutorizado = null;
                 itemActivo.act_cajas = 0;
                 itemActivo.act_unidades = 0;
-                confirmarVerificacion();
+                ejecutarGuardadoBD();
             }
         }
 
-
         function ejecutarFaltaExistencias() {
-            cerrarConfirmacionStock();
             novedadPendiente = 'FALTA_EXISTENCIAS';
             idSupervisorAutorizado = null;
             itemActivo.act_cajas = 0;
             itemActivo.act_unidades = 0;
-            intentarTerminarItem();
+            ejecutarGuardadoBD();
         }
 
         function declararSinEAN() {
             if (!itemActivo) return;
-            if (window.confirm("¿Está seguro de enviar este ítem sin EAN? El controlador deberá validarlo.")) {
+            if (window.confirm("¿Está seguro de Reportar Sin EAN?")) {
                 novedadPendiente = 'SIN_EAN';
                 idSupervisorAutorizado = null;
                 itemActivo.act_cajas = itemActivo.req_cajas;
                 itemActivo.act_unidades = itemActivo.req_unidades;
-                confirmarVerificacion();
+                ejecutarGuardadoBD();
             }
         }
 
         function declararNoEnBD() {
             if (!itemActivo) return;
-            if (window.confirm("¿Está seguro de reportar que este producto no existe en Base de Datos?")) {
+            if (window.confirm("¿Está seguro de Reportar No En BD?")) {
                 novedadPendiente = 'NO_EN_BD';
                 idSupervisorAutorizado = null;
                 itemActivo.act_cajas = itemActivo.req_cajas;
                 itemActivo.act_unidades = itemActivo.req_unidades;
-                confirmarVerificacion();
+                ejecutarGuardadoBD();
             }
         }
 
         // =====================================
-        // ENVÍO DE DATOS Y BLOQUEO ANDON (CON WINDOW.CONFIRM)
+        // ENVÍO DE DATOS Y BLOQUEO ANDON
         // =====================================
         function confirmarVerificacion() {
             if (!itemActivo) return;
-
-            if (!window.confirm(`¿Confirmar Cantidades?\nAlistaste:\n📦 ${itemActivo.act_cajas} Cajas\n🍬 ${itemActivo.act_unidades} Unidades\n\n¿Está seguro de confirmar este alistamiento?`)) {
-                return;
+            if (window.confirm(`¿Está seguro de Confirmar Cantidades?`)) {
+                ejecutarGuardadoBD();
             }
-
+        }
+        
+        function ejecutarGuardadoBD() {
+            if (!itemActivo) return;
+            
             const btn = document.querySelector('.btn-finish');
             const textoOriginal = btn.textContent;
             btn.textContent = 'Guardando...';
@@ -2149,40 +2147,39 @@
                     id_supervisor: supervisorAEnviar
                 })
             })
-                .then(r => {
-                    if (!r.ok) throw new Error("Error en servidor");
-                    return r.json();
-                })
-                .then(d => {
-                    if (d.status === 'ok') {
-                        if (novedadPendiente) {
-                            // SI HAY NOVEDAD: Bloqueo Andon de pantalla completa
-                            document.getElementById('overlay-bloqueo-andon').style.display = 'flex';
-                            // El polling de cargarItemsSilencioso() lo liberará
-                        } else {
-                            // SI NO HAY NOVEDAD: Flujo normal (cerrar y seguir)
-                            cerrarModalPicking();
-                            const idx = listaItems.findIndex(i => i.id === idParaBorrar);
-                            if (idx > -1) {
-                                listaItems[idx].estado_actividad = d.message && d.message.includes('parcial') ? 'EN_PROCESO' : 'ALISTADO';
-                                listaItems[idx].act_cajas = cajasGuardar;
-                                listaItems[idx].act_unidades = unidadesGuardar;
-                            }
-                            renderizarItems();
-                            playBeep(true);
-                        }
+            .then(r => {
+                if (!r.ok) throw new Error("Error en servidor");
+                return r.json();
+            })
+            .then(d => {
+                if (d.status === 'ok') {
+                    if (novedadPendiente) {
+                        // SI HAY NOVEDAD: Bloqueo Andon de pantalla completa
+                        document.getElementById('overlay-bloqueo-andon').style.display = 'flex';
                     } else {
-                        alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
+                        // SI NO HAY NOVEDAD: Flujo normal (cerrar y seguir)
+                        cerrarModalPicking();
+                        const idx = listaItems.findIndex(i => i.id === idParaBorrar);
+                        if (idx > -1) {
+                            listaItems[idx].estado_actividad = d.message && d.message.includes('parcial') ? 'EN_PROCESO' : 'ALISTADO';
+                            listaItems[idx].act_cajas = cajasGuardar;
+                            listaItems[idx].act_unidades = unidadesGuardar;
+                        }
+                        renderizarItems();
+                        playBeep(true);
                     }
-                })
-                .catch(e => {
-                    console.error(e);
-                    alert("❌ Error de Conexión.");
-                })
-                .finally(() => {
-                    btn.textContent = textoOriginal;
-                    btn.disabled = false;
-                });
+                } else {
+                    alert("⚠️ Servidor: " + (d.error || 'Error desconocido'));
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                alert("❌ Error de Conexión.");
+            })
+            .finally(() => {
+                btn.textContent = textoOriginal;
+                btn.disabled = false;
+            });
         }
     </script>
 </body>
