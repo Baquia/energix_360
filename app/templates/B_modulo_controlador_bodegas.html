@@ -2322,8 +2322,7 @@
                                             Vehículo</button>
                                     </div>
                                     {% elif op.estado_visual == 'DESPACHADO' or op.estado_visual == 'TERMINADO' %}
-                                    <button 
-                                        onclick="window.location.href='/bodegas/imprimir_acta/{{ op.orden }}'"
+                                    <button onclick="window.location.href='/bodegas/imprimir_acta/{{ op.orden }}'"
                                         class="btn-assign"
                                         style="background:#3b82f6; color:white; border:none; width: 100%; padding:12px;">🖨️
                                         Acta</button>
@@ -4427,7 +4426,7 @@
         function cargarVehiculos() {
             const sel = document.getElementById('selVehiculos');
             sel.innerHTML = '<option value="">Cargando...</option>';
-            
+
             // Se inyecta Date.now() para forzar el refresco y evadir la caché del móvil
             fetch('/api/bodegas/vehiculos?t=' + Date.now())
                 .then(r => r.json())
@@ -4530,8 +4529,13 @@
             cargarMonitoreoRealTime();
             if (monitoreoInterval) clearInterval(monitoreoInterval);
             monitoreoInterval = setInterval(cargarMonitoreoRealTime, 3000);
-        });
 
+            document.addEventListener("visibilitychange", function () {
+                if (!document.hidden) {
+                    cargarMonitoreoRealTime();
+                }
+            });
+        });
         function actualizarCronometros() {
             const cronometros = document.querySelectorAll('.cronometro');
 

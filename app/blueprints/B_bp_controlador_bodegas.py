@@ -412,8 +412,11 @@ def novedades_en_vivo():
         """, (session.get('empresa_id'),))
         data = cur.fetchall()
         cur.close()
+        
+        mysql.connection.commit()
         return jsonify(data)
     except Exception as e:
+        mysql.connection.rollback()
         print(f"Error novedades en vivo: {e}")
         return jsonify([])
 
@@ -826,6 +829,8 @@ def monitoreo_realtime():
         ordenes_procesadas = activos + finalizados
 
         cur.close()
+        
+        mysql.connection.commit()
 
         return jsonify({
             'kpis': kpis,
@@ -837,9 +842,9 @@ def monitoreo_realtime():
         })
 
     except Exception as e:
+        mysql.connection.rollback()
         print(f"Error en realtime: {e}")
         return jsonify({'error': str(e)})
-
 
 # ==============================================================================
 # ALIAS Y EXCEPCIONES IA
