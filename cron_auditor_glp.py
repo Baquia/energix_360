@@ -124,7 +124,7 @@ def auditar_granjas():
                 p.codigo_pedido, 
                 p.estatus_flujo,
                 e.nit AS id_empresa,
-                p.fecha_solicitud AS fecha_referencia
+                COALESCE(p.fecha_solicitud, p.fecha_registro) AS fecha_referencia
             FROM pedidos_gas_glp p
             JOIN empresas e ON TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(e.nombre_comercial)) COLLATE utf8mb4_general_ci
             WHERE p.estatus_lote = 'ACTIVO'
@@ -135,7 +135,7 @@ def auditar_granjas():
                   WHERE TRIM(c.ubicacion) COLLATE utf8mb4_general_ci = TRIM(p.ubicacion) COLLATE utf8mb4_general_ci
                     AND (
                         (c.codigo_pedido IS NOT NULL AND TRIM(c.codigo_pedido) <> '' AND c.codigo_pedido COLLATE utf8mb4_general_ci = p.codigo_pedido COLLATE utf8mb4_general_ci)
-                        OR (c.lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND c.fecha >= p.fecha_solicitud)
+                        OR (c.lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND c.fecha >= COALESCE(p.fecha_solicitud, p.fecha_registro))
                     )
                     AND c.operacion = 'tanqueo'
               )
