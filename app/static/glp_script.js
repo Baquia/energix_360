@@ -4,6 +4,9 @@ let pedidoPendienteGlobal = null;
 // NUEVA LÍNEA: Variable para evitar colapsos en la sincronización offline
 let IS_SYNCING = false;
 
+// Funcionalidad CSRF BQA-ONE
+const getCsrfToken = () => document.getElementById('csrf_token') ? document.getElementById('csrf_token').value : '';
+
 /* ==========================================================
 NUEVA LÓGICA: NOTIFICACIONES PUSH LOCALES (WEB NOTIFICATIONS API)
 ========================================================== */
@@ -47,10 +50,6 @@ function enviarNotificacionPushLocal(titulo, cuerpo) {
     }
   }
 }
-
-/* ==========================================================
-NUEVO FLUJO ATÓMICO: CONSUMO + NEGOCIACIÓN (OFFLINE FIRST)
-========================================================== */
 
 /* ==========================================================
 NUEVO FLUJO ATÓMICO: CONSUMO + NEGOCIACIÓN (OFFLINE FIRST)
@@ -124,6 +123,8 @@ function abrirNegociacionLocal(sugerencia) {
 }
 
 function ejecutarEnvioAtomico(solicitudGas) {
+  if (!window.confirm("¿Está seguro de registrar el consumo para esta sede?")) return;
+
   // 3. Empaquetado final de datos (El Súper-Paquete)
   const payload = {
     op_id: generarOpId(),
@@ -159,40 +160,6 @@ function configurarModoFoto(permitirGaleria) {
     // Para los demás: Forzamos la cámara trasera por seguridad y auditoría.
     input.setAttribute("capture", "environment");
   }
-}
-
-/* ==========================================
-LÓGICA DEL MODAL DE CONFIRMACIÓN
-========================================== */
-let accionPendiente = null; // Aquí guardaremos la función a ejecutar (ej: iniciarCalefaccion)
-
-function solicitarConfirmacion(mensaje, funcionCallback) {
-  const modal = document.getElementById("modalConfirmacion");
-  const txtMensaje = document.getElementById("modalMensaje");
-  const btnSi = document.getElementById("btnModalConfirmar");
-
-  // 1. Ponemos el mensaje personalizado
-  txtMensaje.textContent = mensaje;
-
-  // 2. Guardamos la función que queremos ejecutar
-  accionPendiente = funcionCallback;
-
-  // 3. Configuramos el botón SI para que ejecute esa función
-  btnSi.onclick = function () {
-    if (typeof accionPendiente === "function") {
-      accionPendiente(); // Ejecuta la acción original (ej: iniciarCalefaccion)
-    }
-    cerrarModalConfirmacion();
-  };
-
-  // 4. Mostramos el modal (usamos flex para centrar)
-  modal.style.display = "flex";
-}
-
-function cerrarModalConfirmacion() {
-  const modal = document.getElementById("modalConfirmacion");
-  modal.style.display = "none";
-  accionPendiente = null; // Limpiamos la memoria
 }
 
 function generarOpId() {
@@ -375,7 +342,10 @@ async function pingOperatividadPWA() {
       cache: "no-store",
       credentials: "include",
       signal: ctrl.signal,
-      headers: { "Accept": "application/json" }
+      headers: { 
+        "Accept": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      }
     });
 
     clearTimeout(timeout);
@@ -554,7 +524,10 @@ async function flushOfflineQueue() {
       if (item.operacion === 'confirmar_arribo') {
         response = await fetch("/glp/confirmar_arribo_pollito", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken()
+          },
           body: JSON.stringify(item)
         });
       }
@@ -566,7 +539,10 @@ async function flushOfflineQueue() {
         
         response = await fetch(item.url || "/glp/registrar_operacion_glp", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken()
+          },
           body: JSON.stringify(payloadToSync)
         });
       }
@@ -709,7 +685,10 @@ async function obtenerTanquesConFallback(sede) {
       try {
         const response = await fetch("/glp/obtener_tanques", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken()
+          },
           body: JSON.stringify({ sede: sede }),
           cache: "no-store" // <-- SOLUCIÓN 1: Prohíbe al navegador/ServiceWorker usar respuestas viejas
         });
@@ -913,7 +892,10 @@ async function sendWithOffline(url, payload, onSuccess) {
   try {
     const r = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      },
       body: JSON.stringify(payload)
     });
 
@@ -1094,7 +1076,10 @@ async function ejecutarSyncManual() {
   try {
     await fetch("/glp/notificar_intento_sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      },
       body: JSON.stringify({ sede: (typeof sedeQR !== 'undefined' && sedeQR) ? sedeQR : "Sede Pendiente" })
     });
   } catch (e) {
@@ -1560,11 +1545,6 @@ function preguntarNivelFoto(onFinish) {
   };
 }
 
-function generarOpId() {
-  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-  return "op_" + Date.now() + "_" + Math.random().toString(16).slice(2);
-}
-
 function limpiarEstadoOperacion() {
   desactivarProteccionOperacion();
   items = [];
@@ -1709,6 +1689,7 @@ async function iniciarCalefaccion() {
 }
 
 function enviarInicio() {
+  if (!window.confirm("¿Está seguro de iniciar la calefacción en esta sede?")) return;
   const inputRef = document.getElementById("respuestaInput");
   const pollitos = Number(inputRef.dataset.pollitos || 0) || null;
   const fechaLlegada = inputRef.dataset.fecha_llegada || null;
@@ -2212,6 +2193,8 @@ function pedirFotoBaucher() {
   };
 }
 function enviarTanqueo() {
+  if (!window.confirm("¿Está seguro de registrar este tanqueo de gas?")) return;
+
   // 1. CONECTAMOS LA TUBERÍA: Pasamos los datos recolectados
   items = registrarTanqueoData.tanques;
 
@@ -2405,6 +2388,7 @@ async function finalizarCalefaccion() {
 }
 
 function enviarFinalizar() {
+  if (!window.confirm("¿Está seguro de FINALIZAR la calefacción y cerrar este lote?")) return;
   actualizarCacheUltimoNivel(sedeQR, items, "finalizar_calefaccion");
 
   const payload = {
@@ -2490,7 +2474,10 @@ async function sincronizarNivelesServidor(sede) {
   try {
     const response = await fetch("/glp/obtener_tanques", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      },
       body: JSON.stringify({ sede: sede })
     });
 
@@ -2500,11 +2487,6 @@ async function sincronizarNivelesServidor(sede) {
       // Guardamos los niveles oficiales en la caché local
       cacheTanquesLocal(sede, data.tanques);
       console.log("✅ [Sync-Fondo] Caché actualizada con éxito desde el servidor.");
-
-      // Si estamos en la pantalla de tanques, podríamos refrescar la UI (opcional)
-      // if (typeof dibujarPasoTanques === 'function' && document.getElementById("cont-tanques")) {
-      //    dibujarPasoTanques(data.tanques);
-      // }
     }
   } catch (e) {
     console.warn("⚠️ [Sync-Fondo] Error al sincronizar niveles en segundo plano:", e);
@@ -2580,6 +2562,8 @@ async function ejecutarConfirmarArribo() {
     return;
   }
 
+  if (!window.confirm("¿Está seguro de confirmar el arribo de aves? Esta acción arranca el reloj del lote.")) return;
+
   const dataConfirmacion = {
     operacion: 'confirmar_arribo',
     sede: sedeQR,
@@ -2629,7 +2613,10 @@ async function iniciarAnalisisLote() {
     // 3. Petición al backend
     const response = await fetch('/glp/consultar_analisis_lote', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        "X-CSRFToken": getCsrfToken()
+      },
       body: JSON.stringify({ sede: sedeQR })
     });
 

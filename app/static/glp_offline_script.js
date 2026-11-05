@@ -4,6 +4,9 @@ let pedidoPendienteGlobal = null;
 // NUEVA LÍNEA: Variable para evitar colapsos en la sincronización offline
 let IS_SYNCING = false;
 
+// Funcionalidad CSRF BQA-ONE
+const getCsrfToken = () => document.getElementById('csrf_token') ? document.getElementById('csrf_token').value : '';
+
 /* ==========================================================
 NUEVA LÓGICA: NOTIFICACIONES PUSH LOCALES (WEB NOTIFICATIONS API)
 ========================================================== */
@@ -47,10 +50,6 @@ function enviarNotificacionPushLocal(titulo, cuerpo) {
     }
   }
 }
-
-/* ==========================================================
-NUEVO FLUJO ATÓMICO: CONSUMO + NEGOCIACIÓN (OFFLINE FIRST)
-========================================================== */
 
 /* ==========================================================
 NUEVO FLUJO ATÓMICO: CONSUMO + NEGOCIACIÓN (OFFLINE FIRST)
@@ -124,6 +123,8 @@ function abrirNegociacionLocal(sugerencia) {
 }
 
 function ejecutarEnvioAtomico(solicitudGas) {
+  if (!window.confirm("¿Está seguro de registrar el consumo para esta sede?")) return;
+
   // 3. Empaquetado final de datos (El Súper-Paquete)
   const payload = {
     op_id: generarOpId(),
@@ -357,6 +358,7 @@ let _opw = {
   fails: 0,
   oks: 0
 };
+
 async function pingOperatividadPWA() {
   // CORRECCIÓN CRÍTICA: Se eliminó la línea "if (isForceOffline()) return false;"
   // Ahora el sistema SIEMPRE verificará si hay señal para poder despertar.
@@ -374,7 +376,10 @@ async function pingOperatividadPWA() {
       cache: "no-store",
       credentials: "include",
       signal: ctrl.signal,
-      headers: { "Accept": "application/json" }
+      headers: { 
+        "Accept": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      }
     });
 
     clearTimeout(timeout);
@@ -521,6 +526,8 @@ async function setQueue(q) {
   for (const it of q) await idbAdd(it);
 }
 
+// 1. AÑADE ESTA PEQUEÑA FUNCIÓN (junto a getQueue y setQueue)
+// Es necesaria porque tu código llama a removeFromQueue(item.id) y no existía en IndexedDB
 async function removeFromQueue(id) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -551,7 +558,10 @@ async function flushOfflineQueue() {
       if (item.operacion === 'confirmar_arribo') {
         response = await fetch("/glp/confirmar_arribo_pollito", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken()
+          },
           body: JSON.stringify(item)
         });
       }
@@ -563,7 +573,10 @@ async function flushOfflineQueue() {
         
         response = await fetch(item.url || "/glp/registrar_operacion_glp", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken()
+          },
           body: JSON.stringify(payloadToSync)
         });
       }
@@ -573,6 +586,7 @@ async function flushOfflineQueue() {
       if (resData.success) {
         console.log(`[Sync] Éxito en operación: ${item.operacion} (ID local: ${item.id})`);
 
+        // Si fue un arribo, nos aseguramos de limpiar el estado de espera en el dispositivo
         if (item.operacion === 'confirmar_arribo') {
           localStorage.setItem(`estado_lote_${item.sede}`, JSON.stringify({ esperando_pollito: false }));
           if (document.getElementById('bloque-arribo-pollito')) {
@@ -580,18 +594,21 @@ async function flushOfflineQueue() {
           }
         }
 
+        // Eliminar de la cola IndexedDB
         await removeFromQueue(item.id);
       } else {
         console.error(`[Sync] El servidor rechazó la operación: ${resData.message}`);
       }
     } catch (err) {
       console.error("[Sync] Error de red o servidor:", err);
+      // Detenemos el bucle para reintentar en el próximo ciclo de conexión
       break;
     }
   }
 
   IS_SYNCING = false;
 
+  // Actualizar la UI de advertencia de sincronización y enviar NOTIFICACIÓN DE ÉXITO PUSH
   const remaining = await getQueue();
   const warning = document.getElementById("syncWarning");
   
@@ -602,6 +619,7 @@ async function flushOfflineQueue() {
     if (warning) {
       warning.style.display = "none";
     }
+    // Si todo se subió, recargamos niveles oficiales para estar al día
     if (typeof sedeQR !== 'undefined') {
       sincronizarNivelesServidor(sedeQR);
     }
@@ -701,7 +719,10 @@ async function obtenerTanquesConFallback(sede) {
       try {
         const response = await fetch("/glp/obtener_tanques", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken()
+          },
           body: JSON.stringify({ sede: sede }),
           cache: "no-store" // <-- SOLUCIÓN 1: Prohíbe al navegador/ServiceWorker usar respuestas viejas
         });
@@ -831,7 +852,6 @@ async function obtenerTanquesConFallback(sede) {
 // ACTUALIZAR CACHÉ DE NIVELES (OFFLINE SMART CACHE)
 // ===================================================
 function actualizarCacheUltimoNivel(sede, itemsGuardados, operacion) {
-  // ⚠️ CORRECCIÓN: Usamos la misma constante que usa tu sistema
   const cacheKey = "tanques_cache_" + sede;
   let cacheData = localStorage.getItem(cacheKey);
 
@@ -839,14 +859,13 @@ function actualizarCacheUltimoNivel(sede, itemsGuardados, operacion) {
     try {
       let datosSede = JSON.parse(cacheData);
 
-      // ⚠️ CORRECCIÓN: Tu sistema original guarda un objeto con la propiedad "tanques"
       if (datosSede && Array.isArray(datosSede.tanques)) {
         itemsGuardados.forEach(item => {
           // Buscar el tanque en la caché
           let tkCache = datosSede.tanques.find(t => String(t.numero).toLowerCase() === String(item.numero).toLowerCase());
 
           if (tkCache) {
-            // Si es tanqueo, el nuevo "último nivel" es el nivel FINAL (Corregido a nivel_final)
+            // Si es tanqueo, el nuevo "último nivel" es el nivel FINAL
             if (operacion === "tanqueo" && item.nivel_final !== undefined && item.nivel_final !== null) {
               tkCache.ultimo_nivel = Number(item.nivel_final);
             }
@@ -907,7 +926,10 @@ async function sendWithOffline(url, payload, onSuccess) {
   try {
     const r = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      },
       body: JSON.stringify(payload)
     });
 
@@ -1034,8 +1056,10 @@ Utilidades UI
 function show(el, disp = "block") { if (el) el.style.display = disp; }
 function hide(el) { if (el) el.style.display = "none"; }
 
-// === INYECCIÓN SEGURA DE EMPRESA_SESION DESDE EL HTML ===
+// === CORRECCIÓN CRÍTICA DE ARQUITECTURA ===
+// Obtenemos la variable que inyectamos previamente en el HTML usando window
 const EMPRESA_SESION = window.EMPRESA_SESION || "";
+// ==========================================
 
 function mostrarAvisoSyncPendiente() {
   const div = document.getElementById("syncWarning");
@@ -1086,7 +1110,10 @@ async function ejecutarSyncManual() {
   try {
     await fetch("/glp/notificar_intento_sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      },
       body: JSON.stringify({ sede: (typeof sedeQR !== 'undefined' && sedeQR) ? sedeQR : "Sede Pendiente" })
     });
   } catch (e) {
@@ -1114,11 +1141,10 @@ async function ejecutarSyncManual() {
   }
 }
 
-
 let sedeQR = "", empresaQR = "";
-let tanques = []; // [{numero, capacidad}]
-let tanquesQR = [];  // fallback de tanques leídos desde el QR (si vienen)
-let items = [];   // [{numero, capacidad, nivel, testigo(base64)}]
+let tanques = [];
+let tanquesQR = [];
+let items = [];
 let idx = 0;
 let opActual = "";
 
@@ -1134,12 +1160,6 @@ function tituloOperacion(op) {
     default: return "Resumen de operación GLP";
   }
 }
-
-/**
-* FUNCIÓN ÚNICA DE RESULTADOS (Backend -> Frontend)
-* Reemplaza a la anterior. Maneja éxito (Modal Nuevo) y Error (Alerta Vieja).
-*/
-
 
 function mostrarResumenOperacion(res) {
   if (!res || !res.success) {
@@ -1165,13 +1185,13 @@ function mostrarResumenOperacion(res) {
 
   if (res.offline) {
     // ESTADO NARANJA: Guardado en el celular, sin internet
-    headerDiv.style.background = "#f57c00"; // Naranja alerta
+    headerDiv.style.background = "#f57c00";
     iconoDiv.innerText = "📡";
     tituloDiv.innerText = "Guardado en Celular";
     subtituloDiv.innerText = "PENDIENTE DE ENVÍO POR FALTA DE SEÑAL";
   } else {
     // ESTADO VERDE: Éxito total en el servidor
-    headerDiv.style.background = "#015249"; // Verde original
+    headerDiv.style.background = "#015249";
     iconoDiv.innerText = "✅";
     tituloDiv.innerText = "Operación Exitosa";
     subtituloDiv.innerText = "REGISTRO GUARDADO EN EL SERVIDOR";
@@ -1187,10 +1207,8 @@ function mostrarResumenOperacion(res) {
   const bloqueSaldos = document.getElementById('bqa-saldo').parentElement.parentElement;
 
   if (res.offline) {
-    // Si es el modal naranja, ocultamos la barra gris por completo para no mostrar NaN
     bloqueSaldos.style.display = 'none';
   } else {
-    // Si es el modal verde, la mostramos y calculamos los kilos reales
     bloqueSaldos.style.display = 'flex';
     document.getElementById('bqa-saldo').innerText = resumen.saldo_estimado_kg ? parseFloat(resumen.saldo_estimado_kg).toFixed(2) + ' kg' : '---';
     document.getElementById('bqa-consumo').innerText = resumen.kg_consumidos ? parseFloat(resumen.kg_consumidos).toFixed(2) + ' kg' : '0.00 kg';
@@ -1209,7 +1227,6 @@ function mostrarResumenOperacion(res) {
   } else if (resumen.requiere_gas) {
     divAlert.style.display = 'block';
 
-    // MENSAJE CLARO SI PIDIÓ GAS OFFLINE
     if (res.offline) {
       document.getElementById('bqa-razon').innerHTML = "<b>⚠️ ATENCIÓN:</b> Tu pedido de gas está guardado en el celular. <b>MUEVETE A UNA ZONA CON SEÑAL</b> para que el sistema lo envíe al Webmaster.";
     } else {
@@ -1243,7 +1260,6 @@ function cerrarResumen() {
   const convo = document.getElementById("conversacion");
   const pregunta = document.getElementById("preguntaTexto");
 
-  // Limpieza visual completa
   if (pregunta) pregunta.textContent = "";
 
   if (panel) {
@@ -1254,60 +1270,41 @@ function cerrarResumen() {
   if (menu) menu.style.display = "flex";
   if (convo) convo.style.display = "none";
 
-  // Opcional: si quieres evitar que quede “posicionado” raro
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
-
-
-/**
-* Función genérica que usan TODAS las operaciones al recibir la respuesta.
-*/
-
 let currentOpId = null;
 let currentDiasExtra = 0;
-
 
 // ==========================================
 // FUNCIONES DE NEGOCIACIÓN (FALTANTES)
 // ==========================================
 
-// 1. Abrir el Modal con la sugerencia del Copiloto
-// Abre el modal y resetea contadores
 function abrirNegociacion(sugerencia, diasAct) {
   const modal = document.getElementById("modalNegociacion");
 
   document.getElementById("neg_nivel").value = sugerencia;
   document.getElementById("neg_dias_act").innerText = diasAct;
 
-  // Resetear contador de días extra
   currentDiasExtra = 0;
   document.getElementById("neg_dias_extra").innerText = "0";
 
   modal.style.display = "flex";
 }
 
-// 2. Control del contador de Días Extra (+/-)
 function adjustDias(delta) {
   currentDiasExtra += delta;
-  // Evitar números negativos
   if (currentDiasExtra < 0) currentDiasExtra = 0;
-
-  // Actualizar vista
   document.getElementById("neg_dias_extra").innerText = currentDiasExtra;
 }
 
-// 3. Cerrar / Cancelar
 function cerrarNegociacion() {
   document.getElementById("modalNegociacion").style.display = "none";
 
-  // Si el usuario rechaza, modificamos la respuesta pendiente para que el modal final
-  // NO diga "Solicitud en Trámite", sino que muestre los datos normales.
   if (respuestaConsumoPendiente && respuestaConsumoPendiente.resumen) {
     respuestaConsumoPendiente.resumen.requiere_gas = false;
   }
 
-  // Mostrar el resumen final (ahora limpio de alertas de solicitud)
   mostrarResumenOperacion(respuestaConsumoPendiente);
 }
 
@@ -1379,15 +1376,13 @@ async function cargarTanques(callback, bloquearSiActivo = false) {
     mostrarMenu();
   }
 }
-// (Código CORREGIDO)
+
 function mostrarMenu() {
   desactivarProteccionOperacion();
 
-  // CORRECCIÓN 1: Limpiamos explícitamente el texto de la pregunta para que no se quede "pegado"
   const pregunta = document.getElementById("preguntaTexto");
   if (pregunta) pregunta.textContent = "";
 
-  // CORRECCIÓN 2: Aseguramos visibilidad del menú y ocultamos lo demás
   const menu = document.getElementById("menuOpciones");
   const convo = document.getElementById("conversacion");
   const panel = document.getElementById("panelResumen");
@@ -1396,7 +1391,6 @@ function mostrarMenu() {
   if (convo) convo.style.display = "none";
   if (panel) panel.style.display = "none";
 
-  // Aseguramos que se limpien las variables internas
   if (typeof limpiarEstadoOperacion === 'function') {
     limpiarEstadoOperacion();
   }
@@ -1416,7 +1410,6 @@ async function comprimirImagenArchivo(file, maxDim = 1024, quality = 0.7) {
         let width = img.width;
         let height = img.height;
 
-        // Redimensionar manteniendo proporción
         if (width > height) {
           if (width > maxDim) {
             height = Math.round(height * (maxDim / width));
@@ -1435,7 +1428,6 @@ async function comprimirImagenArchivo(file, maxDim = 1024, quality = 0.7) {
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Exportar como JPEG comprimido
         const dataUrl = canvas.toDataURL("image/jpeg", quality);
         resolve(dataUrl);
       };
@@ -1457,14 +1449,12 @@ function preguntarNivelFoto(onFinish) {
   const bSi = document.getElementById("btnSi");
   const bNo = document.getElementById("btnNo");
 
-  // Si ya procesamos todos los tanques, terminamos el flujo
   if (idx >= tanques.length) {
     hide(input);
     hide(foto);
     hide(btn);
     hide(divSiNo);
 
-    // Limpiar el mensaje de ayuda visual histórico
     const msgDiv = document.getElementById("msgUltimoNivel");
     if (msgDiv) msgDiv.innerHTML = "";
 
@@ -1476,7 +1466,6 @@ function preguntarNivelFoto(onFinish) {
   let nivelActualValue = 0;
   let archivoFoto = null;
 
-  // --- PASO 1: PREGUNTAR NIVEL ---
   hide(foto);
   hide(divSiNo);
   input.type = "number";
@@ -1487,7 +1476,6 @@ function preguntarNivelFoto(onFinish) {
   btn.textContent = "Guardar nivel";
   show(btn);
 
-  // --- LÓGICA DE MENSAJE PREVENTIVO VISUAL ---
   let msgDiv = document.getElementById("msgUltimoNivel");
   if (!msgDiv) {
     msgDiv = document.createElement("div");
@@ -1503,7 +1491,6 @@ function preguntarNivelFoto(onFinish) {
   }
   show(msgDiv);
 
-  // --- EVENTO: AL HACER CLIC EN "GUARDAR NIVEL" ---
   btn.onclick = () => {
     const n = Number(input.value || 0);
     if (isNaN(n) || n < 0 || n > 100) {
@@ -1519,13 +1506,11 @@ function preguntarNivelFoto(onFinish) {
         return;
       }
     }
-
     nivelActualValue = n;
 
-    // PASO 2: PEDIR FOTO
     hide(input);
     hide(btn);
-    hide(msgDiv); // Ocultamos leyenda mientras se toma la foto
+    hide(msgDiv);
     texto.textContent = `Adjunta la foto de testigo del ${tk.numero}`;
 
     foto.value = null;
@@ -1537,44 +1522,35 @@ function preguntarNivelFoto(onFinish) {
       archivoFoto = foto.files[0];
     };
 
-    // --- EVENTO: AL HACER CLIC EN "SUBIR FOTO Y CONTINUAR" ---
     btn.onclick = () => {
       if (!archivoFoto) {
         alert("Debes seleccionar la foto antes de continuar.");
         return;
       }
 
-      // PASO 3: CONFIRMACIÓN FINAL ANTES DE PROCESAR
       hide(foto);
       hide(btn);
       texto.textContent = `¿Confirmas nivel ${nivelActualValue}% y foto para el ${tk.numero}?`;
       show(divSiNo);
 
-      // REINICIO DE ESTADO DE BOTONES DE CONFIRMACIÓN
       bSi.disabled = false;
       bNo.disabled = false;
       bSi.textContent = "SÍ, continuar";
 
-      // OPCIÓN NO: Regresar al nivel
       bNo.onclick = () => {
         preguntarNivelFoto(onFinish);
       };
 
-      // OPCIÓN SÍ: PROCESAR FOTO (CON PEAJE ANTI-DOBLE CLIC)
       bSi.onclick = async () => {
-        // --- BLOQUEO DE SEGURIDAD (ANTI-DUPLICADOS) ---
         if (bSi.disabled) return;
         bSi.disabled = true;
         bNo.disabled = true;
         const originalText = bSi.textContent;
         bSi.textContent = "Procesando...";
-        // ----------------------------------------------
 
         try {
-          // Comprimir imagen (proceso que toma tiempo)
           const base64 = await comprimirImagenArchivo(archivoFoto);
 
-          // Guardar en el arreglo temporal de la operación
           items.push({
             numero: tk.numero,
             capacidad: tk.capacidad,
@@ -1585,16 +1561,13 @@ function preguntarNivelFoto(onFinish) {
           idx++;
           hide(divSiNo);
 
-          // Liberar botones antes de la siguiente iteración
           bSi.disabled = false;
           bNo.disabled = false;
           bSi.textContent = originalText;
 
-          // Llamar al siguiente tanque o terminar
           preguntarNivelFoto(onFinish);
 
         } catch (e) {
-          // LIBERAR EN CASO DE ERROR PARA PODER REINTENTAR
           bSi.disabled = false;
           bNo.disabled = false;
           bSi.textContent = originalText;
@@ -1605,17 +1578,12 @@ function preguntarNivelFoto(onFinish) {
     };
   };
 }
-// ===============================
-//  OP_ID (idempotencia frontend)
-// ===============================
+
 function generarOpId() {
-  // Navegadores modernos
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-  // Fallback simple
   return "op_" + Date.now() + "_" + Math.random().toString(16).slice(2);
 }
 
-// Limpia estado de UI/datos al terminar o guardar offline
 function limpiarEstadoOperacion() {
   desactivarProteccionOperacion();
   items = [];
@@ -1627,7 +1595,6 @@ function limpiarEstadoOperacion() {
 
   registrarTanqueoData = { sede: "", tanques: [] };
 
-
   const input = document.getElementById("respuestaInput");
   const foto = document.getElementById("inputFoto");
   const btn = document.getElementById("botonEnviar");
@@ -1638,12 +1605,10 @@ function limpiarEstadoOperacion() {
   if (btn) { btn.onclick = null; btn.style.display = "none"; }
   if (siNo) { siNo.style.display = "none"; }
 
-  // ✅ apagar panel de conversación/lector por seguridad
   const convo = document.getElementById("conversacion");
   const lector = document.getElementById("lectorQR");
   if (convo) convo.style.display = "none";
   if (lector) lector.style.display = "none";
-
 }
 
 /* ============================
@@ -1653,17 +1618,14 @@ async function iniciarCalefaccion() {
   activarProteccionOperacion();
   opActual = "inicio_calefaccion";
 
-  // === FORZAR CÁMARA (Bloquear Galería) ===
   if (typeof configurarModoFoto === 'function') {
     configurarModoFoto(false);
   }
-  // =======================================
 
   try {
     const info = await leerQR("Escanea el QR de la sede para iniciar calefacción");
     sedeQR = info.sede;
     empresaQR = info.empresa;
-    // Importante: Guardamos los tanques que vienen del QR por si estamos offline
     tanquesQR = Array.isArray(info.tanques) ? info.tanques : [];
 
     const texto = document.getElementById("preguntaTexto");
@@ -1681,16 +1643,13 @@ async function iniciarCalefaccion() {
     items = [];
     idx = 0;
 
-    // Función que sigue después de las preguntas de pollitos
     function despuesDeAvicola() {
-      // Pasamos 'true' para que active el bloqueo si hay lote activo
       cargarTanques(() => {
         preguntarNivelFoto(enviarInicio);
       }, true);
     }
 
     if (EMPRESA_SESION === "Pollos GAR SAS") {
-      // Nueva lógica de 2 pasos: 1. Fecha de llegada, 2. Pollitos
       let pasoAvicola = 1;
 
       const hacerPreguntaAvicola = () => {
@@ -1700,7 +1659,6 @@ async function iniciarCalefaccion() {
         show(btn);
 
         if (pasoAvicola === 1) {
-          // PASO 1: Capturar la fecha real de llegada
           input.type = "date";
           input.value = "";
           texto.textContent = "¿Cuál es la fecha real estimada de llegada del pollito? (Día 1)";
@@ -1712,13 +1670,11 @@ async function iniciarCalefaccion() {
               alert("Por favor, selecciona una fecha válida.");
               return;
             }
-            // Guardamos temporalmente la fecha en el dataset
             input.dataset.fecha_llegada = fechaSel;
-            pasoAvicola = 2; // Avanzamos al siguiente paso
+            pasoAvicola = 2;
             hacerPreguntaAvicola();
           };
         } else if (pasoAvicola === 2) {
-          // PASO 2: Capturar la cantidad de aves
           input.type = "number";
           input.value = "";
           texto.textContent = "¿Con cuántos pollitos inicias el lote?";
@@ -1733,7 +1689,6 @@ async function iniciarCalefaccion() {
               return;
             }
 
-            // --- PASO 3: CONFIRMACIÓN FINAL DE AMBOS DATOS ---
             hide(input);
             hide(btn);
             const fLlegada = input.dataset.fecha_llegada;
@@ -1743,27 +1698,24 @@ async function iniciarCalefaccion() {
             const bNo = document.getElementById("btnNo");
             show(divSiNo);
 
-            // Opción NO: Reiniciar el proceso
             bNo.onclick = () => {
               hide(divSiNo);
               pasoAvicola = 1;
               hacerPreguntaAvicola();
             };
 
-            // Opción SI: Guardar y continuar a la carga de tanques
             bSi.onclick = () => {
               hide(divSiNo);
               input.dataset.pollitos = String(pollitos);
-              despuesDeAvicola(); // Dispara la carga de tanques
+              despuesDeAvicola();
             };
           };
         }
       };
 
-      hacerPreguntaAvicola(); // Inicia la secuencia avícola
+      hacerPreguntaAvicola();
 
     } else {
-      // Si no es Pollos GAR SAS, saltamos directamente a los tanques
       hide(input);
       hide(btn);
       hide(foto);
@@ -1776,6 +1728,7 @@ async function iniciarCalefaccion() {
 }
 
 function enviarInicio() {
+  if (!window.confirm("¿Está seguro de iniciar la calefacción en esta sede?")) return;
   const inputRef = document.getElementById("respuestaInput");
   const pollitos = Number(inputRef.dataset.pollitos || 0) || null;
   const fechaLlegada = inputRef.dataset.fecha_llegada || null;
@@ -1788,19 +1741,13 @@ function enviarInicio() {
     tanques: items
   };
 
-  // Envío con soporte para modo offline
   sendWithOffline("/glp/registrar_inicio", payload, mostrarResumenOperacion);
 }
-
 
 // ============================================
 // NUEVO FLUJO DE REGISTRAR TANQUEO
 // ============================================
 
-// Cargar tanques SOLO para la operación registrar tanqueo (con fallback offline)
-// Cargar tanques SOLO para la operación registrar tanqueo
-// Cargar tanques SOLO para la operación registrar tanqueo
-// Cargar tanques SOLO para la operación registrar tanqueo
 async function cargarTanquesTanqueo(callback) {
   try {
     const res = await obtenerTanquesConFallback(sedeQR);
@@ -1834,23 +1781,15 @@ async function cargarTanquesTanqueo(callback) {
     mostrarMenu();
   }
 }
-
-// Inicia la operación registrar tanqueo
-// Inicia la operación registrar tanqueo
 async function registrarTanqueo() {
   activarProteccionOperacion();
-  opActual = "tanqueo"; // <--- LÍNEA NUEVA
+  opActual = "tanqueo";
 
-  // === CAMBIO SOLICITADO: HABILITAR GALERÍA ===
-  // Esto quita el atributo "capture" del input, permitiendo elegir archivos.
   if (typeof configurarModoFoto === 'function') {
     configurarModoFoto(true);
   }
-  // ============================================
 
   try {
-    // CORRECCIÓN IMPORTANTE: Generar siempre un op_id nuevo al iniciar
-    // Esto evita que se envíe un objeto sin ID si hubo una limpieza previa incorrecta.
     registrarTanqueoData = {
       op_id: generarOpId(),
       sede: "",
@@ -1866,7 +1805,6 @@ async function registrarTanqueo() {
 
     registrarTanqueoData.sede = sedeQR;
 
-    // 🔹 Limpiamos cualquier handler viejo antes de empezar el flujo nuevo
     const input = document.getElementById("respuestaInput");
     const foto = document.getElementById("inputFoto");
     const btn = document.getElementById("botonEnviar");
@@ -1893,7 +1831,6 @@ async function registrarTanqueo() {
   }
 }
 
-// Pregunta: ¿Desea tanquear el tanque TK-n?
 function preguntarSiTanquearTanqueActual() {
   const texto = document.getElementById("preguntaTexto");
   const input = document.getElementById("respuestaInput");
@@ -1903,7 +1840,6 @@ function preguntarSiTanquearTanqueActual() {
   const btnSi = document.getElementById("btnSi");
   const btnNo = document.getElementById("btnNo");
 
-  // Si ya terminamos los tanques, enviar
   if (tanqueActualIndex >= tanquesDisponibles.length) {
     enviarTanqueo();
     return;
@@ -1911,25 +1847,20 @@ function preguntarSiTanquearTanqueActual() {
 
   const tk = tanquesDisponibles[tanqueActualIndex];
 
-  // Mostrar pregunta
   texto.textContent = `¿Desea tanquear el tanque ${tk.numero.toUpperCase()}?`;
 
-  // Ocultar controles normales
   hide(input);
   hide(foto);
   hide(btn);
 
-  // Mostrar botones sí/no
   panelSiNo.style.display = "block";
 
-  // Acción SI
   btnSi.onclick = () => {
     panelSiNo.style.display = "none";
     prepararDatosTanqueActual(tk);
     pedirNivelInicial();
   };
 
-  // Acción NO
   btnNo.onclick = () => {
     panelSiNo.style.display = "none";
     tanqueActualIndex++;
@@ -1937,15 +1868,12 @@ function preguntarSiTanquearTanqueActual() {
   };
 }
 
-
-// Prepara objeto temporal del tanque actual
-// Prepara objeto temporal del tanque actual
 let tanqueActualDatos = null;
 function prepararDatosTanqueActual(tk) {
   tanqueActualDatos = {
     numero: tk.numero,
     capacidad: tk.capacidad,
-    ultimo_nivel: tk.ultimo_nivel, // <--- NUEVO: Heredamos el nivel para mostrarlo visualmente
+    ultimo_nivel: tk.ultimo_nivel,
     nivel_inicial: 0,
     foto_nivel_inicial: "",
     nivel_final: 0,
@@ -1956,7 +1884,6 @@ function prepararDatosTanqueActual(tk) {
   };
 }
 
-// 1) Nivel inicial
 function pedirNivelInicial() {
   const texto = document.getElementById("preguntaTexto");
   const input = document.getElementById("respuestaInput");
@@ -1966,7 +1893,7 @@ function pedirNivelInicial() {
 
   show(input);
   hide(foto);
-  hide(divSiNo); // Asegurar que los botones de confirmación estén ocultos al inicio
+  hide(divSiNo);
 
   input.type = "number";
   input.value = "";
@@ -1974,7 +1901,6 @@ function pedirNivelInicial() {
   btn.textContent = "Confirmar nivel";
   show(btn);
 
-  // --- NUEVO: CREAR MENSAJE PREVENTIVO VISUAL PARA TANQUEO ---
   let msgDiv = document.getElementById("msgUltimoNivel");
   if (!msgDiv) {
     msgDiv = document.createElement("div");
@@ -1989,7 +1915,6 @@ function pedirNivelInicial() {
     msgDiv.innerHTML = `<small class="text-warning fw-bold" style="font-size:0.85rem;">⚠️ Último dato no disponible. El nivel inicial no puede ser mayor al anterior.</small>`;
   }
   show(msgDiv);
-  // -----------------------------------------------------------
 
   btn.onclick = () => {
     const n = Number(input.value || 0);
@@ -1998,45 +1923,39 @@ function pedirNivelInicial() {
       return;
     }
 
-    // --- NUEVO: PEAJE DE SEGURIDAD (No puede ser mayor al último nivel conocido) ---
     if (tanqueActualDatos.ultimo_nivel !== null && tanqueActualDatos.ultimo_nivel !== undefined) {
       if (n > tanqueActualDatos.ultimo_nivel) {
         alert(`⚠️ ERROR DE LECTURA\n\nEl nivel inicial (${n}%) no puede ser MAYOR al último nivel reportado en este tanque (${tanqueActualDatos.ultimo_nivel}%).\n\nVerifica el manómetro e intenta de nuevo.`);
-        return; // Bloquea el avance
+        return;
       }
     }
-    // -------------------------------------------------------------------------------
 
-    // --- INICIO CONFIRMACIÓN ---
     hide(input);
-    hide(btn); // Ocultar input y botón enviar
-    hide(msgDiv); // Ocultamos el mensaje azul en la pantalla de "Estás Seguro"
+    hide(btn);
+    hide(msgDiv);
     texto.textContent = `¿Estás seguro que el Nivel Inicial es ${n}%?`;
 
     const bSi = document.getElementById("btnSi");
     const bNo = document.getElementById("btnNo");
-    show(divSiNo); // Mostrar los botones de Sí/No
+    show(divSiNo);
 
-    // Opción NO: Regresar a editar
     bNo.onclick = () => {
       hide(divSiNo);
       texto.textContent = `Ingresa el NIVEL ACTUAL del tanque ${tanqueActualDatos.numero.toUpperCase()} (0-100 %)`;
       show(input);
       show(btn);
-      show(msgDiv); // Restauramos el mensaje azul
-      input.focus(); // Poner foco para corrección rápida
+      show(msgDiv);
+      input.focus();
     };
 
-    // Opción SÍ: Guardar y pasar a la siguiente etapa
     bSi.onclick = () => {
       hide(divSiNo);
       tanqueActualDatos.nivel_inicial = n;
       pedirFotoNivelInicial();
     };
-    // --- FIN CONFIRMACIÓN ---
   };
 }
-// 2) Foto nivel inicial
+
 function pedirFotoNivelInicial() {
   const texto = document.getElementById("preguntaTexto");
   const input = document.getElementById("respuestaInput");
@@ -2068,7 +1987,7 @@ function pedirFotoNivelInicial() {
     }
   };
 }
-// 3) Mensaje: puede proceder con el tanqueo
+
 function mostrarMensajeProcederTanqueo() {
   const texto = document.getElementById("preguntaTexto");
   const input = document.getElementById("respuestaInput");
@@ -2086,7 +2005,6 @@ function mostrarMensajeProcederTanqueo() {
   };
 }
 
-// 4) Nivel final
 function pedirNivelFinal() {
   const texto = document.getElementById("preguntaTexto");
   const input = document.getElementById("respuestaInput");
@@ -2096,7 +2014,7 @@ function pedirNivelFinal() {
 
   show(input);
   hide(foto);
-  hide(divSiNo); // Asegurar que los botones de confirmación estén ocultos
+  hide(divSiNo);
 
   input.type = "number";
   input.value = "";
@@ -2111,35 +2029,30 @@ function pedirNivelFinal() {
       return;
     }
 
-    // --- INICIO CONFIRMACIÓN ---
     hide(input);
-    hide(btn); // Ocultar input y botón enviar
+    hide(btn);
     texto.textContent = `¿Estás seguro que el Nivel Final es ${n}%?`;
 
     const bSi = document.getElementById("btnSi");
     const bNo = document.getElementById("btnNo");
-    show(divSiNo); // Mostrar los botones de Sí/No
+    show(divSiNo);
 
-    // Opción NO: Regresar a editar
     bNo.onclick = () => {
       hide(divSiNo);
       texto.textContent = `Ingresa el NIVEL FINAL del tanque ${tanqueActualDatos.numero.toUpperCase()} (0-100 %)`;
       show(input);
       show(btn);
-      input.focus(); // Poner foco para corrección rápida
+      input.focus();
     };
 
-    // Opción SÍ: Guardar y pasar a la siguiente etapa
     bSi.onclick = () => {
       hide(divSiNo);
       tanqueActualDatos.nivel_final = n;
       pedirFotoNivelFinal();
     };
-    // --- FIN CONFIRMACIÓN ---
   };
 }
 
-// 5) Foto nivel final
 function pedirFotoNivelFinal() {
   const texto = document.getElementById("preguntaTexto");
   const input = document.getElementById("respuestaInput");
@@ -2171,11 +2084,7 @@ function pedirFotoNivelFinal() {
     }
   };
 }
-
-// 6) Densidad suministrada
-// 6) Densidad suministrada (CON LÍMITE 1.8 - 2.5)
 function pedirDensidadSuministrada() {
-  // ... (código de setup igual) ...
   const texto = document.getElementById("preguntaTexto");
   const input = document.getElementById("respuestaInput");
   const foto = document.getElementById("inputFoto");
@@ -2196,16 +2105,13 @@ function pedirDensidadSuministrada() {
   btn.onclick = () => {
     const d = Number(input.value || 0);
 
-    // --- CAMBIO AQUÍ: RANGO 1.8 a 2.5 ---
     if (isNaN(d) || d < 1.8 || d > 2.5) {
       alert("⛔ DATO INVÁLIDO\n\nLa densidad debe estar obligatoriamente entre 1.8 y 2.5 kg/gal.\n\nRevisa el baucher nuevamente.");
-      input.value = ""; // Borrar dato incorrecto
+      input.value = "";
       input.focus();
-      return; // DETIENE EL PROCESO
+      return;
     }
-    // ------------------------------------
 
-    // ... (resto de la confirmación Si/No igual) ...
     hide(input);
     hide(btn);
     texto.textContent = `¿Estás seguro que la densidad es ${d} kg/gal?`;
@@ -2229,7 +2135,7 @@ function pedirDensidadSuministrada() {
     };
   };
 }
-// 7) Kg suministrados
+
 function pedirKgSuministrados() {
   const texto = document.getElementById("preguntaTexto");
   const input = document.getElementById("respuestaInput");
@@ -2239,7 +2145,7 @@ function pedirKgSuministrados() {
 
   show(input);
   hide(foto);
-  hide(divSiNo); // Asegurar que los botones de confirmación estén ocultos al inicio
+  hide(divSiNo);
 
   input.type = "number";
   input.step = "0.01";
@@ -2255,36 +2161,30 @@ function pedirKgSuministrados() {
       return;
     }
 
-    // --- INICIO CONFIRMACIÓN ---
     hide(input);
-    hide(btn); // Ocultar input y botón enviar
+    hide(btn);
     texto.textContent = `¿Estás seguro que son ${k} Kilogramos?`;
 
     const bSi = document.getElementById("btnSi");
     const bNo = document.getElementById("btnNo");
-    show(divSiNo); // Mostrar los botones de Sí/No
+    show(divSiNo);
 
-    // Opción NO: Regresar a editar
     bNo.onclick = () => {
       hide(divSiNo);
       texto.textContent = `Ingresa los KG SUMINISTRADOS al tanque ${tanqueActualDatos.numero.toUpperCase()}.`;
       show(input);
       show(btn);
-      input.focus(); // Poner foco para corrección rápida
+      input.focus();
     };
 
-    // Opción SÍ: Guardar y pasar a la siguiente etapa
     bSi.onclick = () => {
       hide(divSiNo);
       tanqueActualDatos.kg_suministrados = k;
       pedirFotoBaucher();
     };
-    // --- FIN CONFIRMACIÓN ---
   };
 }
 
-// 8) Foto baucher
-// 5) Foto Baucher
 function pedirFotoBaucher() {
   const texto = document.getElementById("preguntaTexto");
   const input = document.getElementById("respuestaInput");
@@ -2331,9 +2231,9 @@ function pedirFotoBaucher() {
     }
   };
 }
-
-// 9) Enviar todo al backend
 function enviarTanqueo() {
+  if (!window.confirm("¿Está seguro de registrar este tanqueo de gas?")) return;
+
   // 1. CONECTAMOS LA TUBERÍA: Pasamos los datos recolectados
   items = registrarTanqueoData.tanques;
 
@@ -2376,7 +2276,6 @@ function enviarTanqueo() {
     mostrarResumenOperacion
   );
 }
-
 /* ============================
    INICIAR CONSUMO (PUERTA DE ENTRADA)
 ============================ */
@@ -2486,21 +2385,16 @@ async function registrarConsumo() {
   mostrarMenu();
 }
 
-
-
-
 /* ============================
    FINALIZAR CALEFACCIÓN
 ============================ */
 async function finalizarCalefaccion() {
   activarProteccionOperacion();
-  opActual = "finalizar_calefaccion"; // <--- LÍNEA NUEVA
+  opActual = "finalizar_calefaccion";
 
-  // === CAMBIO: FORZAR CÁMARA (Bloquear Galería) ===
   if (typeof configurarModoFoto === 'function') {
     configurarModoFoto(false);
   }
-  // ================================================
 
   try {
     const info = await leerQR("Escanea el QR de la sede para finalizar la calefacción");
@@ -2514,8 +2408,6 @@ async function finalizarCalefaccion() {
     const btn = document.getElementById("botonEnviar");
     document.getElementById("preguntaSiNo").style.display = "none";
 
-
-    // 🔹 limpieza de handlers viejos
     if (input) {
       input.onkeyup = null;
       input.dataset.pollitos = "";
@@ -2535,7 +2427,7 @@ async function finalizarCalefaccion() {
 }
 
 function enviarFinalizar() {
-  // NUEVA LÍNEA: Actualizar la caché local antes de enviar
+  if (!window.confirm("¿Está seguro de FINALIZAR la calefacción y cerrar este lote?")) return;
   actualizarCacheUltimoNivel(sedeQR, items, "finalizar_calefaccion");
 
   const payload = {
@@ -2544,7 +2436,6 @@ function enviarFinalizar() {
     tanques: items
   };
 
-  // Envío con tolerancia a offline
   sendWithOffline(
     "/glp/finalizar_calefaccion_batch",
     payload,
@@ -2581,37 +2472,33 @@ function actualizarBloqueoLogout() {
   const logoutLinks = document.querySelectorAll('a[href="/logout"]');
 
   logoutLinks.forEach(a => {
-    a.onclick = null; // Limpiamos handlers viejos
+    a.onclick = null;
 
     a.addEventListener("click", async function (e) {
-      e.preventDefault(); // Detenemos la salida inmediatamente
+      e.preventDefault();
 
-      // 1. Si está a mitad de un formulario
       if (typeof GLP_OPERACION_EN_CURSO !== 'undefined' && GLP_OPERACION_EN_CURSO) {
         alert("⛔ Debes terminar la operación actual antes de cerrar sesión.");
         return;
       }
 
-      // 2. Si no hay internet (el servidor no podría cerrar la sesión de todos modos)
       if (!navigator.onLine) {
         alert("📡 Estás sin conexión. El cierre de sesión requiere internet.");
         return;
       }
 
-      // 3. EL NUEVO PEAJE: Verificar la "Caja Fuerte" (IndexedDB)
       try {
         if (typeof getQueue === 'function') {
           const q = await getQueue();
           if (q && q.length > 0) {
             alert("⛔ ACCESO DENEGADO\n\nTienes operaciones guardadas en el celular que aún no se han subido al servidor.\n\nPor favor, espera a que se sincronicen o presiona 'Intentar enviar ahora' antes de salir.");
-            return; // Bloqueamos la salida
+            return;
           }
         }
       } catch (err) {
         console.error("Error leyendo cola offline:", err);
       }
 
-      // 4. Si pasó todos los filtros, lo dejamos ir
       window.location.href = "/logout";
     });
   });
@@ -2626,7 +2513,10 @@ async function sincronizarNivelesServidor(sede) {
   try {
     const response = await fetch("/glp/obtener_tanques", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken()
+      },
       body: JSON.stringify({ sede: sede })
     });
 
@@ -2636,11 +2526,6 @@ async function sincronizarNivelesServidor(sede) {
       // Guardamos los niveles oficiales en la caché local
       cacheTanquesLocal(sede, data.tanques);
       console.log("✅ [Sync-Fondo] Caché actualizada con éxito desde el servidor.");
-
-      // Si estamos en la pantalla de tanques, podríamos refrescar la UI (opcional)
-      // if (typeof dibujarPasoTanques === 'function' && document.getElementById("cont-tanques")) {
-      //    dibujarPasoTanques(data.tanques);
-      // }
     }
   } catch (e) {
     console.warn("⚠️ [Sync-Fondo] Error al sincronizar niveles en segundo plano:", e);
@@ -2689,7 +2574,6 @@ async function iniciarConfirmacionArribo() {
     mostrarMenu();
   }
 }
-
 function abrirModalArribo() {
   // Ocultar la cámara y textos detrás del modal
   const lector = document.getElementById("lectorQR");
@@ -2716,6 +2600,8 @@ async function ejecutarConfirmarArribo() {
     alert("⚠️ Por favor completa ambos campos.");
     return;
   }
+
+  if (!window.confirm("¿Está seguro de confirmar el arribo de aves? Esta acción arranca el reloj del lote.")) return;
 
   const dataConfirmacion = {
     operacion: 'confirmar_arribo',
@@ -2766,7 +2652,10 @@ async function iniciarAnalisisLote() {
     // 3. Petición al backend
     const response = await fetch('/glp/consultar_analisis_lote', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        "X-CSRFToken": getCsrfToken()
+      },
       body: JSON.stringify({ sede: sedeQR })
     });
 
@@ -2867,7 +2756,6 @@ function cerrarAnalisis() {
   mostrarMenu();
 }
 
-// Se ejecuta en todos los estados posibles
 window.addEventListener("load", actualizarBloqueoLogout);
 window.addEventListener("online", actualizarBloqueoLogout);
 window.addEventListener("offline", actualizarBloqueoLogout);

@@ -72,14 +72,15 @@
 
 <body>
   <!-- NAVBAR OBLIGATORIO -->
+  <!-- NAVBAR OBLIGATORIO -->
   <nav class="bqa-navbar">
     <div class="bqa-navbar-brand">
       <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360" onerror="this.style.display='none'">
-      <img src="{{ url_for('static', filename='logo_' ~ session.get('empresa_id', '') ~ '.png') }}" alt="Logo Cliente" onerror="this.style.display='none'">
+      <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente" onerror="this.style.display='none'">
       <span style="font-weight: bold; font-size: 1.1rem; margin-left: 8px;">Sistema BQA-ONE</span>
     </div>
     <div class="bqa-user-info">
-      <div>👤 <strong>{{ session.get('nombre', 'Usuario') }}</strong> | 🏢 {{ session.get('empresa', 'Empresa') }}</div>
+      <div>👤 <strong>{{ usuario }}</strong> | 🏢 {{ empresa }}</div>
       <div class="bqa-nav-links">
         <a href="/hub_administracion/dashboard">⬅ Volver al Hub</a>
         <a href="/logout" style="background: #d32f2f; color: white;">Salir</a>
@@ -91,7 +92,7 @@
     <!-- CSRF TOKEN OBLIGATORIO -->
     <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token() }}">
 
-    <p id="saludo">¡Hola {{ session.get('nombre','Usuario') }}!</p>
+    <p id="saludo">¡Hola {{ usuario }}!</p>
 
     <div id="syncWarning" style="display:none;">
     </div>
@@ -314,7 +315,7 @@
   </footer>
 
   <script>
-    window.EMPRESA_SESION = "{{ session.get('empresa','') }}";
+    window.EMPRESA_SESION = "{{ empresa }}";
 
     // PROTECCIÓN DE MUTACIONES OBLIGATORIA CON window.confirm()
     function ejecutarAccionConConfirmacion(nombreOperacion, funcionEjecutar) {

@@ -584,7 +584,7 @@ def _calcular_consumo_lote(cur, empresa, ubicacion, lote, id_operacion_actual, t
     return consumo_total_kg, kg_pollito_acumulado, pollitos
 
 
-def _buscar_proveedor_principal(cur, empresa, ubicacion, tanques):
+def _buscar_proveedor_principal(cur, id_empresa, ubicacion, tanques):
     if not tanques:
         return None
     
@@ -595,9 +595,9 @@ def _buscar_proveedor_principal(cur, empresa, ubicacion, tanques):
     cur.execute("""
         SELECT proveedor
         FROM tanques_sedes
-        WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND UPPER(nombre_tanque)=UPPER(%s)
+        WHERE empresa_id=%s AND TRIM(ubicacion)=TRIM(%s) AND UPPER(nombre_tanque)=UPPER(%s)
         LIMIT 1
-    """, (empresa, ubicacion, primer_num))
+    """, (id_empresa, ubicacion, primer_num))
     
     p = cur.fetchone()
     
@@ -607,7 +607,6 @@ def _buscar_proveedor_principal(cur, empresa, ubicacion, tanques):
         else:
             return p[0]
     return None
-
 
 def _generar_codigo_pedido(cliente_nombre, lote_id, ubicacion, proveedor, cur):
     mes = datetime.now().strftime("%m")
@@ -1378,7 +1377,6 @@ def _analizar_riesgo_glp(cur, empresa, ubicacion, lote, nivel_actual_ponderado, 
         "dias_extra_active": dias_extra
     }
 
-@csrf.exempt
 @bp_glp.route('/context', methods=['GET'])
 # @login_required_custom
 def glp_context():
@@ -1387,7 +1385,6 @@ def glp_context():
 # =========================================================
 # OBTENER TANQUES (VERSIÓN BLINDADA: ID-EMPRESA + UPPER-CASE)
 # =========================================================
-@csrf.exempt
 @bp_glp.route('/obtener_tanques', methods=['POST'])
 @login_required_custom
 def obtener_tanques():
@@ -1564,7 +1561,6 @@ def obtener_tanques():
 # ======================
 # Iniciar calefacción (CORREGIDA Y BLINDADA CON NOTIFICACIONES)
 # ======================
-@csrf.exempt
 @bp_glp.route('/registrar_inicio', methods=['POST'])
 @login_required_custom
 def registrar_inicio_calefaccion():
@@ -1579,19 +1575,17 @@ def registrar_inicio_calefaccion():
     usuario    = session.get('nombre') or ''
     empresa    = session.get('empresa') or ''
     id_empresa = session.get('empresa_id') or 0
+    cedula_op  = session.get('cedula', 'N/D')
     ubicacion  = _normalize_sede(data.get('sede'))
     op_id      = data.get('op_id')
 
-    # Captura bandera de sincronización para Telegram
     es_sync = data.get('is_sync', False)
     estado_notif = "sync" if es_sync else "exito"
 
-    # 1. BLINDAJE INICIAL CENTRALIZADO
     check = _verificar_idempotencia(op_id, "inicio_calefaccion", ubicacion)
     if check: return check
 
     pollitos = data.get('pollitos')
-    # Capturar fecha_llegada_pollitos
     fecha_llegada_p = data.get('fecha_llegada_pollitos')
     if not fecha_llegada_p:
         fecha_llegada_p = None
@@ -1600,15 +1594,18 @@ def registrar_inicio_calefaccion():
 
     try:
         with mysql.connection.cursor() as cur:
-            # 2. Validar si ya hay lote activo
-            cur.execute("SELECT COUNT(*) FROM cardex_glp WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'", (empresa, ubicacion))
-            if cur.fetchone()[0] > 0:
+            # BLOQUEO PESIMISTA
+            cur.execute("""
+                SELECT lote FROM cardex_glp 
+                WHERE id_empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO' 
+                FOR UPDATE
+            """, (id_empresa, ubicacion))
+            if cur.fetchone():
                 return jsonify({"success": False, "message": "⛔ YA EXISTE UN LOTE ACTIVO."})
 
             fecha = datetime.now().date()
             lote_id = f"{fecha.strftime('%Y%m%d')}_{ubicacion.replace(' ', '')}"
 
-            # 3. Insertar Registro
             cur.execute("""
                 INSERT INTO cardex_glp (fecha, empresa, id_empresa, ubicacion, lote, estatus_lote, operacion, tipo, clase, pollitos, fecha_llegada_pollitos, registro, dias_operacion, op_id)
                 VALUES (%s, %s, %s, %s, %s, 'ACTIVO', 'inicio_calefaccion', 'manual', 'saldo inicial', %s, %s, %s, 1, %s)
@@ -1620,9 +1617,8 @@ def registrar_inicio_calefaccion():
             saldo_kg = 0.0
             densidad = 2.0
             tanques_para_pedido = [] 
-            tanques_alerta_flameo = [] # <-- NUEVO: Lista para guardar caídas bruscas
+            tanques_alerta_flameo = [] 
 
-            # 4. Procesar Tanques (Con corrección tk-tk)
             for tk in tanques:
                 num_raw = str(tk.get("numero", ""))
                 match = _re.search(r'\d+', num_raw)
@@ -1635,7 +1631,6 @@ def registrar_inicio_calefaccion():
                 try: cap = float(tk.get("capacidad", 250))
                 except: cap = 250.0
                 
-                # --- NUEVO: VALIDAR SI HAY CAÍDA > 10% RESPECTO AL ÚLTIMO REGISTRO ---
                 try:
                     cur.execute(f"""
                         SELECT `nivel tk-{num}`, `nivelfinal tk-{num}`, operacion 
@@ -1669,7 +1664,6 @@ def registrar_inicio_calefaccion():
                             })
                 except Exception as e_caida:
                     print(f"Error evaluando caída de nivel por flameo: {e_caida}")
-                # ----------------------------------------------------------------------
 
                 col_n = f"nivel tk-{num}"
                 col_c = f"capacidad tk-{num}"
@@ -1696,19 +1690,17 @@ def registrar_inicio_calefaccion():
                 if nivel < 70.0:
                     tanques_para_pedido.append({"numero": num, "nivel": nivel})
 
-            proveedor = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
+            # LLAMADA MULTI-TENANT
+            proveedor = _buscar_proveedor_principal(cur, id_empresa, ubicacion, tanques)
             cur.execute("UPDATE cardex_glp SET saldo_estimado_kg=%s, proveedor=%s WHERE id=%s", (saldo_kg, proveedor, id_operacion))
 
-            # --- NUEVO: ENVIAR CORREO SI HUBO CAÍDAS > 10% ---
             if tanques_alerta_flameo:
                 try:
                     _enviar_alerta_diferencia_saldos(empresa, ubicacion, usuario, lote_id, tanques_alerta_flameo)
                     registrar_auditoria(id_empresa, empresa, "GLP", "Sistema", "⚠️ Alerta Saldo Flameo", f"Diferencia >10% en inicio de lote {lote_id}.", "ALERTA")
                 except Exception as e_alerta:
                     print(f"Error enviando alerta flameo: {e_alerta}")
-            # -------------------------------------------------
 
-            # 5. Generación de Pedido
             pedido_info = None
             requiere_gas_ui = False
             codigo_generado = None
@@ -1747,20 +1739,23 @@ def registrar_inicio_calefaccion():
                     print(f"⚠️ Error generando pedido automático: {ep}")
                     pedido_info = {"generado": False, "error": str(ep)}
 
-            # 🔊 AVISO A LA BITÁCORA
             try:
                 registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Inicio Calefacción", f"Sede: {ubicacion}. Lote: {lote_id}. Población: {pollitos}. Fecha Llegada: {fecha_llegada_p or 'Hoy'}.", "INFO")
             except Exception as e:
                 print("Error audit:", e)
 
             _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha)
-            
-            # 🔊 AUDITORÍA TELEGRAM ÉXITO
             notificar_opglp_telegram(id_empresa, usuario, "Inicio Calefacción", ubicacion, fecha.strftime("%Y-%m-%d"), estado=estado_notif)
+
+            # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
+            cur.execute("""
+                INSERT INTO `registro_operaciones_bqa-one` 
+                (empresa, empresa_id, backend, datos, usuario, cedula)
+                VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
+            """, (empresa, id_empresa, f"Inicio calefacción - Lote: {lote_id} - Sede: {ubicacion}", usuario, cedula_op))
 
             mysql.connection.commit()
 
-        # 6. Preparar Respuesta Completa
         mensaje = f"Inicio registrado correctamente."
         if pedido_info and pedido_info.get("generado"):
             mensaje += f" ✅ Se generó pedido automático ({pedido_info['codigo']})."
@@ -1789,18 +1784,14 @@ def registrar_inicio_calefaccion():
 
     except Exception as e:
         print(f"Error GLP inicio: {e}")
-        # 🔊 REINCORPORADO: AUDITORÍA TELEGRAM FALLO
         notificar_opglp_telegram(id_empresa, usuario, "Inicio Calefacción", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
-        return jsonify({"success": False, "message": "Error interno al iniciar calefacción"}), 500    
-
+        return jsonify({"success": False, "message": "Error interno al iniciar calefacción"}), 500
 # ======================
 # Registrar Tanqueo (VERSION PRODUCCIÓN BLINDADA ANTI-DEADLOCK)
 # ======================
-@csrf.exempt
 @bp_glp.route('/registrar_tanqueo', methods=['POST'])
 @login_required_custom
 def registrar_tanqueo():
-    # --- BLINDAJE 1: Captura de errores globales ---
     try:
         try:
             data = request.get_json(force=True) or {}
@@ -1813,17 +1804,16 @@ def registrar_tanqueo():
         if not op_id:
             return jsonify({"success": False, "message": "Falta op_id en la operación"}), 400
 
-        # 1. BLINDAJE INICIAL CENTRALIZADO
         check = _verificar_idempotencia(op_id, "tanqueo", ubicacion)
         if check: return check
 
-        # NUEVO: Captura bandera de sincronización para Telegram
         es_sync = data.get('is_sync', False)
         estado_notif = "sync" if es_sync else "exito"
 
         empresa    = session.get('empresa') or ''
         usuario    = session.get('nombre') or ''
         id_empresa = session.get('empresa_id') or 0
+        cedula_op  = session.get('cedula', 'N/D')
         tanques    = data.get('tanques', []) or []
 
         if not empresa or not ubicacion:
@@ -1831,18 +1821,15 @@ def registrar_tanqueo():
         if not tanques:
             return jsonify({"success": False, "message": "No se recibieron tanques para el tanqueo."}), 400
 
-        # --- INICIO DE TRANSACCIÓN ---
         with mysql.connection.cursor() as cur:
-            
-            # ---------------------------------------------------------
-            # PASO 1: BUSCAR LOTE ACTIVO (Se invierte el orden para asegurar trazabilidad)
-            # ---------------------------------------------------------
+            # BLOQUEO PESIMISTA
             cur.execute("""
                 SELECT lote
                 FROM cardex_glp
-                WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
+                WHERE id_empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
                 ORDER BY fecha DESC, id DESC LIMIT 1
-            """, (empresa, ubicacion))
+                FOR UPDATE
+            """, (id_empresa, ubicacion))
 
             row_raw = cur.fetchone()
             lote_id = None
@@ -1852,17 +1839,14 @@ def registrar_tanqueo():
             if not lote_id:
                 return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
 
-            # ---------------------------------------------------------
-            # PASO 2: TRAZABILIDAD Y CIERRE DE PEDIDO PENDIENTE DEL LOTE ACTIVO
-            # ---------------------------------------------------------
             cur.execute("""
-            SELECT codigo_pedido 
-            FROM pedidos_gas_glp 
-            WHERE cliente = %s AND TRIM(ubicacion) = TRIM(%s) AND lote = %s
-              AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster', 'pendiente_aprobacion') 
-              AND estatus != 'cancelado'
-            ORDER BY id DESC LIMIT 1
-        """, (empresa, ubicacion, lote_id))
+                SELECT codigo_pedido 
+                FROM pedidos_gas_glp 
+                WHERE cliente = %s AND TRIM(ubicacion) = TRIM(%s) AND lote = %s
+                  AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster', 'pendiente_aprobacion') 
+                  AND estatus != 'cancelado'
+                ORDER BY id DESC LIMIT 1
+            """, (empresa, ubicacion, lote_id))
             
             row_ped = cur.fetchone()
             codigo_trazabilidad = ""
@@ -1870,21 +1854,17 @@ def registrar_tanqueo():
             
             if row_ped:
                 codigo_trazabilidad = row_ped.get("codigo_pedido") if isinstance(row_ped, dict) else row_ped[0]
-                # Estampamos el código en la columna registro del cárdex
                 usuario_registro = f"{usuario} | Pedido: {codigo_trazabilidad}"
                 
-                # Cerramos el pedido para que el candado libere los consumos
                 cur.execute("""
                     UPDATE pedidos_gas_glp 
                     SET estatus_flujo = 'tanqueo_registrado', 
                         comentarios = CONCAT(COALESCE(comentarios, ''), ' | Cumplido por OP: ', %s) 
                     WHERE codigo_pedido = %s
                 """, (op_id, codigo_trazabilidad))
-            # ---------------------------------------------------------
 
             fecha = datetime.now().date()
             
-            # 3. Insertar Registro Base
             columnas = [
                 "fecha","empresa","id_empresa","ubicacion",
                 "lote","estatus_lote","operacion","tipo","clase",
@@ -1893,7 +1873,7 @@ def registrar_tanqueo():
             valores  = [
                 fecha, empresa, id_empresa, ubicacion,
                 lote_id, 'ACTIVO', "tanqueo", "manual", "ingreso",
-                usuario_registro, op_id, codigo_trazabilidad  # <-- USAMOS EL USUARIO CON EL CÓDIGO ESTAMPADO
+                usuario_registro, op_id, codigo_trazabilidad 
             ]
             
             placeholders = ', '.join(['%s'] * len(columnas))
@@ -1915,7 +1895,6 @@ def registrar_tanqueo():
             masas_facturadas = []
             errores_tanqueo = []
 
-            # 4. Procesar Tanques
             for tk in tanques:
                 num_str = str(tk.get("numero", ""))
                 match = _re.search(r'\d+', num_str)
@@ -1926,7 +1905,6 @@ def registrar_tanqueo():
                 nivel_ini = float(tk.get("nivel_inicial", 0) or 0.0)
                 nivel_fin = float(tk.get("nivel_final", 0) or 0.0)
 
-                # Validación Lógica de Negocio: EL NIVEL DEBE SUBIR
                 if (nivel_fin - nivel_ini) < -0.1:
                      errores_tanqueo.append(f"• TK-{num}: Inicio {nivel_ini}% -> Fin {nivel_fin}% (BAJÓ).")
 
@@ -1963,7 +1941,7 @@ def registrar_tanqueo():
                 if densidad_sum > 0: densidades_registradas.append(densidad_sum)
 
                 kg_sumin = float(tk.get("kg_suministrados") or 0.0)
-                masas_facturadas.append(kg_sumin) # Siempre sumamos lo facturado
+                masas_facturadas.append(kg_sumin)
 
                 delta_nivel = nivel_fin - nivel_ini
                 masa_esp_tk = 0.0
@@ -1972,7 +1950,6 @@ def registrar_tanqueo():
                 
                 if masa_esp_tk > 0: masas_esperadas.append(masa_esp_tk)
 
-            # Abortar transacción si hay errores lógicos (Nivel bajó)
             if errores_tanqueo:
                 mensaje_final = "⛔ ERRORES LÓGICOS:\n" + "\n".join(errores_tanqueo) + "\n\nEn un tanqueo el nivel debe SUBIR."
                 raise ValueError(mensaje_final)
@@ -1983,7 +1960,6 @@ def registrar_tanqueo():
             saldo_estimado_gal = saldo_estimado_kg/densidad_estimada if densidad_estimada else 0.0
             cur.execute("UPDATE cardex_glp SET saldo_estimado_kg=%s, saldo_estimado_galones=%s WHERE id=%s", (round(saldo_estimado_kg,2), round(saldo_estimado_gal,2), id_operacion))
 
-            # 5. Cálculos de Consumo (Protegidos)
             consumo_kg, kg_pollito, pollitos = 0.0, 0.0, 0
             try:
                 tks_consumo = [{"numero": t.get("numero"), "capacidad": t.get("capacidad"), "nivel": t.get("nivel_inicial")} for t in tanques]
@@ -2001,22 +1977,19 @@ def registrar_tanqueo():
             if masa_esperada_total > 0:
                 desvio_total = ((masa_facturada_total - masa_esperada_total) / masa_esperada_total) * 100.0
 
-            # 6. BUSCAR PROVEEDOR Y PRECIOS (MEJORADO CON TRIM)
-            proveedor_principal = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
-            print(f"🔍 Proveedor encontrado: '{proveedor_principal}'") # Debug en consola
+            # LLAMADA MULTI-TENANT
+            proveedor_principal = _buscar_proveedor_principal(cur, id_empresa, ubicacion, tanques)
+            print(f"🔍 Proveedor encontrado: '{proveedor_principal}'")
 
             precio_unitario = 0.0
             precio_total = 0.0
 
             if proveedor_principal:
-                # Usamos TRIM para evitar fallos por espacios
                 cur.execute("SELECT precio FROM proveedores WHERE TRIM(UPPER(proveedor))=TRIM(UPPER(%s)) LIMIT 1", (proveedor_principal,))
                 prow_raw = cur.fetchone()
                 if prow_raw:
                     if isinstance(prow_raw, dict): precio_unitario = float(prow_raw.get("precio") or 0.0)
                     else: precio_unitario = float(prow_raw[0] or 0.0)
-                else:
-                    print(f"⚠️ No se encontró precio para el proveedor: {proveedor_principal}")
 
             precio_total = precio_unitario * float(masa_facturada_total or 0.0)
 
@@ -2036,8 +2009,6 @@ def registrar_tanqueo():
                 id_operacion
             ))
 
-            # 7. Auditoría y Alertas
-            # Alerta Desviación > 8%
             if masa_esperada_total > 0 and desvio_total > 8.0 and proveedor_principal:
                 try:
                     alerta_enviada = _enviar_alerta_desviacion_tanqueo(
@@ -2051,7 +2022,6 @@ def registrar_tanqueo():
                 except Exception as e_mail:
                     print(f"⛔ Error envío alerta desviación: {e_mail}")
 
-            # Auditoría General del Tanqueo (NUEVO: Incluye el código del pedido)
             registrar_auditoria(
                 empresa_id=id_empresa,
                 empresa_nombre=empresa,
@@ -2062,12 +2032,17 @@ def registrar_tanqueo():
                 nivel="INFO"
             )
 
-            # 🔊 ADICIÓN: NOTIFICACIÓN MAESTRA DE TELEGRAM PARA TANQUEO EXITOSO
             notificar_opglp_telegram(id_empresa, usuario, "Registrar Tanqueo", ubicacion, fecha.strftime("%Y-%m-%d"), estado=estado_notif)
+
+            # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
+            cur.execute("""
+                INSERT INTO `registro_operaciones_bqa-one` 
+                (empresa, empresa_id, backend, datos, usuario, cedula)
+                VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
+            """, (empresa, id_empresa, f"Tanqueo - Sede: {ubicacion} - Carga: {round(masa_facturada_total,2)} kg", usuario, cedula_op))
 
             mysql.connection.commit()
 
-        # Respuesta Exitosa (NUEVO: Confirma el cierre del pedido)
         mensaje = "Tanqueo registrado correctamente."
         if codigo_trazabilidad:
             mensaje += f" Se ha cerrado el pedido: {codigo_trazabilidad}."
@@ -2101,16 +2076,23 @@ def registrar_tanqueo():
         return jsonify({"success": True, "message": mensaje, "resumen": resumen})
 
     except IntegrityError as e:
-        # 2. BLINDAJE FINAL (SI PASA LA CONDICIÓN DE CARRERA)
         return _manejar_error_idempotencia(e, "tanqueo", ubicacion)
 
     except ValueError as e:
         mysql.connection.rollback()
-        # Registramos el intento fallido en auditoría también
         try: registrar_auditoria(id_empresa, empresa, "GLP", usuario, "⛔ Error Lógico Tanqueo", str(e), "WARNING")
         except: pass
         return jsonify({"success": False, "message": str(e)})
 
+    except Exception as e:
+        mysql.connection.rollback()
+        print("❌ ERROR CRÍTICO EN REGISTRAR TANQUEO:")
+        traceback.print_exc()
+        notificar_opglp_telegram(id_empresa, usuario, "Registrar Tanqueo", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
+        try: registrar_auditoria(id_empresa, empresa, "GLP", usuario, "💀 Error Sistema Tanqueo", str(e), "CRITICAL")
+        except: pass
+        return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
+    
     except Exception as e:
         # --- BLINDAJE FINAL: REPORTE DE ERROR REAL ---
         mysql.connection.rollback()
@@ -2128,7 +2110,6 @@ def registrar_tanqueo():
 # Registrar consumo (VERSIÓN ATÓMICA Y BLINDADA)
 # ======================
 
-@csrf.exempt
 @bp_glp.route('/registrar_consumo', methods=['POST'])
 @login_required_custom
 def registrar_consumo():
@@ -2142,18 +2123,17 @@ def registrar_consumo():
         if not op_id:
             return jsonify({"success": False, "message": "Falta op_id en la operación"}), 400
 
-        # BLINDAJE INICIAL
         ubicacion = _normalize_sede(data.get('sede'))
         check = _verificar_idempotencia(op_id, "consumo", ubicacion)
         if check: return check
 
-        # NUEVO: Captura bandera de sincronización para Telegram
         es_sync = data.get('is_sync', False)
         estado_notif = "sync" if es_sync else "exito"
 
         empresa    = session.get('empresa') or ''
         usuario    = session.get('nombre') or ''
         id_empresa = session.get('empresa_id') or 0
+        cedula_op  = session.get('cedula', 'N/D')
         tanques    = data.get('tanques', []) or []
 
         if not empresa or not ubicacion:
@@ -2171,17 +2151,17 @@ def registrar_consumo():
         dias_operacion = 0
         proveedor_principal = None
 
-        # --- NUEVO: SISTEMA DE REINTENTOS PARA DEADLOCKS (Igual que en cierre de lote) ---
         max_intentos = 3
         for intento in range(max_intentos):
             try:
                 with mysql.connection.cursor() as cur:
-                    # 1. Buscar Lote Activo
+                    # BLOQUEO PESIMISTA
                     cur.execute("""
                         SELECT lote FROM cardex_glp
-                        WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
+                        WHERE id_empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
                         ORDER BY fecha DESC, id DESC LIMIT 1
-                    """, (empresa, ubicacion))
+                        FOR UPDATE
+                    """, (id_empresa, ubicacion))
 
                     row_raw = cur.fetchone()
                     if row_raw:
@@ -2190,7 +2170,6 @@ def registrar_consumo():
                     if not lote_id:
                         return jsonify({"success": False, "message": "No hay lote activo en esta sede."})
 
-                    # 2. Insertar Registro Base
                     columnas = ["fecha","empresa","id_empresa","ubicacion","lote","estatus_lote","operacion","tipo","clase","registro","op_id"]
                     valores  = [fecha, empresa, id_empresa, ubicacion, lote_id, 'ACTIVO', "consumo", "manual", "egreso", usuario, op_id]
                     
@@ -2204,7 +2183,6 @@ def registrar_consumo():
                     sum_nivel_cap = 0.0
                     sum_cap = 0.0
 
-                    # 3. Procesar Tanques
                     for tk in tanques:
                         num_str = str(tk.get("numero", ""))
                         match = _re.search(r'\d+', num_str)
@@ -2234,13 +2212,13 @@ def registrar_consumo():
                     saldo_estimado_gal = saldo_estimado_kg/densidad if densidad else 0.0
                     cur.execute("UPDATE cardex_glp SET saldo_estimado_kg=%s, saldo_estimado_galones=%s WHERE id=%s", (round(saldo_estimado_kg,2), round(saldo_estimado_gal,2), id_operacion))
 
-                    # 4. Cálculos
                     consumo_kg, kg_pollito, pollitos = _calcular_consumo_lote(cur, empresa, ubicacion, lote_id, id_operacion, tanques)
                     dias_operacion = _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha)
-                    proveedor_principal = _buscar_proveedor_principal(cur, empresa, ubicacion, tanques)
+                    
+                    # LLAMADA MULTI-TENANT
+                    proveedor_principal = _buscar_proveedor_principal(cur, id_empresa, ubicacion, tanques)
                     cur.execute("UPDATE cardex_glp SET proveedor=%s WHERE id=%s", (proveedor_principal, id_operacion))
 
-                    # 5. SOLICITUD DE GAS
                     solicitud_gas = data.get("solicitud_gas")
                     analisis_riesgo = {"requiere_gas": False, "razon": "", "codigo": None}
 
@@ -2268,31 +2246,33 @@ def registrar_consumo():
                         cur.execute("UPDATE cardex_glp SET codigo_pedido=%s WHERE id=%s", (codigo, id_operacion))
                         analisis_riesgo.update({"requiere_gas": True, "razon": f"Solicitud {codigo} enviada a revisión.", "codigo": codigo})
 
-                        # Alerta a Telegram nativa de solicitud
                         try:
                             nivel_notif = round(sum_nivel_cap/sum_cap if sum_cap > 0 else 0, 1)
                             _enviar_alerta_telegram_oficial(id_empresa, ubicacion, usuario, nivel_notif, codigo)
                             _enviar_alerta_webmaster_nueva_solicitud(empresa, ubicacion, usuario, nivel_notif, codigo)
                         except Exception: pass
 
-                    # Auditoría
                     registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Consumo Registrado", f"Sede: {ubicacion}. Consumo: {round(consumo_kg, 2)} kg.", "INFO")
-
-                    # 🔊 NUEVO: AUDITORÍA TELEGRAM ÉXITO
                     notificar_opglp_telegram(id_empresa, usuario, "Registro de Consumo", ubicacion, fecha.strftime("%Y-%m-%d"), estado=estado_notif)
 
+                    # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
+                    cur.execute("""
+                        INSERT INTO `registro_operaciones_bqa-one` 
+                        (empresa, empresa_id, backend, datos, usuario, cedula)
+                        VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
+                    """, (empresa, id_empresa, f"Consumo - Sede: {ubicacion} - Gasto: {round(consumo_kg, 2)} kg", usuario, cedula_op))
+
                     mysql.connection.commit()
-                    break # ÉXITO, SALIMOS DEL BUCLE
+                    break 
 
             except OperationalError as e:
-                if e.args[0] == 1213: # DEADLOCK DETECTADO
+                if e.args[0] == 1213: 
                     print(f"⚠️ Deadlock en Consumo (Intento {intento+1})... reintentando.")
                     mysql.connection.rollback()
                     time.sleep(0.2)
                     if intento == max_intentos - 1: raise e
                 else: raise e
 
-        # 6. Preparar Respuesta
         resumen = {
             "operacion": "consumo", "sede": ubicacion, "lote": lote_id, "fecha": fecha.strftime("%Y-%m-%d"),
             "tanques": _resumen_tanques(tanques), "saldo_estimado_kg": round(saldo_estimado_kg,2), "dias_operacion": dias_operacion,
@@ -2305,14 +2285,11 @@ def registrar_consumo():
     except IntegrityError as e: return _manejar_error_idempotencia(e, "consumo", ubicacion)
     except ValueError as e: return jsonify({"success": False, "message": str(e)})
     except Exception as e: 
-        # 🔊 NUEVO: AUDITORÍA TELEGRAM FALLO
         notificar_opglp_telegram(id_empresa, usuario, "Registro de Consumo", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
         return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
-
 # ======================
 # Finalizar calefacción (VERSION PRODUCCIÓN BLINDADA)
 # ======================
-@csrf.exempt
 @bp_glp.route('/finalizar_calefaccion_batch', methods=['POST'])
 @login_required_custom
 def finalizar_calefaccion_batch():
@@ -2325,7 +2302,6 @@ def finalizar_calefaccion_batch():
         op_id = (data or {}).get("op_id")
         ubicacion = _normalize_sede(data.get('sede'))
         
-        # NUEVO: Captura bandera de sincronización para Telegram
         es_sync = data.get('is_sync', False)
         estado_notif = "sync" if es_sync else "exito"
 
@@ -2338,18 +2314,20 @@ def finalizar_calefaccion_batch():
         empresa    = session.get('empresa') or ''
         usuario    = session.get('nombre') or ''
         id_empresa = session.get('empresa_id') or 0
+        cedula_op  = session.get('cedula', 'N/D')
         tanques    = data.get('tanques', []) or []
 
-        # --- SISTEMA DE REINTENTOS PARA DEADLOCKS ---
         max_intentos = 3
         for intento in range(max_intentos):
             try:
                 with mysql.connection.cursor() as cur:
+                    # BLOQUEO PESIMISTA
                     cur.execute("""
                         SELECT lote FROM cardex_glp
-                        WHERE empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
+                        WHERE id_empresa=%s AND TRIM(ubicacion)=TRIM(%s) AND estatus_lote='ACTIVO'
                         ORDER BY fecha DESC, id DESC LIMIT 1
-                    """, (empresa, ubicacion))
+                        FOR UPDATE
+                    """, (id_empresa, ubicacion))
 
                     row_raw = cur.fetchone()
                     lote_id = row_raw.get("lote") if row_raw and isinstance(row_raw, dict) else (row_raw[0] if row_raw else None)
@@ -2361,7 +2339,6 @@ def finalizar_calefaccion_batch():
                     columnas = ["fecha","empresa","id_empresa","ubicacion","lote","estatus_lote","operacion","tipo","clase","registro","op_id"]
                     valores = [fecha, empresa, id_empresa, ubicacion, lote_id, 'ACTIVO', "finalizar_calefaccion", "manual", "saldo final", usuario, op_id]
                     
-                    # INSERT BASE (Donde ocurría el deadlock)
                     cur.execute(f"INSERT INTO cardex_glp ({', '.join(columnas)}) VALUES ({', '.join(['%s']*len(columnas))})", valores)
                     id_operacion = cur.lastrowid
 
@@ -2397,13 +2374,11 @@ def finalizar_calefaccion_batch():
                         consumo_kg, kg_pollito, pollitos = 0.0, 0.0, 0
 
                     dias_operacion = _calcular_actualizar_dias_operacion(cur, empresa, ubicacion, lote_id, fecha)
-                    cur.execute("UPDATE cardex_glp SET proveedor=%s WHERE id=%s", (_buscar_proveedor_principal(cur, empresa, ubicacion, tanques), id_operacion))
+                    
+                    # LLAMADA MULTI-TENANT
+                    cur.execute("UPDATE cardex_glp SET proveedor=%s WHERE id=%s", (_buscar_proveedor_principal(cur, id_empresa, ubicacion, tanques), id_operacion))
 
-                    # CIERRE DE LOTE
-                    # CORRECCIÓN: Actualizamos usando el id_empresa y lote_id exactos
                     cur.execute("UPDATE cardex_glp SET estatus_lote='INACTIVO' WHERE id_empresa=%s AND lote=%s", (id_empresa, lote_id))
-                    # NUEVO: Actualizamos en cascada el estatus del lote en la tabla de pedidos
-                    # para que el auditor automático (cron) ignore los pedidos de lotes finalizados.
                     cur.execute("""
                         UPDATE pedidos_gas_glp 
                         SET estatus_lote = 'INACTIVO' 
@@ -2411,30 +2386,32 @@ def finalizar_calefaccion_batch():
                         AND TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
                         AND lote = %s
                     """, (empresa, ubicacion, lote_id))
-                    # =======================================================
-                    # 🔊 AVISO A LA BITÁCORA
-                    # =======================================================
+
                     try:
                         registrar_auditoria(id_empresa, empresa, "GLP", usuario, "Fin Calefacción", f"Sede: {ubicacion}. Lote cerrado: {lote_id}.", "INFO")
                     except Exception as e:
                         print("Error audit:", e)
-                    # =======================================================
 
-                    # 🔊 NUEVO: AUDITORÍA TELEGRAM ÉXITO
                     notificar_opglp_telegram(id_empresa, usuario, "Finalización de Calefacción", ubicacion, fecha.strftime("%Y-%m-%d"), estado=estado_notif)
 
+                    # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
+                    cur.execute("""
+                        INSERT INTO `registro_operaciones_bqa-one` 
+                        (empresa, empresa_id, backend, datos, usuario, cedula)
+                        VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
+                    """, (empresa, id_empresa, f"Fin calefacción - Lote: {lote_id} - Sede: {ubicacion}", usuario, cedula_op))
+
                     mysql.connection.commit()
-                    break # Éxito: Salir del bucle
+                    break 
 
             except OperationalError as e:
-                if e.args[0] == 1213: # Si es Deadlock, reintentamos
+                if e.args[0] == 1213: 
                     print(f"⚠️ Deadlock en Cierre (Intento {intento+1})...")
                     mysql.connection.rollback()
                     time.sleep(0.2)
                     if intento == max_intentos - 1: raise e
                 else: raise e
 
-        # Preparar la respuesta completa para la tarjeta verde (UI)
         resumen = {
             "operacion": "finalizar_calefaccion",
             "sede": ubicacion,
@@ -2459,11 +2436,8 @@ def finalizar_calefaccion_batch():
         return _manejar_error_idempotencia(e, "finalizar_calefaccion", ubicacion)
     except Exception as e:
         mysql.connection.rollback()
-        print("❌ ERROR CRÍTICO FINAL:", e)
-        # 🔊 NUEVO: AUDITORÍA TELEGRAM FALLO
         notificar_opglp_telegram(id_empresa, usuario, "Finalización de Calefacción", ubicacion, datetime.now().strftime("%Y-%m-%d"), estado="fallo")
-        return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})
-               
+        return jsonify({"success": False, "message": f"Error del sistema: {str(e)}"})               
 # --- FUNCIÓN DE CONSULTA DE PEDIDOS ---
 @bp_glp.route('/consultar_pedidos_pendientes', methods=['POST'])
 @login_required_custom
@@ -2528,7 +2502,6 @@ def consultar_pedidos_pendientes():
 # --- FUNCIÓN DE VALIDACIÓN ---
 @bp_glp.route('/validar_pedido', methods=['POST'])
 @login_required_custom
-@csrf.exempt 
 def validar_pedido():
     data = request.json
     pedido_id = data.get('pedido_id')
@@ -2630,7 +2603,6 @@ def ver_facturas_glp():
 # NUEVOS ENDPOINTS: NEGOCIACIÓN Y ADMIN
 # ==========================================
 
-@csrf.exempt
 @bp_glp.route('/solicitar_pedido_manual', methods=['POST'])
 @login_required_custom
 def solicitar_pedido_manual():
@@ -2694,6 +2666,14 @@ def solicitar_pedido_manual():
         # B. Vincular el pedido al registro actual del Cardex
         cur.execute("UPDATE cardex_glp SET codigo_pedido=%s WHERE op_id=%s", (codigo, op_id))
         
+        # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
+        cedula_op = session.get('cedula', 'N/D')
+        cur.execute("""
+            INSERT INTO `registro_operaciones_bqa-one` 
+            (empresa, empresa_id, backend, datos, usuario, cedula)
+            VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
+        """, (empresa, session.get('empresa_id', 0), f"Solicitud Pedido Manual - Código: {codigo}", session.get('nombre', ''), cedula_op))
+        
         mysql.connection.commit() # <--- ¡DATOS GUARDADOS CORRECTAMENTE!
 
         # ---------------------------------------------------------------------
@@ -2743,7 +2723,6 @@ def solicitar_pedido_manual():
 # ❌ CAMINO B: ANULACIÓN INVESTIGATIVA (SIN EVIDENCIA)
 # ==============================================================================
 
-@csrf.exempt
 @bp_glp.route('/anular_pedido_sin_evidencia', methods=['POST'])
 @login_required_custom
 def anular_pedido_sin_evidencia():
@@ -2801,6 +2780,14 @@ def anular_pedido_sin_evidencia():
             session.get('empresa_id', 0), empresa_actor, "GLP", usuario, 
             "Anulación Sin Evidencia", f"Pedido {codigo} de {cliente} ({ubicacion}). Razón: {justificacion}", nivel_audit
         )
+        
+        # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
+        cedula_op = session.get('cedula', 'N/D')
+        cur.execute("""
+            INSERT INTO `registro_operaciones_bqa-one` 
+            (empresa, empresa_id, backend, datos, usuario, cedula)
+            VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
+        """, (empresa_actor, session.get('empresa_id', 0), f"Anular pedido sin evidencia - Código: {codigo}", usuario, cedula_op))
         
         mysql.connection.commit()
         cur.close()
@@ -2903,7 +2890,6 @@ def _enviar_correo_investigacion_anulacion(cur, cliente, ubicacion, codigo, fact
 # ⚖️ CAMINO A: LEGALIZACIÓN EXTEMPORÁNEA (INYECCIÓN EN EL PASADO)
 # ==============================================================================
 
-@csrf.exempt
 @bp_glp.route('/legalizar_tanqueo_extemporaneo', methods=['POST'])
 @login_required_custom
 def legalizar_tanqueo_extemporaneo():
@@ -3005,7 +2991,15 @@ def legalizar_tanqueo_extemporaneo():
 
         # Auditoría
         registrar_auditoria(id_empresa_actor, session.get('empresa', 'N/D'), "GLP", usuario, "Legalización Extemporánea", f"Se insertó tanqueo ({codigo_pedido}) en {fecha_real} para {ubicacion}. Historia recalculada.", "INFO")
-
+        
+        # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
+        cedula_op = session.get('cedula', 'N/D')
+        cur.execute("""
+            INSERT INTO `registro_operaciones_bqa-one` 
+            (empresa, empresa_id, backend, datos, usuario, cedula)
+            VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
+        """, (session.get('empresa', 'N/D'), id_empresa_actor, f"Legalizar Tanqueo Extemp - Código: {codigo_pedido}", usuario, cedula_op))
+        
         mysql.connection.commit()
         cur.close()
         
@@ -3105,7 +3099,6 @@ def _recalcular_historia_lote(cur, empresa, ubicacion, lote_id):
 # ==========================================
 # RUTA PARA NOTIFICAR INTENTOS DE SINCRONIZACIÓN MANUAL
 # ==========================================
-@csrf.exempt
 @bp_glp.route('/notificar_intento_sync', methods=['POST'])
 @login_required_custom
 def notificar_intento_sync():
@@ -3127,7 +3120,6 @@ def notificar_intento_sync():
         print(f"Error en notificar_intento_sync: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
     
-@csrf.exempt
 @bp_glp.route('/confirmar_arribo_pollito', methods=['POST'])
 @login_required_custom
 def confirmar_arribo_pollito():
@@ -3163,6 +3155,14 @@ def confirmar_arribo_pollito():
                 registro = CONCAT(COALESCE(registro, ''), ' | Conf. por ', %s)
             WHERE id = %s
         """, (poblacion_real, fecha_arribo, usuario, op_id))
+        
+        # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
+        cedula_op = session.get('cedula', 'N/D')
+        cur.execute("""
+            INSERT INTO `registro_operaciones_bqa-one` 
+            (empresa, empresa_id, backend, datos, usuario, cedula)
+            VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
+        """, (session.get('empresa', 'N/D'), id_empresa, f"Confirmar arribo pollito - Sede: {sede} - Pob: {poblacion_real}", usuario, cedula_op))
 
         mysql.connection.commit()
 
@@ -3192,7 +3192,6 @@ def confirmar_arribo_pollito():
 # ==========================================
 # RUTA PARA ANÁLISIS DE LOTE (DASHBOARD)
 # ==========================================
-@csrf.exempt
 @bp_glp.route('/consultar_analisis_lote', methods=['POST'])
 @login_required_custom
 def consultar_analisis_lote():

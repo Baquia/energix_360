@@ -25,8 +25,6 @@ self.addEventListener("message", (event) => {
         clients.forEach(client => client.postMessage({ type: "BQA_GLPSYNC", action: "flushQueue" }));
       });
     }
-      flushOfflineQueue();
-    }
 
     try {
       if (event.source && typeof event.source.postMessage === "function") {
