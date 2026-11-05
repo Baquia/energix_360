@@ -1520,7 +1520,7 @@ def obtener_tanques():
                     WHERE cliente = %s 
                       AND TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
                       AND lote = %s
-                      AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
+                      AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster', 'pendiente_aprobacion', 'pendiente_envio_auto') 
                       AND estatus != 'cancelado'
                     ORDER BY id DESC LIMIT 1
                 """, (empresa_nombre, sede, nom_lote))
@@ -1859,7 +1859,7 @@ def registrar_tanqueo():
                 SELECT codigo_pedido 
                 FROM pedidos_gas_glp 
                 WHERE cliente = %s AND TRIM(ubicacion) = TRIM(%s) AND lote = %s
-                  AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster') 
+                  AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster','pendiente_aprobacion) 
                   AND estatus != 'cancelado'
                 ORDER BY id DESC LIMIT 1
             """, (empresa, ubicacion, lote_id))

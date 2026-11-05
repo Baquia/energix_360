@@ -5,6 +5,50 @@ let pedidoPendienteGlobal = null;
 let IS_SYNCING = false;
 
 /* ==========================================================
+NUEVA LÓGICA: NOTIFICACIONES PUSH LOCALES (WEB NOTIFICATIONS API)
+========================================================== */
+
+function solicitarPermisoNotificaciones() {
+  if (!("Notification" in window)) {
+    console.log("Este navegador no soporta notificaciones de escritorio.");
+    return;
+  }
+  if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+    Notification.requestPermission().then(permission => {
+      if (permission === "granted") {
+        console.log("Permiso de notificaciones concedido.");
+      }
+    });
+  }
+}
+
+// Llamar a la solicitud de permisos al cargar la página
+window.addEventListener("load", solicitarPermisoNotificaciones);
+
+function enviarNotificacionPushLocal(titulo, cuerpo) {
+  if (!("Notification" in window)) return;
+
+  if (Notification.permission === "granted") {
+    // Intentar usar el Service Worker para mostrar la notificación en móviles (mejor soporte)
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready.then(registration => {
+        registration.showNotification(titulo, {
+          body: cuerpo,
+          icon: '/static/BQA_ONE_192.png',
+          vibrate: [200, 100, 200]
+        });
+      });
+    } else {
+      // Fallback para escritorio o si el SW no está listo
+      new Notification(titulo, {
+        body: cuerpo,
+        icon: '/static/BQA_ONE_192.png'
+      });
+    }
+  }
+}
+
+/* ==========================================================
 NUEVO FLUJO ATÓMICO: CONSUMO + NEGOCIACIÓN (OFFLINE FIRST)
 ========================================================== */
 
@@ -503,7 +547,7 @@ async function flushOfflineQueue() {
     try {
       let response;
 
-      // CASO 1: Confirmación de Arribo de Pollitos (Nueva funcionalidad)
+      // CASO 1: Confirmación de Arribo de Pollitos
       if (item.operacion === 'confirmar_arribo') {
         response = await fetch("/glp/confirmar_arribo_pollito", {
           method: "POST",
@@ -513,11 +557,14 @@ async function flushOfflineQueue() {
       }
       // CASO 2: Operaciones estándar (Consumo, Tanqueo, etc.)
       else {
-        // CORRECCIÓN QUIRÚRGICA: Lee la URL y el PAYLOAD exactos que guardó sendWithOffline
+        let payloadToSync = item.payload || item;
+        // INYECCIÓN DE LA BANDERA is_sync
+        payloadToSync.is_sync = true; 
+        
         response = await fetch(item.url || "/glp/registrar_operacion_glp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item.payload || item)
+          body: JSON.stringify(payloadToSync)
         });
       }
 
@@ -526,7 +573,6 @@ async function flushOfflineQueue() {
       if (resData.success) {
         console.log(`[Sync] Éxito en operación: ${item.operacion} (ID local: ${item.id})`);
 
-        // Si fue un arribo, nos aseguramos de limpiar el estado de espera en el dispositivo
         if (item.operacion === 'confirmar_arribo') {
           localStorage.setItem(`estado_lote_${item.sede}`, JSON.stringify({ esperando_pollito: false }));
           if (document.getElementById('bloque-arribo-pollito')) {
@@ -534,51 +580,57 @@ async function flushOfflineQueue() {
           }
         }
 
-        // Eliminar de la cola IndexedDB
         await removeFromQueue(item.id);
       } else {
         console.error(`[Sync] El servidor rechazó la operación: ${resData.message}`);
-        // Si el error es crítico (ej. lote cerrado), podrías decidir borrarlo o dejarlo para revisión
       }
     } catch (err) {
       console.error("[Sync] Error de red o servidor:", err);
-      // Detenemos el bucle para reintentar en el próximo ciclo de conexión
       break;
     }
   }
 
   IS_SYNCING = false;
 
-  // Actualizar la UI de advertencia de sincronización si existe
   const remaining = await getQueue();
   const warning = document.getElementById("syncWarning");
-  if (warning) {
-    if (remaining.length > 0) {
-      warning.style.display = "block";
-      warning.innerHTML = `⚠️ Tienes ${remaining.length} operaciones pendientes por subir.`;
-      warning.className = "alert-warning-sync";
-    } else {
+  
+  if (remaining.length === 0) {
+    // Si la cola se vació por completo, enviamos la notificación push de éxito
+    enviarNotificacionPushLocal("✅ BQA-ONE", "Sincronización completada. Tus registros ya están en el servidor.");
+    
+    if (warning) {
       warning.style.display = "none";
-      // Si todo se subió, recargamos niveles oficiales para estar al día
-      if (typeof sedeQR !== 'undefined') {
-        sincronizarNivelesServidor(sedeQR);
-      }
     }
+    if (typeof sedeQR !== 'undefined') {
+      sincronizarNivelesServidor(sedeQR);
+    }
+  } else if (warning) {
+    warning.style.display = "block";
+    warning.innerHTML = `⚠️ Tienes ${remaining.length} operaciones pendientes por subir.`;
+    warning.className = "alert-warning-sync";
   }
 }
 
-// 3. TU FUNCIÓN INTACTA
 function programarFlushOffline() {
-  // 1. Cuando el navegador detecta que volvieron los datos/wifi
-  window.addEventListener("online", () => {
+  window.addEventListener("online", async () => {
     console.log("[GLP offline] Señal detectada. Iniciando secuencia de sincronización...");
+    
+    // NOTIFICACIÓN PUSH: Avisar al usuario que hay señal y pendientes
+    try {
+      if (typeof getQueue === 'function') {
+        const q = await getQueue();
+        if (q.length > 0) {
+          enviarNotificacionPushLocal("⚠️ BQA-ONE", "Tienes operaciones pendientes. Abre la app para sincronizar.");
+        }
+      }
+    } catch (e) {
+      console.warn("No se pudo verificar la cola al volver online:", e);
+    }
 
-    // ESTRATEGIA DE REINTENTOS ESCALONADOS (2.5s, 6s, 12s)
-    // Ayuda a superar micro-cortes o inestabilidad inicial
     setTimeout(() => {
       console.log("🔄 Sincronizando (Intento 1)...");
       flushOfflineQueue();
-      // Forzamos también la revisión del estado general (ping)
       if (typeof evaluarYAplicarOperatividadPWA === 'function') {
         evaluarYAplicarOperatividadPWA();
       }
@@ -594,16 +646,14 @@ function programarFlushOffline() {
     }, 12000);
   });
 
-  // 2. Al abrir la app (EVENTO LOAD) - AQUÍ ESTÁ LA MEJORA VISUAL
   window.addEventListener("load", async () => {
     try {
-      // A. Verificar visualmente si hay pendientes para mostrar el aviso rojo
       if (typeof getQueue === 'function') {
         const q = await getQueue();
         if (q.length > 0) {
           console.log("⚠️ Se detectaron operaciones pendientes al iniciar.");
           if (typeof mostrarAvisoSyncPendiente === 'function') {
-            mostrarAvisoSyncPendiente(); // Muestra el botón rojo
+            mostrarAvisoSyncPendiente(); 
           }
         }
       }
@@ -611,66 +661,9 @@ function programarFlushOffline() {
       console.error("Error verificando cola al inicio:", e);
     }
 
-    // B. Intentar sincronizar automáticamente tras 1.5s
     setTimeout(flushOfflineQueue, 1500);
   });
 
-  // 3. Monitor constante (Cada 10 segundos)
-  // Sigue intentando eternamente mientras haya internet
-  setInterval(() => {
-    if (navigator.onLine) flushOfflineQueue();
-  }, 10000);
-}
-
-function programarFlushOffline() {
-  // 1. Cuando el navegador detecta que volvieron los datos/wifi
-  window.addEventListener("online", () => {
-    console.log("[GLP offline] Señal detectada. Iniciando secuencia de sincronización...");
-
-    // ESTRATEGIA DE REINTENTOS ESCALONADOS (2.5s, 6s, 12s)
-    // Ayuda a superar micro-cortes o inestabilidad inicial
-    setTimeout(() => {
-      console.log("🔄 Sincronizando (Intento 1)...");
-      flushOfflineQueue();
-      // Forzamos también la revisión del estado general (ping)
-      if (typeof evaluarYAplicarOperatividadPWA === 'function') {
-        evaluarYAplicarOperatividadPWA();
-      }
-    }, 2500);
-
-    setTimeout(() => {
-      console.log("🔄 Sincronizando (Intento 2)...");
-      flushOfflineQueue();
-    }, 6000);
-
-    setTimeout(() => {
-      flushOfflineQueue();
-    }, 12000);
-  });
-
-  // 2. Al abrir la app (EVENTO LOAD) - AQUÍ ESTÁ LA MEJORA VISUAL
-  window.addEventListener("load", async () => {
-    try {
-      // A. Verificar visualmente si hay pendientes para mostrar el aviso rojo
-      if (typeof getQueue === 'function') {
-        const q = await getQueue();
-        if (q.length > 0) {
-          console.log("⚠️ Se detectaron operaciones pendientes al iniciar.");
-          if (typeof mostrarAvisoSyncPendiente === 'function') {
-            mostrarAvisoSyncPendiente(); // Muestra el botón rojo
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Error verificando cola al inicio:", e);
-    }
-
-    // B. Intentar sincronizar automáticamente tras 1.5s
-    setTimeout(flushOfflineQueue, 1500);
-  });
-
-  // 3. Monitor constante (Cada 10 segundos)
-  // Sigue intentando eternamente mientras haya internet
   setInterval(() => {
     if (navigator.onLine) flushOfflineQueue();
   }, 10000);

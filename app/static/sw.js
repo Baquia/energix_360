@@ -20,6 +20,11 @@ self.addEventListener("message", (event) => {
     console.log("[SW v14] FORCE_OFFLINE =", FORCE_OFFLINE);
 
     if (!FORCE_OFFLINE) {
+      // Solicita al frontend que ejecute su función del DOM
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => client.postMessage({ type: "BQA_GLPSYNC", action: "flushQueue" }));
+      });
+    }
       flushOfflineQueue();
     }
 

@@ -101,7 +101,8 @@ def auditar_granjas():
             if emp_id not in alertas_por_empresa:
                 alertas_por_empresa[emp_id] = {
                     'nombre': reg['empresa'],
-                    'alertas_pedidos': []
+                    'alertas_pedidos': [],
+                    'alertas_aprobaciones': []
                 }
             
             cod_pedido = reg['codigo_pedido'] if reg['codigo_pedido'] else 'S/N'
@@ -113,6 +114,44 @@ def auditar_granjas():
                 f"   • Última Operación: {reg['operacion']}\n"
                 f"   • Fecha: {fec_str}\n"
                 f"   • Estado Lote: {reg['estatus_lote']}"
+            )
+
+        # -----------------------------------------------------------------
+        # NUEVA CONSULTA: APROBACIONES ADMINISTRATIVAS PENDIENTES
+        # -----------------------------------------------------------------
+        query_aprobaciones = """
+            SELECT 
+                p.cliente AS empresa, 
+                p.ubicacion, 
+                p.codigo_pedido, 
+                e.nit AS id_empresa,
+                (SELECT MAX(fecha) FROM cardex_glp WHERE codigo_pedido = p.codigo_pedido AND operacion = 'tanqueo') AS fecha_tanqueo
+            FROM pedidos_gas_glp p
+            JOIN empresas e ON TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(e.nombre_comercial)) COLLATE utf8mb4_general_ci
+            WHERE p.estatus_flujo = 'tanqueo_registrado' AND p.estatus = 'generado'
+        """
+        cur.execute(query_aprobaciones)
+        aprobaciones_pendientes = cur.fetchall()
+
+        for reg in aprobaciones_pendientes:
+            emp_id = reg['id_empresa']
+            if emp_id not in alertas_por_empresa:
+                alertas_por_empresa[emp_id] = {
+                    'nombre': reg['empresa'],
+                    'alertas_pedidos': [],
+                    'alertas_aprobaciones': []
+                }
+            
+            if 'alertas_aprobaciones' not in alertas_por_empresa[emp_id]:
+                alertas_por_empresa[emp_id]['alertas_aprobaciones'] = []
+                
+            fec_tanqueo = reg['fecha_tanqueo'].strftime('%Y-%m-%d') if reg['fecha_tanqueo'] else 'Desconocida'
+            
+            alertas_por_empresa[emp_id]['alertas_aprobaciones'].append(
+                f"📋 <b>Ubicación: {reg['ubicacion']}</b>\n"
+                f"   • Código Pedido: {reg['codigo_pedido']}\n"
+                f"   • Fecha Tanqueo Físico: {fec_tanqueo}\n"
+                f"   • Estado: Esperando validación Webmaster"
             )
 
         # -----------------------------------------------------------------
@@ -136,19 +175,28 @@ def auditar_granjas():
             # Copia de seguridad
             destinatarios_unicos.add("5368207368")
 
-            # Encabezado con el nombre exacto del informe
-            mensaje = f"📊 <b>TANQUEOS NO REGISTRADOS</b> 📊\nEmpresa: {datos['nombre']}\n\n"
+            # Encabezado consolidado
+            mensaje = f"📊 <b>REPORTE DIARIO GLP</b> 📊\nEmpresa: {datos['nombre']}\n\n"
 
-            if not datos['alertas_pedidos']:
-                mensaje += "✅ <b>Todo en orden.</b>\nNo hay sedes con tanqueos pendientes de registro para sus lotes activos."
+            # Sección 1: Tanqueos No Registrados (Operadores)
+            mensaje += "🚨 <b>TANQUEOS NO REGISTRADOS:</b>\n"
+            if not datos.get('alertas_pedidos'):
+                mensaje += "✅ <i>Todo en orden. No hay operaciones omitidas.</i>\n\n"
             else:
-                mensaje += "🔍 <b>Reporte discriminado por ubicación:</b>\n\n"
-                mensaje += "\n\n".join(datos['alertas_pedidos']) + "\n\n"
-                mensaje += "Por favor, contactar a los operarios de estas sedes."
+                mensaje += "\n\n".join(datos['alertas_pedidos']) + "\n"
+                mensaje += "<i>⚠️ Por favor, contactar a los operarios de estas sedes.</i>\n\n"
+
+            # Sección 2: Aprobaciones Pendientes (Administrativo)
+            mensaje += "⚠️ <b>APROBACIONES ADMIN. PENDIENTES:</b>\n"
+            if not datos.get('alertas_aprobaciones'):
+                mensaje += "✅ <i>Todo en orden. No hay facturas estancadas.</i>\n"
+            else:
+                mensaje += "\n\n".join(datos['alertas_aprobaciones']) + "\n"
+                mensaje += "<i>⚠️ Requiere gestión del Webmaster/Contable en el panel de facturación.</i>\n"
 
             for chat_id in destinatarios_unicos:
                 enviar_telegram(chat_id, mensaje)
-
+                
         cur.close()
         conn.close()
         print("✅ Auditoría de tanqueos no registrados finalizada correctamente.")
