@@ -85,8 +85,11 @@ def auditar_granjas():
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM cardex_glp t
-                WHERE t.codigo_pedido COLLATE utf8mb4_general_ci = c.codigo_pedido COLLATE utf8mb4_general_ci
-                  AND TRIM(t.ubicacion) COLLATE utf8mb4_general_ci = TRIM(c.ubicacion) COLLATE utf8mb4_general_ci
+                WHERE TRIM(t.ubicacion) COLLATE utf8mb4_general_ci = TRIM(c.ubicacion) COLLATE utf8mb4_general_ci
+                  AND (
+                      (t.codigo_pedido IS NOT NULL AND TRIM(t.codigo_pedido) <> '' AND t.codigo_pedido COLLATE utf8mb4_general_ci = c.codigo_pedido COLLATE utf8mb4_general_ci)
+                      OR (t.lote COLLATE utf8mb4_general_ci = c.lote COLLATE utf8mb4_general_ci AND t.id > c.id)
+                  )
                   AND t.operacion = 'tanqueo'
             )
             ORDER BY c.ubicacion;
