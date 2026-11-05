@@ -57,7 +57,7 @@ def auditar_granjas():
             }
 
         # -----------------------------------------------------------------
-        # CONSULTA SQL ÚNICA SOLICITADA (Con inclusión de id_empresa/empresa para multitenancy)
+        # CONSULTA SQL SITUACIÓN 1: INICIO CALEFACCIÓN CON ARRIBO CONFIRMADO SIN TANQUEO
         # -----------------------------------------------------------------
         query_tanqueos_no_registrados = """
             SELECT
@@ -75,7 +75,8 @@ def auditar_granjas():
                     MAX(id) AS ultimo_id
                 FROM cardex_glp
                 WHERE estatus_lote = 'ACTIVO'
-                  AND operacion IN ('inicio_calefaccion', 'consumo')
+                  AND operacion = 'inicio_calefaccion'
+                  AND fecha_llegada_pollitos IS NOT NULL
                   AND codigo_pedido IS NOT NULL
                   AND TRIM(codigo_pedido) <> ''
                 GROUP BY ubicacion
@@ -113,11 +114,11 @@ def auditar_granjas():
                 f"   • Código Pedido: {cod_pedido}\n"
                 f"   • Última Operación: {reg['operacion']}\n"
                 f"   • Fecha: {fec_str}\n"
-                f"   • Estado Lote: {reg['estatus_lote']}"
+                f"   • Estado: Arribo confirmado, esperando tanqueo"
             )
 
         # -----------------------------------------------------------------
-        # NUEVA CONSULTA: APROBACIONES ADMINISTRATIVAS PENDIENTES
+        # CONSULTA SQL SITUACIÓN 2: PEDIDOS ACTIVOS APROBADOS SIN TANQUEO
         # -----------------------------------------------------------------
         query_aprobaciones = """
             SELECT 
@@ -125,10 +126,17 @@ def auditar_granjas():
                 p.ubicacion, 
                 p.codigo_pedido, 
                 e.nit AS id_empresa,
-                (SELECT MAX(fecha) FROM cardex_glp WHERE codigo_pedido = p.codigo_pedido AND operacion = 'tanqueo') AS fecha_tanqueo
+                p.fecha_solicitud AS fecha_referencia
             FROM pedidos_gas_glp p
             JOIN empresas e ON TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(e.nombre_comercial)) COLLATE utf8mb4_general_ci
-            WHERE p.estatus_flujo = 'tanqueo_registrado' AND p.estatus = 'generado'
+            WHERE p.estatus_lote = 'ACTIVO'
+              AND p.estatus_flujo IN ('aprobado_webmaster', 'enviado_auto')
+              AND NOT EXISTS (
+                  SELECT 1 
+                  FROM cardex_glp c 
+                  WHERE c.codigo_pedido = p.codigo_pedido 
+                    AND c.operacion = 'tanqueo'
+              )
         """
         cur.execute(query_aprobaciones)
         aprobaciones_pendientes = cur.fetchall()
@@ -145,13 +153,14 @@ def auditar_granjas():
             if 'alertas_aprobaciones' not in alertas_por_empresa[emp_id]:
                 alertas_por_empresa[emp_id]['alertas_aprobaciones'] = []
                 
-            fec_tanqueo = reg['fecha_tanqueo'].strftime('%Y-%m-%d') if reg['fecha_tanqueo'] else 'Desconocida'
+            fec_ref = reg.get('fecha_referencia')
+            fec_str = fec_ref.strftime('%Y-%m-%d') if fec_ref else 'Desconocida'
             
             alertas_por_empresa[emp_id]['alertas_aprobaciones'].append(
                 f"📋 <b>Ubicación: {reg['ubicacion']}</b>\n"
                 f"   • Código Pedido: {reg['codigo_pedido']}\n"
-                f"   • Fecha Tanqueo Físico: {fec_tanqueo}\n"
-                f"   • Estado: Esperando validación Webmaster"
+                f"   • Aprobado el: {fec_str}\n"
+                f"   • Estado: Aprobado, esperando tanqueo físico"
             )
 
         # -----------------------------------------------------------------
@@ -178,22 +187,21 @@ def auditar_granjas():
             # Encabezado consolidado
             mensaje = f"📊 <b>REPORTE DIARIO GLP</b> 📊\nEmpresa: {datos['nombre']}\n\n"
 
-            # Sección 1: Tanqueos No Registrados (Operadores)
-            mensaje += "🚨 <b>TANQUEOS NO REGISTRADOS:</b>\n"
+            # Sección 1: Tanqueos No Registrados (Situación 1)
+            mensaje += "🚨 <b>TANQUEOS PENDIENTES (INICIO LOTE):</b>\n"
             if not datos.get('alertas_pedidos'):
                 mensaje += "✅ <i>Todo en orden. No hay operaciones omitidas.</i>\n\n"
             else:
                 mensaje += "\n\n".join(datos['alertas_pedidos']) + "\n"
-                mensaje += "<i>⚠️ Por favor, contactar a los operarios de estas sedes.</i>\n\n"
+                mensaje += "<i>⚠️ Por favor, registrar el tanqueo inicial en la app.</i>\n\n"
 
-            # Sección 2: Aprobaciones Pendientes (Administrativo)
-            mensaje += "⚠️ <b>APROBACIONES ADMIN. PENDIENTES:</b>\n"
+            # Sección 2: Aprobaciones Pendientes sin Tanquear (Situación 2)
+            mensaje += "⚠️ <b>TANQUEOS PENDIENTES (PEDIDOS APROBADOS):</b>\n"
             if not datos.get('alertas_aprobaciones'):
-                mensaje += "✅ <i>Todo en orden. No hay facturas estancadas.</i>\n"
+                mensaje += "✅ <i>Todo en orden. No hay pedidos activos sin tanquear.</i>\n"
             else:
                 mensaje += "\n\n".join(datos['alertas_aprobaciones']) + "\n"
-                mensaje += "<i>⚠️ Requiere gestión del Webmaster/Contable en el panel de facturación.</i>\n"
-
+                mensaje += "<i>⚠️ El pedido fue aprobado, falta que el proveedor descargue y el operador registre.</i>\n"
             for chat_id in destinatarios_unicos:
                 enviar_telegram(chat_id, mensaje)
                 

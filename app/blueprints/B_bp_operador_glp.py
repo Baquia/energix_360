@@ -2402,7 +2402,15 @@ def finalizar_calefaccion_batch():
                     # CIERRE DE LOTE
                     # CORRECCIÓN: Actualizamos usando el id_empresa y lote_id exactos
                     cur.execute("UPDATE cardex_glp SET estatus_lote='INACTIVO' WHERE id_empresa=%s AND lote=%s", (id_empresa, lote_id))
-
+                    # NUEVO: Actualizamos en cascada el estatus del lote en la tabla de pedidos
+                    # para que el auditor automático (cron) ignore los pedidos de lotes finalizados.
+                    cur.execute("""
+                        UPDATE pedidos_gas_glp 
+                        SET estatus_lote = 'INACTIVO' 
+                        WHERE TRIM(UPPER(cliente)) = TRIM(UPPER(%s)) 
+                        AND TRIM(UPPER(ubicacion)) = TRIM(UPPER(%s)) 
+                        AND lote = %s
+                    """, (empresa, ubicacion, lote_id))
                     # =======================================================
                     # 🔊 AVISO A LA BITÁCORA
                     # =======================================================
