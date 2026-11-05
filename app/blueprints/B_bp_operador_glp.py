@@ -1856,13 +1856,13 @@ def registrar_tanqueo():
             # PASO 2: TRAZABILIDAD Y CIERRE DE PEDIDO PENDIENTE DEL LOTE ACTIVO
             # ---------------------------------------------------------
             cur.execute("""
-                SELECT codigo_pedido 
-                FROM pedidos_gas_glp 
-                WHERE cliente = %s AND TRIM(ubicacion) = TRIM(%s) AND lote = %s
-                  AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster','pendiente_aprobacion) 
-                  AND estatus != 'cancelado'
-                ORDER BY id DESC LIMIT 1
-            """, (empresa, ubicacion, lote_id))
+            SELECT codigo_pedido 
+            FROM pedidos_gas_glp 
+            WHERE cliente = %s AND TRIM(ubicacion) = TRIM(%s) AND lote = %s
+              AND estatus_flujo IN ('enviado_auto', 'aprobado_webmaster', 'pendiente_aprobacion') 
+              AND estatus != 'cancelado'
+            ORDER BY id DESC LIMIT 1
+        """, (empresa, ubicacion, lote_id))
             
             row_ped = cur.fetchone()
             codigo_trazabilidad = ""

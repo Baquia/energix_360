@@ -53,11 +53,12 @@ def auditar_granjas():
             emp_id = emp['id_empresa']
             alertas_por_empresa[emp_id] = {
                 'nombre': emp['empresa'],
-                'alertas_pedidos': []
+                'alertas_pedidos': [],
+                'alertas_aprobaciones': []
             }
 
         # -----------------------------------------------------------------
-        # CONSULTA SQL: INICIO CALEFACCIÓN CON ARRIBO CONFIRMADO SIN TANQUEO
+        # SITUACIÓN 1: INICIO CALEFACCIÓN CON ARRIBO CONFIRMADO SIN TANQUEO
         # -----------------------------------------------------------------
         query_tanqueos_no_registrados = """
             SELECT
@@ -95,18 +96,12 @@ def auditar_granjas():
             ORDER BY c.ubicacion;
         """
         cur.execute(query_tanqueos_no_registrados)
-        registros = cur.fetchall()
+        registros_situacion1 = cur.fetchall()
 
-        # -----------------------------------------------------------------
-        # PROCESAMIENTO Y DISCRIMINACIÓN POR UBICACIÓN
-        # -----------------------------------------------------------------
-        for reg in registros:
+        for reg in registros_situacion1:
             emp_id = reg['id_empresa']
             if emp_id not in alertas_por_empresa:
-                alertas_por_empresa[emp_id] = {
-                    'nombre': reg['empresa'],
-                    'alertas_pedidos': []
-                }
+                alertas_por_empresa[emp_id] = {'nombre': reg['empresa'], 'alertas_pedidos': [], 'alertas_aprobaciones': []}
             
             cod_pedido = reg['codigo_pedido'] if reg['codigo_pedido'] else 'S/N'
             fec_str = reg['fecha'].strftime('%Y-%m-%d') if reg['fecha'] else 'N/A'
@@ -120,7 +115,53 @@ def auditar_granjas():
             )
 
         # -----------------------------------------------------------------
-        # ENVÍO DE INFORMES A TELEGRAM (FORMATO ÚNICO IMAGEN 1)
+        # SITUACIÓN 2: PEDIDOS POR CONSUMO PENDIENTES DE TANQUEO
+        # -----------------------------------------------------------------
+        query_aprobaciones = """
+            SELECT 
+                p.cliente AS empresa, 
+                p.ubicacion, 
+                p.codigo_pedido, 
+                p.estatus_flujo,
+                e.nit AS id_empresa,
+                p.fecha_solicitud AS fecha_referencia
+            FROM pedidos_gas_glp p
+            JOIN empresas e ON TRIM(UPPER(p.cliente)) COLLATE utf8mb4_general_ci = TRIM(UPPER(e.nombre_comercial)) COLLATE utf8mb4_general_ci
+            WHERE p.estatus_lote = 'ACTIVO'
+              AND p.estatus_flujo IN ('aprobado_webmaster', 'pendiente_aprobacion')
+              AND NOT EXISTS (
+                  SELECT 1 
+                  FROM cardex_glp c 
+                  WHERE TRIM(c.ubicacion) COLLATE utf8mb4_general_ci = TRIM(p.ubicacion) COLLATE utf8mb4_general_ci
+                    AND (
+                        (c.codigo_pedido IS NOT NULL AND TRIM(c.codigo_pedido) <> '' AND c.codigo_pedido COLLATE utf8mb4_general_ci = p.codigo_pedido COLLATE utf8mb4_general_ci)
+                        OR (c.lote COLLATE utf8mb4_general_ci = p.lote COLLATE utf8mb4_general_ci AND c.fecha >= p.fecha_solicitud)
+                    )
+                    AND c.operacion = 'tanqueo'
+              )
+            ORDER BY p.ubicacion;
+        """
+        cur.execute(query_aprobaciones)
+        registros_situacion2 = cur.fetchall()
+
+        for reg in registros_situacion2:
+            emp_id = reg['id_empresa']
+            if emp_id not in alertas_por_empresa:
+                alertas_por_empresa[emp_id] = {'nombre': reg['empresa'], 'alertas_pedidos': [], 'alertas_aprobaciones': []}
+            
+            estado_ui = "Aprobado (Esperando tanqueo físico)" if reg['estatus_flujo'] == 'aprobado_webmaster' else "En Trámite (Posible tanqueo adelantado)"
+            fec_ref = reg.get('fecha_referencia')
+            fec_str = fec_ref.strftime('%Y-%m-%d') if fec_ref else 'Desconocida'
+            
+            alertas_por_empresa[emp_id]['alertas_aprobaciones'].append(
+                f"📋 <b>Ubicación: {reg['ubicacion']}</b>\n"
+                f"   • Código Pedido: {reg['codigo_pedido']}\n"
+                f"   • Fecha Solicitud: {fec_str}\n"
+                f"   • Estado: {estado_ui}"
+            )
+
+        # -----------------------------------------------------------------
+        # ENSAMBLAJE Y ENVÍO DE INFORMES A TELEGRAM
         # -----------------------------------------------------------------
         for emp_id, datos in alertas_por_empresa.items():
             
@@ -137,19 +178,27 @@ def auditar_granjas():
             for u in usuarios_destino:
                 destinatarios_unicos.add(u['telegram_id'])
             
-            # Copia de seguridad
+            # Copia de seguridad central
             destinatarios_unicos.add("5368207368")
 
-            # Encabezado consolidado
+            # Encabezado
             mensaje = f"📊 <b>REPORTE DIARIO GLP</b> 📊\nEmpresa: {datos['nombre']}\n\n"
 
-            # Sección única: Tanqueos Pendientes (Inicio Lote)
+            # Bloque 1: Situación Uno
             mensaje += "🚨 <b>TANQUEOS PENDIENTES (INICIO LOTE):</b>\n"
             if not datos.get('alertas_pedidos'):
-                mensaje += "✅ <i>Todo en orden. No hay operaciones omitidas.</i>"
+                mensaje += "✅ <i>Todo en orden. No hay operaciones omitidas.</i>\n\n"
             else:
-                mensaje += "\n\n".join(datos['alertas_pedidos'])
+                mensaje += "\n\n".join(datos['alertas_pedidos']) + "\n\n"
 
+            # Bloque 2: Situación Dos
+            mensaje += "⚠️ <b>TANQUEOS PENDIENTES (PEDIDOS DE CONSUMO):</b>\n"
+            if not datos.get('alertas_aprobaciones'):
+                mensaje += "✅ <i>Todo en orden. No hay pedidos de consumo sin tanquear.</i>"
+            else:
+                mensaje += "\n\n".join(datos['alertas_aprobaciones'])
+
+            # Enviar a la red de usuarios
             for chat_id in destinatarios_unicos:
                 enviar_telegram(chat_id, mensaje)
                 
