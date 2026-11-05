@@ -165,6 +165,10 @@ def auditar_granjas():
         # -----------------------------------------------------------------
         for emp_id, datos in alertas_por_empresa.items():
             
+            # FILTRO ANTI-FANTASMA: Si no hay novedades en ninguno de los dos arrays, NO enviar reporte.
+            if not datos.get('alertas_pedidos') and not datos.get('alertas_aprobaciones'):
+                continue
+            
             cur.execute("""
                 SELECT telegram_id FROM usuarios 
                 WHERE empresa_id = %s 
