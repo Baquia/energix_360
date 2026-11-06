@@ -1749,7 +1749,7 @@ def registrar_inicio_calefaccion():
 
             # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
             cur.execute("""
-                INSERT INTO `registro_operaciones_bqa-one` 
+                INSERT INTO `registro_operaciones_bqa_one` 
                 (empresa, empresa_id, backend, datos, usuario, cedula)
                 VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
             """, (empresa, id_empresa, f"Inicio calefacción - Lote: {lote_id} - Sede: {ubicacion}", usuario, cedula_op))
@@ -2036,7 +2036,7 @@ def registrar_tanqueo():
 
             # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
             cur.execute("""
-                INSERT INTO `registro_operaciones_bqa-one` 
+                INSERT INTO `registro_operaciones_bqa_one` 
                 (empresa, empresa_id, backend, datos, usuario, cedula)
                 VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
             """, (empresa, id_empresa, f"Tanqueo - Sede: {ubicacion} - Carga: {round(masa_facturada_total,2)} kg", usuario, cedula_op))
@@ -2257,7 +2257,7 @@ def registrar_consumo():
 
                     # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
                     cur.execute("""
-                        INSERT INTO `registro_operaciones_bqa-one` 
+                        INSERT INTO `registro_operaciones_bqa_one` 
                         (empresa, empresa_id, backend, datos, usuario, cedula)
                         VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
                     """, (empresa, id_empresa, f"Consumo - Sede: {ubicacion} - Gasto: {round(consumo_kg, 2)} kg", usuario, cedula_op))
@@ -2396,7 +2396,7 @@ def finalizar_calefaccion_batch():
 
                     # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
                     cur.execute("""
-                        INSERT INTO `registro_operaciones_bqa-one` 
+                        INSERT INTO `registro_operaciones_bqa_one` 
                         (empresa, empresa_id, backend, datos, usuario, cedula)
                         VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
                     """, (empresa, id_empresa, f"Fin calefacción - Lote: {lote_id} - Sede: {ubicacion}", usuario, cedula_op))
@@ -2669,7 +2669,7 @@ def solicitar_pedido_manual():
         # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
         cedula_op = session.get('cedula', 'N/D')
         cur.execute("""
-            INSERT INTO `registro_operaciones_bqa-one` 
+            INSERT INTO `registro_operaciones_bqa_one` 
             (empresa, empresa_id, backend, datos, usuario, cedula)
             VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
         """, (empresa, session.get('empresa_id', 0), f"Solicitud Pedido Manual - Código: {codigo}", session.get('nombre', ''), cedula_op))
@@ -2784,7 +2784,7 @@ def anular_pedido_sin_evidencia():
         # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
         cedula_op = session.get('cedula', 'N/D')
         cur.execute("""
-            INSERT INTO `registro_operaciones_bqa-one` 
+            INSERT INTO `registro_operaciones_bqa_one` 
             (empresa, empresa_id, backend, datos, usuario, cedula)
             VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
         """, (empresa_actor, session.get('empresa_id', 0), f"Anular pedido sin evidencia - Código: {codigo}", usuario, cedula_op))
@@ -2995,7 +2995,7 @@ def legalizar_tanqueo_extemporaneo():
         # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
         cedula_op = session.get('cedula', 'N/D')
         cur.execute("""
-            INSERT INTO `registro_operaciones_bqa-one` 
+            INSERT INTO `registro_operaciones_bqa_one` 
             (empresa, empresa_id, backend, datos, usuario, cedula)
             VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
         """, (session.get('empresa', 'N/D'), id_empresa_actor, f"Legalizar Tanqueo Extemp - Código: {codigo_pedido}", usuario, cedula_op))
@@ -3159,7 +3159,7 @@ def confirmar_arribo_pollito():
         # BITÁCORA OBLIGATORIA BQA-ONE ANTES DEL COMMIT
         cedula_op = session.get('cedula', 'N/D')
         cur.execute("""
-            INSERT INTO `registro_operaciones_bqa-one` 
+            INSERT INTO `registro_operaciones_bqa_one` 
             (empresa, empresa_id, backend, datos, usuario, cedula)
             VALUES (%s, %s, 'B_bp_operador_glp', %s, %s, %s)
         """, (session.get('empresa', 'N/D'), id_empresa, f"Confirmar arribo pollito - Sede: {sede} - Pob: {poblacion_real}", usuario, cedula_op))
