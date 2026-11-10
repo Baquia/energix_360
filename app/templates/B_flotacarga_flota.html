@@ -262,7 +262,7 @@
                                     <td><span class="badge {% if v.propiedad == 'Propio' %}badge-success{% else %}badge-gray{% endif %}">{{ v.propiedad }}</span></td>
                                     <td style="text-align: right; white-space: nowrap;">
                                         <a href="{{ url_for('flotacarga_flota.generar_qr_vehiculo', placa=v.placa) }}" target="_blank" class="btn-icon qr" title="Descargar QR PDF">🔲</a>
-                                        <button class="btn-icon edit" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.caja_de_carga }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}', '{{ v.propiedad }}', '{{ v.id_tarjeta_propiedad or '' }}', '{{ v.id_soat or '' }}', '{{ v.vencimiento_soat or '' }}', '{{ v.id_tecnomecanica or '' }}', '{{ v.vencimiento_tecnomecanica or '' }}', '{{ v.id_poliza_rce or '' }}', '{{ v.aseguradora_rce or '' }}', '{{ v.vencimiento_poliza_rce or '' }}')" title="Editar">✏️</button>
+                                        <button class="btn-icon edit" onclick="abrirEditarVehiculo('{{ v.id }}', '{{ v.placa }}', '{{ v.tipo }}', '{{ v.caja_de_carga }}', '{{ v.referencia }}', '{{ v.peso_vacio }}', '{{ v['capacidad (kg)'] }}', '{{ v.propiedad }}', '{{ v.id_tarjeta_propiedad or '' }}', '{{ v.id_soat or '' }}', '{{ v.vencimiento_soat or '' }}', '{{ v.id_tecnomecanica or '' }}', '{{ v.vencimiento_tecnomecanica or '' }}', '{{ v.id_poliza_rce or '' }}', '{{ v.aseguradora_rce or '' }}', '{{ v.vencimiento_poliza_rce or '' }}', '{{ v.ruta_tarjeta_propiedad or '' }}', '{{ v.ruta_soat or '' }}', '{{ v.ruta_tecnomecanica or '' }}', '{{ v.ruta_poliza_rce or '' }}')" title="Editar">✏️</button>
                                         <button class="btn-icon delete" onclick="confirmarEliminar('{{ v.id }}', '{{ v.placa }}')" title="Eliminar">🗑️</button>
                                     </td>
                                 </tr>
@@ -303,7 +303,7 @@
                                     <td><span class="badge {% if op.tipo_conductor == 'Propio' %}badge-success{% else %}badge-gray{% endif %}">{{ op.tipo_conductor }}</span></td>
                                     <td><span class="badge {% if op.perfil == 'operador_flotacarga' %}badge-success{% else %}badge-gray{% endif %}">{% if op.perfil == 'operador_flotacarga' %}Conductor{% else %}Auxiliar{% endif %}</span></td>
                                     <td style="text-align: right; white-space: nowrap;">
-                                        <button class="btn-icon edit" onclick="abrirEditarOperador('{{ op.id }}', '{{ op.nombre }}', '{{ op.cedula }}', '{{ op.perfil }}', '{{ op.tipo_conductor }}', '{{ op.email }}', '{{ op.vehiculo_asignado }}', '{{ op.fecha_nacimiento }}', '{{ op.edad }}', '{{ op.eps }}', '{{ op.arl }}', '{{ op.fondo_pensiones }}', '{{ op.numero_licencia_conduccion }}', '{{ op.fecha_expedicion_licencia }}', '{{ op.categoria_licencia }}', '{{ op.ultimo_pago_seguridad_social }}', '{{ op.password_visible }}')" title="Editar">✏️</button>
+                                        <button class="btn-icon edit" onclick="abrirEditarOperador('{{ op.id }}', '{{ op.nombre }}', '{{ op.cedula }}', '{{ op.perfil }}', '{{ op.tipo_conductor }}', '{{ op.email }}', '{{ op.vehiculo_asignado }}', '{{ op.fecha_nacimiento }}', '{{ op.edad }}', '{{ op.eps }}', '{{ op.arl }}', '{{ op.fondo_pensiones }}', '{{ op.numero_licencia_conduccion }}', '{{ op.fecha_expedicion_licencia }}', '{{ op.categoria_licencia }}', '{{ op.ultimo_pago_seguridad_social }}', '{{ op.password_visible }}', '{{ op.ruta_pdf_licencia or '' }}', '{{ op.ruta_pdf_seguridad_social or '' }}', '{{ op.ruta_pdf_soporte_pago or '' }}', '{{ op.ruta_foto_facial or '' }}')" title="Editar">✏️</button>
                                         <button class="btn-icon delete" onclick="confirmarEliminarOperador('{{ op.id }}', '{{ op.nombre }}')" title="Eliminar">🗑️</button>
                                     </td>
                                 </tr>
@@ -616,19 +616,31 @@
                 <h4 class="section-title">Documentación Obligatoria</h4>
                 <div class="form-group" style="display: flex; gap: 15px;">
                     <div style="flex: 1;"><label>ID Licencia Tránsito</label><input type="text" name="id_tarjeta_propiedad" id="edit_id_tarjeta_propiedad"></div>
-                    <div style="flex: 1;"><label>Reemplazar Archivo</label><input type="file" name="archivo_tarjeta_propiedad" accept=".pdf, .jpg, .jpeg, .png"></div>
+                    <div style="flex: 1;">
+                        <label>Reemplazar Archivo</label>
+                        <input type="file" name="archivo_tarjeta_propiedad" accept=".pdf, .jpg, .jpeg, .png">
+                        <div id="enlace_edit_tarjeta"></div>
+                    </div>
                 </div>
                 <div class="form-group" style="display: flex; gap: 15px;">
                     <div style="flex: 1;"><label>ID SOAT</label><input type="text" name="id_soat" id="edit_id_soat"></div>
                     <div style="flex: 1;"><label>Vencimiento SOAT</label><input type="date" name="vencimiento_soat" id="edit_vencimiento_soat"></div>
                 </div>
-                <div class="form-group"><label>Reemplazar Archivo SOAT</label><input type="file" name="archivo_soat" accept=".pdf, .jpg, .jpeg, .png"></div>
+                <div class="form-group">
+                    <label>Reemplazar Archivo SOAT</label>
+                    <input type="file" name="archivo_soat" accept=".pdf, .jpg, .jpeg, .png">
+                    <div id="enlace_edit_soat"></div>
+                </div>
                 
                 <div class="form-group" style="display: flex; gap: 15px;">
                     <div style="flex: 1;"><label>ID Tecnomecánica</label><input type="text" name="id_tecnomecanica" id="edit_id_tecnomecanica"></div>
                     <div style="flex: 1;"><label>Vencimiento Tecnomecánica</label><input type="date" name="vencimiento_tecnomecanica" id="edit_vencimiento_tecnomecanica"></div>
                 </div>
-                <div class="form-group"><label>Reemplazar Archivo Tecnomecánica</label><input type="file" name="archivo_tecnomecanica" accept=".pdf, .jpg, .jpeg, .png"></div>
+                <div class="form-group">
+                    <label>Reemplazar Archivo Tecnomecánica</label>
+                    <input type="file" name="archivo_tecnomecanica" accept=".pdf, .jpg, .jpeg, .png">
+                    <div id="enlace_edit_tecno"></div>
+                </div>
 
                 <h4 class="section-title">Documentación Opcional</h4>
                 <div class="form-group" style="display: flex; gap: 15px;">
@@ -637,14 +649,17 @@
                 </div>
                 <div class="form-group" style="display: flex; gap: 15px;">
                     <div style="flex: 1;"><label>Vencimiento RCE</label><input type="date" name="vencimiento_poliza_rce" id="edit_vencimiento_poliza_rce"></div>
-                    <div style="flex: 1;"><label>Reemplazar Archivo RCE</label><input type="file" name="archivo_poliza_rce" accept=".pdf, .jpg, .jpeg, .png"></div>
+                    <div style="flex: 1;">
+                        <label>Reemplazar Archivo RCE</label>
+                        <input type="file" name="archivo_poliza_rce" accept=".pdf, .jpg, .jpeg, .png">
+                        <div id="enlace_edit_rce"></div>
+                    </div>
                 </div>
 
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarVehiculo')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">Actualizar</button></div>
             </form>
         </div>
     </div>
-
     <div id="modalEliminar" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header"><h3 style="color: #ef4444;">Eliminar Vehículo</h3><button class="close-btn" type="button" onclick="closeModal('modalEliminar')">&times;</button></div>
@@ -842,15 +857,26 @@
                     <div style="flex: 1;" id="edit_ss_fecha_group" style="display: none;"><label>Último Pago Seg. Social</label><input type="date" name="ultimo_pago_seguridad_social" id="edit_ultimo_pago_seguridad_social"></div>
                 </div>
 
-                <div class="form-group"><label>Reemplazar PDF Licencia</label><input type="file" name="archivo_licencia" accept=".pdf"></div>
-                <div class="form-group" id="edit_ss_pdf1_group" style="display: none;"><label>Reemplazar PDF Seguridad Social</label><input type="file" name="archivo_seguridad_social" accept=".pdf"></div>
-                <div class="form-group" id="edit_ss_pdf2_group" style="display: none;"><label>Reemplazar PDF Soporte de Pago</label><input type="file" name="archivo_soporte_pago" accept=".pdf"></div>
+                <div class="form-group">
+                    <label>Reemplazar PDF Licencia</label>
+                    <input type="file" name="archivo_licencia" accept=".pdf">
+                    <div id="enlace_edit_licencia"></div>
+                </div>
+                <div class="form-group" id="edit_ss_pdf1_group" style="display: none;">
+                    <label>Reemplazar PDF Seguridad Social</label>
+                    <input type="file" name="archivo_seguridad_social" accept=".pdf">
+                    <div id="enlace_edit_seg_soc"></div>
+                </div>
+                <div class="form-group" id="edit_ss_pdf2_group" style="display: none;">
+                    <label>Reemplazar PDF Soporte de Pago</label>
+                    <input type="file" name="archivo_soporte_pago" accept=".pdf">
+                    <div id="enlace_edit_pago"></div>
+                </div>
 
                 <div class="modal-footer"><button type="button" class="btn-cancel" onclick="closeModal('modalEditarOperador')">Cancelar</button><button type="submit" class="btn-primary" style="background: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">Actualizar</button></div>
             </form>
         </div>
     </div>
-
     <div id="modalEliminarOperador" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-header"><h3 style="color: #ef4444;">Eliminar Registro</h3><button class="close-btn" type="button" onclick="closeModal('modalEliminarOperador')">&times;</button></div>
@@ -916,7 +942,18 @@
             console.log('Filtro de vehículo actualizado');
         }
 
-        function abrirEditarVehiculo(id, placa, tipo, caja, ref, peso, cap, prop, id_tp, id_soat, v_soat, id_tecno, v_tecno, id_rce, aseg_rce, v_rce) {
+        function renderEnlaceDocumento(contenedorId, ruta, nombreDoc) {
+            const contenedor = document.getElementById(contenedorId);
+            if (contenedor) {
+                if (ruta && ruta !== 'None' && ruta.trim() !== '') {
+                    contenedor.innerHTML = `<a href="/static/${ruta}" target="_blank" style="color: #059669; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; padding: 4px 8px; background: #d1fae5; border-radius: 6px; margin-top: 6px; border: 1px solid #34d399;">👁️ Ver documento actual cargado (${nombreDoc})</a>`;
+                } else {
+                    contenedor.innerHTML = '';
+                }
+            }
+        }
+        
+        function abrirEditarVehiculo(id, placa, tipo, caja, ref, peso, cap, prop, id_tp, id_soat, v_soat, id_tecno, v_tecno, id_rce, aseg_rce, v_rce, ruta_tarjeta, ruta_soat, ruta_tecno, ruta_rce) {
             document.getElementById('edit_id').value = id; 
             document.getElementById('edit_placa').value = placa;
             
@@ -963,6 +1000,11 @@
             document.getElementById('edit_id_poliza_rce').value = id_rce || '';
             document.getElementById('edit_aseguradora_rce').value = aseg_rce || '';
             document.getElementById('edit_vencimiento_poliza_rce').value = v_rce || '';
+
+            renderEnlaceDocumento('enlace_edit_tarjeta', ruta_tarjeta, 'Licencia Tránsito');
+            renderEnlaceDocumento('enlace_edit_soat', ruta_soat, 'SOAT');
+            renderEnlaceDocumento('enlace_edit_tecno', ruta_tecno, 'Tecnomecánica');
+            renderEnlaceDocumento('enlace_edit_rce', ruta_rce, 'Póliza RCE');
 
             openModal('modalEditarVehiculo');
         }
@@ -1047,7 +1089,7 @@
             }
         }
 
-        function abrirEditarOperador(id, nombre, cedula, perfil, tipo_conductor, email, vehiculo, f_nac, edad, eps, arl, pension, n_licencia, f_exp_licencia, cat_licencia, ult_pago, pass_visible) {
+        function abrirEditarOperador(id, nombre, cedula, perfil, tipo_conductor, email, vehiculo, f_nac, edad, eps, arl, pension, n_licencia, f_exp_licencia, cat_licencia, ult_pago, pass_visible, ruta_licencia, ruta_seg_soc, ruta_pago, ruta_foto) {
             document.getElementById('edit_operador_id').value = id; 
             document.getElementById('edit_nombre').value = nombre;
             document.getElementById('edit_cedula').value = cedula; 
@@ -1069,6 +1111,10 @@
             document.getElementById('edit_ultimo_pago_seguridad_social').value = ult_pago || '';
             
             document.getElementById('edit_password_visible_text').innerText = pass_visible ? pass_visible : 'No registrada';
+
+            renderEnlaceDocumento('enlace_edit_licencia', ruta_licencia, 'Licencia');
+            renderEnlaceDocumento('enlace_edit_seg_soc', ruta_seg_soc, 'Seguridad Social');
+            renderEnlaceDocumento('enlace_edit_pago', ruta_pago, 'Soporte Pago');
 
             toggleTipoConductor('edit');
             openModal('modalEditarOperador');

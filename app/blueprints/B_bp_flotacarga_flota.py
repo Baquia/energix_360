@@ -574,7 +574,9 @@ def gestion_vehiculos():
             SELECT id, placa, clase as tipo, carroceria as caja_de_carga, linea as referencia, 0 as peso_vacio, capacidad as `capacidad (kg)`, tipo_vinculacion as propiedad, 
                    NULL as id_tarjeta_propiedad, numero_poliza_soat as id_soat, vencimiento_soat, 
                    numero_certificado_rtm as id_tecnomecanica, vencimiento_rtm as vencimiento_tecnomecanica, 
-                   numero_poliza_rcc_rce as id_poliza_rce, aseguradora_rcc_rce as aseguradora_rce, vencimiento_rcc_rce as vencimiento_poliza_rce 
+                   numero_poliza_rcc_rce as id_poliza_rce, aseguradora_rcc_rce as aseguradora_rce, vencimiento_rcc_rce as vencimiento_poliza_rce,
+                   ruta_pdf_tarjeta_propiedad as ruta_tarjeta_propiedad, ruta_pdf_soat as ruta_soat, 
+                   ruta_pdf_tecnomecanica as ruta_tecnomecanica, ruta_pdf_rcc_rce as ruta_poliza_rce
             FROM vehiculos_especial WHERE id_empresa = %s ORDER BY id DESC
         """, (empresa_id,))
     else:
