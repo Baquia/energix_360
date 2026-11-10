@@ -52,6 +52,31 @@ def control_logistica():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
 
+        # ---------------------------------------------------------------------
+        # NUEVO: ASEGURAR TABLA DE AUDITORÍA Y LA COLUMNA 'backend_emisor'
+        # ---------------------------------------------------------------------
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                empresa VARCHAR(150),
+                empresa_id INT,
+                backend_emisor VARCHAR(150),
+                usuario VARCHAR(100),
+                cedula VARCHAR(50),
+                accion VARCHAR(100),
+                datos LONGTEXT,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        try:
+            cur.execute("""
+                ALTER TABLE registro_operaciones_bqa_one
+                ADD COLUMN backend_emisor VARCHAR(150) NULL AFTER empresa_id;
+            """)
+        except Exception:
+            pass # La columna ya existe, ignorar silenciosamente
+        # ---------------------------------------------------------------------
+
         # AGREGAR COLUMNA nombre_componente A promociones_clientes SI NO EXISTE
         try:
             cur.execute("""
@@ -388,7 +413,6 @@ def control_logistica():
                            marcas_huerfanas=marcas_huerfanas,
                            ordenes_asignadas=ordenes_procesadas,
                            alertas_criticas=alertas_criticas)
-
 # ==============================================================================
 # GESTIÓN DE NOVEDADES EN VIVO (SISTEMA ANDON / STOP THE LINE)
 # ==============================================================================
@@ -2371,7 +2395,7 @@ def prevalidar_productos_excel():
         return jsonify({'error': 'No se recibieron archivos'}), 400
 
     try:
-        eans_desc_map = {} # Ahora usamos un diccionario para guardar EAN y Nombre
+        eans_desc_map = {} # Diccionario para guardar EAN y Nombre
         for file in archivos:
             if file.filename == '': continue
             ext = file.filename.lower()
@@ -2411,23 +2435,32 @@ def prevalidar_productos_excel():
         if not eans_desc_map:
             return jsonify({'faltantes': []})
 
-        cur = mysql.connection.cursor()
-        format_strings = ','.join(['%s'] * len(eans_desc_map))
-        # Validar existencia multi-tenant
-        query = f"SELECT ean, sku FROM productos WHERE id_empresa = %s AND (ean IN ({format_strings}) OR sku IN ({format_strings}))"
-        params = [empresa_id] + list(eans_desc_map.keys()) + list(eans_desc_map.keys())
+        eans_unicos = list(eans_desc_map.keys())
+        eans_en_bd = set()
+        faltantes = []
         
-        cur.execute(query, params)
-        db_prods = cur.fetchall()
+        # FRAGMENTACIÓN (CHUNKING) PARA EVITAR DESBORDAMIENTO MAX_ALLOWED_PACKET
+        chunk_size = 500
+        cur = mysql.connection.cursor()
+        
+        for i in range(0, len(eans_unicos), chunk_size):
+            chunk = eans_unicos[i:i + chunk_size]
+            format_strings = ','.join(['%s'] * len(chunk))
+            
+            # Validar existencia multi-tenant
+            query = f"SELECT ean, sku FROM productos WHERE id_empresa = %s AND (ean IN ({format_strings}) OR sku IN ({format_strings}))"
+            params = [empresa_id] + chunk + chunk
+            
+            cur.execute(query, params)
+            db_prods = cur.fetchall()
+            
+            for p in db_prods:
+                if p[0]: eans_en_bd.add(p[0])
+                if p[1]: eans_en_bd.add(p[1])
+
         cur.close()
 
-        eans_en_bd = set()
-        for p in db_prods:
-            if p[0]: eans_en_bd.add(p[0])
-            if p[1]: eans_en_bd.add(p[1])
-
         # Enviar lista de objetos con EAN y Nombre
-        faltantes = []
         for ean, desc in eans_desc_map.items():
             if ean not in eans_en_bd:
                 faltantes.append({'ean': ean, 'nombre': desc})
@@ -2450,63 +2483,57 @@ def guardar_faltantes_excel():
 
     try:
         cur = mysql.connection.cursor()
+        data_to_insert = []
         
-        # Bloque Antificción (Deadlocks / Retries)
-        for intento in range(3):
-            try:
-                for p in productos_nuevos:
-                    ean = p.get('ean')
-                    fabricante = str(p.get('fabricante', 'GENERICO')).strip().upper()
-                    producto = str(p.get('producto', 'SIN NOMBRE')).strip().upper()
-                    embalaje = str(p.get('unidad_embalaje', 'UND')).strip().upper()
-                    
-                    if embalaje not in ['CAJA', 'DISPLAY']:
-                        embalaje = 'UND'
+        for p in productos_nuevos:
+            ean = p.get('ean')
+            fabricante = str(p.get('fabricante', 'GENERICO')).strip().upper()
+            producto = str(p.get('producto', 'SIN NOMBRE')).strip().upper()
+            embalaje = str(p.get('unidad_embalaje', 'UND')).strip().upper()
+            
+            if embalaje not in ['CAJA', 'DISPLAY']:
+                embalaje = 'UND'
+                
+            data_to_insert.append((empresa_id, empresa_nombre, ean, ean, producto, fabricante, embalaje))
 
-                    cur.execute("""
+        if data_to_insert:
+            # INSERCIÓN MASIVA ESTRICTA PARA LIBERACIÓN RÁPIDA DE CONEXIÓN Y REDUCCIÓN DE DEADLOCKS
+            for intento in range(3):
+                try:
+                    cur.executemany("""
                         INSERT INTO productos (id_empresa, empresa, tipo_empresa, sku, ean, producto, fabricante, unidad_embalaje)
                         VALUES (%s, %s, 'general', %s, %s, %s, %s, %s)
                         ON DUPLICATE KEY UPDATE
                         producto = VALUES(producto),
                         fabricante = VALUES(fabricante),
                         unidad_embalaje = VALUES(unidad_embalaje)
-                    """, (empresa_id, empresa_nombre, ean, ean, producto, fabricante, embalaje))
+                    """, data_to_insert)
 
-                # Registro Obligatorio de Auditoría BQA-ONE
-                payload = json.dumps(productos_nuevos)
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS registro_operaciones_bqa_one (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        empresa VARCHAR(150),
-                        empresa_id VARCHAR(50),
-                        backend_emisor VARCHAR(100),
-                        usuario VARCHAR(100),
-                        cedula VARCHAR(50),
-                        accion VARCHAR(100),
-                        datos JSON
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-                """)
-                cur.execute("""
-                    INSERT INTO registro_operaciones_bqa_one 
-                    (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (empresa_nombre, empresa_id, 'B_bp_controlador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'INSERCION_MASIVA_FALTANTES_EXCEL', payload))
+                    # Registro Obligatorio de Auditoría BQA-ONE ajustado al esquema actual
+                    payload_data = {
+                        "accion": "INSERCION_MASIVA_FALTANTES_EXCEL",
+                        "productos": productos_nuevos
+                    }
+                    payload = json.dumps(payload_data)
+                    cur.execute("""
+                        INSERT INTO registro_operaciones_bqa_one 
+                        (empresa, empresa_id, backend, datos, usuario, cedula) 
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (empresa_nombre, empresa_id, 'B_bp_controlador_bodegas.py', payload, session.get('nombre', 'N/A'), session.get('cedula', 'N/A')))
 
-                mysql.connection.commit()
-                break
-            except Exception as db_e:
-                if "deadlock" in str(db_e).lower() and intento < 2:
-                    time.sleep(0.5)
-                    continue
-                raise db_e
+                    mysql.connection.commit()
+                    break
+                except Exception as db_e:
+                    if "deadlock" in str(db_e).lower() and intento < 2:
+                        time.sleep(0.5)
+                        continue
+                    raise db_e
                 
         cur.close()
         return jsonify({'status': 'success', 'message': 'Productos guardados exitosamente.'})
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
 
 @bp_bodegas.route('/bodegas/upload_excel', methods=['POST'])
 @login_required_custom
@@ -3123,3 +3150,47 @@ def eliminar_usuario_crud(id_user):
     except Exception as e:
         mysql.connection.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
+
+# ==============================================================================
+# INTERCEPTOR DE AUDITORÍA ASÍNCRONA (REGLA 11 BQA-ONE)
+# ==============================================================================
+@bp_bodegas.after_request
+def auditar_upload_excel_asincrono(response):
+    """
+    Middleware que evalúa silenciosamente las peticiones y registra en auditoría
+    si la carga masiva de Excel concluyó exitosamente, sin tocar la función nativa.
+    Cumple estrictamente con el esquema BD: empresa, empresa_id, backend, datos, usuario, cedula.
+    """
+    if request.endpoint == 'bodegas.upload_excel' and response.status_code == 200:
+        try:
+            res_data = response.get_json()
+            # Si el JSON contiene 'message' y no 'error', la transacción de carga fue exitosa
+            if res_data and 'error' not in res_data:
+                empresa_id = session.get('empresa_id')
+                if empresa_id:
+                    # Empaquetamos la "accion" y otros metadatos dentro de la columna "datos" (JSON)
+                    payload = json.dumps({
+                        "accion": "UPLOAD_EXCEL_MASIVO",
+                        "nota": "Ejecución exitosa interceptada vía after_request",
+                        "resultado_endpoint": res_data.get('message', 'N/A')
+                    })
+                    
+                    cur = mysql.connection.cursor()
+                    cur.execute("""
+                        INSERT INTO registro_operaciones_bqa_one 
+                        (empresa, empresa_id, backend, datos, usuario, cedula) 
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        session.get('empresa', 'Sistema'), 
+                        empresa_id, 
+                        'B_bp_controlador_bodegas.py', 
+                        payload,
+                        session.get('nombre', 'N/A'), 
+                        session.get('cedula', 'N/A')
+                    ))
+                    mysql.connection.commit()
+                    cur.close()
+        except Exception as e:
+            pass # Se silencia para evitar que un error de auditoría corrompa la respuesta del cliente
+            
+    return response
