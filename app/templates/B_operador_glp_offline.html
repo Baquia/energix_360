@@ -16,55 +16,49 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
   <style>
     /* Estructura Base */
-    html,
-    body {
+    html, body {
       min-height: 100vh;
       margin: 0;
       display: flex;
       flex-direction: column;
       background-color: #f4f7f6;
     }
-
+    
     /* 1. CABECERA MOBILE-FIRST (Apilada) */
     .bqa-navbar {
       background-color: #029c8a;
       color: #ffffff;
-      padding: 18px 20px;
+      padding: 18px 20px; 
       display: flex;
       flex-direction: column;
       gap: 12px;
       align-items: center;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
       width: 100%;
       box-sizing: border-box;
       text-align: center;
     }
-
     .bqa-navbar-brand {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 8px;
     }
-
     .bqa-navbar-logos {
       display: flex;
       gap: 12px;
       justify-content: center;
       align-items: center;
     }
-
     .bqa-navbar-logos img {
       height: 45px;
       object-fit: contain;
       filter: drop-shadow(0px 0px 4px rgba(255, 255, 255, 0.95));
     }
-
     .bqa-navbar-title {
-      font-weight: bold;
-      font-size: 1.1rem;
+      font-weight: bold; 
+      font-size: 1.1rem; 
     }
-
     .bqa-user-info {
       font-size: 0.95rem;
       display: flex;
@@ -76,28 +70,37 @@
     /* 2. BARRA DE ACCIONES MÓVIL (Fuera de la cabecera verde) */
     .bqa-top-actions {
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
-      background-color: #f4f7f6;
+      gap: 15px; /* Requerimiento 2: Canal de separación estricto para evitar que se peguen */
+      background-color: #f4f7f6; 
       padding: 12px 20px;
       width: 100%;
       box-sizing: border-box;
       border-bottom: 1px solid #dce2e0;
     }
-
-    /* ESTILO DE BOTONES */
+    
+    /* ESTILO DE BOTONES BASE */
     .btn-accion {
       padding: 8px 14px;
       border-radius: 6px;
       text-decoration: none;
       font-weight: bold;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       transition: transform 0.2s;
       text-align: center;
+      box-sizing: border-box;
     }
 
-    .btn-accion:active {
-      transform: scale(0.95);
+    /* SIMETRÍA FORZADA EN MÓVILES (Requerimientos 1, 3 y 4) */
+    .bqa-top-actions .btn-accion {
+      flex: 1; /* Divide el espacio en dos fracciones exactamente iguales */
+      height: 44px; /* Eje horizontal idéntico para que no se vean torcidos */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0 5px;
+      font-size: 0.95rem;
     }
 
     .btn-salir {
@@ -105,22 +108,15 @@
       color: white;
       border: 1.5px solid #b71c1c;
     }
-
     .btn-volver {
       background: #ffffff;
       color: #2c3e50;
       border: 1.5px solid #2c3e50;
-      /* Contraste solicitado */
     }
 
     /* CLASES DE VISIBILIDAD DINÁMICA */
-    .desktop-only {
-      display: none;
-    }
-
-    .mobile-only {
-      display: flex;
-    }
+    .desktop-only { display: none; }
+    .mobile-only { display: flex; }
 
     /* 3. CENTRADO DEL ÁREA DE TRABAJO (Flexbox) */
     .wrap {
@@ -133,21 +129,18 @@
       padding: 20px;
       box-sizing: border-box;
     }
-
     .menu {
       width: 100%;
       max-width: 500px;
     }
-
+    
     /* 4. PROTECCIÓN DE CÁMARA (Lector QR y dinámicos) */
-    #conversacion,
-    #preguntaTexto {
+    #conversacion, #preguntaTexto {
       width: 100%;
       max-width: 500px;
       text-align: center;
       box-sizing: border-box;
     }
-
     #lectorQR {
       width: 100%;
       min-height: 250px;
@@ -156,12 +149,10 @@
       overflow: hidden;
       margin: 0 auto;
     }
-
     #lectorQR video {
       width: 100% !important;
       object-fit: cover;
     }
-
     #preguntaSiNo {
       width: 100%;
       display: flex;
@@ -188,30 +179,20 @@
         padding: 20px 30px;
         text-align: left;
       }
-
       .bqa-navbar-brand {
         flex-direction: row;
       }
-
       .bqa-navbar-logos img {
-        height: 60px;
-        /* Logos grandes en PC */
+        height: 60px; /* Logos grandes en PC */
       }
-
       .bqa-user-info {
         flex-direction: row;
         gap: 25px;
       }
-
+      
       /* Oculta la barra móvil y muestra botones integrados en la cabecera */
-      .desktop-only {
-        display: flex;
-        gap: 12px;
-      }
-
-      .mobile-only {
-        display: none !important;
-      }
+      .desktop-only { display: flex; gap: 12px; align-items: center; }
+      .mobile-only { display: none !important; }
     }
   </style>
 </head>
@@ -221,14 +202,12 @@
   <nav class="bqa-navbar">
     <div class="bqa-navbar-brand">
       <div class="bqa-navbar-logos">
-        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360"
-          onerror="this.style.display='none'">
-        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente"
-          onerror="this.style.display='none'">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360" onerror="this.style.display='none'">
+        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente" onerror="this.style.display='none'">
       </div>
       <span class="bqa-navbar-title">BQA-ONE Gestión GLP Granjas Avícolas</span>
     </div>
-
+    
     <div class="bqa-user-info">
       <div>👤 <strong>{{ usuario }}</strong> | 🏢 {{ empresa }}</div>
       <!-- Botones en versión PC (Nativos en la cabecera) -->
@@ -244,7 +223,6 @@
     <a href="/logout" class="btn-accion btn-salir">Salir</a>
     <a href="/hub_administracion/dashboard" class="btn-accion btn-volver">⬅ Volver al Hub</a>
   </div>
-
   <div class="wrap">
     <!-- CSRF TOKEN OBLIGATORIO -->
     <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token() }}">
