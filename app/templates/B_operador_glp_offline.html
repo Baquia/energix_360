@@ -15,7 +15,7 @@
 
   <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
   <style>
-    /* Requerimiento 3: Base para el Centrado Matemático del área de trabajo */
+    /* Estructura Base */
     html,
     body {
       min-height: 100vh;
@@ -25,79 +25,104 @@
       background-color: #f4f7f6;
     }
 
-    /* Requerimiento 1: Cabecera más ancha y ergonomía responsiva */
+    /* 1. CABECERA MOBILE-FIRST (Apilada) */
     .bqa-navbar {
-      background-color: #048778;
+      background-color: #029c8a;
       color: #ffffff;
       padding: 18px 20px;
       display: flex;
       flex-direction: column;
-      /* Mobile-First: Elementos apilados en móvil */
-      gap: 15px;
+      gap: 12px;
       align-items: center;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
       width: 100%;
       box-sizing: border-box;
+      text-align: center;
     }
 
     .bqa-navbar-brand {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      justify-content: center;
+      gap: 8px;
     }
 
-    /* Requerimiento 4: Escala de Logos y Resplandor para letras verdes */
-    .bqa-navbar-brand img {
+    .bqa-navbar-logos {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .bqa-navbar-logos img {
       height: 45px;
-      /* Tamaño táctil adecuado en móviles */
       object-fit: contain;
       filter: drop-shadow(0px 0px 4px rgba(255, 255, 255, 0.95));
-      /* Aísla el logo verde del fondo */
     }
 
-    .bqa-navbar-brand span {
+    .bqa-navbar-title {
       font-weight: bold;
       font-size: 1.1rem;
-      text-align: center;
     }
 
-    /* Requerimiento 2: Separación de Usuario e independización de botones */
     .bqa-user-info {
+      font-size: 0.95rem;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 12px;
-      font-size: 0.95rem;
     }
 
-    .bqa-nav-links {
+    /* 2. BARRA DE ACCIONES MÓVIL (Fuera de la cabecera verde) */
+    .bqa-top-actions {
       display: flex;
-      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #f4f7f6;
+      padding: 12px 20px;
+      width: 100%;
+      box-sizing: border-box;
+      border-bottom: 1px solid #dce2e0;
     }
 
-    .bqa-nav-links a {
-      color: #726a95;
-      background: #ffffff;
+    /* ESTILO DE BOTONES */
+    .btn-accion {
       padding: 8px 14px;
       border-radius: 6px;
       text-decoration: none;
       font-weight: bold;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: transform 0.2s;
+      text-align: center;
     }
 
-    .bqa-nav-links a:active {
+    .btn-accion:active {
       transform: scale(0.95);
     }
 
-    .bqa-nav-links a.btn-salir {
+    .btn-salir {
       background: #d32f2f;
       color: white;
+      border: 1.5px solid #b71c1c;
     }
 
-    /* Requerimiento 3: Centrado Forzado del Modal mediante Flexbox */
+    .btn-volver {
+      background: #ffffff;
+      color: #2c3e50;
+      border: 1.5px solid #2c3e50;
+      /* Contraste solicitado */
+    }
+
+    /* CLASES DE VISIBILIDAD DINÁMICA */
+    .desktop-only {
+      display: none;
+    }
+
+    .mobile-only {
+      display: flex;
+    }
+
+    /* 3. CENTRADO DEL ÁREA DE TRABAJO (Flexbox) */
     .wrap {
       flex: 1;
       display: flex;
@@ -114,44 +139,7 @@
       max-width: 500px;
     }
 
-    .bqa-footer {
-      background-color: #726a95;
-      color: #ffffff;
-      text-align: center;
-      padding: 12px;
-      font-size: 0.85rem;
-      margin-top: auto;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    /* Media Queries: Escalado Profesional para PC (Desktop) */
-    @media (min-width: 768px) {
-      .bqa-navbar {
-        flex-direction: row;
-        justify-content: space-between;
-        padding: 20px 30px;
-        /* Cabecera aún más robusta en PC */
-      }
-
-      .bqa-navbar-brand {
-        justify-content: flex-start;
-      }
-
-      .bqa-navbar-brand img {
-        height: 60px;
-        /* Logos grandes y proporcionales en monitores */
-      }
-
-      .bqa-user-info {
-        flex-direction: row;
-        /* Usuario y botones en una sola línea elegante */
-        align-items: center;
-        gap: 25px;
-      }
-    }
-
-    /* Corrección: Forzar ancho del contenedor de la cámara y conversación para evitar colapso en Flexbox */
+    /* 4. PROTECCIÓN DE CÁMARA (Lector QR y dinámicos) */
     #conversacion,
     #preguntaTexto {
       width: 100%;
@@ -169,18 +157,61 @@
       margin: 0 auto;
     }
 
-    /* Obliga al feed de video inyectado por html5-qrcode a respetar el contenedor en móviles */
     #lectorQR video {
       width: 100% !important;
       object-fit: cover;
     }
 
-    /* Aseguramos que los botones dinámicos de Sí/No también compartan el ancho */
     #preguntaSiNo {
       width: 100%;
       display: flex;
       justify-content: center;
       gap: 15px;
+    }
+
+    .bqa-footer {
+      background-color: #726a95;
+      color: #ffffff;
+      text-align: center;
+      padding: 12px;
+      font-size: 0.85rem;
+      margin-top: auto;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* 5. DISTRIBUCIÓN PARA COMPUTADORES (Desktop) */
+    @media (min-width: 768px) {
+      .bqa-navbar {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 20px 30px;
+        text-align: left;
+      }
+
+      .bqa-navbar-brand {
+        flex-direction: row;
+      }
+
+      .bqa-navbar-logos img {
+        height: 60px;
+        /* Logos grandes en PC */
+      }
+
+      .bqa-user-info {
+        flex-direction: row;
+        gap: 25px;
+      }
+
+      /* Oculta la barra móvil y muestra botones integrados en la cabecera */
+      .desktop-only {
+        display: flex;
+        gap: 12px;
+      }
+
+      .mobile-only {
+        display: none !important;
+      }
     }
   </style>
 </head>
@@ -189,20 +220,30 @@
   <!-- NAVBAR OBLIGATORIO -->
   <nav class="bqa-navbar">
     <div class="bqa-navbar-brand">
-      <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360"
-        onerror="this.style.display='none'">
-      <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente"
-        onerror="this.style.display='none'">
-      <span>BQA-ONE Gestión GLP Granjas Avícolas</span>
+      <div class="bqa-navbar-logos">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360"
+          onerror="this.style.display='none'">
+        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente"
+          onerror="this.style.display='none'">
+      </div>
+      <span class="bqa-navbar-title">BQA-ONE Gestión GLP Granjas Avícolas</span>
     </div>
+
     <div class="bqa-user-info">
       <div>👤 <strong>{{ usuario }}</strong> | 🏢 {{ empresa }}</div>
-      <div class="bqa-nav-links">
-        <a href="/hub_administracion/dashboard">⬅ Volver al Hub</a>
-        <a href="/logout" class="btn-salir">Salir</a>
+      <!-- Botones en versión PC (Nativos en la cabecera) -->
+      <div class="desktop-only">
+        <a href="/hub_administracion/dashboard" class="btn-accion btn-volver">⬅ Volver al Hub</a>
+        <a href="/logout" class="btn-accion btn-salir">Salir</a>
       </div>
     </div>
   </nav>
+
+  <!-- BARRA DE ACCIONES MÓVIL (Bajo la cabecera) -->
+  <div class="bqa-top-actions mobile-only">
+    <a href="/logout" class="btn-accion btn-salir">Salir</a>
+    <a href="/hub_administracion/dashboard" class="btn-accion btn-volver">⬅ Volver al Hub</a>
+  </div>
 
   <div class="wrap">
     <!-- CSRF TOKEN OBLIGATORIO -->
