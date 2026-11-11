@@ -3307,3 +3307,29 @@ def consultar_analisis_lote():
     except Exception as e:
         print(f"Error en analisis de lote: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+    
+# ==========================================
+# RUTA: NOTIFICAR COLA OFFLINE (BACKGROUND PING)
+# ==========================================
+@csrf.exempt
+@bp_glp.route('/notificar_operaciones_pendientes_background', methods=['POST'])
+@login_required_custom
+def notificar_operaciones_pendientes_background():
+    """
+    Ruta disparada silenciosamente por la PWA en el momento en que 
+    los 3 reintentos fallan y los datos se guardan offline. Envía alerta a Telegram.
+    """
+    try:
+        data = request.get_json(force=True) or {}
+        id_empresa = session.get('empresa_id') or 0
+        usuario = session.get('nombre') or 'Usuario'
+        sede = data.get('sede', 'Sede en campo')
+        fecha = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        # Inyecta el estado 'pendientes' para levantar el semáforo amarillo en Telegram
+        notificar_opglp_telegram(id_empresa, usuario, "Operación Retenida Offline", sede, fecha, estado="pendientes")
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        # Falla silenciosa permitida (El operador no debe bloquearse por falta de red aquí)
+        return jsonify({"success": False, "message": str(e)}), 500

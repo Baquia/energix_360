@@ -486,7 +486,50 @@
         </button>
       </div>
     </div>
+    <!-- ================= INICIO BLOQUE OFFLINE (MODALES PWA) ================= -->
+    <!-- Modal Naranja: Guardado en Celular (Offline) -->
+    <div id="modal-offline-naranja"
+      style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+      <div
+        style="background: white; width: 100%; max-width: 380px; border-radius: 12px; overflow: hidden; text-align: center; font-family: sans-serif;">
+        <div style="background: #ff8f00; color: white; padding: 30px 20px;">
+          <div style="font-size: 45px; margin-bottom: 10px;">📡</div>
+          <h2 style="margin: 0; font-size: 1.6rem; font-weight: 800;">Guardado en Celular</h2>
+          <p style="margin: 5px 0 0; font-size: 0.85rem; text-transform: uppercase;">OPERACIÓN RETENIDA (OFFLINE)</p>
+        </div>
+        <div style="padding: 25px;">
+          <p style="font-size: 0.95rem; color: #555; font-weight: 600; margin-bottom: 25px;">No hay conexión a internet.
+            Los datos se han guardado de forma segura en la memoria de tu dispositivo. Podrás enviarlos cuando recuperes
+            la señal estable.</p>
+          <button onclick="document.getElementById('modal-offline-naranja').style.display='none'; location.reload();"
+            style="width: 100%; background: #015249; color: white; border: none; padding: 14px; border-radius: 50px; font-size: 1rem; font-weight: bold; cursor: pointer;">
+            VOLVER AL MENÚ
+          </button>
+        </div>
+      </div>
+    </div>
 
+    <!-- Modal Verde: Sincronización Exitosa -->
+    <div id="modal-sync-exito"
+      style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+      <div
+        style="background: white; width: 100%; max-width: 380px; border-radius: 12px; overflow: hidden; text-align: center; font-family: sans-serif;">
+        <div style="background: #2e7d32; color: white; padding: 30px 20px;">
+          <div style="font-size: 45px; margin-bottom: 10px;">🔄</div>
+          <h2 style="margin: 0; font-size: 1.5rem; font-weight: 800;">Sincronización Exitosa</h2>
+          <p style="margin: 5px 0 0; font-size: 0.85rem; text-transform: uppercase;">DATOS ENVIADOS</p>
+        </div>
+        <div style="padding: 25px;">
+          <p id="msg-sync-exito" style="font-size: 1rem; color: #333; font-weight: bold; margin-bottom: 25px;">Se han
+            subido las operaciones retenidas correctamente a la base de datos.</p>
+          <button onclick="document.getElementById('modal-sync-exito').style.display='none'; location.reload();"
+            style="width: 100%; background: #015249; color: white; border: none; padding: 14px; border-radius: 50px; font-size: 1rem; font-weight: bold; cursor: pointer;">
+            CONTINUAR
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- ================= FIN BLOQUE OFFLINE ================= -->
     <!-- FOOTER OBLIGATORIO -->
     <footer class="bqa-footer">
       BQA-ONE © 2026 |

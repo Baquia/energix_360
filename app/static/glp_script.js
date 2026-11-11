@@ -515,84 +515,87 @@ async function flushOfflineQueue() {
 
   IS_SYNCING = true;
   console.log(`[Sync] Intentando sincronizar ${queue.length} operaciones...`);
+  
+  let sincronizadasExito = 0;
 
   for (const item of queue) {
     try {
       let response;
 
-      // CASO 1: Confirmación de Arribo de Pollitos
       if (item.operacion === 'confirmar_arribo') {
         response = await fetch("/glp/confirmar_arribo_pollito", {
           method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "X-CSRFToken": getCsrfToken()
-          },
+          headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
           body: JSON.stringify(item)
         });
       }
-      // CASO 2: Operaciones estándar (Consumo, Tanqueo, etc.)
       else {
         let payloadToSync = item.payload || item;
-        // INYECCIÓN DE LA BANDERA is_sync
         payloadToSync.is_sync = true; 
         
         response = await fetch(item.url || "/glp/registrar_operacion_glp", {
           method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "X-CSRFToken": getCsrfToken()
-          },
+          headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
           body: JSON.stringify(payloadToSync)
         });
       }
 
       const resData = await response.json();
 
-      if (resData.success) {
+      if (resData.success || (resData.message && resData.message.includes("recuperada"))) {
         console.log(`[Sync] Éxito en operación: ${item.operacion} (ID local: ${item.id})`);
-
-        // Si fue un arribo, nos aseguramos de limpiar el estado de espera en el dispositivo
+        
         if (item.operacion === 'confirmar_arribo') {
           localStorage.setItem(`estado_lote_${item.sede}`, JSON.stringify({ esperando_pollito: false }));
-          if (document.getElementById('bloque-arribo-pollito')) {
-            document.getElementById('bloque-arribo-pollito').style.display = 'none';
-          }
+          const ba = document.getElementById('bloque-arribo-pollito');
+          if(ba) ba.style.display = 'none';
+        }
+        
+        // Purga de caché profunda por éxito
+        if (item.payload && item.payload.sede) {
+           localStorage.removeItem("tanques_cache_" + item.payload.sede);
+           localStorage.removeItem("estado_lote_" + item.payload.sede);
         }
 
-        // Eliminar de la cola IndexedDB
         await removeFromQueue(item.id);
-      } else {
-        console.error(`[Sync] El servidor rechazó la operación: ${resData.message}`);
+        sincronizadasExito++;
       }
     } catch (err) {
-      console.error("[Sync] Error de red o servidor:", err);
-      // Detenemos el bucle para reintentar en el próximo ciclo de conexión
-      break;
+      console.error("[Sync] Error de red o servidor durante sincronización:", err);
+      break; 
     }
   }
 
   IS_SYNCING = false;
 
-  // Actualizar la UI de advertencia de sincronización y enviar NOTIFICACIÓN DE ÉXITO PUSH
   const remaining = await getQueue();
   const warning = document.getElementById("syncWarning");
   
-  if (remaining.length === 0) {
-    // Si la cola se vació por completo, enviamos la notificación push de éxito
-    enviarNotificacionPushLocal("✅ BQA-ONE", "Sincronización completada. Tus registros ya están en el servidor.");
+  // SI SE LOGRÓ VACIAR LA COLA O HUBO ÉXITOS
+  if (remaining.length === 0 && sincronizadasExito > 0) {
+    // 1. Notificación Push de Navegador (Si hay permisos)
+    enviarNotificacionPushLocal("✅ Sincronización Completada", `Se han subido ${sincronizadasExito} registros retenidos.`);
     
-    if (warning) {
-      warning.style.display = "none";
+    // 2. Modificación UI: Quitar el banner
+    if (warning) warning.style.display = "none";
+    
+    // 3. Forzar el Modal Verde de Éxito en pantalla para que el operador no esté ciego
+    const modalExito = document.getElementById('modal-sync-exito');
+    const msgExito = document.getElementById('msg-sync-exito');
+    if (modalExito && msgExito) {
+        msgExito.innerText = `Se ejecutaron ${sincronizadasExito} operaciones retenidas correctamente. La caché ha sido liberada.`;
+        modalExito.style.display = 'flex';
+    } else {
+        // Fallback nativo
+        alert(`✅ SINCRONIZACIÓN EXITOSA\nSe han subido ${sincronizadasExito} registros a la base de datos central.`);
     }
-    // Si todo se subió, recargamos niveles oficiales para estar al día
-    if (typeof sedeQR !== 'undefined') {
+
+    if (typeof sedeQR !== 'undefined' && sedeQR) {
       sincronizarNivelesServidor(sedeQR);
     }
-  } else if (warning) {
+  } else if (remaining.length > 0 && warning) {
     warning.style.display = "block";
     warning.innerHTML = `⚠️ Tienes ${remaining.length} operaciones pendientes por subir.`;
-    warning.className = "alert-warning-sync";
   }
 }
 
@@ -855,137 +858,152 @@ function actualizarCacheUltimoNivel(sede, itemsGuardados, operacion) {
 //   ENVÍO POST CON OFFLINE-FALLBACK (VERSIÓN SEMÁFORO ATÓMICO)
 // ===================================================
 async function sendWithOffline(url, payload, onSuccess) {
-  // 1. MODO OFFLINE MANUAL (Si el usuario forzó el modo offline)
+  const btn = document.getElementById("botonEnviar");
+  const textoOriginal = btn ? btn.textContent : "Enviar";
+  
+  // 1. MODO OFFLINE MANUAL (Forzado por PWA)
   if (typeof isForceOffline === "function" && isForceOffline()) {
     await enqueueOffline({ url, payload });
-
-    // Activamos el aviso rojo visual
-    if (typeof mostrarAvisoSyncPendiente === 'function') {
-      mostrarAvisoSyncPendiente();
-    }
-
-    // Construimos una respuesta simulada para que el Modal de Resumen sepa qué mostrar
+    dispararNotificacionBackground(payload.sede);
+    
+    if (typeof mostrarAvisoSyncPendiente === 'function') mostrarAvisoSyncPendiente();
+    
     const fakeResponse = {
       success: true,
       offline: true,
-      message: "Guardado offline (modo OFFLINE activo). Se enviará automáticamente al recuperar operatividad.",
+      message: "Guardado offline.",
       resumen: {
         operacion: url.includes("consumo") ? "consumo" : (url.includes("tanqueo") ? "tanqueo" : "operacion"),
         saldo_estimado_kg: "Calculando...",
         kg_consumidos: "Calculando...",
         tanques: payload.tanques,
         requiere_gas: payload.solicitud_gas ? true : false,
-        razon_alerta: payload.solicitud_gas ? "El pedido se generará automáticamente apenas recuperes la señal." : ""
+        razon_alerta: payload.solicitud_gas ? "Pedido retenido offline." : ""
       }
     };
-
-    // ENVIAMOS AL MODAL FINAL (Semáforo Naranja)
-    if (typeof onSuccess === "function") {
-      onSuccess(fakeResponse);
-    }
-
-    limpiarEstadoOperacion(); // Limpiamos variables, el modal ya quedó activo
+    
+    if (typeof onSuccess === "function") onSuccess(fakeResponse);
+    limpiarEstadoOperacion();
+    mostrarModalNaranja();
     return fakeResponse;
   }
 
-  // 2. ENVÍO NORMAL (Intentamos conectar con el servidor)
-  try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCsrfToken()
-      },
-      body: JSON.stringify(payload)
-    });
+  // 2. BUCLE DE REINTENTOS ACTIVOS (3 intentos, cada 20 seg)
+  const INTENTOS_MAXIMOS = 3;
+  const INTERVALO_MS = 20000;
 
-    const ct = (r.headers.get("content-type") || "").toLowerCase();
-
-    if (!ct.includes("application/json")) {
-      throw new Error("non-json-response");
-    }
-
-    const j = await r.json();
-
-    // Si el servidor responde pero dice FALSE (ej: Error lógico, Lote activo, etc.)
-    if (!j.success) {
-      alert(j.message || "Operación rechazada.");
-
-      if (typeof mostrarMenu === 'function') {
-        mostrarMenu();
-      } else {
-        limpiarEstadoOperacion();
-      }
-      return j;
-    }
-
-    // ÉXITO REAL ONLINE: Aquí SÍ mostramos el modal verde con datos reales
-    if (typeof onSuccess === "function") {
-      onSuccess(j);
-    }
-
-    limpiarEstadoOperacion();
-    return j;
-
-  } catch (e) {
-    // 3. FALLO DE RED (No hay internet o servidor caído)
-    const msg = String(e || "");
-
-    const isNetworkError =
-      !navigator.onLine ||
-      msg.includes("Failed to fetch") ||
-      msg.includes("NetworkError") ||
-      msg.includes("non-json-response") ||
-      msg.includes("Unexpected token <") ||
-      msg.includes("Load failed");
-
-    if (isNetworkError) {
-      console.warn("⚠️ Fallo de red. Iniciando persistencia:", e);
-
-      // A. Guardar en cola local
-      await enqueueOffline({ url, payload });
-
-      // B. Mostrar botón rojo de pendientes
-      if (typeof mostrarAvisoSyncPendiente === 'function') {
-        mostrarAvisoSyncPendiente();
-      }
-
-      // Construimos la respuesta simulada para el corte de red
-      const fakeResponse = {
-        success: true,
-        offline: true,
-        message: "⚠️ Señal inestable. Operación guardada en el dispositivo.",
-        resumen: {
-          operacion: url.includes("consumo") ? "consumo" : (url.includes("tanqueo") ? "tanqueo" : "operacion"),
-          saldo_estimado_kg: "Calculando...",
-          kg_consumidos: "Calculando...",
-          tanques: payload.tanques,
-          requiere_gas: payload.solicitud_gas ? true : false,
-          razon_alerta: payload.solicitud_gas ? "El pedido se enviará al Webmaster apenas recuperes la señal." : ""
+  for (let intento = 1; intento <= INTENTOS_MAXIMOS; intento++) {
+    try {
+      if (intento > 1) {
+        if (btn) {
+          btn.textContent = `⏳ Reintentando red... (${intento}/3)`;
+          btn.style.backgroundColor = "#ff9800";
         }
-      };
-
-      // ENVIAMOS AL MODAL FINAL (Semáforo Naranja)
-      if (typeof onSuccess === "function") {
-        onSuccess(fakeResponse);
+        await new Promise(r => setTimeout(r, INTERVALO_MS));
+      } else {
+        if (btn) {
+          btn.textContent = "Procesando...";
+          btn.disabled = true;
+        }
       }
 
-      limpiarEstadoOperacion(); // Limpiamos estado de variables
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-      // Intentos de resincronización en background
-      setTimeout(() => flushOfflineQueue(), 2000);
-      setTimeout(() => flushOfflineQueue(), 5000);
-      setTimeout(() => flushOfflineQueue(), 10000);
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
 
-      return fakeResponse;
+      const ct = (r.headers.get("content-type") || "").toLowerCase();
+      if (!ct.includes("application/json")) throw new Error("non-json-response");
+
+      const j = await r.json();
+
+      if (!j.success) {
+        alert(j.message || "Operación rechazada por el servidor.");
+        if (typeof mostrarMenu === 'function') mostrarMenu();
+        else limpiarEstadoOperacion();
+        if (btn) { btn.textContent = textoOriginal; btn.disabled = false; btn.style.backgroundColor = ""; }
+        return j;
+      }
+
+      // ÉXITO REAL ONLINE
+      if (typeof onSuccess === "function") onSuccess(j);
+      limpiarEstadoOperacion();
+      if (btn) { btn.textContent = textoOriginal; btn.disabled = false; btn.style.backgroundColor = ""; }
+      return j;
+
+    } catch (e) {
+      const msg = String(e || "");
+      const isNetworkError = !navigator.onLine || msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("AbortError") || msg.includes("non-json-response");
+      
+      if (!isNetworkError) {
+        alert("Error crítico del sistema: " + msg);
+        if (btn) { btn.textContent = textoOriginal; btn.disabled = false; btn.style.backgroundColor = ""; }
+        throw e;
+      }
+
+      if (intento === INTENTOS_MAXIMOS) {
+        console.warn("⚠️ Agotados 3 intentos de red. Transfiriendo a memoria local.");
+        break; 
+      }
     }
+  }
 
-    // Error desconocido que no es de red (ej: código roto)
-    alert("No se pudo completar la operación: " + (e.message || e));
-    throw e;
+  // 3. FALLBACK A MODO OFFLINE TRAS 3 INTENTOS FALLIDOS
+  await enqueueOffline({ url, payload });
+  dispararNotificacionBackground(payload.sede);
+  
+  if (typeof mostrarAvisoSyncPendiente === 'function') mostrarAvisoSyncPendiente();
+  
+  const fakeResponseFallback = {
+      success: true,
+      offline: true,
+      message: "Guardado offline.",
+      resumen: {
+        operacion: url.includes("consumo") ? "consumo" : (url.includes("tanqueo") ? "tanqueo" : "operacion"),
+        saldo_estimado_kg: "Calculando...",
+        kg_consumidos: "Calculando...",
+        tanques: payload.tanques,
+        requiere_gas: payload.solicitud_gas ? true : false,
+        razon_alerta: payload.solicitud_gas ? "Pedido retenido offline." : ""
+      }
+  };
+  
+  if (typeof onSuccess === "function") onSuccess(fakeResponseFallback);
+  
+  limpiarEstadoOperacion();
+  mostrarModalNaranja();
+  
+  if (btn) { btn.textContent = textoOriginal; btn.disabled = false; btn.style.backgroundColor = ""; }
+  return fakeResponseFallback;
+}
+
+// ==========================================
+// FUNCIONES AUXILIARES OFFLINE OBLIGATORIAS
+// ==========================================
+function mostrarModalNaranja() {
+  const modalNaranja = document.getElementById('modal-offline-naranja');
+  if (modalNaranja) {
+      modalNaranja.style.display = 'flex';
+  } else {
+      alert("📡 GUARDADO EN CELULAR (OFFLINE)\n\nLos datos se han guardado en tu dispositivo.");
+      location.reload();
   }
 }
 
+function dispararNotificacionBackground(sede) {
+  fetch('/glp/notificar_operaciones_pendientes_background', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify({ sede: sede || "Sede en campo" })
+  }).catch(() => {});
+}
 function leerQR(titulo) {
   return new Promise((resolve, reject) => {
     const menu = document.getElementById("menuOpciones");
@@ -1028,82 +1046,76 @@ const EMPRESA_SESION = window.EMPRESA_SESION || "";
 // ==========================================
 
 function mostrarAvisoSyncPendiente() {
-  const div = document.getElementById("syncWarning");
-  if (!div) return;
+    const div = document.getElementById("syncWarning");
+    if (!div) return;
 
-  div.style.display = "block";
-  div.innerHTML = `
-    <div id="syncWarning-header">
-      <div id="syncWarning-icon">!</div>
-      <div>Operaciones pendientes</div>
-    </div>
-    <div id="syncWarning-body">
-      Hay operaciones guardadas en el celular que no han subido al servidor.
-    </div>
-    
-    <button id="btnSyncManual" onclick="ejecutarSyncManual()" style="
-        width: 100%;
-        margin-top: 8px;
-        padding: 10px;
-        background-color: #b71c1c;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: all 0.3s;
-    ">
-        🔄 INTENTAR ENVIAR AHORA
-    </button>
-    
-    <div style="margin-top:8px; font-size:12px; color:#555;">
-       El sistema intentará enviarlas automáticamente, pero puedes usar este botón para forzarlo si tienes internet.
-    </div>
-  `;
+    getQueue().then(queue => {
+        if (queue.length === 0) {
+            div.style.display = "none";
+            return;
+        }
+        
+        div.style.display = "block";
+        div.innerHTML = `
+            <div style="background: #333; color: white; padding: 20px; border-radius: 12px; text-align: left; margin-bottom: 20px; border-left: 5px solid #d9534f; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                <h4 style="margin: 0 0 10px 0; color: #ff9800; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.3rem;">⛔</span> OPERACIONES RETENIDAS
+                </h4>
+                <p style="font-size: 0.9rem; margin: 0 0 15px 0; color: #ddd; line-height: 1.4;">
+                    Tienes <strong>${queue.length} operaciones pendientes</strong> en la memoria del celular porque trabajaste sin conexión.<br>
+                    Si ya tienes señal estable, presiona el botón para enviarlas.
+                </p>
+                <button onclick="ejecutarSyncManual()" style="background: #2196f3; color: white; border: none; padding: 12px 15px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;">
+                    🔄 Sincronizar Pendientes
+                </button>
+            </div>
+        `;
+    });
 }
 
+// ==========================================
+// SINCRONIZACIÓN MANUAL Y PURGA DE CACHÉ
+// ==========================================
 async function ejecutarSyncManual() {
   const btn = document.getElementById("btnSyncManual");
 
-  // 1. Feedback visual inmediato (para que sepas que sí hizo click)
   if (btn) {
-    btn.innerHTML = "⏳ Conectando con el servidor...";
-    btn.disabled = true; // Evitar doble click
+    btn.innerHTML = "⏳ Subiendo datos... Espere";
+    btn.disabled = true;
     btn.style.opacity = "0.7";
   }
 
-  // --- NUEVO: AVISAR A TELEGRAM DEL INTENTO MANUAL ---
   try {
     await fetch("/glp/notificar_intento_sync", {
       method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCsrfToken()
-      },
+      headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
       body: JSON.stringify({ sede: (typeof sedeQR !== 'undefined' && sedeQR) ? sedeQR : "Sede Pendiente" })
     });
-  } catch (e) {
-    console.warn("No se pudo enviar aviso de pendientes a Telegram");
-  }
-  // ----------------------------------------------------
+  } catch (e) { }
 
-  // 2. CORRECCIÓN CRÍTICA: Forzamos al sistema a creer que hay internet
-  // Esto rompe el bloqueo que hacía que "no pasara nada"
-  if (typeof setForceOffline === 'function') {
-    setForceOffline(false);
-  }
+  if (typeof setForceOffline === 'function') setForceOffline(false);
 
-  // 3. Intentamos enviar (esperamos un poquito para que la UI respire)
   await new Promise(r => setTimeout(r, 500));
   await flushOfflineQueue();
 
-  // 4. Si llegamos aquí y el aviso sigue visible, es que falló de nuevo.
-  // Restauramos el botón para que puedas intentar otra vez.
-  const warningDiv = document.getElementById("syncWarning");
-  if (warningDiv && warningDiv.style.display !== 'none' && btn) {
-    btn.innerHTML = "⚠️ Falló. Reintentar ahora";
-    btn.disabled = false;
-    btn.style.opacity = "1";
+  const remaining = await getQueue();
+  if (remaining.length === 0) {
+      const modalExito = document.getElementById('modal-sync-exito');
+      if (modalExito) {
+          // Purga profunda de caché fantasma (Libera el bloqueo de lote)
+          if (typeof sedeQR !== 'undefined' && sedeQR) {
+              localStorage.removeItem("tanques_cache_" + sedeQR);
+              localStorage.removeItem("estado_lote_" + sedeQR);
+          }
+          modalExito.style.display = 'flex';
+      }
+  } else {
+      const warningDiv = document.getElementById("syncWarning");
+      if (warningDiv && warningDiv.style.display !== 'none' && btn) {
+          btn.innerHTML = "⚠️ Falló. Reintentar ahora";
+          btn.disabled = false;
+          btn.style.opacity = "1";
+      }
   }
 }
 

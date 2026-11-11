@@ -16,49 +16,55 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
   <style>
     /* Estructura Base */
-    html, body {
+    html,
+    body {
       min-height: 100vh;
       margin: 0;
       display: flex;
       flex-direction: column;
       background-color: #f4f7f6;
     }
-    
+
     /* 1. CABECERA MOBILE-FIRST (Apilada) */
     .bqa-navbar {
       background-color: #029c8a;
       color: #ffffff;
-      padding: 18px 20px; 
+      padding: 18px 20px;
       display: flex;
       flex-direction: column;
       gap: 12px;
       align-items: center;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
       width: 100%;
       box-sizing: border-box;
       text-align: center;
     }
+
     .bqa-navbar-brand {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 8px;
     }
+
     .bqa-navbar-logos {
       display: flex;
       gap: 12px;
       justify-content: center;
       align-items: center;
     }
+
     .bqa-navbar-logos img {
       height: 45px;
       object-fit: contain;
       filter: drop-shadow(0px 0px 4px rgba(255, 255, 255, 0.95));
     }
+
     .bqa-navbar-title {
-      font-weight: bold; 
-      font-size: 1.1rem; 
+      font-weight: bold;
+      font-size: 1.1rem;
     }
+
     .bqa-user-info {
       font-size: 0.95rem;
       display: flex;
@@ -72,21 +78,22 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 15px; /* Requerimiento 2: Canal de separación estricto para evitar que se peguen */
-      background-color: #f4f7f6; 
+      gap: 15px;
+      /* Requerimiento 2: Canal de separación estricto para evitar que se peguen */
+      background-color: #f4f7f6;
       padding: 12px 20px;
       width: 100%;
       box-sizing: border-box;
       border-bottom: 1px solid #dce2e0;
     }
-    
+
     /* ESTILO DE BOTONES BASE */
     .btn-accion {
       padding: 8px 14px;
       border-radius: 6px;
       text-decoration: none;
       font-weight: bold;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       transition: transform 0.2s;
       text-align: center;
       box-sizing: border-box;
@@ -94,8 +101,10 @@
 
     /* SIMETRÍA FORZADA EN MÓVILES (Requerimientos 1, 3 y 4) */
     .bqa-top-actions .btn-accion {
-      flex: 1; /* Divide el espacio en dos fracciones exactamente iguales */
-      height: 44px; /* Eje horizontal idéntico para que no se vean torcidos */
+      flex: 1;
+      /* Divide el espacio en dos fracciones exactamente iguales */
+      height: 44px;
+      /* Eje horizontal idéntico para que no se vean torcidos */
       display: flex;
       justify-content: center;
       align-items: center;
@@ -108,6 +117,7 @@
       color: white;
       border: 1.5px solid #b71c1c;
     }
+
     .btn-volver {
       background: #ffffff;
       color: #2c3e50;
@@ -115,8 +125,13 @@
     }
 
     /* CLASES DE VISIBILIDAD DINÁMICA */
-    .desktop-only { display: none; }
-    .mobile-only { display: flex; }
+    .desktop-only {
+      display: none;
+    }
+
+    .mobile-only {
+      display: flex;
+    }
 
     /* 3. CENTRADO DEL ÁREA DE TRABAJO (Flexbox) */
     .wrap {
@@ -129,18 +144,21 @@
       padding: 20px;
       box-sizing: border-box;
     }
+
     .menu {
       width: 100%;
       max-width: 500px;
     }
-    
+
     /* 4. PROTECCIÓN DE CÁMARA (Lector QR y dinámicos) */
-    #conversacion, #preguntaTexto {
+    #conversacion,
+    #preguntaTexto {
       width: 100%;
       max-width: 500px;
       text-align: center;
       box-sizing: border-box;
     }
+
     #lectorQR {
       width: 100%;
       min-height: 250px;
@@ -149,10 +167,12 @@
       overflow: hidden;
       margin: 0 auto;
     }
+
     #lectorQR video {
       width: 100% !important;
       object-fit: cover;
     }
+
     #preguntaSiNo {
       width: 100%;
       display: flex;
@@ -179,20 +199,31 @@
         padding: 20px 30px;
         text-align: left;
       }
+
       .bqa-navbar-brand {
         flex-direction: row;
       }
+
       .bqa-navbar-logos img {
-        height: 60px; /* Logos grandes en PC */
+        height: 60px;
+        /* Logos grandes en PC */
       }
+
       .bqa-user-info {
         flex-direction: row;
         gap: 25px;
       }
-      
+
       /* Oculta la barra móvil y muestra botones integrados en la cabecera */
-      .desktop-only { display: flex; gap: 12px; align-items: center; }
-      .mobile-only { display: none !important; }
+      .desktop-only {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .mobile-only {
+        display: none !important;
+      }
     }
   </style>
 </head>
@@ -202,12 +233,14 @@
   <nav class="bqa-navbar">
     <div class="bqa-navbar-brand">
       <div class="bqa-navbar-logos">
-        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360" onerror="this.style.display='none'">
-        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente" onerror="this.style.display='none'">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360"
+          onerror="this.style.display='none'">
+        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente"
+          onerror="this.style.display='none'">
       </div>
       <span class="bqa-navbar-title">BQA-ONE Gestión GLP Granjas Avícolas</span>
     </div>
-    
+
     <div class="bqa-user-info">
       <div>👤 <strong>{{ usuario }}</strong> | 🏢 {{ empresa }}</div>
       <!-- Botones en versión PC (Nativos en la cabecera) -->
@@ -450,7 +483,50 @@
       </button>
     </div>
   </div>
+  <!-- ================= INICIO BLOQUE OFFLINE (MODALES PWA) ================= -->
+  <!-- Modal Naranja: Guardado en Celular (Offline) -->
+  <div id="modal-offline-naranja"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+    <div
+      style="background: white; width: 100%; max-width: 380px; border-radius: 12px; overflow: hidden; text-align: center; font-family: sans-serif;">
+      <div style="background: #ff8f00; color: white; padding: 30px 20px;">
+        <div style="font-size: 45px; margin-bottom: 10px;">📡</div>
+        <h2 style="margin: 0; font-size: 1.6rem; font-weight: 800;">Guardado en Celular</h2>
+        <p style="margin: 5px 0 0; font-size: 0.85rem; text-transform: uppercase;">OPERACIÓN RETENIDA (OFFLINE)</p>
+      </div>
+      <div style="padding: 25px;">
+        <p style="font-size: 0.95rem; color: #555; font-weight: 600; margin-bottom: 25px;">No hay conexión a internet.
+          Los datos se han guardado de forma segura en la memoria de tu dispositivo. Podrás enviarlos cuando recuperes
+          la señal estable.</p>
+        <button onclick="document.getElementById('modal-offline-naranja').style.display='none'; location.reload();"
+          style="width: 100%; background: #015249; color: white; border: none; padding: 14px; border-radius: 50px; font-size: 1rem; font-weight: bold; cursor: pointer;">
+          VOLVER AL MENÚ
+        </button>
+      </div>
+    </div>
+  </div>
 
+  <!-- Modal Verde: Sincronización Exitosa -->
+  <div id="modal-sync-exito"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+    <div
+      style="background: white; width: 100%; max-width: 380px; border-radius: 12px; overflow: hidden; text-align: center; font-family: sans-serif;">
+      <div style="background: #2e7d32; color: white; padding: 30px 20px;">
+        <div style="font-size: 45px; margin-bottom: 10px;">🔄</div>
+        <h2 style="margin: 0; font-size: 1.5rem; font-weight: 800;">Sincronización Exitosa</h2>
+        <p style="margin: 5px 0 0; font-size: 0.85rem; text-transform: uppercase;">DATOS ENVIADOS</p>
+      </div>
+      <div style="padding: 25px;">
+        <p id="msg-sync-exito" style="font-size: 1rem; color: #333; font-weight: bold; margin-bottom: 25px;">Se han
+          subido las operaciones retenidas correctamente a la base de datos.</p>
+        <button onclick="document.getElementById('modal-sync-exito').style.display='none'; location.reload();"
+          style="width: 100%; background: #015249; color: white; border: none; padding: 14px; border-radius: 50px; font-size: 1rem; font-weight: bold; cursor: pointer;">
+          CONTINUAR
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- ================= FIN BLOQUE OFFLINE ================= -->
   <!-- FOOTER OBLIGATORIO -->
   <footer class="bqa-footer">
     BQA-ONE © 2026 |
