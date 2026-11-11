@@ -15,49 +15,105 @@
 
   <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
   <style>
-    /* Estilos para Navbar y Footer obligatorios */
-    html, body {
+    /* Requerimiento 3: Base para el Centrado Matemático del área de trabajo */
+    html,
+    body {
       min-height: 100vh;
       margin: 0;
       display: flex;
       flex-direction: column;
+      background-color: #f4f7f6;
     }
+
+    /* Requerimiento 1: Cabecera más ancha y ergonomía responsiva */
     .bqa-navbar {
-      background-color: #029c8a;
+      background-color: #048778;
       color: #ffffff;
-      padding: 12px 20px;
+      padding: 18px 20px;
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
+      /* Mobile-First: Elementos apilados en móvil */
+      gap: 15px;
       align-items: center;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
       width: 100%;
+      box-sizing: border-box;
     }
+
     .bqa-navbar-brand {
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
     }
+
+    /* Requerimiento 4: Escala de Logos y Resplandor para letras verdes */
     .bqa-navbar-brand img {
-      height: 38px;
+      height: 45px;
+      /* Tamaño táctil adecuado en móviles */
       object-fit: contain;
+      filter: drop-shadow(0px 0px 4px rgba(255, 255, 255, 0.95));
+      /* Aísla el logo verde del fondo */
     }
+
+    .bqa-navbar-brand span {
+      font-weight: bold;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+
+    /* Requerimiento 2: Separación de Usuario e independización de botones */
     .bqa-user-info {
-      font-size: 0.9rem;
-      text-align: right;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.95rem;
     }
+
     .bqa-nav-links {
-      margin-top: 4px;
-      font-size: 0.85rem;
+      display: flex;
+      gap: 12px;
     }
+
     .bqa-nav-links a {
       color: #726a95;
       background: #ffffff;
-      padding: 3px 8px;
-      border-radius: 4px;
+      padding: 8px 14px;
+      border-radius: 6px;
       text-decoration: none;
       font-weight: bold;
-      margin-left: 6px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
     }
+
+    .bqa-nav-links a:active {
+      transform: scale(0.95);
+    }
+
+    .bqa-nav-links a.btn-salir {
+      background: #d32f2f;
+      color: white;
+    }
+
+    /* Requerimiento 3: Centrado Forzado del Modal mediante Flexbox */
+    .wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .menu {
+      width: 100%;
+      max-width: 500px;
+    }
+
     .bqa-footer {
       background-color: #726a95;
       color: #ffffff;
@@ -66,24 +122,84 @@
       font-size: 0.85rem;
       margin-top: auto;
       width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Media Queries: Escalado Profesional para PC (Desktop) */
+    @media (min-width: 768px) {
+      .bqa-navbar {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 20px 30px;
+        /* Cabecera aún más robusta en PC */
+      }
+
+      .bqa-navbar-brand {
+        justify-content: flex-start;
+      }
+
+      .bqa-navbar-brand img {
+        height: 60px;
+        /* Logos grandes y proporcionales en monitores */
+      }
+
+      .bqa-user-info {
+        flex-direction: row;
+        /* Usuario y botones en una sola línea elegante */
+        align-items: center;
+        gap: 25px;
+      }
+    }
+
+    /* Corrección: Forzar ancho del contenedor de la cámara y conversación para evitar colapso en Flexbox */
+    #conversacion,
+    #preguntaTexto {
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    #lectorQR {
+      width: 100%;
+      min-height: 250px;
+      background-color: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+
+    /* Obliga al feed de video inyectado por html5-qrcode a respetar el contenedor en móviles */
+    #lectorQR video {
+      width: 100% !important;
+      object-fit: cover;
+    }
+
+    /* Aseguramos que los botones dinámicos de Sí/No también compartan el ancho */
+    #preguntaSiNo {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
     }
   </style>
 </head>
 
 <body>
   <!-- NAVBAR OBLIGATORIO -->
-  <!-- NAVBAR OBLIGATORIO -->
   <nav class="bqa-navbar">
     <div class="bqa-navbar-brand">
-      <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360" onerror="this.style.display='none'">
-      <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente" onerror="this.style.display='none'">
-      <span style="font-weight: bold; font-size: 1.1rem; margin-left: 8px;">BQA-ONE Gestión GLP Granjas Avícolas</span>
+      <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360"
+        onerror="this.style.display='none'">
+      <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente"
+        onerror="this.style.display='none'">
+      <span>BQA-ONE Gestión GLP Granjas Avícolas</span>
     </div>
     <div class="bqa-user-info">
       <div>👤 <strong>{{ usuario }}</strong> | 🏢 {{ empresa }}</div>
       <div class="bqa-nav-links">
         <a href="/hub_administracion/dashboard">⬅ Volver al Hub</a>
-        <a href="/logout" style="background: #d32f2f; color: white;">Salir</a>
+        <a href="/logout" class="btn-salir">Salir</a>
       </div>
     </div>
   </nav>
@@ -107,7 +223,8 @@
         🐣 Confirmar llegada del pollito
       </button>
 
-      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('iniciar una nueva operación de CALEFACCIÓN', iniciarCalefaccion)">
+      <button class="menu-btn"
+        onclick="ejecutarAccionConConfirmacion('iniciar una nueva operación de CALEFACCIÓN', iniciarCalefaccion)">
         🔥 Iniciar calefacción
       </button>
 
@@ -119,11 +236,12 @@
         📊 Registrar consumo
       </button>
 
-      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('FINALIZAR la calefacción de este lote', finalizarCalefaccion)">
+      <button class="menu-btn"
+        onclick="ejecutarAccionConConfirmacion('FINALIZAR la calefacción de este lote', finalizarCalefaccion)">
         🔥 Finalizar calefacción
       </button>
 
-      <button class="menu-btn" 
+      <button class="menu-btn"
         style="background: #ede7f6; color: #283593; border: 2px solid #3f51b5; font-weight: bold;"
         onclick="iniciarAnalisisLote()">
         📈 Análisis del lote
@@ -131,44 +249,47 @@
 
     </div>
 
-    <div id="panelAnalisis" style="display:none; width: 100%; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); text-align: left;">
+    <div id="panelAnalisis"
+      style="display:none; width: 100%; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); text-align: left;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <h3 style="color: #015249; margin: 0; font-size: 1.2rem;">Análisis de Lote</h3>
-          <button onclick="cerrarAnalisis()" style="background: #f4f6f7; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; color: #555; cursor: pointer;">Volver</button>
+        <h3 style="color: #015249; margin: 0; font-size: 1.2rem;">Análisis de Lote</h3>
+        <button onclick="cerrarAnalisis()"
+          style="background: #f4f6f7; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; color: #555; cursor: pointer;">Volver</button>
       </div>
-      
+
       <h4 id="analisis_sede_nombre" style="margin: 0 0 5px 0; color: #1976d2; font-size: 1.1rem;"></h4>
-      <p id="analisis_lote_nombre" style="font-size: 0.8rem; color: #888; margin-top: 0; margin-bottom: 20px; word-break: break-all;"></p>
+      <p id="analisis_lote_nombre"
+        style="font-size: 0.8rem; color: #888; margin-top: 0; margin-bottom: 20px; word-break: break-all;"></p>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #015249;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">DÍAS DE LOTE</span>
-              <span id="kpi_dias" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
-          </div>
-          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #1976d2;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">POBLACIÓN</span>
-              <span id="kpi_poblacion" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
-          </div>
-          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #d32f2f;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">CONSUMO TOTAL</span>
-              <span id="kpi_consumo" style="font-size: 1.2rem; font-weight: bold; color: #333;">-- kg</span>
-          </div>
-          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #f57c00;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">Kg / AVE (Acumulado)</span>
-              <span id="kpi_eficiencia" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
-          </div>
-          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #2e7d32;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">TOTAL FACTURADO</span>
-              <span id="kpi_facturado" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
-          </div>
-          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #7b1fa2;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">$ / AVE</span>
-              <span id="kpi_costo_ave" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
-          </div>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #015249;">
+          <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">DÍAS DE LOTE</span>
+          <span id="kpi_dias" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
+        </div>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #1976d2;">
+          <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">POBLACIÓN</span>
+          <span id="kpi_poblacion" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
+        </div>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #d32f2f;">
+          <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">CONSUMO TOTAL</span>
+          <span id="kpi_consumo" style="font-size: 1.2rem; font-weight: bold; color: #333;">-- kg</span>
+        </div>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #f57c00;">
+          <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">Kg / AVE (Acumulado)</span>
+          <span id="kpi_eficiencia" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
+        </div>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #2e7d32;">
+          <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">TOTAL FACTURADO</span>
+          <span id="kpi_facturado" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
+        </div>
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #7b1fa2;">
+          <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">$ / AVE</span>
+          <span id="kpi_costo_ave" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
+        </div>
       </div>
 
       <div style="width: 100%; height: 220px; position: relative;">
-          <canvas id="graficaAnalisis"></canvas>
+        <canvas id="graficaAnalisis"></canvas>
       </div>
     </div>
 
@@ -207,7 +328,9 @@
           <button class="counter-btn" onclick="adjustDias(1)">+</button>
         </div>
       </div>
-      <button class="btn-solicitar" onclick="ejecutarAccionConConfirmacion('confirmar y enviar la solicitud de gas', confirmarSolicitud)">✅ Confirmar y Solicitar</button>
+      <button class="btn-solicitar"
+        onclick="ejecutarAccionConConfirmacion('confirmar y enviar la solicitud de gas', confirmarSolicitud)">✅
+        Confirmar y Solicitar</button>
       <button onclick="cerrarNegociacion()"
         style="background:transparent; border:none; color:#777; margin-top:15px; text-decoration:underline; font-size:0.9em;">No
         pedir ahora (Asumo el riesgo)</button>

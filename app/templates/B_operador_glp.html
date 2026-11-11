@@ -15,49 +15,105 @@
 
   <link rel="stylesheet" href="{{ url_for('static', filename='glp_styles.css') }}">
   <style>
-    /* Estilos para Navbar y Footer obligatorios */
-    html, body {
+    /* Requerimiento 3: Base para el Centrado Matemático del área de trabajo */
+    html,
+    body {
       min-height: 100vh;
       margin: 0;
       display: flex;
       flex-direction: column;
+      background-color: #f4f7f6;
     }
+
+    /* Requerimiento 1: Cabecera más ancha y ergonomía responsiva */
     .bqa-navbar {
-      background-color: #029c8a;
+      background-color: #048778;
       color: #ffffff;
-      padding: 12px 20px;
+      padding: 18px 20px;
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
+      /* Mobile-First: Elementos apilados en móvil */
+      gap: 15px;
       align-items: center;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
       width: 100%;
+      box-sizing: border-box;
     }
+
     .bqa-navbar-brand {
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
     }
+
+    /* Requerimiento 4: Escala de Logos y Resplandor para letras verdes */
     .bqa-navbar-brand img {
-      height: 38px;
+      height: 45px;
+      /* Tamaño táctil adecuado en móviles */
       object-fit: contain;
+      filter: drop-shadow(0px 0px 4px rgba(255, 255, 255, 0.95));
+      /* Aísla el logo verde del fondo */
     }
+
+    .bqa-navbar-brand span {
+      font-weight: bold;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+
+    /* Requerimiento 2: Separación de Usuario e independización de botones */
     .bqa-user-info {
-      font-size: 0.9rem;
-      text-align: right;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.95rem;
     }
+
     .bqa-nav-links {
-      margin-top: 4px;
-      font-size: 0.85rem;
+      display: flex;
+      gap: 12px;
     }
+
     .bqa-nav-links a {
       color: #726a95;
       background: #ffffff;
-      padding: 3px 8px;
-      border-radius: 4px;
+      padding: 8px 14px;
+      border-radius: 6px;
       text-decoration: none;
       font-weight: bold;
-      margin-left: 6px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
     }
+
+    .bqa-nav-links a:active {
+      transform: scale(0.95);
+    }
+
+    .bqa-nav-links a.btn-salir {
+      background: #d32f2f;
+      color: white;
+    }
+
+    /* Requerimiento 3: Centrado Forzado del Modal mediante Flexbox */
+    .wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .menu {
+      width: 100%;
+      max-width: 500px;
+    }
+
     .bqa-footer {
       background-color: #726a95;
       color: #ffffff;
@@ -66,267 +122,336 @@
       font-size: 0.85rem;
       margin-top: auto;
       width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Media Queries: Escalado Profesional para PC (Desktop) */
+    @media (min-width: 768px) {
+      .bqa-navbar {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 20px 30px;
+        /* Cabecera aún más robusta en PC */
+      }
+
+      .bqa-navbar-brand {
+        justify-content: flex-start;
+      }
+
+      .bqa-navbar-brand img {
+        height: 60px;
+        /* Logos grandes y proporcionales en monitores */
+      }
+
+      .bqa-user-info {
+        flex-direction: row;
+        /* Usuario y botones en una sola línea elegante */
+        align-items: center;
+        gap: 25px;
+      }
+    }
+    /* Corrección: Forzar ancho del contenedor de la cámara y conversación para evitar colapso en Flexbox */
+    #conversacion, #preguntaTexto {
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    
+    #lectorQR {
+      width: 100%;
+      min-height: 250px;
+      background-color: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+    
+    /* Obliga al feed de video inyectado por html5-qrcode a respetar el contenedor en móviles */
+    #lectorQR video {
+      width: 100% !important;
+      object-fit: cover;
+    }
+    
+    /* Aseguramos que los botones dinámicos de Sí/No también compartan el ancho */
+    #preguntaSiNo {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
     }
   </style>
 </head>
 
 <body>
-  <!-- NAVBAR OBLIGATORIO -->
-  <!-- NAVBAR OBLIGATORIO -->
-  <nav class="bqa-navbar">
-    <div class="bqa-navbar-brand">
-      <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360" onerror="this.style.display='none'">
-      <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente" onerror="this.style.display='none'">
-      <span style="font-weight: bold; font-size: 1.1rem; margin-left: 8px;">BQA-ONE Gestión GLP Granjas Avícolas</span>
-    </div>
-    <div class="bqa-user-info">
-      <div>👤 <strong>{{ usuario }}</strong> | 🏢 {{ empresa }}</div>
-      <div class="bqa-nav-links">
-        <a href="/hub_administracion/dashboard">⬅ Volver al Hub</a>
-        <a href="/logout" style="background: #d32f2f; color: white;">Salir</a>
+
+  <body>
+    <!-- NAVBAR OBLIGATORIO -->
+    <nav class="bqa-navbar">
+      <div class="bqa-navbar-brand">
+        <img src="{{ url_for('static', filename='logo_energix360.png') }}" alt="Logo Energix360"
+          onerror="this.style.display='none'">
+        <img src="{{ url_for('static', filename='logo_' ~ nit ~ '.png') }}" alt="Logo Cliente"
+          onerror="this.style.display='none'">
+        <span>BQA-ONE Gestión GLP Granjas Avícolas</span>
       </div>
-    </div>
-  </nav>
+      <div class="bqa-user-info">
+        <div>👤 <strong>{{ usuario }}</strong> | 🏢 {{ empresa }}</div>
+        <div class="bqa-nav-links">
+          <a href="/hub_administracion/dashboard">⬅ Volver al Hub</a>
+          <a href="/logout" class="btn-salir">Salir</a>
+        </div>
+      </div>
+    </nav>
 
-  <div class="wrap">
-    <!-- CSRF TOKEN OBLIGATORIO -->
-    <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="wrap">
+      <!-- CSRF TOKEN OBLIGATORIO -->
+      <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token() }}">
 
-    <p id="saludo">¡Hola {{ usuario }}!</p>
+      <p id="saludo">¡Hola {{ usuario }}!</p>
 
-    <div id="syncWarning" style="display:none;">
-    </div>
+      <div id="syncWarning" style="display:none;">
+      </div>
 
-    <p id="preguntaTexto"></p>
+      <p id="preguntaTexto"></p>
 
-    <div id="menuOpciones" class="menu" style="display:flex; flex-direction:column; gap:10px;">
+      <div id="menuOpciones" class="menu" style="display:flex; flex-direction:column; gap:10px;">
 
-      <button class="menu-btn"
-        style="background: #e3f2fd; color: #1565c0; border: 2px solid #2196f3; font-weight: bold;"
-        onclick="ejecutarAccionConConfirmacion('confirmar la llegada real de los pollitos', iniciarConfirmacionArribo)">
-        🐣 Confirmar llegada del pollito
-      </button>
+        <button class="menu-btn"
+          style="background: #e3f2fd; color: #1565c0; border: 2px solid #2196f3; font-weight: bold;"
+          onclick="ejecutarAccionConConfirmacion('confirmar la llegada real de los pollitos', iniciarConfirmacionArribo)">
+          🐣 Confirmar llegada del pollito
+        </button>
 
-      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('iniciar una nueva operación de CALEFACCIÓN', iniciarCalefaccion)">
-        🔥 Iniciar calefacción
-      </button>
+        <button class="menu-btn"
+          onclick="ejecutarAccionConConfirmacion('iniciar una nueva operación de CALEFACCIÓN', iniciarCalefaccion)">
+          🔥 Iniciar calefacción
+        </button>
 
-      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('registrar un nuevo TANQUEO', registrarTanqueo)">
-        ⛽ Registrar tanqueo
-      </button>
+        <button class="menu-btn"
+          onclick="ejecutarAccionConConfirmacion('registrar un nuevo TANQUEO', registrarTanqueo)">
+          ⛽ Registrar tanqueo
+        </button>
 
-      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('registrar el CONSUMO actual', iniciarConsumo)">
-        📊 Registrar consumo
-      </button>
+        <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('registrar el CONSUMO actual', iniciarConsumo)">
+          📊 Registrar consumo
+        </button>
 
-      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('FINALIZAR la calefacción de este lote', finalizarCalefaccion)">
-        🔥 Finalizar calefacción
-      </button>
+        <button class="menu-btn"
+          onclick="ejecutarAccionConConfirmacion('FINALIZAR la calefacción de este lote', finalizarCalefaccion)">
+          🔥 Finalizar calefacción
+        </button>
 
-      <button class="menu-btn" 
-        style="background: #ede7f6; color: #283593; border: 2px solid #3f51b5; font-weight: bold;"
-        onclick="iniciarAnalisisLote()">
-        📈 Análisis del lote
-      </button>
+        <button class="menu-btn"
+          style="background: #ede7f6; color: #283593; border: 2px solid #3f51b5; font-weight: bold;"
+          onclick="iniciarAnalisisLote()">
+          📈 Análisis del lote
+        </button>
 
-    </div>
+      </div>
 
-    <div id="panelAnalisis" style="display:none; width: 100%; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); text-align: left;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <div id="panelAnalisis"
+        style="display:none; width: 100%; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); text-align: left;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <h3 style="color: #015249; margin: 0; font-size: 1.2rem;">Análisis de Lote</h3>
-          <button onclick="cerrarAnalisis()" style="background: #f4f6f7; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; color: #555; cursor: pointer;">Volver</button>
-      </div>
-      
-      <h4 id="analisis_sede_nombre" style="margin: 0 0 5px 0; color: #1976d2; font-size: 1.1rem;"></h4>
-      <p id="analisis_lote_nombre" style="font-size: 0.8rem; color: #888; margin-top: 0; margin-bottom: 20px; word-break: break-all;"></p>
+          <button onclick="cerrarAnalisis()"
+            style="background: #f4f6f7; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; color: #555; cursor: pointer;">Volver</button>
+        </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+        <h4 id="analisis_sede_nombre" style="margin: 0 0 5px 0; color: #1976d2; font-size: 1.1rem;"></h4>
+        <p id="analisis_lote_nombre"
+          style="font-size: 0.8rem; color: #888; margin-top: 0; margin-bottom: 20px; word-break: break-all;"></p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
           <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #015249;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">DÍAS DE LOTE</span>
-              <span id="kpi_dias" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
+            <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">DÍAS DE LOTE</span>
+            <span id="kpi_dias" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
           </div>
           <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #1976d2;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">POBLACIÓN</span>
-              <span id="kpi_poblacion" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
+            <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">POBLACIÓN</span>
+            <span id="kpi_poblacion" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
           </div>
           <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #d32f2f;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">CONSUMO TOTAL</span>
-              <span id="kpi_consumo" style="font-size: 1.2rem; font-weight: bold; color: #333;">-- kg</span>
+            <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">CONSUMO TOTAL</span>
+            <span id="kpi_consumo" style="font-size: 1.2rem; font-weight: bold; color: #333;">-- kg</span>
           </div>
           <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #f57c00;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">Kg / AVE (Acumulado)</span>
-              <span id="kpi_eficiencia" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
+            <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">Kg / AVE (Acumulado)</span>
+            <span id="kpi_eficiencia" style="font-size: 1.2rem; font-weight: bold; color: #333;">--</span>
           </div>
           <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #2e7d32;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">TOTAL FACTURADO</span>
-              <span id="kpi_facturado" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
+            <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">TOTAL FACTURADO</span>
+            <span id="kpi_facturado" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
           </div>
           <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 4px solid #7b1fa2;">
-              <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">$ / AVE</span>
-              <span id="kpi_costo_ave" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
+            <span style="font-size: 0.7rem; color: #666; font-weight: bold; display: block;">$ / AVE</span>
+            <span id="kpi_costo_ave" style="font-size: 1.1rem; font-weight: bold; color: #333;">--</span>
           </div>
-      </div>
+        </div>
 
-      <div style="width: 100%; height: 220px; position: relative;">
+        <div style="width: 100%; height: 220px; position: relative;">
           <canvas id="graficaAnalisis"></canvas>
-      </div>
-    </div>
-
-    <div id="conversacion" style="display:none">
-      <div id="lectorQR" style="display:none; min-height: 250px; background-color: #000;"></div>
-      <input id="respuestaInput" type="text" style="display:none" />
-      <input id="inputFoto" type="file" accept="image/*" capture="environment" style="display:none" />
-
-      <div id="preguntaSiNo" style="display:none; text-align:center; margin-top:14px;">
-        <button id="btnSi"
-          style="padding:10px 18px; margin-right:12px; font-size:16px; background:#015249; color:white; border:none; border-radius:8px;">Sí</button>
-        <button id="btnNo"
-          style="padding:10px 18px; font-size:16px; background:#cc0000; color:white; border:none; border-radius:8px;">No</button>
-      </div>
-
-      <button id="botonEnviar">Enviar</button>
-    </div>
-  </div>
-
-  <div id="modalNegociacion" class="modal-negociacion">
-    <div class="neg-card">
-      <h3 style="color:#d9534f; margin-top:0;">⚠️ Nivel Bajo Detectado</h3>
-      <p style="color:#555;">El sistema sugiere pedir gas para asegurar el lote.</p>
-      <div style="background:#e8f5e9; padding:15px; border-radius:12px; margin:15px 0;">
-        <label style="font-weight:bold; color:#015249;">Nivel Objetivo a Dejar (%)</label><br>
-        <input type="number" id="neg_nivel" class="neg-input" value="80">
-        <div style="font-size:0.75em; color:#666; margin-top:5px;">(Toca el número para editar la meta del tanque)</div>
-      </div>
-      <div style="margin:20px 0;">
-        <label style="font-weight:bold;">⏳ Extensión de Lote</label>
-        <p style="font-size:0.85em; margin:5px 0; color:#666;">Llevas <span id="neg_dias_act"></span> días. ¿Necesitas
-          días extra?</p>
-        <div style="display:flex; justify-content:center; gap:15px; align-items:center;">
-          <button class="counter-btn" onclick="adjustDias(-1)">-</button>
-          <span id="neg_dias_extra" style="font-size:1.8em; font-weight:bold; min-width:40px;">0</span>
-          <button class="counter-btn" onclick="adjustDias(1)">+</button>
         </div>
       </div>
-      <button class="btn-solicitar" onclick="ejecutarAccionConConfirmacion('confirmar y enviar la solicitud de gas', confirmarSolicitud)">✅ Confirmar y Solicitar</button>
-      <button onclick="cerrarNegociacion()"
-        style="background:transparent; border:none; color:#777; margin-top:15px; text-decoration:underline; font-size:0.9em;">No
-        pedir ahora (Asumo el riesgo)</button>
-    </div>
-  </div>
 
-  <div id="modal-resumen-final"></div>
+      <div id="conversacion" style="display:none">
+        <div id="lectorQR" style="display:none; min-height: 250px; background-color: #000;"></div>
+        <input id="respuestaInput" type="text" style="display:none" />
+        <input id="inputFoto" type="file" accept="image/*" capture="environment" style="display:none" />
 
-  <div id="modal-resultado-final"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+        <div id="preguntaSiNo" style="display:none; text-align:center; margin-top:14px;">
+          <button id="btnSi"
+            style="padding:10px 18px; margin-right:12px; font-size:16px; background:#015249; color:white; border:none; border-radius:8px;">Sí</button>
+          <button id="btnNo"
+            style="padding:10px 18px; font-size:16px; background:#cc0000; color:white; border:none; border-radius:8px;">No</button>
+        </div>
 
-    <div
-      style="background: white; width: 100%; max-width: 420px; border-radius: 12px; overflow: hidden; position: relative; font-family: sans-serif;">
-
-      <div style="background: #015249; color: white; padding: 20px; text-align: center;">
-        <div style="font-size: 45px; margin-bottom: 5px;">✅</div>
-        <h2 style="margin: 0; font-size: 1.4rem;">Operación Exitosa</h2>
-        <p id="bqa-operacion" style="margin: 5px 0 0; opacity: 0.8; font-size: 0.8rem; text-transform: uppercase;">
-          Registro Guardado</p>
+        <button id="botonEnviar">Enviar</button>
       </div>
+    </div>
 
-      <div style="padding: 20px;">
-
-        <div
-          style="display: flex; justify-content: space-between; background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #eee;">
-          <div style="text-align: center; width: 48%;">
-            <span style="display: block; font-size: 0.7rem; color: #666; font-weight: bold;">SALDO KG</span>
-            <span id="bqa-saldo"
-              style="display: block; font-size: 1.1rem; font-weight: bold; color: #015249;">---</span>
-          </div>
-          <div style="border-left: 1px solid #ddd;"></div>
-          <div style="text-align: center; width: 48%;">
-            <span style="display: block; font-size: 0.7rem; color: #666; font-weight: bold;">CONSUMO KG</span>
-            <span id="bqa-consumo"
-              style="display: block; font-size: 1.1rem; font-weight: bold; color: #d32f2f;">---</span>
+    <div id="modalNegociacion" class="modal-negociacion">
+      <div class="neg-card">
+        <h3 style="color:#d9534f; margin-top:0;">⚠️ Nivel Bajo Detectado</h3>
+        <p style="color:#555;">El sistema sugiere pedir gas para asegurar el lote.</p>
+        <div style="background:#e8f5e9; padding:15px; border-radius:12px; margin:15px 0;">
+          <label style="font-weight:bold; color:#015249;">Nivel Objetivo a Dejar (%)</label><br>
+          <input type="number" id="neg_nivel" class="neg-input" value="80">
+          <div style="font-size:0.75em; color:#666; margin-top:5px;">(Toca el número para editar la meta del tanque)
           </div>
         </div>
+        <div style="margin:20px 0;">
+          <label style="font-weight:bold;">⏳ Extensión de Lote</label>
+          <p style="font-size:0.85em; margin:5px 0; color:#666;">Llevas <span id="neg_dias_act"></span> días. ¿Necesitas
+            días extra?</p>
+          <div style="display:flex; justify-content:center; gap:15px; align-items:center;">
+            <button class="counter-btn" onclick="adjustDias(-1)">-</button>
+            <span id="neg_dias_extra" style="font-size:1.8em; font-weight:bold; min-width:40px;">0</span>
+            <button class="counter-btn" onclick="adjustDias(1)">+</button>
+          </div>
+        </div>
+        <button class="btn-solicitar"
+          onclick="ejecutarAccionConConfirmacion('confirmar y enviar la solicitud de gas', confirmarSolicitud)">✅
+          Confirmar y Solicitar</button>
+        <button onclick="cerrarNegociacion()"
+          style="background:transparent; border:none; color:#777; margin-top:15px; text-decoration:underline; font-size:0.9em;">No
+          pedir ahora (Asumo el riesgo)</button>
+      </div>
+    </div>
 
-        <div id="bqa-bloque-pedido"
-          style="display: none; background: #e8f5e9; border: 1px dashed #2e7d32; border-radius: 8px; padding: 10px; text-align: center; margin-bottom: 15px;">
-          <strong style="color: #2e7d32; font-size: 0.8rem; display: block;">🚀 PEDIDO GENERADO</strong>
-          <div id="bqa-codigo"
-            style="font-size: 1.4rem; font-weight: 800; color: #1b5e20; letter-spacing: 1px; margin: 5px 0;">---</div>
-          <div id="bqa-proveedor" style="font-size: 0.75rem; color: #555;"></div>
+    <div id="modal-resumen-final"></div>
+
+    <div id="modal-resultado-final"
+      style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+
+      <div
+        style="background: white; width: 100%; max-width: 420px; border-radius: 12px; overflow: hidden; position: relative; font-family: sans-serif;">
+
+        <div style="background: #015249; color: white; padding: 20px; text-align: center;">
+          <div style="font-size: 45px; margin-bottom: 5px;">✅</div>
+          <h2 style="margin: 0; font-size: 1.4rem;">Operación Exitosa</h2>
+          <p id="bqa-operacion" style="margin: 5px 0 0; opacity: 0.8; font-size: 0.8rem; text-transform: uppercase;">
+            Registro Guardado</p>
         </div>
 
-        <div id="bqa-bloque-alerta"
-          style="display: none; background: #fff3e0; border-left: 4px solid #ff9800; padding: 10px; margin-bottom: 15px;">
-          <strong style="color: #ef6c00; font-size: 0.9rem;">⚠️ Atención</strong>
-          <p id="bqa-razon" style="margin: 3px 0 0; font-size: 0.85rem; color: #444; line-height: 1.3;"></p>
+        <div style="padding: 20px;">
+
+          <div
+            style="display: flex; justify-content: space-between; background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #eee;">
+            <div style="text-align: center; width: 48%;">
+              <span style="display: block; font-size: 0.7rem; color: #666; font-weight: bold;">SALDO KG</span>
+              <span id="bqa-saldo"
+                style="display: block; font-size: 1.1rem; font-weight: bold; color: #015249;">---</span>
+            </div>
+            <div style="border-left: 1px solid #ddd;"></div>
+            <div style="text-align: center; width: 48%;">
+              <span style="display: block; font-size: 0.7rem; color: #666; font-weight: bold;">CONSUMO KG</span>
+              <span id="bqa-consumo"
+                style="display: block; font-size: 1.1rem; font-weight: bold; color: #d32f2f;">---</span>
+            </div>
+          </div>
+
+          <div id="bqa-bloque-pedido"
+            style="display: none; background: #e8f5e9; border: 1px dashed #2e7d32; border-radius: 8px; padding: 10px; text-align: center; margin-bottom: 15px;">
+            <strong style="color: #2e7d32; font-size: 0.8rem; display: block;">🚀 PEDIDO GENERADO</strong>
+            <div id="bqa-codigo"
+              style="font-size: 1.4rem; font-weight: 800; color: #1b5e20; letter-spacing: 1px; margin: 5px 0;">---</div>
+            <div id="bqa-proveedor" style="font-size: 0.75rem; color: #555;"></div>
+          </div>
+
+          <div id="bqa-bloque-alerta"
+            style="display: none; background: #fff3e0; border-left: 4px solid #ff9800; padding: 10px; margin-bottom: 15px;">
+            <strong style="color: #ef6c00; font-size: 0.9rem;">⚠️ Atención</strong>
+            <p id="bqa-razon" style="margin: 3px 0 0; font-size: 0.85rem; color: #444; line-height: 1.3;"></p>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <h4
+              style="margin: 0 0 5px; color: #444; font-size: 0.8rem; border-bottom: 1px solid #eee; padding-bottom: 5px; text-transform: uppercase;">
+              Estado Final Tanques</h4>
+            <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+              <tbody id="bqa-tabla-tanques"></tbody>
+            </table>
+          </div>
+
+          <button onclick="window.location.reload()"
+            style="width: 100%; background: #015249; color: white; border: none; padding: 14px; border-radius: 50px; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            VOLVER AL MENÚ
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modalArribo"
+      style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; backdrop-filter: blur(3px); padding: 15px;">
+      <div
+        style="background: white; padding: 25px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <h3 style="color: #1565c0; margin-top: 0; font-size: 1.4rem;">🐣 ¡Llegó el Pollito!</h3>
+        <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">Registra la población real y hora de entrada
+          para activar el reloj del lote.</p>
+
+        <div style="text-align: left; margin-bottom: 15px;">
+          <label style="font-size: 0.8rem; font-weight: bold; color: #444;">Población Real:</label>
+          <input type="number" id="poblacion_real" placeholder="Cantidad de aves" class="input-bqa"
+            style="width: 100%; padding: 12px; margin-top: 5px;">
         </div>
 
-        <div style="margin-bottom: 20px;">
-          <h4
-            style="margin: 0 0 5px; color: #444; font-size: 0.8rem; border-bottom: 1px solid #eee; padding-bottom: 5px; text-transform: uppercase;">
-            Estado Final Tanques</h4>
-          <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
-            <tbody id="bqa-tabla-tanques"></tbody>
-          </table>
+        <div style="text-align: left; margin-bottom: 25px;">
+          <label style="font-size: 0.8rem; font-weight: bold; color: #444;">Fecha y Hora de Arribo:</label>
+          <input type="datetime-local" id="fecha_arribo_real" class="input-bqa"
+            style="width: 100%; padding: 12px; margin-top: 5px;">
         </div>
 
-        <button onclick="window.location.reload()"
-          style="width: 100%; background: #015249; color: white; border: none; padding: 14px; border-radius: 50px; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-          VOLVER AL MENÚ
+        <button onclick="ejecutarAccionConConfirmacion('confirmar y activar el lote', ejecutarConfirmarArribo)"
+          style="background: #2196f3; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; width: 100%; margin-bottom: 10px; cursor: pointer;">
+          CONFIRMAR Y ACTIVAR LOTE
+        </button>
+
+        <button onclick="cerrarModalArribo()"
+          style="background: #f5f5f5; color: #666; border: none; padding: 10px; border-radius: 10px; width: 100%; cursor: pointer;">
+          Cancelar
         </button>
       </div>
     </div>
-  </div>
 
-  <div id="modalArribo"
-    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; backdrop-filter: blur(3px); padding: 15px;">
-    <div
-      style="background: white; padding: 25px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-      <h3 style="color: #1565c0; margin-top: 0; font-size: 1.4rem;">🐣 ¡Llegó el Pollito!</h3>
-      <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">Registra la población real y hora de entrada
-        para activar el reloj del lote.</p>
+    <!-- FOOTER OBLIGATORIO -->
+    <footer class="bqa-footer">
+      BQA-ONE © 2026 |
+    </footer>
 
-      <div style="text-align: left; margin-bottom: 15px;">
-        <label style="font-size: 0.8rem; font-weight: bold; color: #444;">Población Real:</label>
-        <input type="number" id="poblacion_real" placeholder="Cantidad de aves" class="input-bqa"
-          style="width: 100%; padding: 12px; margin-top: 5px;">
-      </div>
+    <script>
+      window.EMPRESA_SESION = "{{ empresa }}";
 
-      <div style="text-align: left; margin-bottom: 25px;">
-        <label style="font-size: 0.8rem; font-weight: bold; color: #444;">Fecha y Hora de Arribo:</label>
-        <input type="datetime-local" id="fecha_arribo_real" class="input-bqa"
-          style="width: 100%; padding: 12px; margin-top: 5px;">
-      </div>
-
-      <button onclick="ejecutarAccionConConfirmacion('confirmar y activar el lote', ejecutarConfirmarArribo)"
-        style="background: #2196f3; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; width: 100%; margin-bottom: 10px; cursor: pointer;">
-        CONFIRMAR Y ACTIVAR LOTE
-      </button>
-
-      <button onclick="cerrarModalArribo()"
-        style="background: #f5f5f5; color: #666; border: none; padding: 10px; border-radius: 10px; width: 100%; cursor: pointer;">
-        Cancelar
-      </button>
-    </div>
-  </div>
-
-  <!-- FOOTER OBLIGATORIO -->
-  <footer class="bqa-footer">
-    BQA-ONE © 2026 |
-  </footer>
-
-  <script>
-    window.EMPRESA_SESION = "{{ empresa }}";
-
-    // PROTECCIÓN DE MUTACIONES OBLIGATORIA CON window.confirm()
-    function ejecutarAccionConConfirmacion(nombreOperacion, funcionEjecutar) {
-      if (window.confirm("¿Está seguro de " + nombreOperacion + "?")) {
-        funcionEjecutar();
+      // PROTECCIÓN DE MUTACIONES OBLIGATORIA CON window.confirm()
+      function ejecutarAccionConConfirmacion(nombreOperacion, funcionEjecutar) {
+        if (window.confirm("¿Está seguro de " + nombreOperacion + "?")) {
+          funcionEjecutar();
+        }
       }
-    }
-  </script>
+    </script>
 
-  <script src="{{ url_for('static', filename='glp_script.js') }}"></script>
+    <script src="{{ url_for('static', filename='glp_script.js') }}"></script>
 
-</body>
+  </body>
 
 </html>
