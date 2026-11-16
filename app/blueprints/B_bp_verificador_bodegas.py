@@ -176,12 +176,14 @@ def verificador_confirmar_item():
             """, (verif_cajas, verif_unidades, usuario_id, id_row, empresa_id))
             
             # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
-            payload = json.dumps(d)
+            payload_dict = d.copy() if isinstance(d, dict) else {}
+            payload_dict['accion'] = 'CONFIRMAR_ITEM_VERIFICACION'
+            payload = json.dumps(payload_dict)
             cur.execute("""
                 INSERT INTO registro_operaciones_bqa_one 
-                (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                (empresa, empresa_id, backend_emisor, backend, usuario, cedula, datos) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_verificador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'CONFIRMAR_ITEM_VERIFICACION', payload))
+            """, (session.get('empresa', 'Sistema'), empresa_id, 'WMS_Verificador', 'B_bp_verificador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), payload))
             mysql.connection.commit()
             cur.close()
             return jsonify({'status': 'ok', 'message': 'Item verificado con éxito'})
@@ -263,12 +265,18 @@ def sellar_orden():
                 """, (empresa_id, orden, firma_verificador))
                 
             # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
-            payload = json.dumps(d)
+            payload_dict = d.copy() if isinstance(d, dict) else {}
+            # Omitimos la imagen base64 de la firma para evitar saturar el JSON de la base de datos
+            if 'firma_verificador' in payload_dict:
+                payload_dict['firma_verificador'] = 'IMAGEN_BASE64_OMITIDA'
+            payload_dict['accion'] = 'SELLAR_AUDITORIA_ORDEN'
+            payload = json.dumps(payload_dict)
+            
             cur.execute("""
                 INSERT INTO registro_operaciones_bqa_one 
-                (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                (empresa, empresa_id, backend_emisor, backend, usuario, cedula, datos) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_verificador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'SELLAR_AUDITORIA_ORDEN', payload))
+            """, (session.get('empresa', 'Sistema'), empresa_id, 'WMS_Verificador', 'B_bp_verificador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), payload))
             mysql.connection.commit()
             cur.close()
             

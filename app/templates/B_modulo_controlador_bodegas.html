@@ -2743,6 +2743,7 @@
         </div>
     </div>
 
+    
     <!-- MODAL ASIGNAR PUERTA -->
     <div id="modalAsignarPuerta" class="modal-overlay">
         <div class="modal-card">
@@ -2768,6 +2769,14 @@
                         <option value="8">Muelle 8</option>
                         <option value="9">Muelle 9</option>
                         <option value="10">Muelle 10</option>
+                    </select>
+                </div>
+                <div style="text-align:left; margin-top:20px;">
+                    <label style="font-size:0.85rem; color:var(--color-muted); font-weight:700;">ASIGNACIÓN INTEGRAL A UN OPERADOR (OPCIONAL)</label>
+                    <p style="font-size:0.75rem; color:#64748b; margin: 4px 0 8px 0;">Si seleccionas un operador aquí, asumirá el 100% de la orden, ignorando sus marcas preasignadas. Verá todas las marcas como ruta de navegación.</p>
+                    <select id="selOperarioIntegral"
+                        style="width:100%; padding:15px; border-radius:8px; border:1px solid var(--color-border); font-size:1rem; background:#f8fafc; color:var(--color-text);">
+                        <option value="">-- Dejar vacío para asignación por marcas --</option>
                     </select>
                 </div>
             </div>
@@ -4304,19 +4313,45 @@
             window.curSecuencia = inputSecuencia ? inputSecuencia.value : (window.tempInputs[idS] || 0);
 
             document.getElementById('targetPuertaOrden').textContent = "Orden #" + orden;
+            
+            const selOp = document.getElementById('selOperarioIntegral');
+            selOp.innerHTML = '<option value="">Cargando operadores...</option>';
+            fetch('/bodegas/api/get_empleados')
+                .then(r => r.json())
+                .then(data => {
+                    selOp.innerHTML = '<option value="">-- Dejar vacío para asignación por marcas --</option>';
+                    data.forEach(op => {
+                        selOp.innerHTML += `<option value="${op.id}">${op.nombre}</option>`;
+                    });
+                })
+                .catch(e => {
+                    selOp.innerHTML = '<option value="">-- Error al cargar operadores --</option>';
+                });
+
             document.getElementById('modalAsignarPuerta').style.display = 'flex';
         }
 
-        function cerrarAsignarPuerta() { document.getElementById('modalAsignarPuerta').style.display = 'none'; }
+        function cerrarAsignarPuerta() { 
+            document.getElementById('modalAsignarPuerta').style.display = 'none'; 
+        }
 
         function ejecutarAsignarPuerta() {
             const puertaVal = document.getElementById('selPuerta').value;
+            const operarioIntegralVal = document.getElementById('selOperarioIntegral').value;
+            
             if (!puertaVal) return alert('⚠️ Debes asignar un Muelle antes de continuar.');
 
             let zonaVal = window.curZona || 'GENERAL';
             let secuenciaVal = window.curSecuencia || 0;
 
-            if (!window.confirm(`¿Está seguro de ASIGNAR PUERTA al muelle ${puertaVal}?`)) return;
+            let msg = `¿Está seguro de ASIGNAR PUERTA al muelle ${puertaVal}?`;
+            if (operarioIntegralVal) {
+                const selObj = document.getElementById('selOperarioIntegral');
+                const nombreOp = selObj.options[selObj.selectedIndex].text;
+                msg = `¿Está seguro de ASIGNAR PUERTA al muelle ${puertaVal} y ASIGNAR LA ORDEN COMPLETA a ${nombreOp}?`;
+            }
+
+            if (!window.confirm(msg)) return;
 
             const btn = document.getElementById('btnConfirmarPuerta');
             btn.textContent = 'Guardando...'; btn.disabled = true;
@@ -4327,10 +4362,23 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
-                body: JSON.stringify({ numero_orden: curOrden, puerta: puertaVal, zona: zonaVal, secuencia: secuenciaVal })
+                body: JSON.stringify({ 
+                    numero_orden: curOrden, 
+                    puerta: puertaVal, 
+                    zona: zonaVal, 
+                    secuencia: secuenciaVal,
+                    id_operario_integral: operarioIntegralVal
+                })
             })
-                .then(r => r.json())
+                .then(r => {
+                    if (!r.ok) throw new Error("Fallo crítico del servidor (HTTP " + r.status + ")");
+                    return r.json();
+                })
                 .then(d => {
+                    if (d.error) {
+                        alert("❌ Error interno del servidor: " + d.error);
+                        return;
+                    }
                     cerrarAsignarPuerta();
                     if (curFilaDOM) {
                         curFilaDOM.style.transition = "opacity 0.4s ease";
@@ -4338,11 +4386,11 @@
                         setTimeout(() => curFilaDOM.remove(), 400);
                     }
                     setTimeout(() => {
-                        alert(`✅ Muelle asignado con éxito a la Orden #${curOrden}`);
+                        alert(`✅ ${d.message}`);
                         cargarMonitoreoRealTime();
                     }, 450);
                 })
-                .catch(e => alert("❌ Error de conexión."))
+                .catch(e => alert("❌ " + e.message))
                 .finally(() => { btn.textContent = 'Confirmar Asignación'; btn.disabled = false; });
         }
 

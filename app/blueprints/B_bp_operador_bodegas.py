@@ -234,12 +234,14 @@ def operario_confirmar_item():
             """, (estado_final, act_cajas, act_unidades, novedad, id_supervisor, uid, session.get('nombre'), id_row, empresa_id))
             
             # REGISTRO DE AUDITORIA BQA-ONE OBLIGATORIO
-            payload = json.dumps(d)
+            payload_dict = d.copy() if isinstance(d, dict) else {}
+            payload_dict['accion'] = 'CONFIRMAR_ITEM_PICKING'
+            payload = json.dumps(payload_dict)
             cur.execute("""
                 INSERT INTO registro_operaciones_bqa_one 
-                (empresa, empresa_id, backend_emisor, usuario, cedula, accion, datos) 
+                (empresa, empresa_id, backend_emisor, backend, usuario, cedula, datos) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (session.get('empresa', 'Sistema'), empresa_id, 'B_bp_operador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), 'CONFIRMAR_ITEM_PICKING', payload))
+            """, (session.get('empresa', 'Sistema'), empresa_id, 'WMS_Operador', 'B_bp_operador_bodegas.py', session.get('nombre', 'N/A'), session.get('cedula', 'N/A'), payload))
             mysql.connection.commit()
             cur.close()
             
@@ -254,7 +256,7 @@ def operario_confirmar_item():
                 time.sleep(0.5)
                 continue
             return jsonify({'error': str(e)}), 500
-           
+                   
 @bp_oper_bodegas.route('/api/operario/mis_marcas')
 @login_required_custom
 def operario_mis_marcas():
