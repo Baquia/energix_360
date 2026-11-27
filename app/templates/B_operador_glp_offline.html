@@ -79,7 +79,6 @@
       justify-content: center;
       align-items: center;
       gap: 15px;
-      /* Requerimiento 2: Canal de separación estricto para evitar que se peguen */
       background-color: #f4f7f6;
       padding: 12px 20px;
       width: 100%;
@@ -99,12 +98,10 @@
       box-sizing: border-box;
     }
 
-    /* SIMETRÍA FORZADA EN MÓVILES (Requerimientos 1, 3 y 4) */
+    /* SIMETRÍA FORZADA EN MÓVILES */
     .bqa-top-actions .btn-accion {
       flex: 1;
-      /* Divide el espacio en dos fracciones exactamente iguales */
       height: 44px;
-      /* Eje horizontal idéntico para que no se vean torcidos */
       display: flex;
       justify-content: center;
       align-items: center;
@@ -206,7 +203,6 @@
 
       .bqa-navbar-logos img {
         height: 60px;
-        /* Logos grandes en PC */
       }
 
       .bqa-user-info {
@@ -214,7 +210,6 @@
         gap: 25px;
       }
 
-      /* Oculta la barra móvil y muestra botones integrados en la cabecera */
       .desktop-only {
         display: flex;
         gap: 12px;
@@ -256,14 +251,14 @@
     <a href="/logout" class="btn-accion btn-salir">Salir</a>
     <a href="/hub_administracion/dashboard" class="btn-accion btn-volver">⬅ Volver al Hub</a>
   </div>
+
   <div class="wrap">
     <!-- CSRF TOKEN OBLIGATORIO -->
     <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token() }}">
 
     <p id="saludo">¡Hola {{ usuario }}!</p>
 
-    <div id="syncWarning" style="display:none;">
-    </div>
+    <div id="syncWarning" style="display:none;"></div>
 
     <p id="preguntaTexto"></p>
 
@@ -280,11 +275,13 @@
         🔥 Iniciar calefacción
       </button>
 
-      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('registrar un nuevo TANQUEO', registrarTanqueo)">
+      <button class="menu-btn"
+        onclick="ejecutarAccionConConfirmacion('registrar un nuevo TANQUEO', registrarTanqueo)">
         ⛽ Registrar tanqueo
       </button>
 
-      <button class="menu-btn" onclick="ejecutarAccionConConfirmacion('registrar el CONSUMO actual', iniciarConsumo)">
+      <button class="menu-btn"
+        onclick="ejecutarAccionConConfirmacion('registrar el CONSUMO actual', iniciarConsumo)">
         📊 Registrar consumo
       </button>
 
@@ -302,7 +299,7 @@
     </div>
 
     <div id="panelAnalisis"
-      style="display:none; width: 100%; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); text-align: left;">
+      style="display:none; width: 100%; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); text-align: left; box-sizing: border-box;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h3 style="color: #015249; margin: 0; font-size: 1.2rem;">Análisis de Lote</h3>
         <button onclick="cerrarAnalisis()"
@@ -352,39 +349,40 @@
 
       <div id="preguntaSiNo" style="display:none; text-align:center; margin-top:14px;">
         <button id="btnSi"
-          style="padding:10px 18px; margin-right:12px; font-size:16px; background:#015249; color:white; border:none; border-radius:8px;">Sí</button>
+          style="padding:10px 18px; margin-right:12px; font-size:16px; background:#015249; color:white; border:none; border-radius:8px; cursor:pointer;">Sí</button>
         <button id="btnNo"
-          style="padding:10px 18px; font-size:16px; background:#cc0000; color:white; border:none; border-radius:8px;">No</button>
+          style="padding:10px 18px; font-size:16px; background:#cc0000; color:white; border:none; border-radius:8px; cursor:pointer;">No</button>
       </div>
 
-      <button id="botonEnviar">Enviar</button>
+      <button id="botonEnviar" style="display:none;">Enviar</button>
     </div>
+
+    <div id="panelResumen" style="display:none;"></div>
   </div>
 
+  <!-- MODAL DE NEGOCIACIÓN LOCAL DE PEDIDO DE GAS -->
   <div id="modalNegociacion" class="modal-negociacion">
     <div class="neg-card">
       <h3 style="color:#d9534f; margin-top:0;">⚠️ Nivel Bajo Detectado</h3>
       <p style="color:#555;">El sistema sugiere pedir gas para asegurar el lote.</p>
       <div style="background:#e8f5e9; padding:15px; border-radius:12px; margin:15px 0;">
         <label style="font-weight:bold; color:#015249;">Nivel Objetivo a Dejar (%)</label><br>
-        <input type="number" id="neg_nivel" class="neg-input" value="80">
+        <input type="number" id="neg_nivel" class="neg-input" value="80" min="1" max="100">
         <div style="font-size:0.75em; color:#666; margin-top:5px;">(Toca el número para editar la meta del tanque)</div>
       </div>
       <div style="margin:20px 0;">
         <label style="font-weight:bold;">⏳ Extensión de Lote</label>
-        <p style="font-size:0.85em; margin:5px 0; color:#666;">Llevas <span id="neg_dias_act"></span> días. ¿Necesitas
+        <p style="font-size:0.85em; margin:5px 0; color:#666;">Llevas <span id="neg_dias_act">--</span> días. ¿Necesitas
           días extra?</p>
         <div style="display:flex; justify-content:center; gap:15px; align-items:center;">
-          <button class="counter-btn" onclick="adjustDias(-1)">-</button>
+          <button type="button" class="counter-btn" onclick="adjustDias(-1)">-</button>
           <span id="neg_dias_extra" style="font-size:1.8em; font-weight:bold; min-width:40px;">0</span>
-          <button class="counter-btn" onclick="adjustDias(1)">+</button>
+          <button type="button" class="counter-btn" onclick="adjustDias(1)">+</button>
         </div>
       </div>
-      <button class="btn-solicitar"
-        onclick="ejecutarAccionConConfirmacion('confirmar y enviar la solicitud de gas', confirmarSolicitud)">✅
-        Confirmar y Solicitar</button>
-      <button onclick="cerrarNegociacion()"
-        style="background:transparent; border:none; color:#777; margin-top:15px; text-decoration:underline; font-size:0.9em;">No
+      <button type="button" class="btn-solicitar" onclick="confirmarSolicitud()">✅ Confirmar y Solicitar</button>
+      <button type="button" onclick="omitirSolicitudNegociacion()"
+        style="background:transparent; border:none; color:#777; margin-top:15px; text-decoration:underline; font-size:0.9em; cursor:pointer;">No
         pedir ahora (Asumo el riesgo)</button>
     </div>
   </div>
@@ -392,7 +390,7 @@
   <div id="modal-resumen-final"></div>
 
   <div id="modal-resultado-final"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box;">
 
     <div
       style="background: white; width: 100%; max-width: 420px; border-radius: 12px; overflow: hidden; position: relative; font-family: sans-serif;">
@@ -400,11 +398,11 @@
       <div style="background: #015249; color: white; padding: 20px; text-align: center;">
         <div style="font-size: 45px; margin-bottom: 5px;">✅</div>
         <h2 style="margin: 0; font-size: 1.4rem;">Operación Exitosa</h2>
-        <p id="bqa-operacion" style="margin: 5px 0 0; opacity: 0.8; font-size: 0.8rem; text-transform: uppercase;">
-          Registro Guardado</p>
+        <p style="margin: 5px 0 0; opacity: 0.9; font-size: 0.78rem; text-transform: uppercase;">REGISTRO GUARDADO EN EL SERVIDOR</p>
       </div>
 
       <div style="padding: 20px;">
+        <div id="bqa-operacion" style="text-align:center; font-weight:bold; color:#015249; font-size:0.9rem; margin-bottom:12px; text-transform:uppercase;"></div>
 
         <div
           style="display: flex; justify-content: space-between; background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #eee;">
@@ -452,10 +450,11 @@
     </div>
   </div>
 
+  <!-- MODAL CONFIRMACIÓN DE ARRIBO DE POLLITO -->
   <div id="modalArribo"
-    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; backdrop-filter: blur(3px); padding: 15px;">
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; backdrop-filter: blur(3px); padding: 15px; box-sizing: border-box;">
     <div
-      style="background: white; padding: 25px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+      style="background: white; padding: 25px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); box-sizing: border-box;">
       <h3 style="color: #1565c0; margin-top: 0; font-size: 1.4rem;">🐣 ¡Llegó el Pollito!</h3>
       <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">Registra la población real y hora de entrada
         para activar el reloj del lote.</p>
@@ -463,30 +462,31 @@
       <div style="text-align: left; margin-bottom: 15px;">
         <label style="font-size: 0.8rem; font-weight: bold; color: #444;">Población Real:</label>
         <input type="number" id="poblacion_real" placeholder="Cantidad de aves" class="input-bqa"
-          style="width: 100%; padding: 12px; margin-top: 5px;">
+          style="width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box;">
       </div>
 
       <div style="text-align: left; margin-bottom: 25px;">
         <label style="font-size: 0.8rem; font-weight: bold; color: #444;">Fecha y Hora de Arribo:</label>
         <input type="datetime-local" id="fecha_arribo_real" class="input-bqa"
-          style="width: 100%; padding: 12px; margin-top: 5px;">
+          style="width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box;">
       </div>
 
-      <button onclick="ejecutarAccionConConfirmacion('confirmar y activar el lote', ejecutarConfirmarArribo)"
+      <button type="button" onclick="ejecutarConfirmarArribo()"
         style="background: #2196f3; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; width: 100%; margin-bottom: 10px; cursor: pointer;">
         CONFIRMAR Y ACTIVAR LOTE
       </button>
 
-      <button onclick="cerrarModalArribo()"
+      <button type="button" onclick="cerrarModalArribo()"
         style="background: #f5f5f5; color: #666; border: none; padding: 10px; border-radius: 10px; width: 100%; cursor: pointer;">
         Cancelar
       </button>
     </div>
   </div>
+
   <!-- ================= INICIO BLOQUE OFFLINE (MODALES PWA) ================= -->
   <!-- Modal Naranja: Guardado en Celular (Offline) -->
   <div id="modal-offline-naranja"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box;">
     <div
       style="background: white; width: 100%; max-width: 380px; border-radius: 12px; overflow: hidden; text-align: center; font-family: sans-serif;">
       <div style="background: #ff8f00; color: white; padding: 30px 20px;">
@@ -508,7 +508,7 @@
 
   <!-- Modal Verde: Sincronización Exitosa -->
   <div id="modal-sync-exito"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box;">
     <div
       style="background: white; width: 100%; max-width: 380px; border-radius: 12px; overflow: hidden; text-align: center; font-family: sans-serif;">
       <div style="background: #2e7d32; color: white; padding: 30px 20px;">
@@ -527,6 +527,7 @@
     </div>
   </div>
   <!-- ================= FIN BLOQUE OFFLINE ================= -->
+
   <!-- FOOTER OBLIGATORIO -->
   <footer class="bqa-footer">
     BQA-ONE © 2026 |
@@ -535,7 +536,7 @@
   <script>
     window.EMPRESA_SESION = "{{ empresa }}";
 
-    // PROTECCIÓN DE MUTACIONES OBLIGATORIA CON window.confirm()
+    // PROTECCIÓN DE MUTACIONES OBLIGATORIA CON window.confirm() (LEY 7)
     function ejecutarAccionConConfirmacion(nombreOperacion, funcionEjecutar) {
       if (window.confirm("¿Está seguro de " + nombreOperacion + "?")) {
         funcionEjecutar();
